@@ -9,6 +9,8 @@ export type Agent = Pick<
   "id" | "name" | "description" | "icon" | "category"
 >
 
+export type WidgetPosition = { x: number; y: number }
+
 type AgentChatState = {
   agents: Agent[]
   loading: boolean
@@ -19,6 +21,8 @@ type AgentChatState = {
   conversationIdByAgent: Record<string, string>
   /** 에이전트별 chat 인스턴스 nonce — "새 대화" 클릭 시 증가시켜 ChatBody를 강제 remount한다 */
   chatVersionByAgent: Record<string, number>
+  /** 위젯 좌상단 좌표(px). null이면 기본 우하단(CSS bottom-6 right-6) */
+  position: WidgetPosition | null
 }
 
 type AgentChatActions = {
@@ -30,6 +34,7 @@ type AgentChatActions = {
   setConversationId: (agentId: string, conversationId: string) => void
   startNewConversation: () => void
   setUnread: (v: boolean) => void
+  setPosition: (pos: WidgetPosition | null) => void
 }
 
 const Ctx = createContext<(AgentChatState & AgentChatActions) | null>(null)
@@ -38,6 +43,7 @@ const STORAGE_KEY = "equria.agent-chat"
 
 type Persisted = {
   selectedAgentId?: string | null
+  position?: WidgetPosition | null
 }
 
 function loadPersisted(): Persisted {
@@ -64,17 +70,19 @@ export function AgentChatProvider({ children }: { children: React.ReactNode }) {
   const [chatVersionByAgent, setChatVersionByAgentState] = useState<
     Record<string, number>
   >({})
+  const [position, setPositionState] = useState<WidgetPosition | null>(null)
 
   useEffect(() => {
     const persisted = loadPersisted()
     if (persisted.selectedAgentId) setSelectedAgentIdState(persisted.selectedAgentId)
+    if (persisted.position) setPositionState(persisted.position)
   }, [])
 
   useEffect(() => {
     if (typeof window === "undefined") return
-    const payload: Persisted = { selectedAgentId }
+    const payload: Persisted = { selectedAgentId, position }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
-  }, [selectedAgentId])
+  }, [selectedAgentId, position])
 
   useEffect(() => {
     let cancelled = false
@@ -117,6 +125,9 @@ export function AgentChatProvider({ children }: { children: React.ReactNode }) {
       prev[agentId] === conversationId ? prev : { ...prev, [agentId]: conversationId }
     )
   }, [])
+  const setPosition = useCallback((pos: WidgetPosition | null) => {
+    setPositionState(pos)
+  }, [])
   const startNewConversation = useCallback(() => {
     if (!selectedAgentId) return
     setConversationIdByAgentState((prev) => {
@@ -142,6 +153,7 @@ export function AgentChatProvider({ children }: { children: React.ReactNode }) {
         selectedAgentId,
         conversationIdByAgent,
         chatVersionByAgent,
+        position,
         open,
         close,
         toggle,
@@ -150,6 +162,7 @@ export function AgentChatProvider({ children }: { children: React.ReactNode }) {
         setConversationId,
         startNewConversation,
         setUnread,
+        setPosition,
       }}
     >
       {children}

@@ -82,6 +82,28 @@ export function ChatList() {
     load()
   }, [load])
 
+  // Realtime 구독: 다른 곳에서 메시지 INSERT/UPDATE가 발생하면 목록 다시 로드.
+  // 새 메시지 도착 시 unread 카운트 증가, 상대가 읽으면 (UPDATE) 감소 즉시 반영.
+  useEffect(() => {
+    if (!meId) return
+    const channel = supabase
+      .channel("dm-list")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "direct_messages" },
+        () => load()
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "direct_messages" },
+        () => load()
+      )
+      .subscribe()
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [supabase, meId, load])
+
   const startedIds = new Set(rooms.map((r) => r.otherId))
   const newContacts = colleagues.filter((c) => !startedIds.has(c.id))
 

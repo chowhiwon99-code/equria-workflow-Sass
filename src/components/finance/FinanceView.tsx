@@ -309,7 +309,7 @@ export function FinanceView() {
                 <th className="px-3 py-2 text-right font-medium">부가세/수수료</th>
                 <th className="px-3 py-2 text-right font-medium">합계</th>
                 <th className="px-3 py-2 font-medium">상태</th>
-                <th className="w-8 px-3 py-2"></th>
+                <th className="w-16 px-3 py-2"></th>
               </tr>
             </thead>
             <tbody>
@@ -341,9 +341,28 @@ export function FinanceView() {
                     )}
                   </td>
                   <td className="px-3 py-2">
-                    <button onClick={() => setEditing(e)} className="text-muted-foreground hover:text-foreground" aria-label="수정">
-                      <Pencil className="size-3.5" />
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                      <button onClick={() => setEditing(e)} className="text-muted-foreground hover:text-foreground" aria-label="수정">
+                        <Pencil className="size-3.5" />
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (!confirm(`이 항목을 삭제할까요?\n(${e.vendor ?? e.description ?? ""} · ${won(e.total_amount)})\n영수증 첨부파일도 함께 삭제됩니다.`)) return
+                          const { error: err } = await supabase.from("finance_entries").delete().eq("id", e.id)
+                          if (err) return setError(err.message)
+                          setSelected((prev) => {
+                            const next = new Set(prev)
+                            next.delete(e.id)
+                            return next
+                          })
+                          load()
+                        }}
+                        className="text-muted-foreground hover:text-red-600"
+                        aria-label="삭제"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
