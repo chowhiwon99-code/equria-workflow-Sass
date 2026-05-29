@@ -47,11 +47,11 @@ export const FEATURES: Feature[] = [
   },
   {
     href: "/agents",
-    label: "AI 에이전트",
-    description: "8개 기본 에이전트 + 직접 만든 커스텀 에이전트와 대화",
+    label: "AI 에이전트 관리",
+    description: "에이전트 빌더 (실제 대화는 좌측 하단 위젯에서)",
     icon: Bot,
-    status: "wip",
-    phase: 2,
+    status: "planned",
+    phase: 3,
   },
   {
     href: "/projects",

@@ -1,0 +1,164 @@
+"use client"
+
+import { createContext, useCallback, useContext, useEffect, useState } from "react"
+import { createClient } from "@/lib/supabase/client"
+import type { Tables } from "@/lib/supabase/types"
+
+export type Agent = Pick<
+  Tables<"agents">,
+  "id" | "name" | "description" | "icon" | "category"
+>
+
+type AgentChatState = {
+  agents: Agent[]
+  loading: boolean
+  isOpen: boolean
+  isExpanded: boolean
+  unread: boolean
+  selectedAgentId: string | null
+  conversationIdByAgent: Record<string, string>
+  /** 에이전트별 chat 인스턴스 nonce — "새 대화" 클릭 시 증가시켜 ChatBody를 강제 remount한다 */
+  chatVersionByAgent: Record<string, number>
+}
+
+type AgentChatActions = {
+  open: () => void
+  close: () => void
+  toggle: () => void
+  setExpanded: (v: boolean) => void
+  setSelectedAgent: (id: string) => void
+  setConversationId: (agentId: string, conversationId: string) => void
+  startNewConversation: () => void
+  setUnread: (v: boolean) => void
+}
+
+const Ctx = createContext<(AgentChatState & AgentChatActions) | null>(null)
+
+const STORAGE_KEY = "equria.agent-chat"
+
+type Persisted = {
+  selectedAgentId?: string | null
+}
+
+function loadPersisted(): Persisted {
+  if (typeof window === "undefined") return {}
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return {}
+    return JSON.parse(raw) as Persisted
+  } catch {
+    return {}
+  }
+}
+
+export function AgentChatProvider({ children }: { children: React.ReactNode }) {
+  const [agents, setAgents] = useState<Agent[]>([])
+  const [loading, setLoading] = useState(true)
+  const [isOpen, setIsOpen] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [unread, setUnread] = useState(false)
+  const [selectedAgentId, setSelectedAgentIdState] = useState<string | null>(null)
+  const [conversationIdByAgent, setConversationIdByAgentState] = useState<
+    Record<string, string>
+  >({})
+  const [chatVersionByAgent, setChatVersionByAgentState] = useState<
+    Record<string, number>
+  >({})
+
+  useEffect(() => {
+    const persisted = loadPersisted()
+    if (persisted.selectedAgentId) setSelectedAgentIdState(persisted.selectedAgentId)
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const payload: Persisted = { selectedAgentId }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
+  }, [selectedAgentId])
+
+  useEffect(() => {
+    let cancelled = false
+    const supabase = createClient()
+    ;(async () => {
+      const { data } = await supabase
+        .from("agents")
+        .select("id, name, description, icon, category")
+        .eq("is_active", true)
+        .eq("is_public", true)
+        .order("created_at", { ascending: true })
+      if (cancelled) return
+      const list = (data ?? []) as Agent[]
+      setAgents(list)
+      setLoading(false)
+      setSelectedAgentIdState((cur) => cur ?? list[0]?.id ?? null)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const open = useCallback(() => {
+    setIsOpen(true)
+    setUnread(false)
+  }, [])
+  const close = useCallback(() => setIsOpen(false), [])
+  const toggle = useCallback(() => {
+    setIsOpen((v) => {
+      if (!v) setUnread(false)
+      return !v
+    })
+  }, [])
+  const setExpanded = useCallback((v: boolean) => setIsExpanded(v), [])
+  const setSelectedAgent = useCallback((id: string) => {
+    setSelectedAgentIdState(id)
+  }, [])
+  const setConversationId = useCallback((agentId: string, conversationId: string) => {
+    setConversationIdByAgentState((prev) =>
+      prev[agentId] === conversationId ? prev : { ...prev, [agentId]: conversationId }
+    )
+  }, [])
+  const startNewConversation = useCallback(() => {
+    if (!selectedAgentId) return
+    setConversationIdByAgentState((prev) => {
+      const next = { ...prev }
+      delete next[selectedAgentId]
+      return next
+    })
+    // 클라이언트 messages 상태도 초기화하기 위해 ChatBody 강제 remount
+    setChatVersionByAgentState((prev) => ({
+      ...prev,
+      [selectedAgentId]: (prev[selectedAgentId] ?? 0) + 1,
+    }))
+  }, [selectedAgentId])
+
+  return (
+    <Ctx.Provider
+      value={{
+        agents,
+        loading,
+        isOpen,
+        isExpanded,
+        unread,
+        selectedAgentId,
+        conversationIdByAgent,
+        chatVersionByAgent,
+        open,
+        close,
+        toggle,
+        setExpanded,
+        setSelectedAgent,
+        setConversationId,
+        startNewConversation,
+        setUnread,
+      }}
+    >
+      {children}
+    </Ctx.Provider>
+  )
+}
+
+export function useAgentChat() {
+  const v = useContext(Ctx)
+  if (!v) throw new Error("useAgentChat must be used inside AgentChatProvider")
+  return v
+}

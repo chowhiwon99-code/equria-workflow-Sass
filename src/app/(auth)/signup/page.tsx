@@ -30,28 +30,37 @@ export default function SignupPage() {
     setError(null)
     setLoading(true)
 
-    // 1) 서버에서 공용 비밀번호 검증 + 계정 생성
-    const result = await signupAction(name, password)
-    if (result.error) {
-      setError(result.error)
+    try {
+      // 1) 서버에서 공용 비밀번호 검증 + 계정 생성
+      const result = await signupAction(name, password)
+      if (result.error) {
+        setError(result.error)
+        setLoading(false)
+        return
+      }
+
+      // 2) 생성 직후 바로 로그인
+      const supabase = createClient()
+      const { error } = await supabase.auth.signInWithPassword({
+        email: nameToEmail(name),
+        password,
+      })
+      if (error) {
+        // 가입은 됐으나 자동 로그인 실패 → 로그인 페이지로
+        router.push("/login")
+        return
+      }
+
+      router.push("/dashboard")
+      router.refresh()
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? `서버 오류가 발생했습니다: ${err.message}`
+          : "서버 오류가 발생했습니다. 관리자에게 문의하세요."
+      )
       setLoading(false)
-      return
     }
-
-    // 2) 생성 직후 바로 로그인
-    const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({
-      email: nameToEmail(name),
-      password,
-    })
-    if (error) {
-      // 가입은 됐으나 자동 로그인 실패 → 로그인 페이지로
-      router.push("/login")
-      return
-    }
-
-    router.push("/dashboard")
-    router.refresh()
   }
 
   return (
