@@ -44,6 +44,13 @@ export function CardsView() {
     load()
   }, [load])
 
+  // 되돌리기/다시실행으로 데이터가 바뀌면 목록 새로고침
+  useEffect(() => {
+    const h = () => load()
+    window.addEventListener("equria:reload", h)
+    return () => window.removeEventListener("equria:reload", h)
+  }, [load])
+
   useEffect(() => {
     setPageCount(1)
   }, [searchText])

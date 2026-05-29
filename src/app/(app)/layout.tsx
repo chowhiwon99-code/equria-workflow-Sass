@@ -4,6 +4,8 @@ import { Sidebar } from "@/components/layout/Sidebar"
 import { Header } from "@/components/layout/Header"
 import { AgentChatProvider } from "@/components/agent-chat/AgentChatContext"
 import { FloatingAgentChat } from "@/components/agent-chat/FloatingAgentChat"
+import { UndoProvider } from "@/components/undo/UndoProvider"
+import { Toaster } from "@/components/ui/sonner"
 
 export default async function AppLayout({
   children,
@@ -25,15 +27,18 @@ export default async function AppLayout({
     .single()
 
   return (
-    <AgentChatProvider>
-      <div className="flex h-screen overflow-hidden">
-        <Sidebar />
-        <div className="flex flex-1 flex-col overflow-hidden">
-          <Header userName={profile?.name ?? "직원"} userId={user.id} />
-          <main className="flex-1 overflow-y-auto p-6">{children}</main>
+    <UndoProvider>
+      <AgentChatProvider>
+        <div className="flex h-screen overflow-hidden">
+          <Sidebar />
+          <div className="flex flex-1 flex-col overflow-hidden">
+            <Header userName={profile?.name ?? "직원"} userId={user.id} />
+            <main className="flex-1 overflow-y-auto p-6">{children}</main>
+          </div>
         </div>
-      </div>
-      <FloatingAgentChat />
-    </AgentChatProvider>
+        <FloatingAgentChat />
+        <Toaster />
+      </AgentChatProvider>
+    </UndoProvider>
   )
 }

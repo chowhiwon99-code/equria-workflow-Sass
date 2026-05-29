@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Modal, fieldClass } from "@/components/shared/Modal"
 import { BackLink } from "@/components/shared/BackLink"
+import { useUndo } from "@/components/undo/UndoProvider"
 import { PROJECT_STATUS, PROJECT_STATUS_ORDER } from "@/lib/projects"
 import { isFigmaUrl, toFigmaDesktopUrl } from "@/lib/figma"
 import type { Project, ProjectStatus, Profile, DriveFile } from "@/types"
@@ -15,6 +16,7 @@ type MemberRow = { id: string; user_id: string; role: string; member: { name: st
 
 export function ProjectDetail({ projectId }: { projectId: string }) {
   const supabase = createClient()
+  const { push } = useUndo()
   const [project, setProject] = useState<(Project & { owner: { name: string } | null }) | null>(null)
   const [members, setMembers] = useState<MemberRow[]>([])
   const [profiles, setProfiles] = useState<Pick<Profile, "id" | "name">[]>([])
@@ -50,20 +52,66 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
   }, [load])
 
   const changeStatus = async (status: ProjectStatus) => {
+    const prev = project?.status as ProjectStatus | undefined
     await supabase.from("projects").update({ status }).eq("id", projectId)
     load()
+    if (prev && prev !== status) {
+      push({
+        label: "프로젝트 상태 변경",
+        undo: async () => {
+          await supabase.from("projects").update({ status: prev }).eq("id", projectId)
+          load()
+        },
+        redo: async () => {
+          await supabase.from("projects").update({ status }).eq("id", projectId)
+          load()
+        },
+      })
+    }
   }
 
   const addMember = async () => {
     if (!addUserId) return
-    await supabase.from("project_members").insert({ project_id: projectId, user_id: addUserId })
+    const userId = addUserId
+    const { data: inserted } = await supabase
+      .from("project_members")
+      .insert({ project_id: projectId, user_id: userId })
+      .select()
+      .single()
     setAddUserId("")
     load()
+    if (inserted) {
+      push({
+        label: "멤버 추가",
+        undo: async () => {
+          await supabase.from("project_members").delete().eq("id", inserted.id)
+          load()
+        },
+        redo: async () => {
+          await supabase.from("project_members").insert(inserted)
+          load()
+        },
+      })
+    }
   }
 
   const removeMember = async (id: string) => {
+    const row = members.find((m) => m.id === id)
     await supabase.from("project_members").delete().eq("id", id)
     load()
+    if (row) {
+      push({
+        label: "멤버 제거",
+        undo: async () => {
+          await supabase.from("project_members").insert({ id: row.id, project_id: projectId, user_id: row.user_id, role: row.role })
+          load()
+        },
+        redo: async () => {
+          await supabase.from("project_members").delete().eq("id", id)
+          load()
+        },
+      })
+    }
   }
 
   if (loading) return <p className="text-sm text-muted-foreground">불러오는 중…</p>
@@ -146,6 +194,7 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
 
 function FilesSection({ projectId }: { projectId: string }) {
   const supabase = createClient()
+  const { push } = useUndo()
   const [files, setFiles] = useState<DriveFile[]>([])
   const [showAdd, setShowAdd] = useState(false)
 
@@ -163,8 +212,22 @@ function FilesSection({ projectId }: { projectId: string }) {
   }, [load])
 
   const remove = async (id: string) => {
+    const row = files.find((f) => f.id === id)
     await supabase.from("files").delete().eq("id", id)
     load()
+    if (row) {
+      push({
+        label: "파일/링크 삭제",
+        undo: async () => {
+          await supabase.from("files").insert(row)
+          load()
+        },
+        redo: async () => {
+          await supabase.from("files").delete().eq("id", id)
+          load()
+        },
+      })
+    }
   }
 
   return (
@@ -214,6 +277,7 @@ function FilesSection({ projectId }: { projectId: string }) {
       {showAdd && (
         <AddFileModal
           projectId={projectId}
+          reload={load}
           onClose={() => setShowAdd(false)}
           onAdded={() => {
             setShowAdd(false)
@@ -227,14 +291,17 @@ function FilesSection({ projectId }: { projectId: string }) {
 
 function AddFileModal({
   projectId,
+  reload,
   onClose,
   onAdded,
 }: {
   projectId: string
+  reload: () => void
   onClose: () => void
   onAdded: () => void
 }) {
   const supabase = createClient()
+  const { push } = useUndo()
   const [name, setName] = useState("")
   const [url, setUrl] = useState("")
   const [saving, setSaving] = useState(false)
@@ -249,15 +316,32 @@ function AddFileModal({
     setError(null)
     const { data: auth } = await supabase.auth.getUser()
     const source = isFigmaUrl(url) ? "figma" : "link"
-    const { error: insErr } = await supabase.from("files").insert({
-      name: name.trim(),
-      web_view_link: url.trim(),
-      source,
-      project_id: projectId,
-      owner_id: auth.user?.id ?? null,
-    })
+    const { data: inserted, error: insErr } = await supabase
+      .from("files")
+      .insert({
+        name: name.trim(),
+        web_view_link: url.trim(),
+        source,
+        project_id: projectId,
+        owner_id: auth.user?.id ?? null,
+      })
+      .select()
+      .single()
     setSaving(false)
     if (insErr) return setError(insErr.message)
+    if (inserted) {
+      push({
+        label: "파일/링크 추가",
+        undo: async () => {
+          await supabase.from("files").delete().eq("id", inserted.id)
+          reload()
+        },
+        redo: async () => {
+          await supabase.from("files").insert(inserted)
+          reload()
+        },
+      })
+    }
     onAdded()
   }
 

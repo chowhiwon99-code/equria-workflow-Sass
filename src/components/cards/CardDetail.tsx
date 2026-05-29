@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { BackLink } from "@/components/shared/BackLink"
+import { useUndo } from "@/components/undo/UndoProvider"
 import type { BusinessCard } from "@/types"
 
 const FIELDS: { key: keyof BusinessCard; label: string }[] = [
@@ -25,6 +26,7 @@ type CardRow = BusinessCard & { owner: { name: string } | null }
 export function CardDetail({ cardId }: { cardId: string }) {
   const supabase = createClient()
   const router = useRouter()
+  const { push } = useUndo()
   const [card, setCard] = useState<CardRow | null>(null)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -48,7 +50,20 @@ export function CardDetail({ cardId }: { cardId: string }) {
   }, [supabase, cardId])
 
   const remove = async () => {
+    if (!card) return
+    // owner 조인 필드를 제외한 원본 컬럼만 보존 (되돌리기 시 재삽입용)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { owner, ...row } = card
     await supabase.from("business_cards").delete().eq("id", cardId)
+    push({
+      label: "명함 삭제",
+      undo: async () => {
+        await supabase.from("business_cards").insert(row)
+      },
+      redo: async () => {
+        await supabase.from("business_cards").delete().eq("id", cardId)
+      },
+    })
     router.push("/cards")
   }
 

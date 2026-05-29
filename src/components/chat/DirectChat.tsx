@@ -11,6 +11,12 @@ import { fieldClass } from "@/components/shared/Modal"
 import type { DirectMessage } from "@/types"
 
 const URL_SPLIT_RE = /(https?:\/\/[^\s]+)/g
+const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|bmp|svg|avif|heic|heif)$/i
+
+/** 첨부 파일명이 이미지 확장자인지 */
+function isImageAttachment(name: string | null | undefined): boolean {
+  return !!name && IMAGE_EXT_RE.test(name)
+}
 
 /** 메시지 본문 안의 URL을 클릭 가능한 링크로 렌더 */
 function renderContent(text: string, mine: boolean) {
@@ -92,14 +98,11 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
       setMessages(list)
       void resolveAttachments(list)
 
-      // 나와의 채팅이 아니면 상대가 보낸 안 읽은 메시지를 읽음 처리
+      // 나와의 채팅이 아니면 상대 메시지 + 관련 알림을 읽음 처리.
+      // SECURITY DEFINER RPC 로 처리해 RLS/세션 변수를 배제하고 한 번에 갱신한다.
       if (me && me !== otherUserId) {
-        void supabase
-          .from("direct_messages")
-          .update({ read_at: new Date().toISOString() })
-          .eq("conversation_id", convId)
-          .neq("sender_id", me)
-          .is("read_at", null)
+        const { error: readErr } = await supabase.rpc("mark_dm_read", { conv_id: convId })
+        if (readErr) console.error("mark_dm_read 실패:", readErr.message)
       }
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -117,8 +120,9 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
           const next = payload.new as DirectMessage
           setMessages((prev) => (prev.some((m) => m.id === next.id) ? prev : [...prev, next]))
           void resolveAttachments([next])
+          // 상대 메시지면 즉시 읽음 처리 (RPC — .then 으로 실제 요청 전송)
           if (next.sender_id !== meId) {
-            void supabase.from("direct_messages").update({ read_at: new Date().toISOString() }).eq("id", next.id).is("read_at", null)
+            void supabase.rpc("mark_dm_read", { conv_id: conversationId }).then(() => {})
           }
         }
       )
@@ -202,26 +206,49 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
           return (
             <div key={m.id} className={cn("flex items-end gap-1", mine ? "justify-end" : "justify-start")}>
               {mine && !isSelf && m.read_at === null && <span className="mb-0.5 shrink-0 text-[10px] text-amber-500">1</span>}
-              <div
-                className={cn(
-                  "max-w-[70%] rounded-2xl px-3 py-1.5 text-sm break-words",
-                  mine ? "bg-primary text-primary-foreground" : "bg-muted"
-                )}
-              >
-                {m.attachment_url ? (
-                  <a
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={cn("inline-flex items-center gap-1.5 underline-offset-2 hover:underline", !url && "pointer-events-none opacity-60")}
-                  >
-                    <FileText className="size-3.5 shrink-0" />
-                    {m.attachment_name ?? "첨부파일"}
-                  </a>
-                ) : (
-                  <span className="whitespace-pre-wrap">{renderContent(m.content, mine)}</span>
-                )}
-              </div>
+              {m.attachment_url && isImageAttachment(m.attachment_name) ? (
+                // 이미지 첨부 — 파일명 대신 썸네일을 바로 렌더 (클릭 시 원본 새 탭)
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={cn("block max-w-[70%] overflow-hidden rounded-2xl", !url && "pointer-events-none")}
+                >
+                  {url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={url}
+                      alt={m.attachment_name ?? "이미지"}
+                      className="max-h-64 w-auto rounded-2xl object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-32 w-32 items-center justify-center bg-muted text-muted-foreground">
+                      <Loader2 className="size-4 animate-spin" />
+                    </div>
+                  )}
+                </a>
+              ) : (
+                <div
+                  className={cn(
+                    "max-w-[70%] rounded-2xl px-3 py-1.5 text-sm break-words",
+                    mine ? "bg-primary text-primary-foreground" : "bg-muted"
+                  )}
+                >
+                  {m.attachment_url ? (
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={cn("inline-flex items-center gap-1.5 underline-offset-2 hover:underline", !url && "pointer-events-none opacity-60")}
+                    >
+                      <FileText className="size-3.5 shrink-0" />
+                      {m.attachment_name ?? "첨부파일"}
+                    </a>
+                  ) : (
+                    <span className="whitespace-pre-wrap">{renderContent(m.content, mine)}</span>
+                  )}
+                </div>
+              )}
             </div>
           )
         })}

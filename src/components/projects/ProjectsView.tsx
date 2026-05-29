@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Modal, fieldClass } from "@/components/shared/Modal"
+import { useUndo } from "@/components/undo/UndoProvider"
 import { PROJECT_STATUS, PROJECT_STATUS_ORDER } from "@/lib/projects"
 import type { Project, ProjectStatus, Profile } from "@/types"
 
@@ -47,6 +48,13 @@ export function ProjectsView() {
 
   useEffect(() => {
     load()
+  }, [load])
+
+  // 되돌리기/다시실행 반영
+  useEffect(() => {
+    const h = () => load()
+    window.addEventListener("equria:reload", h)
+    return () => window.removeEventListener("equria:reload", h)
   }, [load])
 
   useEffect(() => {
@@ -181,6 +189,7 @@ function CreateProjectModal({
   onCreated: () => void
 }) {
   const supabase = createClient()
+  const { push } = useUndo()
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [status, setStatus] = useState<ProjectStatus>("planned")
@@ -203,19 +212,34 @@ function CreateProjectModal({
       setSaving(false)
       return
     }
-    const { error: insErr } = await supabase.from("projects").insert({
-      name: name.trim(),
-      description: description.trim() || null,
-      status,
-      owner_id: ownerId || null,
-      start_date: startDate || null,
-      due_date: dueDate || null,
-      created_by: auth.user.id,
-    })
+    const { data: inserted, error: insErr } = await supabase
+      .from("projects")
+      .insert({
+        name: name.trim(),
+        description: description.trim() || null,
+        status,
+        owner_id: ownerId || null,
+        start_date: startDate || null,
+        due_date: dueDate || null,
+        created_by: auth.user.id,
+      })
+      .select()
+      .single()
     setSaving(false)
     if (insErr) {
       setError(insErr.message)
       return
+    }
+    if (inserted) {
+      push({
+        label: "프로젝트 생성",
+        undo: async () => {
+          await supabase.from("projects").delete().eq("id", inserted.id)
+        },
+        redo: async () => {
+          await supabase.from("projects").insert(inserted)
+        },
+      })
     }
     onCreated()
   }

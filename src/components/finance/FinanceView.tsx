@@ -7,6 +7,7 @@ import { uploadImage } from "@/lib/upload"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Modal, fieldClass } from "@/components/shared/Modal"
+import { useUndo } from "@/components/undo/UndoProvider"
 import { categoriesFor, computeAmounts, won, EXPENSE_CATEGORIES, REVENUE_CATEGORIES } from "@/lib/finance"
 import { downloadCsv, todayStamp } from "@/lib/csv"
 import type { FinanceEntry, TaxInvoice } from "@/types"
@@ -17,6 +18,7 @@ const PAGE_SIZE = 50
 
 export function FinanceView() {
   const supabase = createClient()
+  const { push } = useUndo()
   const [entries, setEntries] = useState<FinanceEntry[]>([])
   const [invoices, setInvoices] = useState<TaxInvoice[]>([])
   const [loading, setLoading] = useState(true)
@@ -157,10 +159,29 @@ export function FinanceView() {
 
   const deleteSelected = async () => {
     if (selected.size === 0) return
-    if (!confirm(`선택한 ${selected.size}건을 삭제할까요? (영수증 첨부파일도 함께 삭제됩니다)`)) return
+    if (!confirm(`선택한 ${selected.size}건을 삭제할까요?`)) return
     setError(null)
-    const { error: err } = await supabase.from("finance_entries").delete().in("id", [...selected])
+    const ids = [...selected]
+    // 되돌리기로 복구할 수 있도록 삭제 전 전체 행을 확보 (영수증 파일은 보존)
+    const { data: rows } = await supabase.from("finance_entries").select("*").in("id", ids)
+    const { error: err } = await supabase.from("finance_entries").delete().in("id", ids)
     if (err) return setError(err.message)
+    if (rows && rows.length) {
+      push({
+        label: `${rows.length}건 삭제`,
+        undo: async () => {
+          await supabase.from("finance_entries").insert(rows)
+          load()
+        },
+        redo: async () => {
+          await supabase
+            .from("finance_entries")
+            .delete()
+            .in("id", rows.map((r) => r.id))
+          load()
+        },
+      })
+    }
     setSelected(new Set())
     load()
   }
@@ -181,7 +202,8 @@ export function FinanceView() {
   const net = totalRevenue - totalExpense
   const expenseByCat = totals.byCat
   const hasMore = entries.length < totalCount
-  const allCategories = [...EXPENSE_CATEGORIES, ...REVENUE_CATEGORIES]
+  // 비용·매출 분류에 "기타" 등 중복 항목이 있어 Set 으로 중복 제거 (select key 충돌 방지)
+  const allCategories = [...new Set([...EXPENSE_CATEGORIES, ...REVENUE_CATEGORIES])]
 
   return (
     <div className="flex flex-col gap-5">
@@ -333,7 +355,24 @@ export function FinanceView() {
                   <td className="px-3 py-2 text-right font-medium">{won(e.total_amount)}</td>
                   <td className="px-3 py-2">
                     {e.status === "draft" ? (
-                      <button onClick={() => supabase.from("finance_entries").update({ status: "confirmed" }).eq("id", e.id).then(load)} className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700 hover:bg-amber-200">
+                      <button
+                        onClick={async () => {
+                          await supabase.from("finance_entries").update({ status: "confirmed" }).eq("id", e.id)
+                          push({
+                            label: "확정 처리",
+                            undo: async () => {
+                              await supabase.from("finance_entries").update({ status: "draft" }).eq("id", e.id)
+                              load()
+                            },
+                            redo: async () => {
+                              await supabase.from("finance_entries").update({ status: "confirmed" }).eq("id", e.id)
+                              load()
+                            },
+                          })
+                          load()
+                        }}
+                        className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700 hover:bg-amber-200"
+                      >
                         검토→확정
                       </button>
                     ) : (
@@ -347,9 +386,20 @@ export function FinanceView() {
                       </button>
                       <button
                         onClick={async () => {
-                          if (!confirm(`이 항목을 삭제할까요?\n(${e.vendor ?? e.description ?? ""} · ${won(e.total_amount)})\n영수증 첨부파일도 함께 삭제됩니다.`)) return
+                          if (!confirm(`이 항목을 삭제할까요?\n(${e.vendor ?? e.description ?? ""} · ${won(e.total_amount)})`)) return
                           const { error: err } = await supabase.from("finance_entries").delete().eq("id", e.id)
                           if (err) return setError(err.message)
+                          push({
+                            label: "항목 삭제",
+                            undo: async () => {
+                              await supabase.from("finance_entries").insert(e)
+                              load()
+                            },
+                            redo: async () => {
+                              await supabase.from("finance_entries").delete().eq("id", e.id)
+                              load()
+                            },
+                          })
                           setSelected((prev) => {
                             const next = new Set(prev)
                             next.delete(e.id)
@@ -416,6 +466,7 @@ export function FinanceView() {
       {(creating || editing) && (
         <FinanceEntryModal
           entry={editing}
+          reload={load}
           onClose={() => {
             setCreating(false)
             setEditing(null)
@@ -442,14 +493,17 @@ function SummaryCard({ label, value, className }: { label: string; value: string
 
 function FinanceEntryModal({
   entry,
+  reload,
   onClose,
   onSaved,
 }: {
   entry: FinanceEntry | null
+  reload: () => void
   onClose: () => void
   onSaved: () => void
 }) {
   const supabase = createClient()
+  const { push } = useUndo()
   const [kind, setKind] = useState<Kind>((entry?.kind as Kind) ?? "expense")
   const [entryDate, setEntryDate] = useState(entry?.entry_date ?? new Date().toISOString().slice(0, 10))
   const [category, setCategory] = useState(entry?.category ?? "")
@@ -495,11 +549,56 @@ function FinanceEntryModal({
       source: "manual" as const,
       status: "confirmed" as const,
     }
-    const { error: err } = entry
-      ? await supabase.from("finance_entries").update(payload).eq("id", entry.id)
-      : await supabase.from("finance_entries").insert({ ...payload, created_by: auth.user.id })
-    setSaving(false)
-    if (err) return setError(err.message)
+    if (entry) {
+      // 수정 — 되돌리기 위해 변경된 컬럼의 이전 값을 보존
+      const before = {
+        kind: entry.kind,
+        entry_date: entry.entry_date,
+        category: entry.category,
+        vendor: entry.vendor,
+        quantity: entry.quantity,
+        unit_price: entry.unit_price,
+        amount: entry.amount,
+        tax_amount: entry.tax_amount,
+        fee_amount: entry.fee_amount,
+        total_amount: entry.total_amount,
+      }
+      const { error: err } = await supabase.from("finance_entries").update(payload).eq("id", entry.id)
+      setSaving(false)
+      if (err) return setError(err.message)
+      push({
+        label: "항목 수정",
+        undo: async () => {
+          await supabase.from("finance_entries").update(before).eq("id", entry.id)
+          reload()
+        },
+        redo: async () => {
+          await supabase.from("finance_entries").update(payload).eq("id", entry.id)
+          reload()
+        },
+      })
+    } else {
+      const { data: inserted, error: err } = await supabase
+        .from("finance_entries")
+        .insert({ ...payload, created_by: auth.user.id })
+        .select()
+        .single()
+      setSaving(false)
+      if (err) return setError(err.message)
+      if (inserted) {
+        push({
+          label: "항목 추가",
+          undo: async () => {
+            await supabase.from("finance_entries").delete().eq("id", inserted.id)
+            reload()
+          },
+          redo: async () => {
+            await supabase.from("finance_entries").insert(inserted)
+            reload()
+          },
+        })
+      }
+    }
     onSaved()
   }
 

@@ -1005,6 +1005,7 @@ export type Database = {
         Args: { other_user: string }
         Returns: string
       }
+      mark_dm_read: { Args: { conv_id: string }; Returns: number }
     }
     Enums: {
       [_ in never]: never
