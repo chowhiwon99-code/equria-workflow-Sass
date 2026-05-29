@@ -2,6 +2,9 @@
 
 > 이 파일은 Claude Code가 프로젝트 세션마다 가장 먼저 읽는 핵심 컨텍스트입니다.
 > 코드 작성 전 반드시 이 파일 전체를 참고하세요.
+>
+> ⚠️ **AI 채팅/스트리밍/Supabase 코드 작성 전 `.claude/skills/latest-stack.md`를 먼저 확인.**
+> 실제 설치된 AI SDK v6 등 최신 패턴이 검증돼 있으며, 라이브러리 API가 불확실하면 **context7 MCP**로 최신 문서를 조회한다.
 
 ---
 
@@ -40,7 +43,7 @@
 
 | 레이어 | 기술 | 버전 | 이유 |
 |--------|------|------|------|
-| 프레임워크 | Next.js | 14 (App Router) | 서버/클라이언트 분리, Vercel 배포 최적화 |
+| 프레임워크 | Next.js | 16.x (App Router) | 서버/클라이언트 분리, Vercel 배포 최적화 (React 19) |
 | 스타일 | TailwindCSS + shadcn/ui | latest | 빠른 UI 구성 |
 | 인증/DB | Supabase | latest | Auth + PostgreSQL + Realtime + Storage |
 | AI 엔진 | Anthropic Claude API | claude-sonnet-4-6 (기본) / claude-opus-4-7 (복잡) | 성능/비용 균형 |
@@ -198,7 +201,7 @@ Body: { messages: UIMessage[], conversationId?: string }   ← useChat가 전송
 3. conversationId 없으면 conversations insert로 새 세션 생성
 4. 토큰 절약: messages 최근 10개만 모델에 전달 (슬라이딩 윈도우)
 5. streamText({ model: anthropic(model), system, messages, maxTokens, temperature })
-6. result.toDataStreamResponse() 반환  (useChat가 파싱)
+6. result.toUIMessageStreamResponse() 반환  (useChat가 파싱) ※ AI SDK v6
 7. onFinish 콜백에서 messages + agent_usage 테이블에 저장
 주의: export const maxDuration = 60 / export const runtime = 'nodejs' 선언 필수
 ```
@@ -250,7 +253,7 @@ Phase 6 [워크플로우] — 에이전트 체이닝, 자동화
 - [ ] `ANTHROPIC_API_KEY`가 서버 코드에서만 쓰이는가?
 - [ ] Supabase 쿼리에 `.from('테이블')` 후 적절한 RLS 정책이 있는가?
 - [ ] `createServerClient`는 서버 컴포넌트/API route에서만, `createBrowserClient`는 클라이언트 컴포넌트에서만
-- [ ] 스트리밍 응답은 `streamText` + `toDataStreamResponse()` 사용 (클라이언트는 `useChat`)
+- [ ] 스트리밍 응답은 `streamText` + `toUIMessageStreamResponse()` 사용 (클라이언트는 `@ai-sdk/react`의 `useChat`) — 상세는 latest-stack.md
 - [ ] 에이전트 채팅 API에서 agent_versions의 `is_current = true` 필터 적용
 - [ ] 새 에이전트 버전 생성 시 이전 버전 `is_current = false` 업데이트 (트리거가 자동 처리)
 - [ ] 모델 호출에 `max_tokens`, `temperature`를 agent_versions 값으로 전달했는가?

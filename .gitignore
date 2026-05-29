@@ -19,6 +19,9 @@ next-env.d.ts
 # supabase
 /supabase/.temp
 
+# claude code (개인 권한 설정만 제외, .claude/skills 는 공유)
+/.claude/settings.local.json
+
 # misc
 .DS_Store
 *.pem

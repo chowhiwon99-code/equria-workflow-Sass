@@ -366,7 +366,11 @@ export const legalReviewAgent = {
 
 ## 5. Claude API 연동 (Vercel AI SDK)
 
-> 스트리밍은 **Vercel AI SDK로 통일**한다. 서버는 `streamText` + `toDataStreamResponse()`,
+> ⚠️ **이 절의 코드는 AI SDK v4 기준의 개념 설명용이다. 실제 설치본은 v6이며 API가 다르다.**
+> **구현 시 반드시 `.claude/skills/latest-stack.md`의 검증된 v6 패턴을 따른다**
+> (`toUIMessageStreamResponse` / `convertToModelMessages` / `maxOutputTokens` / `@ai-sdk/react`의 `useChat` + `sendMessage`).
+>
+> 스트리밍은 **Vercel AI SDK로 통일**한다. 서버는 `streamText` + 스트림 응답,
 > 클라이언트는 `useChat` 훅을 직접 사용한다. (자작 SSE 파서 사용 금지)
 
 ### 5.1 Anthropic Provider 초기화
