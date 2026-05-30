@@ -54,7 +54,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
 
   const isSelf = meId != null && otherUserId === meId
 
-  // 첨부 메시지의 서명 URL 생성 (본인 폴더 파일만 접근 가능 — 나와의 채팅에 최적)
+  // 첨부 메시지의 서명 URL 생성 (본인 파일 + 대화 참여자가 받은 파일 모두 — chat-files RLS 010)
   const resolveAttachments = useCallback(
     async (msgs: DirectMessage[]) => {
       const targets = msgs.filter((m) => m.attachment_url && !fileUrls[m.id])
@@ -62,10 +62,12 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
       const entries = await Promise.all(
         targets.map(async (m) => {
           const { data } = await supabase.storage.from("chat-files").createSignedUrl(m.attachment_url!, 3600)
-          return [m.id, data?.signedUrl ?? ""] as const
+          return [m.id, data?.signedUrl] as const
         })
       )
-      setFileUrls((prev) => ({ ...prev, ...Object.fromEntries(entries) }))
+      // 성공한 것만 캐시 — 실패(undefined)는 남겨 두어 다음 기회에 재시도 가능
+      const resolved = Object.fromEntries(entries.filter(([, url]) => url)) as Record<string, string>
+      if (Object.keys(resolved).length > 0) setFileUrls((prev) => ({ ...prev, ...resolved }))
     },
     [supabase, fileUrls]
   )
@@ -140,6 +142,32 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, conversationId, meId])
+
+  // 탭 복귀/포커스 시 읽음상태·새 메시지 재동기화 (Realtime 누락 대비 — 카톡식 즉시성 보강)
+  useEffect(() => {
+    if (!conversationId || !meId) return
+    const sync = async () => {
+      if (document.visibilityState !== "visible") return
+      const { data: msgs } = await supabase
+        .from("direct_messages")
+        .select("*")
+        .eq("conversation_id", conversationId)
+        .order("created_at", { ascending: true })
+      const list = msgs ?? []
+      setMessages(list)
+      void resolveAttachments(list)
+      if (meId !== otherUserId) {
+        void supabase.rpc("mark_dm_read", { conv_id: conversationId }).then(() => {})
+      }
+    }
+    window.addEventListener("focus", sync)
+    document.addEventListener("visibilitychange", sync)
+    return () => {
+      window.removeEventListener("focus", sync)
+      document.removeEventListener("visibilitychange", sync)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase, conversationId, meId, otherUserId])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
