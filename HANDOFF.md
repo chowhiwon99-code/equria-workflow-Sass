@@ -1,13 +1,26 @@
 # HANDOFF — EQURIA Workspace
 
 > 다음 세션 시작 시 이 파일 + `CLAUDE.md` + `.claude/skills/latest-stack.md`를 **순서대로** 먼저 읽어주세요.
-> 최종 업데이트: 2026-05-30
+> 최종 업데이트: 2026-05-30 (세션 2)
 
 ---
 
 ## 🎯 한 줄 요약
 
-**Phase 1 + 자체기능 5종 + 에이전트 허브(플로팅 위젯) 운영 중. 이번 세션(05-30)에 사용자 보고 버그 4종을 근본 원인까지 규명해 수정하고, 신규로 ⌘Z/⌘⇧Z 전역 Undo/Redo 시스템을 데이터 기능 전반에 구축.** `tsc` 0 에러, dev 정상 컴파일. DB 마이그레이션 008·009 원격 적용 완료. **⚠️ 이번 세션 변경분은 아직 git 미커밋(working tree)** — 커밋 권장. 운영 사이트 `https://equria-workflow-sass.vercel.app`.
+**Phase 1 + 자체기능 5종 + 에이전트 허브 운영 중. 세션2(05-30 오후)에 ① DM 상대 이미지 무한로딩(chat-files RLS) + 명함 삭제 차단(1-B) 근본 수정 ② 휴지통(soft-delete) 도입 ③ 마이그레이션 SSOT 복구(direct_messages 파일화) ④ 보안 하드닝(advisor WARN ~25→3) ⑤ DM 메시지 수정/삭제 신기능 + "꼬임 방지" 설계원칙(`safe-changes.md`) 수립.** `tsc` 0 에러. DB 마이그레이션 `001a`·`010`~`013` 원격 적용 완료. UI 검증 완료(이미지·읽음"1"·DM 수정/삭제). **⚠️ 세션2 커밋 7개 = 로컬 보관(미푸시). push 시 운영 자동배포.** 남은 일: service_role rotation(3-B), 휴지통 purge(후속), Phase 3 빌더(4-B). 운영 `https://equria-workflow-sass.vercel.app`.
+
+---
+
+## 🆕 세션2 (2026-05-30 오후) 작업 — 코드+DB 반영 완료, 로컬 커밋(미푸시)
+
+> 작업 원칙 신설: **`.claude/skills/safe-changes.md`** (꼬임 방지 — 추가는 자유/파괴는 검증 후/모든 변경 되돌림·재현 가능). CLAUDE.md 상단에서 최우선 참조. 사용자 지정.
+
+1. **DM 상대 이미지 무한로딩 수정** ✅검증 — `chat-files` SELECT RLS가 본인폴더 only라 수신자가 서명URL 미발급 → "대화 참여자 허용" 정책 추가(`010`). 실패 서명URL 빈문자 캐시 제거 + 포커스/visibility 재동기화. DB 시뮬+UI 확인.
+2. **DM 읽음 "1"** ✅검증 — 백엔드 정상(mark_dm_read·publication·RLS) 확인. 라이브 트리거로 "1" 즉시 제거 확인. 탭복귀 재동기화 보강.
+3. **휴지통(soft-delete) 도입**(`011`) ✅검증 — finance_entries/business_cards에 `deleted_at`. 삭제=마킹, 목록·합계·CSV에 `deleted_at is null` 필터, Undo=토글. **명함 삭제 차단 버그(1-B) 동시 해결**(하드삭제 트리거 `before_delete_business_cards`/`cleanup_card_storage` 제거). RLS 시뮬 검증.
+4. **마이그레이션 SSOT 복구**(`001a`) — direct_conversations/direct_messages 기반 DDL을 라이브 introspection으로 파일화(원래 MCP직접적용분). 002보다 먼저 정렬되게 `001a` 네이밍. begin/rollback 문법검증(라이브 무변경).
+5. **보안 하드닝**(`012`) ✅검증 — 함수 7종 `search_path=''` 고정 + 트리거함수 execute 회수 + 정상 RPC anon차단/authenticated만. 롤백 트랜잭션으로 트리거 정상동작 확인. advisor WARN ~25→3(남은 3 = 정상 RPC 2 + leaked password).
+6. **DM 메시지 수정/삭제 신기능**(`013`) ✅검증 — 본인 메시지 호버 수정(텍스트, Enter저장/Esc취소, "수정됨")·삭제(soft-delete, "삭제된 메시지입니다"). `dm_update` RLS를 sender 전용으로. ChatList 미리보기/안읽음 반영. Undo 연동. RLS 시뮬+UI 확인.
 
 ---
 
@@ -84,7 +97,7 @@
 | # | 파일 | 핵심 |
 |---|------|------|
 | 001 | `001_initial_schema.sql` | 9테이블 + RLS + 트리거 + 시드 8 에이전트 |
-| — | **(파일 없음, MCP 직접 적용)** ⚠️ | `direct_conversations`/`direct_messages` + `get_or_create_direct_conversation` RPC + Realtime. **여전히 파일 미작성 — 신규 환경 셋업 위해 파일화 필요** |
+| 001a | `001a_direct_messages_baseline.sql` 🆕 | `direct_conversations`/`direct_messages` 기반 DDL + RLS + touch 트리거 + realtime. 원래 MCP직접적용분 → **세션2에 파일화(SSOT 복구 완료)**. 002보다 먼저 정렬되게 `001a` 네이밍 |
 | 002 | `002_features.sql` | 8테이블 추가 + 알림 트리거 + 인덱스 + Storage 버킷 |
 | 003 | `003_finance_qty.sql` | quantity/unit_price/fee_amount |
 | 004 | `004_files_source_link_figma.sql` | files.source 확장 |
@@ -92,7 +105,11 @@
 | 006 | `006_storage_cascade_and_notif_cleanup.sql` | BEFORE DELETE 트리거 + pg_cron 30일 알림 정리 ※일부 트리거는 008에서 제거됨 |
 | 007 | `007_replica_identity_full.sql` | `direct_messages`/`notifications` REPLICA IDENTITY FULL |
 | 008 | `008_drop_storage_delete_triggers.sql` 🆕 | `cleanup_finance_storage`/`cleanup_chat_attachment` 트리거·함수 제거(storage 직접 DELETE 차단 회피) + `finance_entries` update/delete RLS를 authenticated 전체로 완화 |
-| 009 | `009_mark_dm_read_rpc.sql` 🆕 | DM 읽음 처리 RPC `mark_dm_read(conv_id)` (SECURITY DEFINER) |
+| 009 | `009_mark_dm_read_rpc.sql` | DM 읽음 처리 RPC `mark_dm_read(conv_id)` (SECURITY DEFINER) |
+| 010 | `010_chat_files_participant_read.sql` 🆕 | chat-files SELECT RLS를 대화 참여자 허용(상대 이미지 표시) + attachment_url 부분 인덱스 |
+| 011 | `011_soft_delete_trash.sql` 🆕 | finance_entries/business_cards `deleted_at`(휴지통) + 명함 하드삭제 트리거 제거(1-B 해결) + 활성행 부분 인덱스 |
+| 012 | `012_security_hardening.sql` 🆕 | 함수 7종 `search_path=''` 고정 + 트리거함수 execute 회수 + 정상 RPC anon차단/authenticated만 |
+| 013 | `013_dm_edit_delete.sql` 🆕 | direct_messages `edited_at`/`deleted_at` + `dm_update` RLS를 sender 전용으로 |
 
 **Storage 버킷**: `receipts` / `business-cards` / `chat-files` (※ 행 삭제 시 자동 cascade 안 됨 — 008로 트리거 제거됨)
 **Realtime publication**: `direct_messages`, `notifications`
@@ -140,23 +157,21 @@ supabase/migrations/001~009
 
 | 항목 | 상태 |
 |------|------|
-| ① DM unread "빨간 숫자" 사라짐 | **근본 수정**(mark_dm_read RPC). DB 검증 완료. **사용자 UI 검증만 남음** — 대화 열었다 나오면 배지 사라지는지 |
-| ② ChatList unread 배지 갱신 | ①과 동일 메커니즘. read_at 정상 갱신되면 목록 재마운트 시 반영 |
-| ③ 우하단 위젯 드래그 이동 | **이번 세션 미작업 → 여전히 미검증**. 드래그/클릭 분리, 헤더 드래그, 더블클릭 리셋, localStorage 위치 유지 동작 확인 필요 |
-| ④ Finance 행 삭제 | **근본 수정 완료**(트리거 제거 + RLS 완화). DB 검증 완료 |
+| ① DM unread "빨간 숫자(1)" 사라짐 | ✅ **UI 검증 완료**(세션2) — 라이브 읽음처리로 "1" 즉시 제거 확인 + 탭복귀 재동기화 보강 |
+| ② ChatList unread 배지 갱신 | ✅ ①과 동일 메커니즘. read_at/realtime 정상 |
+| ③ 우하단 위젯 드래그 이동 | ⬜ **여전히 미검증**(세션2 미작업). 드래그/클릭 분리·헤더 드래그·더블클릭 리셋·localStorage 확인 필요 |
+| ④ Finance 행 삭제 | ✅ **soft-delete(휴지통) 전환 + DB 검증**(세션2). UI는 데이터 0건이라 미검증 — 데이터 생기면 단건/다건 삭제+⌘Z 확인 |
+| (신규) DM 상대 이미지 / DM 수정·삭제 | ✅ **UI 검증 완료**(세션2) |
 
 ---
 
 ## 🔴 다음 세션 우선순위
 
-1. **이번 세션 변경분 git 커밋** (위 미커밋 목록). 메시지 예: `feat: 채팅 이미지 인라인 + DM 읽음 RPC + Finance 삭제 트리거 fix + 캘린더 기간드래그/연속막대 + 전역 Undo/Redo`
-2. **UI 검증** (Dia 새로고침 후):
-   - DM: 이동규/김건 대화 각각 열었다 나오기 → 빨간 배지 사라짐
-   - Finance: 행 단건/다건 삭제 → 즉시 사라짐
-   - 캘린더: 며칠 드래그 → 연속 막대 + 한국어 날짜 모달
-   - 위젯 드래그(③, 미검증 이월)
-   - Undo: 각 기능 생성/삭제 후 ⌘Z(무음 복구) / ⌘⇧Z
-3. 검증 실패 시: 브라우저 콘솔 + Supabase Logs 확인. DM은 `mark_dm_read 실패` 콘솔 로그 확인.
+1. **세션2 커밋 push 여부 결정** — 로컬 커밋 7개(`9396b12`~). push 시 운영 자동배포. DB 마이그레이션(`001a`·010~013)은 이미 원격 적용됨 → 운영은 현재 "옛 코드 + 새 스키마"(안 깨짐, 신기능 미반영). push하면 정렬.
+2. **트랙3-B service_role rotation** (사용자 직접) — 레거시 키(`eyJ...`) 노출 → 신규 secret/publishable로 이전 후 레거시 비활성화. 순서: 새 키 복사 → `.env.local`+Vercel 갱신(시크릿은 채팅에 붙이지 말 것) → redeploy → 검증 → 레거시 disable.
+3. **트랙3-A part ii: 휴지통 purge** (후속) — `deleted_at` 경과분 영구삭제 메커니즘. pg_cron은 storage 직접삭제 불가 → Edge Function(service_role)으로 행+Storage 동시 삭제 + pg_net 호출. 현재는 휴지통에 영구 보관(안전).
+4. **트랙4-B Phase 3 에이전트 빌더** — 착수 전 **사용자와 기획작업 필수**(약속). /agents/new + POST /api/agents + 리스트 + 버전 이력.
+5. (이월) 위젯 드래그(③) UI 검증 / Finance 삭제 UI 검증(데이터 생기면).
 
 ---
 
@@ -165,9 +180,9 @@ supabase/migrations/001~009
 | # | 항목 | 비고 |
 |---|------|------|
 | ⑤ | **service_role_key Rotation** ⚠️ | transcript 노출. Dashboard→Settings→API→Reset → Vercel/로컬 .env update → Redeploy |
-| ⑥ | 마이그레이션 SSOT 정리 | DB만 있는 `direct_messages` DDL 파일화(위 표 — 참조) |
-| ⑦ | Security Advisor WARN 하드닝 | 함수 `set search_path`, trigger 함수 `revoke execute`. ※008·009 신규 함수도 점검 |
-| ⑧ | **Storage 고아 파일 정리** (중요도↑) | 008로 삭제 cascade 트리거 제거됨 → 영수증/명함/첨부 파일이 행 삭제 후 잔존. 정책 결정 필요: (a)Undo 만료 후 정리 cron, (b)휴지통, (c)방치. OCR 실패 고아도 동일 |
+| ⑥ | 마이그레이션 SSOT 정리 | ✅ **완료**(세션2) — `001a_direct_messages_baseline.sql` 파일화 |
+| ⑦ | Security Advisor WARN 하드닝 | ✅ **완료**(세션2 `012`) — search_path 고정 + revoke execute. WARN ~25→3(남은 3 = 정상 RPC 2 + leaked password protection ⑭) |
+| ⑧ | **Storage 고아 파일 정리** | ✅ **정책 확정+1차 구현**(세션2) — 휴지통(soft-delete `deleted_at`)으로 행·파일 보존. **purge(영구삭제) 메커니즘은 후속**(우선순위 3). OCR 실패 고아도 동일 정책 |
 | ⑨ | `NEXT_PUBLIC_APP_URL` 교체 | placeholder → 실도메인 + Redeploy |
 | ⑩ | 토큰 사용량 모니터링 | `agent_usage` 집계 + 임계 알림 |
 
@@ -223,7 +238,9 @@ supabase/migrations/001~009
 - 세금계산서는 작성·정리만 (실제 발행은 홈택스/팝빌)
 - 캘린더는 자체 구현 (FullCalendar/date-fns 미사용, 네이티브 Date)
 - Google 연동은 설계만
-- **항목 삭제 시 Storage 파일은 더 이상 자동삭제하지 않음**(008로 트리거 제거 — Supabase가 직접 DELETE 차단 + Undo 손실 방지). 고아 파일 정책은 운영 항목 ⑧.
+- **모든 변경은 `.claude/skills/safe-changes.md` 원칙 준수**(세션2 신설, 사용자 지정 최우선): 추가는 자유/파괴는 검증 후, SSOT(마이그레이션 파일+원격 동시), soft-delete, Undo 정합, tsc·advisor 검증, 커밋 분리.
+- **사용자 데이터 삭제 = 휴지통(soft-delete `deleted_at`)** — 하드삭제 안 함(세션2). 목록은 `deleted_at is null` 필터. Storage 파일은 행과 함께 보존(고아 방지). 영구삭제는 후속 purge.
+- **DM 메시지**: 본인 것만 수정(텍스트)/삭제(soft-delete). 첨부는 삭제만.
 - 알림은 30일 자동정리(pg_cron)
 - OCR: PDF+이미지 (Anthropic PDF)
 - CSV: 필터된 전체(페이지네이션 무시)
