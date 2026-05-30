@@ -48,11 +48,11 @@ export function ChatList() {
 
     const convList = convs ?? []
     const convIds = convList.map((c) => c.id)
-    let msgs: { conversation_id: string; sender_id: string; content: string; created_at: string; read_at: string | null }[] = []
+    let msgs: { conversation_id: string; sender_id: string; content: string; created_at: string; read_at: string | null; deleted_at: string | null }[] = []
     if (convIds.length > 0) {
       const { data } = await supabase
         .from("direct_messages")
-        .select("conversation_id, sender_id, content, created_at, read_at")
+        .select("conversation_id, sender_id, content, created_at, read_at, deleted_at")
         .in("conversation_id", convIds)
         .order("created_at", { ascending: false })
       msgs = data ?? []
@@ -63,11 +63,12 @@ export function ChatList() {
         const otherId = c.user_a === me ? c.user_b : c.user_a
         const convMsgs = msgs.filter((m) => m.conversation_id === c.id)
         const last = convMsgs[0]
-        const unread = convMsgs.filter((m) => m.sender_id !== me && m.read_at === null).length
+        // 삭제된 메시지는 안읽음 카운트에서 제외 (작성자가 지우면 상대 배지도 사라짐)
+        const unread = convMsgs.filter((m) => m.sender_id !== me && m.read_at === null && !m.deleted_at).length
         return {
           otherId,
           otherName: nameById.get(otherId) ?? "직원",
-          lastMessage: last?.content ?? "",
+          lastMessage: last?.deleted_at ? "삭제된 메시지입니다" : last?.content ?? "",
           lastAt: last?.created_at ?? null,
           unread,
         }

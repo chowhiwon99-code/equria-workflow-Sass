@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Send, Paperclip, NotebookPen, FileText, Loader2 } from "lucide-react"
+import { ArrowLeft, Send, Paperclip, NotebookPen, FileText, Loader2, Pencil, Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { uploadImage } from "@/lib/upload"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/shared/Modal"
+import { useUndo } from "@/components/undo/UndoProvider"
 import type { DirectMessage } from "@/types"
 
 const URL_SPLIT_RE = /(https?:\/\/[^\s]+)/g
@@ -40,7 +41,10 @@ function renderContent(text: string, mine: boolean) {
 
 export function DirectChat({ otherUserId }: { otherUserId: string }) {
   const supabase = createClient()
+  const { push } = useUndo()
   const [meId, setMeId] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editText, setEditText] = useState("")
   const [otherName, setOtherName] = useState("")
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [messages, setMessages] = useState<DirectMessage[]>([])
@@ -210,6 +214,55 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
     }
   }
 
+  // 본인 메시지 수정 (텍스트만) — 변경은 Realtime UPDATE 로 양쪽에 반영
+  const startEdit = (m: DirectMessage) => {
+    setEditingId(m.id)
+    setEditText(m.content)
+  }
+  const cancelEdit = () => {
+    setEditingId(null)
+    setEditText("")
+  }
+  const saveEdit = async (m: DirectMessage) => {
+    const text = editText.trim()
+    if (!text || text === m.content) return cancelEdit()
+    const prevContent = m.content
+    const prevEdited = m.edited_at
+    const { error: e } = await supabase
+      .from("direct_messages")
+      .update({ content: text, edited_at: new Date().toISOString() })
+      .eq("id", m.id)
+    if (e) return setError(e.message)
+    cancelEdit()
+    push({
+      label: "메시지 수정",
+      undo: async () => {
+        await supabase.from("direct_messages").update({ content: prevContent, edited_at: prevEdited }).eq("id", m.id)
+      },
+      redo: async () => {
+        await supabase.from("direct_messages").update({ content: text, edited_at: new Date().toISOString() }).eq("id", m.id)
+      },
+    })
+  }
+  // 본인 메시지 삭제 = soft-delete (deleted_at 마킹 → "삭제된 메시지" placeholder, Undo 복구)
+  const deleteMessage = async (m: DirectMessage) => {
+    if (!confirm("이 메시지를 삭제할까요?")) return
+    const { error: e } = await supabase
+      .from("direct_messages")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", m.id)
+    if (e) return setError(e.message)
+    push({
+      label: "메시지 삭제",
+      undo: async () => {
+        await supabase.from("direct_messages").update({ deleted_at: null }).eq("id", m.id)
+      },
+      redo: async () => {
+        await supabase.from("direct_messages").update({ deleted_at: new Date().toISOString() }).eq("id", m.id)
+      },
+    })
+  }
+
   if (error) return <p className="text-sm text-destructive">{error}</p>
 
   return (
@@ -231,8 +284,60 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
         {messages.map((m) => {
           const mine = m.sender_id === meId
           const url = m.attachment_url ? fileUrls[m.id] : undefined
+
+          // 삭제된 메시지 → placeholder (양쪽 모두)
+          if (m.deleted_at) {
+            return (
+              <div key={m.id} className={cn("flex", mine ? "justify-end" : "justify-start")}>
+                <span className="max-w-[70%] rounded-2xl border border-dashed px-3 py-1.5 text-sm italic text-muted-foreground">
+                  삭제된 메시지입니다
+                </span>
+              </div>
+            )
+          }
+
+          // 편집 중 → 인라인 입력 (Enter 저장 / Esc 취소)
+          if (editingId === m.id) {
+            return (
+              <div key={m.id} className="flex justify-end">
+                <div className="flex w-[70%] flex-col gap-1">
+                  <textarea
+                    autoFocus
+                    className={cn(fieldClass, "min-h-[60px] resize-none")}
+                    value={editText}
+                    onChange={(e) => setEditText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault()
+                        void saveEdit(m)
+                      }
+                      if (e.key === "Escape") cancelEdit()
+                    }}
+                  />
+                  <div className="flex justify-end gap-1">
+                    <Button size="sm" variant="ghost" onClick={cancelEdit}>취소</Button>
+                    <Button size="sm" onClick={() => saveEdit(m)}>저장</Button>
+                  </div>
+                </div>
+              </div>
+            )
+          }
+
           return (
-            <div key={m.id} className={cn("flex items-end gap-1", mine ? "justify-end" : "justify-start")}>
+            <div key={m.id} className={cn("group flex items-end gap-1", mine ? "justify-end" : "justify-start")}>
+              {/* 본인 메시지 호버 액션 (텍스트만 수정 가능, 삭제는 모두) */}
+              {mine && (
+                <div className="flex items-center gap-0.5 self-center opacity-0 transition-opacity group-hover:opacity-100">
+                  {!m.attachment_url && (
+                    <button onClick={() => startEdit(m)} className="text-muted-foreground hover:text-foreground" aria-label="메시지 수정">
+                      <Pencil className="size-3.5" />
+                    </button>
+                  )}
+                  <button onClick={() => deleteMessage(m)} className="text-muted-foreground hover:text-red-600" aria-label="메시지 삭제">
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </div>
+              )}
               {mine && !isSelf && m.read_at === null && <span className="mb-0.5 shrink-0 text-[10px] text-amber-500">1</span>}
               {m.attachment_url && isImageAttachment(m.attachment_name) ? (
                 // 이미지 첨부 — 파일명 대신 썸네일을 바로 렌더 (클릭 시 원본 새 탭)
@@ -273,7 +378,14 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
                       {m.attachment_name ?? "첨부파일"}
                     </a>
                   ) : (
-                    <span className="whitespace-pre-wrap">{renderContent(m.content, mine)}</span>
+                    <span className="whitespace-pre-wrap">
+                      {renderContent(m.content, mine)}
+                      {m.edited_at && (
+                        <span className={cn("ml-1 align-baseline text-[10px]", mine ? "text-primary-foreground/60" : "text-muted-foreground")}>
+                          수정됨
+                        </span>
+                      )}
+                    </span>
                   )}
                 </div>
               )}
