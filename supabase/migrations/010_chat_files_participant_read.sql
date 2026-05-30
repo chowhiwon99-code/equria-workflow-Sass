@@ -10,6 +10,8 @@ create index if not exists idx_direct_messages_attachment_url
   on public.direct_messages (attachment_url)
   where attachment_url is not null;
 
+drop policy if exists "chatfiles_participant_read" on storage.objects;
+
 create policy "chatfiles_participant_read" on storage.objects
   for select to authenticated
   using (

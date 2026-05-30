@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Modal, fieldClass } from "@/components/shared/Modal"
 import { BackLink } from "@/components/shared/BackLink"
 import { useUndo } from "@/components/undo/UndoProvider"
+import { mustOk } from "@/lib/supabase/mustOk"
 import { PROJECT_STATUS, PROJECT_STATUS_ORDER } from "@/lib/projects"
 import { isFigmaUrl, toFigmaDesktopUrl } from "@/lib/figma"
 import type { Project, ProjectStatus, Profile, DriveFile } from "@/types"
@@ -32,7 +33,7 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
       supabase.from("project_members").select("id, user_id, role, member:profiles!project_members_user_id_fkey(name)").eq("project_id", projectId),
       supabase.from("profiles").select("id, name").order("name"),
       supabase.from("calendar_events").select("id", { count: "exact", head: true }).eq("project_id", projectId),
-      supabase.from("finance_entries").select("kind, total_amount").eq("project_id", projectId),
+      supabase.from("finance_entries").select("kind, total_amount").eq("project_id", projectId).is("deleted_at", null),
     ])
     setProject((proj as (Project & { owner: { name: string } | null }) | null) ?? null)
     setMembers((mem as MemberRow[]) ?? [])
@@ -59,11 +60,11 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
       push({
         label: "프로젝트 상태 변경",
         undo: async () => {
-          await supabase.from("projects").update({ status: prev }).eq("id", projectId)
+          await mustOk(supabase.from("projects").update({ status: prev }).eq("id", projectId))
           load()
         },
         redo: async () => {
-          await supabase.from("projects").update({ status }).eq("id", projectId)
+          await mustOk(supabase.from("projects").update({ status }).eq("id", projectId))
           load()
         },
       })
@@ -84,11 +85,11 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
       push({
         label: "멤버 추가",
         undo: async () => {
-          await supabase.from("project_members").delete().eq("id", inserted.id)
+          await mustOk(supabase.from("project_members").delete().eq("id", inserted.id))
           load()
         },
         redo: async () => {
-          await supabase.from("project_members").insert(inserted)
+          await mustOk(supabase.from("project_members").insert(inserted))
           load()
         },
       })
@@ -103,11 +104,11 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
       push({
         label: "멤버 제거",
         undo: async () => {
-          await supabase.from("project_members").insert({ id: row.id, project_id: projectId, user_id: row.user_id, role: row.role })
+          await mustOk(supabase.from("project_members").insert({ id: row.id, project_id: projectId, user_id: row.user_id, role: row.role }))
           load()
         },
         redo: async () => {
-          await supabase.from("project_members").delete().eq("id", id)
+          await mustOk(supabase.from("project_members").delete().eq("id", id))
           load()
         },
       })
@@ -219,11 +220,11 @@ function FilesSection({ projectId }: { projectId: string }) {
       push({
         label: "파일/링크 삭제",
         undo: async () => {
-          await supabase.from("files").insert(row)
+          await mustOk(supabase.from("files").insert(row))
           load()
         },
         redo: async () => {
-          await supabase.from("files").delete().eq("id", id)
+          await mustOk(supabase.from("files").delete().eq("id", id))
           load()
         },
       })
@@ -333,11 +334,11 @@ function AddFileModal({
       push({
         label: "파일/링크 추가",
         undo: async () => {
-          await supabase.from("files").delete().eq("id", inserted.id)
+          await mustOk(supabase.from("files").delete().eq("id", inserted.id))
           reload()
         },
         redo: async () => {
-          await supabase.from("files").insert(inserted)
+          await mustOk(supabase.from("files").insert(inserted))
           reload()
         },
       })

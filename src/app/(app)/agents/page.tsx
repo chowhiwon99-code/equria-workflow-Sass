@@ -4,7 +4,9 @@ import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Plus, Pencil, Pin, Lock, Globe } from "lucide-react"
+import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
+import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import type { Tables } from "@/lib/supabase/types"
@@ -65,11 +67,21 @@ export default function AgentsPage() {
     if (next.has(agentId)) next.delete(agentId)
     else next.add(agentId)
     setPins(next)
-    await supabase.from("user_agent_pins").delete().eq("user_id", meId)
-    if (next.size > 0) {
-      await supabase.from("user_agent_pins").insert([...next].map((id) => ({ user_id: meId, agent_id: id })))
+    try {
+      // 전체 교체(델타 단순화): 기존 핀을 모두 지우고 next 집합을 다시 넣는다.
+      // delete 성공 후 insert 실패 시 핀이 0개로 남아 위젯이 폴백되므로, 둘 다 mustOk로 검증한다.
+      await mustOk(supabase.from("user_agent_pins").delete().eq("user_id", meId))
+      if (next.size > 0) {
+        await mustOk(
+          supabase.from("user_agent_pins").insert([...next].map((id) => ({ user_id: meId, agent_id: id })))
+        )
+      }
+      window.dispatchEvent(new Event("equria:agents-changed"))
+    } catch {
+      // 실패 시 낙관적 로컬 상태를 버리고 DB에서 다시 동기화 + 사용자에게 알림
+      await load()
+      toast.error("위젯 설정을 저장하지 못했어요. 다시 시도해 주세요.")
     }
-    window.dispatchEvent(new Event("equria:agents-changed"))
   }
 
   return (

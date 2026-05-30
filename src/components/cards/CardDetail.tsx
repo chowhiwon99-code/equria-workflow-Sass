@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react"
 import { Trash2 } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
+import { mustOk } from "@/lib/supabase/mustOk"
 import { Button } from "@/components/ui/button"
 import { BackLink } from "@/components/shared/BackLink"
 import { useUndo } from "@/components/undo/UndoProvider"
@@ -57,14 +59,17 @@ export function CardDetail({ cardId }: { cardId: string }) {
       .from("business_cards")
       .update({ deleted_at: new Date().toISOString() })
       .eq("id", cardId)
-    if (error) return
+    if (error) {
+      toast.error("명함 삭제에 실패했습니다.")
+      return
+    }
     push({
       label: "명함 삭제",
       undo: async () => {
-        await supabase.from("business_cards").update({ deleted_at: null }).eq("id", cardId)
+        await mustOk(supabase.from("business_cards").update({ deleted_at: null }).eq("id", cardId))
       },
       redo: async () => {
-        await supabase.from("business_cards").update({ deleted_at: new Date().toISOString() }).eq("id", cardId)
+        await mustOk(supabase.from("business_cards").update({ deleted_at: new Date().toISOString() }).eq("id", cardId))
       },
     })
     router.push("/cards")

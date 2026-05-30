@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { ChevronLeft, ChevronRight, Plus, X, Check, Trash2, CalendarDays } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
@@ -60,11 +60,15 @@ export function CalendarView() {
   const loadEvents = useCallback(async () => {
     setLoading(true)
     const { startIso, endIso } = monthQueryRange(viewDate)
+    // 가시 범위 [startIso, endIso)와 겹치는 모든 이벤트를 가져온다.
+    // - 시작이 범위 끝 이후면 제외(.lt)
+    // - 범위에 걸치려면: 종료가 범위 시작 이후거나(멀티데이가 안쪽으로 이어짐),
+    //   종료가 없고 시작이 범위 시작 이후(단일일 이벤트)
     const { data } = await supabase
       .from("calendar_events")
       .select("*")
-      .gte("start_time", startIso)
       .lt("start_time", endIso)
+      .or(`end_time.gte.${startIso},and(end_time.is.null,start_time.gte.${startIso})`)
       .order("start_time", { ascending: true })
     setEvents(data ?? [])
     setLoading(false)
@@ -84,6 +88,48 @@ export function CalendarView() {
       const end = e.end_time ? new Date(e.end_time) : s
       return dayMs(day) >= dayMs(s) && dayMs(day) <= dayMs(end)
     })
+
+  // 셀에 보이는 막대 레인(행) 개수 — 초과분은 "+N개"로 표시
+  const LANE_CAP = 3
+
+  // 각 이벤트에 '레인(행) 인덱스'를 고정 배정한다.
+  // 같은 이벤트는 자신이 걸친 모든 날에서 동일한 행에 그려져 가로 막대가 끊기지 않고 이어진다.
+  // 알고리즘: 시작일 오름차순 → 기간 길이 내림차순으로 정렬한 뒤,
+  // 이미 배치된 이벤트 중 날짜 범위가 겹치는 것이 차지한 레인을 피해 가장 낮은 빈 레인을 그리디로 부여.
+  const laneByEventId = useMemo(() => {
+    // 이벤트의 [시작일, 종료일] epoch(시:분 무시)
+    const rangeOf = (e: CalendarEvent): { start: number; end: number } => {
+      const s = new Date(e.start_time)
+      const end = e.end_time ? new Date(e.end_time) : s
+      const startMs = new Date(s.getFullYear(), s.getMonth(), s.getDate()).getTime()
+      const endMs = new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime()
+      return { start: startMs, end: Math.max(startMs, endMs) }
+    }
+    const sorted = [...events].sort((a, b) => {
+      const ra = rangeOf(a)
+      const rb = rangeOf(b)
+      if (ra.start !== rb.start) return ra.start - rb.start
+      const durA = ra.end - ra.start
+      const durB = rb.end - rb.start
+      if (durA !== durB) return durB - durA // 긴 일정 먼저 (낮은 레인 선점)
+      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0 // 안정적 tie-break
+    })
+    const placed: { start: number; end: number; lane: number }[] = []
+    const map = new Map<string, number>()
+    for (const e of sorted) {
+      const r = rangeOf(e)
+      // 이 이벤트와 날짜 범위가 겹치는, 이미 배치된 이벤트들의 레인 집합
+      const taken = new Set<number>()
+      for (const p of placed) {
+        if (r.start <= p.end && r.end >= p.start) taken.add(p.lane)
+      }
+      let lane = 0
+      while (taken.has(lane)) lane++
+      map.set(e.id, lane)
+      placed.push({ start: r.start, end: r.end, lane })
+    }
+    return map
+  }, [events])
 
   // 드래그 선택 범위(정렬된) 안에 day가 포함되는지
   const inDragRange = (day: Date) => {
@@ -105,8 +151,23 @@ export function CalendarView() {
       setDragStart(null)
       setDragEnd(null)
     }
+    // 드래그 중 창이 포커스를 잃거나(alt-tab) Esc를 누르면 mouseup이 안 올 수 있다.
+    // 이 경우 모달을 열지 않고 드래그만 취소 → 이후 hover가 범위를 늘리는 버그 방지.
+    const onCancel = () => {
+      setDragStart(null)
+      setDragEnd(null)
+    }
+    const onKeyDown = (ev: KeyboardEvent) => {
+      if (ev.key === "Escape") onCancel()
+    }
     window.addEventListener("mouseup", onUp)
-    return () => window.removeEventListener("mouseup", onUp)
+    window.addEventListener("blur", onCancel)
+    window.addEventListener("keydown", onKeyDown)
+    return () => {
+      window.removeEventListener("mouseup", onUp)
+      window.removeEventListener("blur", onCancel)
+      window.removeEventListener("keydown", onKeyDown)
+    }
   }, [dragging, dragStart, dragEnd])
 
   return (
@@ -194,7 +255,18 @@ export function CalendarView() {
                 {day.getDate()}
               </span>
               <div className="flex flex-col gap-0.5">
-                {dayEvents.slice(0, 3).map((e) => {
+                {/* 레인(행) 단위 렌더 — 같은 이벤트가 매 칸 동일 행에 놓여 가로 막대가 끊김 없이 이어진다.
+                    레인 0..LANE_CAP-1 만 표시하고, 빈 레인은 같은 높이의 spacer로 채워 칸끼리 행을 정렬한다. */}
+                {Array.from({ length: LANE_CAP }, (_, lane) => {
+                  const e = dayEvents.find((ev) => laneByEventId.get(ev.id) === lane)
+                  if (!e) {
+                    // 빈 레인 — 막대와 동일 높이(py-0.5 + text-[11px]/leading)의 자리 표시
+                    return (
+                      <span key={`spacer-${lane}`} className="py-0.5 text-[11px] leading-[1.2]">
+                        {" "}
+                      </span>
+                    )
+                  }
                   const es = new Date(e.start_time)
                   const ee = e.end_time ? new Date(e.end_time) : es
                   const dow = day.getDay()
@@ -213,7 +285,7 @@ export function CalendarView() {
                         setSelected(e)
                       }}
                       className={cn(
-                        "relative truncate py-0.5 text-[11px] text-white",
+                        "relative truncate py-0.5 text-[11px] leading-[1.2] text-white",
                         roundLeft ? "rounded-l" : "rounded-l-none",
                         roundRight ? "rounded-r" : "rounded-r-none",
                         showLabel ? "pl-1.5 pr-1" : "px-1",
@@ -230,9 +302,14 @@ export function CalendarView() {
                     </span>
                   )
                 })}
-                {dayEvents.length > 3 && (
-                  <span className="px-1 text-[10px] text-muted-foreground">+{dayEvents.length - 3}개</span>
-                )}
+                {/* 초과분은 레인 기준으로 계산 — 레인 < LANE_CAP 인 이벤트는 자신이 걸친 모든 날에
+                    빠짐없이 보이므로 가로 막대 중간에 구멍이 생기지 않는다. */}
+                {(() => {
+                  const overflow = dayEvents.filter((ev) => (laneByEventId.get(ev.id) ?? 0) >= LANE_CAP).length
+                  return overflow > 0 ? (
+                    <span className="px-1 text-[10px] text-muted-foreground">+{overflow}개</span>
+                  ) : null
+                })()}
               </div>
             </button>
           )

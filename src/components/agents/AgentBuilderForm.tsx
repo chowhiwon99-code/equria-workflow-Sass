@@ -3,11 +3,24 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/shared/Modal"
 import { useUndo } from "@/components/undo/UndoProvider"
 import { AGENT_MODELS, AGENT_CATEGORIES, AGENT_DEFAULTS, AGENT_ICON_PRESETS } from "@/lib/agents"
+
+// Take the first user-perceived grapheme cluster (keeps ZWJ sequences, flags,
+// skin-tone modifiers intact). Falls back to a code-point-aware slice when
+// Intl.Segmenter is unavailable.
+function firstGrapheme(s: string): string {
+  if (typeof Intl !== "undefined" && typeof Intl.Segmenter === "function") {
+    const segmenter = new Intl.Segmenter()
+    for (const { segment } of segmenter.segment(s)) return segment
+    return ""
+  }
+  return [...s][0] ?? ""
+}
 
 export type AgentFormInitial = {
   id: string
@@ -91,10 +104,12 @@ export function AgentBuilderForm({ initial }: { initial?: AgentFormInitial | nul
       push({
         label: "에이전트 생성",
         undo: async () => {
-          await supabase.from("agents").update({ is_active: false }).eq("id", agent.id)
+          await mustOk(supabase.from("agents").update({ is_active: false }).eq("id", agent.id))
+          window.dispatchEvent(new Event("equria:agents-changed"))
         },
         redo: async () => {
-          await supabase.from("agents").update({ is_active: true }).eq("id", agent.id)
+          await mustOk(supabase.from("agents").update({ is_active: true }).eq("id", agent.id))
+          window.dispatchEvent(new Event("equria:agents-changed"))
         },
       })
       window.dispatchEvent(new Event("equria:agents-changed"))
@@ -125,24 +140,35 @@ export function AgentBuilderForm({ initial }: { initial?: AgentFormInitial | nul
       temperature !== initial.temperature ||
       maxTokens !== initial.max_tokens
     if (versionChanged) {
-      const { data: last } = await supabase
-        .from("agent_versions")
-        .select("version")
-        .eq("agent_id", initial.id)
-        .order("version", { ascending: false })
-        .limit(1)
-        .maybeSingle()
-      const nextVersion = (last?.version ?? 0) + 1
-      const { error: vErr } = await supabase.from("agent_versions").insert({
-        agent_id: initial.id,
-        system_prompt: systemPrompt.trim(),
-        model,
-        temperature,
-        max_tokens: maxTokens,
-        version: nextVersion,
-        is_current: true, // 트리거 handle_new_agent_version 가 이전 버전 is_current=false 처리
-        created_by: meId,
-      })
+      // version 은 unique(agent_id, version) 라서 동시 수정 시 select max(version)+1 이
+      // 경합한다(둘 다 같은 값 → 두 번째 insert 가 23505). 충돌하면 max 를 다시 읽고
+      // 한 번 재시도한다.
+      const readNextVersion = async () => {
+        const { data: last } = await supabase
+          .from("agent_versions")
+          .select("version")
+          .eq("agent_id", initial.id)
+          .order("version", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        return (last?.version ?? 0) + 1
+      }
+      const insertVersion = (version: number) =>
+        supabase.from("agent_versions").insert({
+          agent_id: initial.id,
+          system_prompt: systemPrompt.trim(),
+          model,
+          temperature,
+          max_tokens: maxTokens,
+          version,
+          is_current: true, // 트리거 handle_new_agent_version 가 이전 버전 is_current=false 처리
+          created_by: meId,
+        })
+
+      let { error: vErr } = await insertVersion(await readNextVersion())
+      if (vErr?.code === "23505") {
+        ;({ error: vErr } = await insertVersion(await readNextVersion()))
+      }
       if (vErr) {
         setError(vErr.message)
         setSaving(false)
@@ -162,7 +188,7 @@ export function AgentBuilderForm({ initial }: { initial?: AgentFormInitial | nul
           <input
             className={cn(fieldClass, "w-16 text-center text-2xl")}
             value={icon}
-            onChange={(e) => setIcon(e.target.value.slice(0, 2))}
+            onChange={(e) => setIcon(firstGrapheme(e.target.value))}
             aria-label="아이콘 이모지"
           />
         </label>

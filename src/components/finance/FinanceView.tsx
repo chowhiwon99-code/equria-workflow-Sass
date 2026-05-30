@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Upload, FileText, Loader2, Plus, Pencil, Download, Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { mustOk } from "@/lib/supabase/mustOk"
 import { uploadImage } from "@/lib/upload"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -171,11 +172,11 @@ export function FinanceView() {
     push({
       label: `${ids.length}건 삭제`,
       undo: async () => {
-        await supabase.from("finance_entries").update({ deleted_at: null }).in("id", ids)
+        await mustOk(supabase.from("finance_entries").update({ deleted_at: null }).in("id", ids))
         load()
       },
       redo: async () => {
-        await supabase.from("finance_entries").update({ deleted_at: new Date().toISOString() }).in("id", ids)
+        await mustOk(supabase.from("finance_entries").update({ deleted_at: new Date().toISOString() }).in("id", ids))
         load()
       },
     })
@@ -358,11 +359,11 @@ export function FinanceView() {
                           push({
                             label: "확정 처리",
                             undo: async () => {
-                              await supabase.from("finance_entries").update({ status: "draft" }).eq("id", e.id)
+                              await mustOk(supabase.from("finance_entries").update({ status: "draft" }).eq("id", e.id))
                               load()
                             },
                             redo: async () => {
-                              await supabase.from("finance_entries").update({ status: "confirmed" }).eq("id", e.id)
+                              await mustOk(supabase.from("finance_entries").update({ status: "confirmed" }).eq("id", e.id))
                               load()
                             },
                           })
@@ -393,11 +394,11 @@ export function FinanceView() {
                           push({
                             label: "항목 삭제",
                             undo: async () => {
-                              await supabase.from("finance_entries").update({ deleted_at: null }).eq("id", e.id)
+                              await mustOk(supabase.from("finance_entries").update({ deleted_at: null }).eq("id", e.id))
                               load()
                             },
                             redo: async () => {
-                              await supabase.from("finance_entries").update({ deleted_at: new Date().toISOString() }).eq("id", e.id)
+                              await mustOk(supabase.from("finance_entries").update({ deleted_at: new Date().toISOString() }).eq("id", e.id))
                               load()
                             },
                           })
@@ -570,11 +571,11 @@ function FinanceEntryModal({
       push({
         label: "항목 수정",
         undo: async () => {
-          await supabase.from("finance_entries").update(before).eq("id", entry.id)
+          await mustOk(supabase.from("finance_entries").update(before).eq("id", entry.id))
           reload()
         },
         redo: async () => {
-          await supabase.from("finance_entries").update(payload).eq("id", entry.id)
+          await mustOk(supabase.from("finance_entries").update(payload).eq("id", entry.id))
           reload()
         },
       })
@@ -590,11 +591,11 @@ function FinanceEntryModal({
         push({
           label: "항목 추가",
           undo: async () => {
-            await supabase.from("finance_entries").delete().eq("id", inserted.id)
+            await mustOk(supabase.from("finance_entries").delete().eq("id", inserted.id))
             reload()
           },
           redo: async () => {
-            await supabase.from("finance_entries").insert(inserted)
+            await mustOk(supabase.from("finance_entries").insert(inserted))
             reload()
           },
         })

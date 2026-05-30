@@ -4,6 +4,7 @@ import { use, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { mustOk } from "@/lib/supabase/mustOk"
 import { Button } from "@/components/ui/button"
 import { BackLink } from "@/components/shared/BackLink"
 import { useUndo } from "@/components/undo/UndoProvider"
@@ -73,11 +74,11 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
     push({
       label: "에이전트 삭제",
       undo: async () => {
-        await supabase.from("agents").update({ is_active: true }).eq("id", id)
+        await mustOk(supabase.from("agents").update({ is_active: true }).eq("id", id))
         window.dispatchEvent(new Event("equria:agents-changed"))
       },
       redo: async () => {
-        await supabase.from("agents").update({ is_active: false }).eq("id", id)
+        await mustOk(supabase.from("agents").update({ is_active: false }).eq("id", id))
         window.dispatchEvent(new Event("equria:agents-changed"))
       },
     })

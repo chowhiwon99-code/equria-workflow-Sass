@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { ArrowLeft, Send, Paperclip, NotebookPen, FileText, Loader2, Pencil, Trash2 } from "lucide-react"
+import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
+import { mustOk } from "@/lib/supabase/mustOk"
 import { uploadImage } from "@/lib/upload"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -187,7 +189,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
       .insert({ conversation_id: conversationId, sender_id: meId, content: text })
     setSending(false)
     if (insErr) {
-      setError(insErr.message)
+      toast.error(insErr.message)
       setInput(text)
     }
   }, [input, conversationId, meId, supabase])
@@ -195,7 +197,6 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
   const onAttach = async (file: File) => {
     if (!conversationId || !meId) return
     setUploading(true)
-    setError(null)
     try {
       const path = await uploadImage("chat-files", file)
       const { error: insErr } = await supabase.from("direct_messages").insert({
@@ -207,7 +208,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
       })
       if (insErr) throw insErr
     } catch (e) {
-      setError(e instanceof Error ? e.message : "첨부 실패")
+      toast.error(e instanceof Error ? e.message : "첨부 실패")
     } finally {
       setUploading(false)
       if (fileRef.current) fileRef.current.value = ""
@@ -232,15 +233,18 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
       .from("direct_messages")
       .update({ content: text, edited_at: new Date().toISOString() })
       .eq("id", m.id)
-    if (e) return setError(e.message)
+    if (e) {
+      toast.error(e.message)
+      return
+    }
     cancelEdit()
     push({
       label: "메시지 수정",
       undo: async () => {
-        await supabase.from("direct_messages").update({ content: prevContent, edited_at: prevEdited }).eq("id", m.id)
+        await mustOk(supabase.from("direct_messages").update({ content: prevContent, edited_at: prevEdited }).eq("id", m.id))
       },
       redo: async () => {
-        await supabase.from("direct_messages").update({ content: text, edited_at: new Date().toISOString() }).eq("id", m.id)
+        await mustOk(supabase.from("direct_messages").update({ content: text, edited_at: new Date().toISOString() }).eq("id", m.id))
       },
     })
   }
@@ -251,14 +255,17 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
       .from("direct_messages")
       .update({ deleted_at: new Date().toISOString() })
       .eq("id", m.id)
-    if (e) return setError(e.message)
+    if (e) {
+      toast.error(e.message)
+      return
+    }
     push({
       label: "메시지 삭제",
       undo: async () => {
-        await supabase.from("direct_messages").update({ deleted_at: null }).eq("id", m.id)
+        await mustOk(supabase.from("direct_messages").update({ deleted_at: null }).eq("id", m.id))
       },
       redo: async () => {
-        await supabase.from("direct_messages").update({ deleted_at: new Date().toISOString() }).eq("id", m.id)
+        await mustOk(supabase.from("direct_messages").update({ deleted_at: new Date().toISOString() }).eq("id", m.id))
       },
     })
   }

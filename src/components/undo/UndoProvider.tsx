@@ -35,7 +35,9 @@ const MAX_HISTORY = 50
 export function UndoProvider({ children }: { children: React.ReactNode }) {
   const past = useRef<UndoAction[]>([])
   const future = useRef<UndoAction[]>([])
-  const busy = useRef(false)
+  // 진행 중인 작업의 promise. ⌘Z 연타 시 드롭하지 않고 직렬화한다 —
+  // 각 호출은 이전 작업이 끝난 뒤 자신의 차례를 실행해 순서를 보존한다.
+  const tail = useRef<Promise<void>>(Promise.resolve())
   // 스택 길이를 상태로 보관해 canUndo/canRedo 를 렌더 중 ref 접근 없이 계산
   const [counts, setCounts] = useState({ undo: 0, redo: 0 })
   const sync = useCallback(
@@ -54,39 +56,43 @@ export function UndoProvider({ children }: { children: React.ReactNode }) {
   )
 
   const redo = useCallback(async () => {
-    if (busy.current) return
-    const action = future.current[future.current.length - 1]
-    if (!action) return
-    busy.current = true
-    try {
-      await action.redo()
-      future.current.pop()
-      past.current.push(action)
-      sync()
-      window.dispatchEvent(new Event("equria:reload"))
-    } catch {
-      toast.error(`다시 실행 실패: ${action.label}`)
-    } finally {
-      busy.current = false
-    }
+    // 이전 작업이 끝난 뒤 실행되도록 큐에 이어 붙인다(직렬화).
+    const run = tail.current.then(async () => {
+      // 차례가 온 시점에 스택 top 을 다시 읽어 정확한 액션을 사용한다.
+      const action = future.current[future.current.length - 1]
+      if (!action) return
+      try {
+        await action.redo()
+        future.current.pop()
+        past.current.push(action)
+        sync()
+        window.dispatchEvent(new Event("equria:reload"))
+      } catch {
+        toast.error(`다시 실행 실패: ${action.label}`)
+      }
+    })
+    tail.current = run
+    return run
   }, [sync])
 
   const undo = useCallback(async () => {
-    if (busy.current) return
-    const action = past.current[past.current.length - 1]
-    if (!action) return
-    busy.current = true
-    try {
-      await action.undo()
-      past.current.pop()
-      future.current.push(action)
-      sync()
-      window.dispatchEvent(new Event("equria:reload"))
-    } catch {
-      toast.error(`되돌리기 실패: ${action.label}`)
-    } finally {
-      busy.current = false
-    }
+    // 이전 작업이 끝난 뒤 실행되도록 큐에 이어 붙인다(직렬화).
+    const run = tail.current.then(async () => {
+      // 차례가 온 시점에 스택 top 을 다시 읽어 정확한 액션을 사용한다.
+      const action = past.current[past.current.length - 1]
+      if (!action) return
+      try {
+        await action.undo()
+        past.current.pop()
+        future.current.push(action)
+        sync()
+        window.dispatchEvent(new Event("equria:reload"))
+      } catch {
+        toast.error(`되돌리기 실패: ${action.label}`)
+      }
+    })
+    tail.current = run
+    return run
   }, [sync])
 
   // 전역 단축키: ⌘Z 되돌리기 / ⌘⇧Z 다시실행.

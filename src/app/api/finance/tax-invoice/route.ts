@@ -27,6 +27,7 @@ export async function POST(req: Request) {
     .from("finance_entries")
     .select("*")
     .in("id", entryIds)
+    .is("deleted_at", null)
   if (selErr) return NextResponse.json({ error: selErr.message }, { status: 500 })
   if (!entries || entries.length === 0) {
     return NextResponse.json({ error: "선택한 항목을 찾을 수 없습니다." }, { status: 404 })
