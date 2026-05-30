@@ -84,26 +84,33 @@ export function AgentChatProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
   }, [selectedAgentId, position])
 
-  useEffect(() => {
-    let cancelled = false
+  // 위젯에 띄울 에이전트 = 내가 핀한 것. 핀이 0개면 공개 기본 에이전트로 폴백(위젯 안 비게).
+  const loadAgents = useCallback(async () => {
     const supabase = createClient()
-    ;(async () => {
-      const { data } = await supabase
-        .from("agents")
-        .select("id, name, description, icon, category")
-        .eq("is_active", true)
-        .eq("is_public", true)
-        .order("created_at", { ascending: true })
-      if (cancelled) return
-      const list = (data ?? []) as Agent[]
-      setAgents(list)
-      setLoading(false)
-      setSelectedAgentIdState((cur) => cur ?? list[0]?.id ?? null)
-    })()
-    return () => {
-      cancelled = true
-    }
+    const { data: pinRows } = await supabase.from("user_agent_pins").select("agent_id")
+    const pinnedIds = (pinRows ?? []).map((p) => p.agent_id)
+
+    let query = supabase
+      .from("agents")
+      .select("id, name, description, icon, category")
+      .eq("is_active", true)
+      .order("created_at", { ascending: true })
+    query = pinnedIds.length > 0 ? query.in("id", pinnedIds) : query.eq("is_public", true)
+
+    const { data } = await query
+    const list = (data ?? []) as Agent[]
+    setAgents(list)
+    setLoading(false)
+    setSelectedAgentIdState((cur) => (cur && list.some((a) => a.id === cur) ? cur : list[0]?.id ?? null))
   }, [])
+
+  useEffect(() => {
+    loadAgents()
+    // 빌더에서 생성/삭제/핀 변경 시 위젯 갱신
+    const h = () => loadAgents()
+    window.addEventListener("equria:agents-changed", h)
+    return () => window.removeEventListener("equria:agents-changed", h)
+  }, [loadAgents])
 
   const open = useCallback(() => {
     setIsOpen(true)
