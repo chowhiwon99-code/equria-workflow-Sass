@@ -1,13 +1,38 @@
 # HANDOFF — EQURIA Workspace
 
 > 다음 세션 시작 시 이 파일 + `CLAUDE.md` + `.claude/skills/latest-stack.md`를 **순서대로** 먼저 읽어주세요.
-> 최종 업데이트: 2026-05-30 (세션 2)
+> 최종 업데이트: 2026-05-30 (세션 3 — 코드리뷰 15건 수정 + Phase 3a 빌더 완료)
 
 ---
 
 ## 🎯 한 줄 요약
 
-**Phase 1 + 자체기능 5종 + 에이전트 허브 운영 중. 세션2(05-30 오후)에 ① DM 상대 이미지 무한로딩(chat-files RLS) + 명함 삭제 차단(1-B) 근본 수정 ② 휴지통(soft-delete) 도입 ③ 마이그레이션 SSOT 복구(direct_messages 파일화) ④ 보안 하드닝(advisor WARN ~25→3) ⑤ DM 메시지 수정/삭제 신기능 + "꼬임 방지" 설계원칙(`safe-changes.md`) 수립.** `tsc` 0 에러. DB 마이그레이션 `001a`·`010`~`013` 원격 적용 완료. UI 검증 완료(이미지·읽음"1"·DM 수정/삭제). **⚠️ 세션2 커밋 7개 = 로컬 보관(미푸시). push 시 운영 자동배포.** 남은 일: service_role rotation(3-B), 휴지통 purge(후속), Phase 3 빌더(4-B). 운영 `https://equria-workflow-sass.vercel.app`.
+**Phase 1 + 자체기능 5종 + 에이전트 허브 운영 중. 세션3(05-30 저녁)에 ① Phase 3a 커스텀 에이전트 빌더 + 위젯 핀(마이그레이션 `014`) 완료 ② 코드리뷰(xhigh)로 발견한 15건을 병렬 워크플로우로 일괄 수정**(재무 soft-delete 누락 H2/H3, DM 에러 UI붕괴 H1, undo 에러삼킴 M4, 캘린더 멀티데이 lane M8 등).** `tsc` 0 에러 / 적대적 리뷰 15/15 / dev 라우트 컴파일 OK / **DB drift 없음(마이그레이션 15↔15 1:1)**. **⚠️ 미푸시 10커밋 = 로컬 보관. push 시 운영 자동배포.** **⏳ 코드리뷰 15건 사용자 E2E 미완 → 다음 세션 첫 작업.** 남은 일: E2E→push 결정, service_role rotation(3-B), 휴지통 purge(후속). 운영 `https://equria-workflow-sass.vercel.app`.
+
+---
+
+## 🆕 세션3 (2026-05-30 저녁) 작업 — Phase 3a + 코드리뷰 15건, 로컬 커밋(미푸시)
+
+> 핵심: ① **Phase 3a 빌더**(커밋 `1c75000`) ② **코드리뷰 15건 병렬 수정**(커밋 `58b17bd`). 전부 검증(tsc 0 / 리뷰 15/15 / dev 컴파일). **E2E(사용자 수동)는 미완 → 다음 세션 첫 작업.**
+
+### A. Phase 3a 커스텀 에이전트 빌더 + 위젯 핀 (커밋 `1c75000`)
+- `/agents` 목록(내것/기본/공유 3섹션) + `/agents/new` + `/agents/[id]`(공용 `AgentBuilderForm`) + 버전 이력.
+- 마이그레이션 `014`: `agents_select`/`av_select` RLS 조이기(비공개=진짜 비공개) + `user_agent_pins` 테이블(위젯에 띄울 에이전트 선택).
+- 위젯(`AgentChatContext`)은 **내 핀 기준 로드**(핀 0개면 공개 기본 폴백) + `equria:agents-changed` 이벤트로 갱신.
+
+### B. 코드리뷰 15건 수정 (커밋 `58b17bd`) — 병렬 워크플로우(11 file-agent → tsc+리뷰 verify)
+| 등급 | 수정 |
+|------|------|
+| 🔴 H1 | DM 수정/삭제/전송/첨부 실패 → `toast`(대화창 전체 붕괴 제거), fatal은 "대화 못 엶"만 |
+| 🔴 H2/H3 | tax-invoice·ProjectDetail finance 조회에 `.is("deleted_at", null)`(휴지통 누출 차단) |
+| 🟠 M4 | undo/redo 클로저 supabase 에러를 **`mustOk()`**로 throw(실패한 되돌리기가 성공처럼 보이던 문제) → 신규 `src/lib/supabase/mustOk.ts` + importer 7파일 |
+| 🟠 M5 | 핀 토글 에러처리(실패 시 resync+toast, 성공시에만 dispatch) |
+| 🟠 M6 | 생성 undo/redo에 `equria:agents-changed` dispatch(위젯 갱신) |
+| 🟠 M7/M8/L9 | 캘린더 멀티데이: **overlap 조회**(start_time만→구간겹침) + **고정 lane**(eventId→lane useMemo, 연속막대) + lane기준 표시 |
+| 🟡 L10~L15 | 명함삭제 toast / ⌘Z 연타 큐 직렬화 / `010` 멱등화 / 이모지 grapheme(Intl.Segmenter) / 버전 23505 재시도 |
+
+- **꼬임 리스크 감사 완료**(세션 마무리): 마이그레이션 15↔15 1:1(drift 0), **이 배치 DB변경 없음**(`010` 파일만 멱등화·재적용 불필요), mustOk+importer 원자적 커밋, 디버그잔재 0.
+- **잔여 노트(비차단)**: ① 핀 교체 delete→insert **비원자성**(에러표시+resync로 안전처리, 완전방지엔 upsert RPC) ② `UndoCtx` 타입 `() => void`인데 실제 async(tsc 통과) ③ L12 blur 취소가 devtools 포커스에도 동작(보수적).
 
 ---
 
@@ -24,7 +49,7 @@
 
 ---
 
-## 🆕 이번 세션(2026-05-30) 작업 — 전부 코드+DB 반영 완료, git 미커밋
+## 📋 세션1 후반(2026-05-30) 작업 — 코드+DB 반영, 커밋 완료(미푸시)
 
 ### 1. 채팅 이미지 인라인 표시 ✅
 - `DirectChat.tsx`: 첨부 파일명이 이미지 확장자(png/jpg/gif/webp/bmp/svg/avif/heic)면 **파일명 링크 대신 썸네일(`<img>`) 직접 렌더**(클릭 시 원본 새 탭). 비이미지 첨부는 기존 `FileText`+파일명 유지.
@@ -64,9 +89,7 @@
 - 상세→목록 등 교차 컴포넌트는 `equria:reload` 이벤트로 목록 뷰(CardsView/ProjectsView)가 자동 새로고침(리스너 추가됨).
 
 ### 미반영/주의
-- **git 미커밋**: 아래 변경 파일들이 working tree에만 있음. 다음 세션 이어가긴 가능하나 **커밋 권장**.
-  - M: `(app)/layout.tsx`, `calendar/CalendarView.tsx`, `cards/CardDetail.tsx`, `cards/CardsView.tsx`, `chat/DirectChat.tsx`, `finance/FinanceView.tsx`, `projects/ProjectDetail.tsx`, `projects/ProjectsView.tsx`, `lib/supabase/types.ts`
-  - 신규: `components/undo/UndoProvider.tsx`, `supabase/migrations/008_…sql`, `supabase/migrations/009_…sql`
+- ✅ **커밋 완료**(세션3에서 정리) — 위 작업들은 커밋 `00929d2`~`1c75000`로 반영됨(미푸시). 워킹트리 깨끗.
 - 남은 lint 경고(`useEffect` 안 `load()`/`setPageCount` = 신규 `react-hooks/set-state-in-effect` 규칙)는 **기존 코드 전반의 패턴**이라 이번 세션 미수정. tsc·dev엔 영향 없음. `next build`에서 eslint 막힐 수 있어 운영 빌드 전 확인 필요.
 
 ---
@@ -76,7 +99,7 @@
 ### 환경
 - **GitHub**: `https://github.com/chowhiwon99-code/equria-workflow-Sass` (main 단일, 자동 배포)
 - **Vercel**: `equria-workflow-sass.vercel.app` (Production, Hobby). `NEXT_PUBLIC_APP_URL` 아직 placeholder.
-- **DB**: Supabase `dutovtfdckhayyvhtuxu` (ap-northeast-2 서울). 마이그레이션 001~009 적용.
+- **DB**: Supabase `dutovtfdckhayyvhtuxu` (ap-northeast-2 서울). 마이그레이션 **001~014 전부 원격 적용**(디스크 15개 ↔ 적용 15개 1:1, drift 없음).
 - **로컬 `.env.local`**: 키 4종 + `WORKSPACE_PASSWORD=4321`(테스트값). ANTHROPIC 키 정상(이번 세션 직접 호출 확인). 기본 모델 `claude-sonnet-4-6` 유효.
 - **테스트 계정 3명**: `조휘원`(c6817c63…) / `이동규`(cacf302d…) / `김건`(fc468e85…) — DM·권한 검증 가능.
 - **로컬 dev 로그**: `/private/tmp/claude-501/-Users-johwiwon-equria-workspace/<id>/tasks/<taskid>.output` (실행 시점마다 경로 달라짐).
@@ -109,7 +132,10 @@
 | 010 | `010_chat_files_participant_read.sql` 🆕 | chat-files SELECT RLS를 대화 참여자 허용(상대 이미지 표시) + attachment_url 부분 인덱스 |
 | 011 | `011_soft_delete_trash.sql` 🆕 | finance_entries/business_cards `deleted_at`(휴지통) + 명함 하드삭제 트리거 제거(1-B 해결) + 활성행 부분 인덱스 |
 | 012 | `012_security_hardening.sql` 🆕 | 함수 7종 `search_path=''` 고정 + 트리거함수 execute 회수 + 정상 RPC anon차단/authenticated만 |
-| 013 | `013_dm_edit_delete.sql` 🆕 | direct_messages `edited_at`/`deleted_at` + `dm_update` RLS를 sender 전용으로 |
+| 013 | `013_dm_edit_delete.sql` | direct_messages `edited_at`/`deleted_at` + `dm_update` RLS를 sender 전용으로 |
+| 014 | `014_agent_builder.sql` 🆕 | `agents_select`/`av_select` RLS 조이기(비공개 진짜 비공개) + `user_agent_pins` 테이블(위젯 핀) |
+
+> ※ 세션3에서 `010`에 `drop policy if exists` 추가(멱등화, L13) — **파일만 수정, 재적용 안 함**(라이브 정책 이미 존재, 동작 동일).
 
 **Storage 버킷**: `receipts` / `business-cards` / `chat-files` (※ 행 삭제 시 자동 cascade 안 됨 — 008로 트리거 제거됨)
 **Realtime publication**: `direct_messages`, `notifications`
@@ -167,11 +193,11 @@ supabase/migrations/001~009
 
 ## 🔴 다음 세션 우선순위
 
-1. **세션2 커밋 push 여부 결정** — 로컬 커밋 7개(`9396b12`~). push 시 운영 자동배포. DB 마이그레이션(`001a`·010~013)은 이미 원격 적용됨 → 운영은 현재 "옛 코드 + 새 스키마"(안 깨짐, 신기능 미반영). push하면 정렬.
-2. **트랙3-B service_role rotation** (사용자 직접) — 레거시 키(`eyJ...`) 노출 → 신규 secret/publishable로 이전 후 레거시 비활성화. 순서: 새 키 복사 → `.env.local`+Vercel 갱신(시크릿은 채팅에 붙이지 말 것) → redeploy → 검증 → 레거시 disable.
-3. **트랙3-A part ii: 휴지통 purge** (후속) — `deleted_at` 경과분 영구삭제 메커니즘. pg_cron은 storage 직접삭제 불가 → Edge Function(service_role)으로 행+Storage 동시 삭제 + pg_net 호출. 현재는 휴지통에 영구 보관(안전).
-4. **트랙4-B Phase 3 에이전트 빌더** — 착수 전 **사용자와 기획작업 필수**(약속). /agents/new + POST /api/agents + 리스트 + 버전 이력.
-5. (이월) 위젯 드래그(③) UI 검증 / Finance 삭제 UI 검증(데이터 생기면).
+1. **코드리뷰 15건 E2E 검증**(미완 — 세션3 수정분, **최우선**) — Dia에서: 캘린더 멀티데이 연속막대/겹침 lane(M7·M8·L9·L12), 에이전트 생성→위젯→⌘Z 사라짐(M6), 핀 토글(M5), 재무 삭제→프로젝트 합계 반영(H3), ⌘Z 연타(L11), 이모지 입력(L14). 이상 없으면 push 후보. (체크리스트는 세션3 대화 참고)
+2. **미푸시 10커밋 push 여부 결정** — `9396b12`~`58b17bd`. push 시 운영 자동배포. DB(`001a`·010~014)는 이미 원격 적용 → 운영은 현재 "옛 코드 + 새 스키마"(안 깨짐, 신기능 미반영). push하면 정렬. **E2E 통과 후 권장.**
+3. **트랙3-B service_role rotation** (사용자 직접) — 레거시 키(`eyJ...`) 노출 → 신규 secret/publishable로 이전 후 레거시 비활성화. 순서: 새 키 복사 → `.env.local`+Vercel 갱신(**시크릿은 채팅에 붙이지 말 것**) → redeploy → 검증 → 레거시 disable.
+4. **트랙3-A part ii: 휴지통 purge** (후속) — `deleted_at` 경과분 영구삭제. pg_cron은 storage 직접삭제 불가 → Edge Function(service_role)으로 행+Storage 동시 삭제. 현재는 영구 보관(안전).
+5. (선택) 핀 교체 원자성 → upsert RPC 격상 / 기존 lint 부채 `set-state-in-effect` 정리 / 위젯 드래그(③) UI 검증.
 
 ---
 
@@ -224,7 +250,7 @@ supabase/migrations/001~009
 | E | 마크다운 다크모드 가독성 | tailwindcss-typography 미설치 |
 | F | DM cross-user 파일 공유 불가 | chat-files 본인 폴더 only(서명 URL은 본인 파일만). 상대가 보낸 이미지 썸네일이 안 뜰 수 있음 — 확인 필요 |
 | G | 그룹 채팅 미구현 | 1:1만 |
-| H | 멀티데이 캘린더 | ✅ 이번 세션 연속 막대로 해결. 단 같은 날 여러 일정 겹칠 때 막대 세로 정렬(lane) 정밀도는 단순(시작순) — 다중 겹침 많아지면 lane 배정 로직 필요 |
+| H | 멀티데이 캘린더 lane | ✅ **세션3에서 해결**(M8) — 고정 lane(eventId→lane useMemo, 그리디 interval coloring)로 겹침 시에도 막대가 같은 행 유지·연속. `LANE_CAP=3` 초과는 `+N개` 표시. **단 E2E 미검증** |
 | I | `.or()` 검색 특수문자 escape 부재 | sanitize 또는 textSearch |
 | J | OCR 카테고리 enum 밖 반환 가능 | zod enum 강제 |
 | K | 파일 업로드 사이즈 제한 부재 | 클라이언트 10MB 사전 차단 |
