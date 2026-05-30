@@ -187,6 +187,7 @@ export type Database = {
           address: string | null
           company: string | null
           created_at: string
+          deleted_at: string | null
           department: string | null
           email: string | null
           id: string
@@ -204,6 +205,7 @@ export type Database = {
           address?: string | null
           company?: string | null
           created_at?: string
+          deleted_at?: string | null
           department?: string | null
           email?: string | null
           id?: string
@@ -221,6 +223,7 @@ export type Database = {
           address?: string | null
           company?: string | null
           created_at?: string
+          deleted_at?: string | null
           department?: string | null
           email?: string | null
           id?: string
@@ -508,6 +511,7 @@ export type Database = {
           category: string | null
           created_at: string
           created_by: string | null
+          deleted_at: string | null
           description: string | null
           entry_date: string
           fee_amount: number
@@ -530,6 +534,7 @@ export type Database = {
           category?: string | null
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
           description?: string | null
           entry_date: string
           fee_amount?: number
@@ -552,6 +557,7 @@ export type Database = {
           category?: string | null
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
           description?: string | null
           entry_date?: string
           fee_amount?: number

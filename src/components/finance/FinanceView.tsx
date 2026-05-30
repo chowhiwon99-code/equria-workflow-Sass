@@ -45,15 +45,15 @@ export function FinanceView() {
   const load = useCallback(async () => {
     setLoading(true)
     const s = `%${searchText.trim()}%`
-    // 1) 페이지된 행
-    let rowsQ = supabase.from("finance_entries").select("*", { count: "exact" })
+    // 1) 페이지된 행 (휴지통 제외 — deleted_at is null)
+    let rowsQ = supabase.from("finance_entries").select("*", { count: "exact" }).is("deleted_at", null)
     if (kindFilter !== "all") rowsQ = rowsQ.eq("kind", kindFilter)
     if (categoryFilter) rowsQ = rowsQ.eq("category", categoryFilter)
     if (searchText.trim()) rowsQ = rowsQ.or(`vendor.ilike.${s},description.ilike.${s}`)
     const rowsP = rowsQ.order("entry_date", { ascending: false }).range(0, pageCount * PAGE_SIZE - 1)
 
-    // 2) 합계 (필터된 전체)
-    let sumQ = supabase.from("finance_entries").select("kind, category, total_amount")
+    // 2) 합계 (필터된 전체, 휴지통 제외)
+    let sumQ = supabase.from("finance_entries").select("kind, category, total_amount").is("deleted_at", null)
     if (kindFilter !== "all") sumQ = sumQ.eq("kind", kindFilter)
     if (categoryFilter) sumQ = sumQ.eq("category", categoryFilter)
     if (searchText.trim()) sumQ = sumQ.or(`vendor.ilike.${s},description.ilike.${s}`)
@@ -117,8 +117,8 @@ export function FinanceView() {
     })
 
   const exportCsv = async () => {
-    // 현재 필터된 전체 행을 받아옴 (페이지네이션 무시)
-    let q = supabase.from("finance_entries").select("*")
+    // 현재 필터된 전체 행을 받아옴 (페이지네이션 무시, 휴지통 제외)
+    let q = supabase.from("finance_entries").select("*").is("deleted_at", null)
     if (kindFilter !== "all") q = q.eq("kind", kindFilter)
     if (categoryFilter) q = q.eq("category", categoryFilter)
     if (searchText.trim()) {
@@ -162,26 +162,23 @@ export function FinanceView() {
     if (!confirm(`선택한 ${selected.size}건을 삭제할까요?`)) return
     setError(null)
     const ids = [...selected]
-    // 되돌리기로 복구할 수 있도록 삭제 전 전체 행을 확보 (영수증 파일은 보존)
-    const { data: rows } = await supabase.from("finance_entries").select("*").in("id", ids)
-    const { error: err } = await supabase.from("finance_entries").delete().in("id", ids)
+    // soft-delete: deleted_at 마킹 (행·영수증 파일 보존 → 휴지통/Undo 복구 가능)
+    const { error: err } = await supabase
+      .from("finance_entries")
+      .update({ deleted_at: new Date().toISOString() })
+      .in("id", ids)
     if (err) return setError(err.message)
-    if (rows && rows.length) {
-      push({
-        label: `${rows.length}건 삭제`,
-        undo: async () => {
-          await supabase.from("finance_entries").insert(rows)
-          load()
-        },
-        redo: async () => {
-          await supabase
-            .from("finance_entries")
-            .delete()
-            .in("id", rows.map((r) => r.id))
-          load()
-        },
-      })
-    }
+    push({
+      label: `${ids.length}건 삭제`,
+      undo: async () => {
+        await supabase.from("finance_entries").update({ deleted_at: null }).in("id", ids)
+        load()
+      },
+      redo: async () => {
+        await supabase.from("finance_entries").update({ deleted_at: new Date().toISOString() }).in("id", ids)
+        load()
+      },
+    })
     setSelected(new Set())
     load()
   }
@@ -387,16 +384,20 @@ export function FinanceView() {
                       <button
                         onClick={async () => {
                           if (!confirm(`이 항목을 삭제할까요?\n(${e.vendor ?? e.description ?? ""} · ${won(e.total_amount)})`)) return
-                          const { error: err } = await supabase.from("finance_entries").delete().eq("id", e.id)
+                          // soft-delete: deleted_at 마킹 (행·영수증 보존 → Undo 복구)
+                          const { error: err } = await supabase
+                            .from("finance_entries")
+                            .update({ deleted_at: new Date().toISOString() })
+                            .eq("id", e.id)
                           if (err) return setError(err.message)
                           push({
                             label: "항목 삭제",
                             undo: async () => {
-                              await supabase.from("finance_entries").insert(e)
+                              await supabase.from("finance_entries").update({ deleted_at: null }).eq("id", e.id)
                               load()
                             },
                             redo: async () => {
-                              await supabase.from("finance_entries").delete().eq("id", e.id)
+                              await supabase.from("finance_entries").update({ deleted_at: new Date().toISOString() }).eq("id", e.id)
                               load()
                             },
                           })

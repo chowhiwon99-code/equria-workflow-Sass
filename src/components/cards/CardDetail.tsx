@@ -37,6 +37,7 @@ export function CardDetail({ cardId }: { cardId: string }) {
         .from("business_cards")
         .select("*, owner:profiles!business_cards_owner_id_fkey(name)")
         .eq("id", cardId)
+        .is("deleted_at", null)
         .single()
       setCard((data as CardRow) ?? null)
       if (data?.image_url) {
@@ -51,17 +52,19 @@ export function CardDetail({ cardId }: { cardId: string }) {
 
   const remove = async () => {
     if (!card) return
-    // owner 조인 필드를 제외한 원본 컬럼만 보존 (되돌리기 시 재삽입용)
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { owner, ...row } = card
-    await supabase.from("business_cards").delete().eq("id", cardId)
+    // soft-delete: deleted_at 마킹 (행·명함 이미지 보존 → Undo 복구). 하드삭제 트리거 차단 문제도 회피.
+    const { error } = await supabase
+      .from("business_cards")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", cardId)
+    if (error) return
     push({
       label: "명함 삭제",
       undo: async () => {
-        await supabase.from("business_cards").insert(row)
+        await supabase.from("business_cards").update({ deleted_at: null }).eq("id", cardId)
       },
       redo: async () => {
-        await supabase.from("business_cards").delete().eq("id", cardId)
+        await supabase.from("business_cards").update({ deleted_at: new Date().toISOString() }).eq("id", cardId)
       },
     })
     router.push("/cards")

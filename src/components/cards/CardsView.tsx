@@ -28,6 +28,7 @@ export function CardsView() {
     let q = supabase
       .from("business_cards")
       .select("*, owner:profiles!business_cards_owner_id_fkey(name)", { count: "exact" })
+      .is("deleted_at", null)
     if (searchText.trim()) {
       const s = `%${searchText.trim()}%`
       q = q.or(`name.ilike.${s},company.ilike.${s},email.ilike.${s}`)
@@ -61,6 +62,7 @@ export function CardsView() {
     let q = supabase
       .from("business_cards")
       .select("*, owner:profiles!business_cards_owner_id_fkey(name)")
+      .is("deleted_at", null)
     if (searchText.trim()) {
       const s = `%${searchText.trim()}%`
       q = q.or(`name.ilike.${s},company.ilike.${s},email.ilike.${s}`)
