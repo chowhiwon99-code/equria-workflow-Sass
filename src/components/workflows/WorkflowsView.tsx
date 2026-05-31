@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Plus, Workflow as WorkflowIcon } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
-import { normalizeSteps } from "@/lib/workflows"
+import { normalizeGraph } from "@/lib/workflows"
 
 type WorkflowRow = {
   id: string
@@ -82,24 +82,38 @@ export function WorkflowsView() {
           아직 워크플로우가 없어요. ‘새 워크플로우’로 시작하세요.
         </p>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
           {rows.map((w) => {
-            const steps = normalizeSteps(w.steps)
+            const { nodes } = normalizeGraph(w.steps)
             return (
               <button
                 key={w.id}
                 onClick={() => router.push(`/workflows/${w.id}`)}
-                className="hover-grow flex flex-col gap-2 rounded-lg border p-4 text-left"
+                className="hover-grow flex flex-col gap-1.5 rounded-lg border p-3 text-left"
               >
-                <div className="flex items-center gap-2">
-                  <WorkflowIcon className="size-4 text-muted-foreground" />
-                  <span className="text-sm font-semibold">{w.name}</span>
+                <div className="flex items-center gap-1.5">
+                  <WorkflowIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                  <span className="truncate text-sm font-semibold">{w.name}</span>
                 </div>
                 {w.description && (
-                  <p className="line-clamp-2 text-xs text-muted-foreground">{w.description}</p>
+                  <p className="line-clamp-1 text-xs text-muted-foreground">{w.description}</p>
                 )}
-                <div className="mt-1 flex items-center gap-2 border-t pt-2 text-[11px] text-muted-foreground">
-                  <span>{steps.length}단계</span>
+                {/* 에이전트 아이콘 미리보기 — 한눈에 협력 흐름 */}
+                {nodes.length > 0 && (
+                  <div className="flex items-center gap-0.5 text-sm">
+                    {nodes.slice(0, 5).map((n, i) => (
+                      <span key={n.id} className="flex items-center">
+                        {i > 0 && <span className="px-0.5 text-[10px] text-muted-foreground/50">→</span>}
+                        <span title={n.agent_name}>{n.agent_icon || "🤖"}</span>
+                      </span>
+                    ))}
+                    {nodes.length > 5 && (
+                      <span className="ml-0.5 text-[10px] text-muted-foreground">+{nodes.length - 5}</span>
+                    )}
+                  </div>
+                )}
+                <div className="mt-0.5 flex items-center gap-1.5 border-t pt-1.5 text-[10px] text-muted-foreground">
+                  <span>{nodes.length}단계</span>
                   <span>·</span>
                   <span>실행 {w.run_count}회</span>
                 </div>

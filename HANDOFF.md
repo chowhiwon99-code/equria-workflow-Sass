@@ -10,6 +10,7 @@
 ## 🎯 지금 상태 (한눈에)
 
 - **Phase 1 + 자체기능(채팅·DM·캘린더·재무·명함·프로젝트) + 에이전트 허브 운영 중.** 전역 ⌘Z Undo · 휴지통(soft-delete) 적용.
+- **세션4-C**: 워크플로우 = **n8n식 캔버스**(원형 노드·드래그·끈 연결·도구배지) + **실제 순차 실행 엔진**(`/api/workflows/[id]/run` — 끈 위상정렬→generateText 순차 호출→앞 결과를 뒤로 체이닝→NDJSON 스트리밍, 노드 상태 시각화). **도구 골격 + 웹훅(HTTP POST, SSRF 가드)**. 권한 정정 = 워크플로우 `is_public` 토글(에이전트 패턴, **016 잘못된 완화를 017로 정정**: select=본인OR공유, update=소유자만). 실행 노드 ≤6(60s 타임아웃 보호). 마이그 `016`(폐기)·`017`.
 - **세션4-B**: 6개 섹션 전체 틀 구축 — 사이드바 **그룹화**(업무/AI/연동/계정)·**다크모드 배선**(next-themes). **설정**(프로필·테마·로그아웃)·**마이페이지**(프로필·사용량·내 에이전트)·**워크플로우**(정의 CRUD, 실행 게이트)·**파일관리**(로컬 업로드, Drive 게이트)=기능 / **메일**(Gmail 게이트 셸)·**MCP**(커넥터 카탈로그+admin 서버읽기)=셸. 마이그 `015`(files 버킷+`files.deleted_at`).
 - **세션4-A**: 에이전트 빌더 대개편 — 가이드 위저드(`/api/agents/generate-prompt`가 skill.md 자동생성)·창의성 프리셋·핀 폴백 제거(0개면 빈 위젯+CTA)·생성 시 자동핀·**회전초밥 캐러셀**(IconPicker + 허브 카드 MarqueeRail).
 - **세션3**: Phase 3a 커스텀 에이전트 빌더 + 위젯 핀(`014`) / 코드리뷰(xhigh) 15건 수정.
@@ -46,7 +47,7 @@
 
 - **GitHub** `chowhiwon99-code/equria-workflow-Sass` (main 단일, push→자동배포)
 - **Vercel** `equria-workflow-sass.vercel.app` (Prod, Hobby) · `NEXT_PUBLIC_APP_URL` 아직 placeholder
-- **Supabase** `dutovtfdckhayyvhtuxu` (ap-northeast-2 서울) · 마이그레이션 **001~014 전부 적용**(15↔15, drift 0)
+- **Supabase** `dutovtfdckhayyvhtuxu` (ap-northeast-2 서울) · 마이그레이션 **001~017 적용**. 015=files버킷+deleted_at · 016=wf_update완화(017이 정정,폐기) · 017=workflows is_public+소유권RLS. ※다음 세션 disk↔remote drift 재확인 권장.
 - **.env.local** 키 4종 + `WORKSPACE_PASSWORD=4321`(테스트값). ANTHROPIC 정상. 기본 모델 `claude-sonnet-4-6`.
 - **테스트 계정**: 조휘원(c6817c63…) / 이동규(cacf302d…) / 김건(fc468e85…) — DM·권한·RLS 시뮬용.
 
