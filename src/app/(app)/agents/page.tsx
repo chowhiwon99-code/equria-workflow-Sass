@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/client"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { MarqueeRail } from "@/components/shared/MarqueeRail"
 import type { Tables } from "@/lib/supabase/types"
 
 type AgentRow = Pick<
@@ -151,7 +152,7 @@ function Section({
           <p className="rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">{empty}</p>
         ) : null
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">{children}</div>
+        <MarqueeRail>{children}</MarqueeRail>
       )}
     </div>
   )
