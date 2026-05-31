@@ -12,8 +12,8 @@
 - **Phase 1 + 자체기능(채팅·DM·캘린더·재무·명함·프로젝트) + 에이전트 허브 운영 중.** 전역 ⌘Z Undo · 휴지통(soft-delete) 적용.
 - **세션4**: 에이전트 빌더 대개편 — 가이드 위저드(`/api/agents/generate-prompt`가 skill.md 자동생성)·창의성 프리셋·핀 폴백 제거(0개면 빈 위젯+CTA)·생성 시 자동핀·**회전초밥 캐러셀**(IconPicker + 허브 카드 MarqueeRail). DB 변경 없음(기존 `user_agent_pins` 재사용).
 - **세션3**: Phase 3a 커스텀 에이전트 빌더 + 위젯 핀(`014`) / 코드리뷰(xhigh) 15건 수정.
-- **검증**: tsc 0 · dev 컴파일 OK · Vercel 프로덕션 빌드 READY(`next build` 통과). DB drift 없음(마이그레이션 15↔15).
-- **✅ 전부 푸시 완료**: origin/main = `c40f4d9`, ahead 0 (세션3 미푸시 13커밋 + 세션4 분 모두 반영). push=운영 자동배포, 워킹트리 깨끗.
+- **검증**: tsc 0 · dev 컴파일 OK · DB drift 없음(마이그레이션 15↔15). ※Vercel 빌드 결과는 **대시보드에서 확인 필요**(이번 세션 Vercel MCP 토큰 스코프 403로 자동확인 불가).
+- **✅ 전부 푸시 완료**: origin/main 동기(ahead 0, 세션3 미푸시 13커밋 + 세션4 분 모두 반영). 코드 최종 커밋 `8cf026c`(+이 문서 커밋). push=운영 자동배포, 워킹트리 깨끗.
 - **⏳ 사용자 E2E 진행 중**: 위저드 생성품질·회전초밥 UI·핀 시나리오 + (세션3) 코드리뷰 15건 → 다음 세션 확인.
 - 운영: `https://equria-workflow-sass.vercel.app`
 
