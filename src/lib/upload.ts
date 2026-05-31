@@ -20,3 +20,28 @@ export async function uploadImage(bucket: string, file: File): Promise<string> {
   if (error) throw error
   return path
 }
+
+/**
+ * 임의 파일을 지정 버킷의 본인 폴더({uid}/{uuid}.{ext})로 업로드.
+ * 이미지 전용 uploadImage와 달리 확장자/콘텐츠 타입을 보존한다.
+ */
+export async function uploadFile(
+  bucket: string,
+  file: File
+): Promise<{ path: string; name: string; size: number; mimeType: string }> {
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error("로그인이 필요합니다.")
+
+  const ext = file.name.includes(".") ? file.name.split(".").pop() : ""
+  const path = `${user.id}/${crypto.randomUUID()}${ext ? `.${ext}` : ""}`
+  const mimeType = file.type || "application/octet-stream"
+  const { error } = await supabase.storage.from(bucket).upload(path, file, {
+    contentType: mimeType,
+    upsert: false,
+  })
+  if (error) throw error
+  return { path, name: file.name, size: file.size, mimeType }
+}

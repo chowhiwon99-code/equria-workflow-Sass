@@ -17,10 +17,12 @@ import {
   Contact,
   FolderOpen,
   Mail,
+  UserCircle,
   type LucideIcon,
 } from "lucide-react"
 
 export type FeatureStatus = "ready" | "wip" | "planned"
+export type FeatureGroup = "main" | "work" | "ai" | "connect" | "account"
 
 export interface Feature {
   /** 라우트 경로 (app 그룹 기준) */
@@ -34,9 +36,21 @@ export interface Feature {
   status: FeatureStatus
   /** PLAN.md의 개발 Phase */
   phase: number
+  /** 사이드바 섹션 그룹 */
+  group: FeatureGroup
 }
 
+/** 사이드바 그룹 순서 + 헤더 라벨 (label=null 이면 헤더 없이 최상단) */
+export const FEATURE_GROUPS: { id: FeatureGroup; label: string | null }[] = [
+  { id: "main", label: null },
+  { id: "work", label: "업무" },
+  { id: "ai", label: "AI" },
+  { id: "connect", label: "연동" },
+  { id: "account", label: "계정" },
+]
+
 export const FEATURES: Feature[] = [
+  // ── 최상단 ──
   {
     href: "/dashboard",
     label: "대시보드",
@@ -44,14 +58,17 @@ export const FEATURES: Feature[] = [
     icon: LayoutDashboard,
     status: "wip",
     phase: 1,
+    group: "main",
   },
+  // ── 업무 ──
   {
-    href: "/agents",
-    label: "AI 에이전트 관리",
-    description: "에이전트 빌더 (실제 대화는 좌측 하단 위젯에서)",
-    icon: Bot,
-    status: "planned",
-    phase: 3,
+    href: "/calendar",
+    label: "팀 캘린더",
+    description: "팀 일정 공유 및 관리",
+    icon: Calendar,
+    status: "ready",
+    phase: 4,
+    group: "work",
   },
   {
     href: "/projects",
@@ -60,6 +77,7 @@ export const FEATURES: Feature[] = [
     icon: FolderKanban,
     status: "ready",
     phase: 3,
+    group: "work",
   },
   {
     href: "/chat",
@@ -68,6 +86,7 @@ export const FEATURES: Feature[] = [
     icon: MessagesSquare,
     status: "ready",
     phase: 2,
+    group: "work",
   },
   {
     href: "/finance",
@@ -76,6 +95,7 @@ export const FEATURES: Feature[] = [
     icon: Receipt,
     status: "ready",
     phase: 5,
+    group: "work",
   },
   {
     href: "/cards",
@@ -84,23 +104,37 @@ export const FEATURES: Feature[] = [
     icon: Contact,
     status: "ready",
     phase: 5,
-  },
-  {
-    href: "/calendar",
-    label: "팀 캘린더",
-    description: "팀 일정 공유 및 관리",
-    icon: Calendar,
-    status: "ready",
-    phase: 4,
+    group: "work",
   },
   {
     href: "/files",
     label: "파일 관리",
-    description: "Google Drive 연동 (준비 중)",
+    description: "파일 업로드·정리 (Google Drive 연동 예정)",
     icon: FolderOpen,
-    status: "planned",
+    status: "wip",
     phase: 6,
+    group: "work",
   },
+  // ── AI ──
+  {
+    href: "/agents",
+    label: "AI 에이전트",
+    description: "에이전트 빌더 (실제 대화는 우하단 위젯에서)",
+    icon: Bot,
+    status: "ready",
+    phase: 3,
+    group: "ai",
+  },
+  {
+    href: "/workflows",
+    label: "워크플로우",
+    description: "에이전트를 체이닝해 업무 자동화",
+    icon: Workflow,
+    status: "wip",
+    phase: 6,
+    group: "ai",
+  },
+  // ── 연동 ──
   {
     href: "/mail",
     label: "메일",
@@ -108,30 +142,35 @@ export const FEATURES: Feature[] = [
     icon: Mail,
     status: "planned",
     phase: 6,
-  },
-  {
-    href: "/workflows",
-    label: "워크플로우",
-    description: "에이전트를 체이닝해 업무 자동화",
-    icon: Workflow,
-    status: "planned",
-    phase: 6,
+    group: "connect",
   },
   {
     href: "/mcp",
     label: "MCP 연결",
-    description: "Google Workspace 등 외부 도구 연결",
+    description: "외부 도구·커넥터 카탈로그",
     icon: Plug,
-    status: "planned",
+    status: "wip",
     phase: 5,
+    group: "connect",
+  },
+  // ── 계정 ──
+  {
+    href: "/mypage",
+    label: "마이페이지",
+    description: "내 프로필·내 에이전트·사용량",
+    icon: UserCircle,
+    status: "ready",
+    phase: 1,
+    group: "account",
   },
   {
     href: "/settings",
     label: "설정",
-    description: "프로필 및 워크스페이스 설정",
+    description: "프로필·테마·워크스페이스 설정",
     icon: Settings,
-    status: "planned",
+    status: "ready",
     phase: 1,
+    group: "account",
   },
 ]
 

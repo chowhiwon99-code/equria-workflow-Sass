@@ -3,7 +3,7 @@
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { FEATURES } from "@/lib/config/features"
+import { FEATURES, FEATURE_GROUPS } from "@/lib/config/features"
 import { cn } from "@/lib/utils"
 
 export function Sidebar() {
@@ -37,30 +37,43 @@ export function Sidebar() {
         </span>
       </Link>
 
-      <nav className="flex-1 space-y-1 overflow-y-auto p-2">
-        {FEATURES.map((feature) => {
-          const Icon = feature.icon
-          const active =
-            pathname === feature.href || pathname.startsWith(`${feature.href}/`)
+      <nav className="flex-1 space-y-3 overflow-y-auto p-2">
+        {FEATURE_GROUPS.map((group) => {
+          const items = FEATURES.filter((f) => f.group === group.id)
+          if (items.length === 0) return null
           return (
-            <Link
-              key={feature.href}
-              href={feature.href}
-              className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                active
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+            <div key={group.id} className="space-y-1">
+              {group.label && (
+                <p className="px-3 pt-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+                  {group.label}
+                </p>
               )}
-            >
-              <Icon className="size-4 shrink-0" />
-              <span className="flex-1">{feature.label}</span>
-              {feature.status === "planned" && (
-                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                  예정
-                </span>
-              )}
-            </Link>
+              {items.map((feature) => {
+                const Icon = feature.icon
+                const active =
+                  pathname === feature.href || pathname.startsWith(`${feature.href}/`)
+                return (
+                  <Link
+                    key={feature.href}
+                    href={feature.href}
+                    className={cn(
+                      "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                      active
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                        : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                    )}
+                  >
+                    <Icon className="size-4 shrink-0" />
+                    <span className="flex-1">{feature.label}</span>
+                    {feature.status === "planned" && (
+                      <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                        예정
+                      </span>
+                    )}
+                  </Link>
+                )
+              })}
+            </div>
           )
         })}
       </nav>

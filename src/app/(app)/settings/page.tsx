@@ -1,17 +1,13 @@
-import { Settings } from "lucide-react"
-import { PagePlaceholder } from "@/components/shared/PagePlaceholder"
+import { SettingsView } from "@/components/settings/SettingsView"
 
 export default function SettingsPage() {
   return (
-    <PagePlaceholder
-      icon={Settings}
-      title="설정"
-      description="프로필 및 워크스페이스 설정"
-      phase={1}
-      todo={[
-        "프로필 이름/부서/아바타 수정",
-        "관리자: 공용 비밀번호·에이전트 관리",
-      ]}
-    />
+    <div className="flex flex-col gap-5">
+      <div>
+        <h1 className="text-lg font-semibold">설정</h1>
+        <p className="text-sm text-muted-foreground">프로필·화면 테마·계정을 관리합니다.</p>
+      </div>
+      <SettingsView />
+    </div>
   )
 }

@@ -44,6 +44,9 @@ export function Header({ userName, userId }: { userName: string; userId: string 
         <DropdownMenuContent align="end">
           <DropdownMenuLabel>{userName}</DropdownMenuLabel>
           <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => router.push("/mypage")}>
+            마이페이지
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={() => router.push("/settings")}>
             설정
           </DropdownMenuItem>
