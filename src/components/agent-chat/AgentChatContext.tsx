@@ -84,20 +84,26 @@ export function AgentChatProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
   }, [selectedAgentId, position])
 
-  // 위젯에 띄울 에이전트 = 내가 핀한 것. 핀이 0개면 공개 기본 에이전트로 폴백(위젯 안 비게).
+  // 위젯에 띄울 에이전트 = 내가 핀한 것만. 핀이 0개면 위젯을 비운다(폴백 없음).
   const loadAgents = useCallback(async () => {
     const supabase = createClient()
     const { data: pinRows } = await supabase.from("user_agent_pins").select("agent_id")
     const pinnedIds = (pinRows ?? []).map((p) => p.agent_id)
 
-    let query = supabase
+    // 핀이 0개면 폴백 없이 위젯을 비운다.
+    if (pinnedIds.length === 0) {
+      setAgents([])
+      setLoading(false)
+      setSelectedAgentIdState(null)
+      return
+    }
+
+    const { data } = await supabase
       .from("agents")
       .select("id, name, description, icon, category")
       .eq("is_active", true)
       .order("created_at", { ascending: true })
-    query = pinnedIds.length > 0 ? query.in("id", pinnedIds) : query.eq("is_public", true)
-
-    const { data } = await query
+      .in("id", pinnedIds)
     const list = (data ?? []) as Agent[]
     setAgents(list)
     setLoading(false)

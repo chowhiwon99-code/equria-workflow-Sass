@@ -8,7 +8,13 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/shared/Modal"
 import { useUndo } from "@/components/undo/UndoProvider"
-import { AGENT_MODELS, AGENT_CATEGORIES, AGENT_DEFAULTS, AGENT_ICON_PRESETS } from "@/lib/agents"
+import { IconPicker } from "@/components/agents/IconPicker"
+import {
+  AGENT_MODELS,
+  AGENT_CATEGORIES,
+  AGENT_DEFAULTS,
+  TEMPERATURE_PRESETS,
+} from "@/lib/agents"
 
 // Take the first user-perceived grapheme cluster (keeps ZWJ sequences, flags,
 // skin-tone modifiers intact). Falls back to a code-point-aware slice when
@@ -35,21 +41,42 @@ export type AgentFormInitial = {
   max_tokens: number
 }
 
-export function AgentBuilderForm({ initial }: { initial?: AgentFormInitial | null }) {
+// 생성(create) 모드에서 위저드가 넘겨주는 초기값(부분). id 없음.
+export type AgentFormPrefill = Partial<Omit<AgentFormInitial, "id">>
+
+export function AgentBuilderForm({
+  initial,
+  prefill,
+  onBack,
+}: {
+  initial?: AgentFormInitial | null
+  prefill?: AgentFormPrefill | null
+  onBack?: () => void
+}) {
   const supabase = createClient()
   const router = useRouter()
   const { push } = useUndo()
   const editing = !!initial
 
-  const [name, setName] = useState(initial?.name ?? "")
-  const [icon, setIcon] = useState(initial?.icon ?? AGENT_DEFAULTS.icon)
-  const [category, setCategory] = useState(initial?.category ?? AGENT_DEFAULTS.category)
-  const [description, setDescription] = useState(initial?.description ?? "")
-  const [isPublic, setIsPublic] = useState(initial?.is_public ?? false)
-  const [systemPrompt, setSystemPrompt] = useState(initial?.system_prompt ?? "")
-  const [model, setModel] = useState(initial?.model ?? AGENT_DEFAULTS.model)
-  const [temperature, setTemperature] = useState(initial?.temperature ?? AGENT_DEFAULTS.temperature)
-  const [maxTokens, setMaxTokens] = useState(initial?.max_tokens ?? AGENT_DEFAULTS.maxTokens)
+  const [name, setName] = useState(initial?.name ?? prefill?.name ?? "")
+  const [icon, setIcon] = useState(initial?.icon ?? prefill?.icon ?? AGENT_DEFAULTS.icon)
+  const [category, setCategory] = useState(
+    initial?.category ?? prefill?.category ?? AGENT_DEFAULTS.category
+  )
+  const [description, setDescription] = useState(
+    initial?.description ?? prefill?.description ?? ""
+  )
+  const [isPublic, setIsPublic] = useState(initial?.is_public ?? prefill?.is_public ?? false)
+  const [systemPrompt, setSystemPrompt] = useState(
+    initial?.system_prompt ?? prefill?.system_prompt ?? ""
+  )
+  const [model, setModel] = useState(initial?.model ?? prefill?.model ?? AGENT_DEFAULTS.model)
+  const [temperature, setTemperature] = useState(
+    initial?.temperature ?? prefill?.temperature ?? AGENT_DEFAULTS.temperature
+  )
+  const [maxTokens, setMaxTokens] = useState(
+    initial?.max_tokens ?? prefill?.max_tokens ?? AGENT_DEFAULTS.maxTokens
+  )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -101,6 +128,10 @@ export function AgentBuilderForm({ initial }: { initial?: AgentFormInitial | nul
         setSaving(false)
         return
       }
+      // 만든 사람 위젯에 자동 핀 → 만들자마자 우하단 위젯에 등장(핀이 SSOT이므로).
+      // 실패해도 생성 자체는 유지(best-effort).
+      await supabase.from("user_agent_pins").insert({ user_id: meId, agent_id: agent.id })
+
       push({
         label: "에이전트 생성",
         undo: async () => {
@@ -181,45 +212,33 @@ export function AgentBuilderForm({ initial }: { initial?: AgentFormInitial | nul
 
   return (
     <div className="flex max-w-2xl flex-col gap-5">
-      {/* 이름 + 아이콘 */}
-      <div className="flex gap-3">
-        <label className="flex flex-col gap-1.5 text-sm">
-          <span className="text-xs text-muted-foreground">아이콘</span>
+      {/* 아이콘 */}
+      <div className="flex flex-col gap-2">
+        <span className="text-xs text-muted-foreground">아이콘</span>
+        <IconPicker value={icon} onChange={setIcon} />
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span>선택됨</span>
+          <span className="text-xl leading-none">{icon}</span>
+          <span className="ml-2">직접 입력</span>
           <input
-            className={cn(fieldClass, "w-16 text-center text-2xl")}
+            className={cn(fieldClass, "w-14 text-center text-lg")}
             value={icon}
             onChange={(e) => setIcon(firstGrapheme(e.target.value))}
-            aria-label="아이콘 이모지"
+            aria-label="아이콘 직접 입력"
           />
-        </label>
-        <label className="flex flex-1 flex-col gap-1.5 text-sm">
-          <span className="text-xs text-muted-foreground">이름 *</span>
-          <input
-            className={fieldClass}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="예: 브랜드 카피라이터"
-          />
-        </label>
+        </div>
       </div>
 
-      {/* 아이콘 프리셋 */}
-      <div className="flex flex-wrap gap-1">
-        {AGENT_ICON_PRESETS.map((em) => (
-          <button
-            key={em}
-            type="button"
-            onClick={() => setIcon(em)}
-            className={cn(
-              "flex size-8 items-center justify-center rounded-md border text-lg transition-colors hover:bg-muted",
-              icon === em && "border-primary bg-primary/10"
-            )}
-            aria-label={`아이콘 ${em}`}
-          >
-            {em}
-          </button>
-        ))}
-      </div>
+      {/* 이름 */}
+      <label className="flex flex-col gap-1.5 text-sm">
+        <span className="text-xs text-muted-foreground">이름 *</span>
+        <input
+          className={fieldClass}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="예: 브랜드 카피라이터"
+        />
+      </label>
 
       {/* 카테고리 + 설명 */}
       <div className="flex gap-3">
@@ -257,7 +276,7 @@ export function AgentBuilderForm({ initial }: { initial?: AgentFormInitial | nul
         />
       </label>
 
-      {/* 모델 + 파라미터 */}
+      {/* 모델 + 최대 토큰 */}
       <div className="flex flex-wrap items-end gap-3">
         <label className="flex flex-1 flex-col gap-1.5 text-sm">
           <span className="text-xs text-muted-foreground">모델</span>
@@ -268,18 +287,6 @@ export function AgentBuilderForm({ initial }: { initial?: AgentFormInitial | nul
               </option>
             ))}
           </select>
-        </label>
-        <label className="flex w-44 flex-col gap-1.5 text-sm">
-          <span className="text-xs text-muted-foreground">창의성(temperature): {temperature.toFixed(1)}</span>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.1}
-            value={temperature}
-            onChange={(e) => setTemperature(Number(e.target.value))}
-            className="h-9"
-          />
         </label>
         <label className="flex w-32 flex-col gap-1.5 text-sm">
           <span className="text-xs text-muted-foreground">최대 토큰</span>
@@ -293,6 +300,43 @@ export function AgentBuilderForm({ initial }: { initial?: AgentFormInitial | nul
             onChange={(e) => setMaxTokens(Number(e.target.value))}
           />
         </label>
+      </div>
+
+      {/* 창의성 (temperature) — 숫자 대신 이해 가능한 프리셋 */}
+      <div className="flex flex-col gap-2 text-sm">
+        <span className="text-xs text-muted-foreground">
+          창의성 <span className="text-muted-foreground/70">— 답변이 얼마나 자유롭고 다양해질지</span>
+        </span>
+        <div className="flex gap-2">
+          {TEMPERATURE_PRESETS.map((p) => (
+            <button
+              type="button"
+              key={p.value}
+              onClick={() => setTemperature(p.value)}
+              className={cn(
+                "flex-1 rounded-lg border px-3 py-2 text-left transition-colors",
+                Math.abs(temperature - p.value) < 0.001
+                  ? "border-primary bg-primary/10"
+                  : "hover:bg-muted"
+              )}
+            >
+              <div className="text-sm font-medium">{p.label}</div>
+              <div className="text-[11px] leading-tight text-muted-foreground">{p.desc}</div>
+            </button>
+          ))}
+        </div>
+        <details className="text-xs text-muted-foreground">
+          <summary className="cursor-pointer select-none">세부 조정 (temperature: {temperature.toFixed(1)})</summary>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.1}
+            value={temperature}
+            onChange={(e) => setTemperature(Number(e.target.value))}
+            className="mt-2 h-9 w-full"
+          />
+        </details>
       </div>
 
       {/* 공유 토글 */}
@@ -314,6 +358,11 @@ export function AgentBuilderForm({ initial }: { initial?: AgentFormInitial | nul
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       <div className="flex justify-end gap-2">
+        {onBack && (
+          <Button variant="ghost" size="sm" onClick={onBack} className="mr-auto">
+            ← 이전
+          </Button>
+        )}
         <Button variant="outline" size="sm" onClick={() => router.push("/agents")}>
           취소
         </Button>

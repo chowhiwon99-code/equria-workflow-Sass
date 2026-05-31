@@ -56,11 +56,10 @@ export default function AgentsPage() {
   const defaults = agents.filter((a) => a.created_by === null)
   const shared = agents.filter((a) => a.created_by !== null && a.created_by !== meId && a.is_public)
 
-  // 핀이 0개면 위젯은 공개 기본 에이전트를 보여줌(폴백) → 화면에서도 기본을 '위젯에 있음'으로 표시(일관성)
-  const defaultIds = defaults.filter((a) => a.is_public).map((a) => a.id)
-  const effectivePins = pins.size > 0 ? pins : new Set(defaultIds)
+  // 위젯은 핀한 에이전트만 보여줌(폴백 없음) → 화면 표시도 실제 핀 상태를 그대로 반영
+  const effectivePins = pins
 
-  // 위젯에 띄울 집합을 통째로 교체(델타 단순화). 첫 변경 시 기본 핀이 자연히 materialize 됨.
+  // 위젯에 띄울 집합을 통째로 교체(델타 단순화).
   const togglePin = async (agentId: string) => {
     if (!meId) return
     const next = new Set(effectivePins)
@@ -69,7 +68,7 @@ export default function AgentsPage() {
     setPins(next)
     try {
       // 전체 교체(델타 단순화): 기존 핀을 모두 지우고 next 집합을 다시 넣는다.
-      // delete 성공 후 insert 실패 시 핀이 0개로 남아 위젯이 폴백되므로, 둘 다 mustOk로 검증한다.
+      // delete 성공 후 insert 실패 시 핀이 0개로 남아 위젯이 비므로, 둘 다 mustOk로 검증한다.
       await mustOk(supabase.from("user_agent_pins").delete().eq("user_id", meId))
       if (next.size > 0) {
         await mustOk(

@@ -3,9 +3,10 @@
 import { useChat } from "@ai-sdk/react"
 import { DefaultChatTransport, type UIMessage } from "ai"
 import { useEffect, useMemo, useRef, useState } from "react"
+import Link from "next/link"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { Send, X, Plus, Maximize2, Minimize2, Copy, Check, GripHorizontal } from "lucide-react"
+import { Send, X, Plus, Maximize2, Minimize2, Copy, Check, GripHorizontal, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAgentChat, type Agent, type WidgetPosition } from "./AgentChatContext"
 
@@ -157,7 +158,11 @@ export function FloatingAgentChat() {
     return () => window.removeEventListener("resize", onResize)
   }, [ctx])
 
-  if (ctx.loading || ctx.agents.length === 0 || !ctx.selectedAgentId) return null
+  // 로딩 중에는 아무것도 그리지 않는다.
+  if (ctx.loading) return null
+  // 핀한 에이전트가 0개 → 위젯을 숨기지 않고 같은 우하단에 빈 상태를 띄운다.
+  if (ctx.agents.length === 0) return <EmptyAgentWidget />
+
   const selected = ctx.agents.find((a) => a.id === ctx.selectedAgentId)
   if (!selected) return null
 
@@ -166,6 +171,78 @@ export function FloatingAgentChat() {
       {!ctx.isOpen && <FloatingButton agent={selected} unread={ctx.unread} />}
       <ChatPanel hidden={!ctx.isOpen} />
     </>
+  )
+}
+
+/**
+ * 핀한 에이전트가 없을 때의 빈 상태.
+ * 닫혀 있으면 런처 버튼, 열면 같은 우하단 위치에 안내 + "에이전트 추가하기" CTA.
+ */
+function EmptyAgentWidget() {
+  const { isOpen, toggle, close, position } = useAgentChat()
+  const tl = widgetTopLeft(position)
+
+  if (!isOpen) {
+    return (
+      <button
+        type="button"
+        onClick={toggle}
+        style={{ position: "fixed", left: tl.left, top: tl.top }}
+        className={cn(
+          "z-50 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-primary/30 transition-shadow",
+          "animate-float hover:scale-110"
+        )}
+        aria-label="에이전트 위젯 열기 (⌘K)"
+        title="핀한 에이전트가 없습니다 (⌘K)"
+      >
+        <Sparkles className="pointer-events-none size-6" />
+      </button>
+    )
+  }
+
+  // 위젯의 우하단 코너를 빈-상태 패널 우하단 코너에 맞춰 정렬 (loading 이후라 window 항상 존재)
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const panelWidth = 288 // w-72
+  const right = vw - (tl.left + WIDGET_SIZE)
+  const bottom = vh - (tl.top + WIDGET_SIZE)
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        right: clamp(right, EDGE_PADDING, vw - panelWidth - EDGE_PADDING),
+        bottom: clamp(bottom, EDGE_PADDING, vh - EDGE_PADDING),
+      }}
+      className="z-50 flex w-72 flex-col gap-3 overflow-hidden rounded-2xl border bg-background p-4 shadow-2xl"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span className="text-2xl" aria-hidden>
+          ✨
+        </span>
+        <button
+          onClick={close}
+          className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          title="닫기"
+          aria-label="닫기"
+        >
+          <X className="size-4" />
+        </button>
+      </div>
+      <div className="flex flex-col gap-1">
+        <p className="text-sm font-semibold">핀한 에이전트가 없습니다</p>
+        <p className="text-xs text-muted-foreground">
+          관리 페이지에서 위젯에 띄울 에이전트를 핀하면 여기에 나타납니다.
+        </p>
+      </div>
+      <Link
+        href="/agents"
+        onClick={close}
+        className="flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+      >
+        <Plus className="size-4" /> 에이전트 추가하기
+      </Link>
+    </div>
   )
 }
 

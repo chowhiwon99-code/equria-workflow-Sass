@@ -166,3 +166,13 @@ body {
     transform: translate(1.5px, 1px) rotate(3deg);
   }
 }
+
+/* 아이콘 피커 — 회전초밥식 가로 무한 마퀴(트랙을 2벌 렌더 → -50% 이동으로 끊김 없는 루프) */
+@keyframes equria-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
