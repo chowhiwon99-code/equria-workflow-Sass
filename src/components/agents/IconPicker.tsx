@@ -7,7 +7,7 @@ import { AGENT_ICONS, type AgentIcon } from "@/lib/agents"
 
 /**
  * 회전초밥식 아이콘 피커.
- * - 평소엔 가로로 무한히 흘러가고(마퀴), hover/focus 하면 멈춰서 정밀 선택 가능.
+ * - 회전초밥처럼 끊김 없이 계속 흘러간다(멈추지 않음). 클릭/방향키로 선택(움직이는 중에도 클릭 가능).
  * - 접근성: role="radiogroup" + roving tabindex(←/→/Home/End/Enter).
  * - prefers-reduced-motion: 흐름을 끄고 줄바꿈 그리드로 폴백.
  * - 이모지 → 이미지 교체 대비: AgentIcon.image 가 있으면 <img>, 없으면 이모지.
@@ -93,7 +93,7 @@ export function IconPicker({
       <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-background to-transparent motion-reduce:hidden" />
       <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-background to-transparent motion-reduce:hidden" />
 
-      <div className="flex w-max motion-safe:animate-[equria-marquee_34s_linear_infinite] group-hover/rail:[animation-play-state:paused] focus-within:[animation-play-state:paused] motion-reduce:w-full motion-reduce:animate-none">
+      <div className="flex w-max motion-safe:animate-[equria-marquee_34s_linear_infinite] motion-reduce:w-full motion-reduce:animate-none">
         {/* 실제 라디오 그룹 */}
         <div className="flex shrink-0 gap-3 pr-3 motion-reduce:w-full motion-reduce:flex-wrap motion-reduce:justify-center motion-reduce:gap-2">
           {AGENT_ICONS.map((it, i) => renderBtn(it, i, false))}
