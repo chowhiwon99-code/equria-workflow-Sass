@@ -10,7 +10,7 @@
 
 - **운영 중**: Phase 1 + 자체기능(채팅·DM·캘린더·재무·명함·프로젝트) + 에이전트 허브 + **6개 섹션 틀**(설정·마이페이지·워크플로우·파일·메일·MCP). 전역 ⌘Z Undo · 휴지통(soft-delete).
 - **✅ 전부 푸시·배포 완료**: origin/main 동기(`9878bc2`), 워킹트리 깨끗. 신규 라우트(`/mypage`·`/api/workflows/[id]/run`)가 운영에서 307 응답 = **Vercel 빌드 성공 정황 확인**.
-- **검증**: tsc 0 · dev 컴파일 OK · `get_advisors` 신규이슈 0. ⚠️ **브라우저 E2E·`next build`·실제 워크플로우 실행은 미검증** → `known-issues.md` 참조.
+- **검증**: tsc 0 · dev 컴파일 OK · `get_advisors` 신규이슈 0 · ✅**세션5: `next build` exit 0 통과**(Next16 빌드는 eslint 비게이트 → 린트 23에러 있어도 배포 안 막힘) · ✅**DB drift 없음**(디스크18=원격18 1:1). ⚠️ **브라우저 E2E·실제 워크플로우 실행은 여전히 미검증** → `known-issues.md` 참조.
 - 운영: `https://equria-workflow-sass.vercel.app`
 
 ### 세션4 작업 요약 (이번 세션)
@@ -23,7 +23,7 @@
 ## 🔴 다음 세션 우선순위
 
 1. **워크플로우 실행 실제 검증**(최우선) — 로그인 후 노드 2~3개 연결 → "워크플로우 실행" → Claude가 순서대로 돌고 앞 결과가 뒤로 넘어가는지 확인. (제가 인증 못 해 미실행)
-2. **`next build` 한 번 돌려 eslint 빌드 통과 확인** (`known-issues.md` I1 — 가장 중요한 잠재 차단).
+2. ~~`next build` eslint 통과 확인~~ → ✅ **세션5 완료**(exit 0, 배포 안전 확정). 남은 린트 부채 23건은 비차단 → `known-issues.md` I1b.
 3. **6개 섹션 + 캔버스 브라우저 E2E**: 다크모드 전환·설정 저장→Header 반영·파일 업로드/다운로드·노드 드래그/끈 연결·is_public 공유.
 4. **세션3 코드리뷰 15건 E2E**(이월): 캘린더 멀티데이 lane·재무삭제→프로젝트합계·⌘Z연타·이모지.
 5. (사용자 직접) **service_role 키 rotation** — 레거시 키 노출. 새 키→`.env.local`+Vercel→redeploy→레거시 disable(**시크릿 채팅 금지**).
