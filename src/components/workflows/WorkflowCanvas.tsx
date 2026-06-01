@@ -35,7 +35,10 @@ export function WorkflowCanvas({
   const wrapRef = useRef<HTMLDivElement>(null)
   const [drag, setDrag] = useState<DragState>(null)
   const dragRef = useRef<DragState>(null)
-  dragRef.current = drag
+  // 렌더 중 ref 쓰기 금지(react-hooks/refs) — effect에서 최신 drag를 미러링
+  useEffect(() => {
+    dragRef.current = drag
+  }, [drag])
 
   const { nodes, edges } = graph
 
@@ -68,6 +71,13 @@ export function WorkflowCanvas({
     const p = toCanvas(e.clientX, e.clientY)
     setDrag({ kind: "wire", source: nodeId, x: p.x, y: p.y })
   }
+
+  // 포인터 위치의 노드 id(끈 연결 대상 판정). 반응형 의존성 없음 → 안정 참조.
+  const nodeAtPoint = useCallback((clientX: number, clientY: number): string | null => {
+    const el = document.elementFromPoint(clientX, clientY)
+    const host = el?.closest("[data-node-id]") as HTMLElement | null
+    return host?.dataset.nodeId ?? null
+  }, [])
 
   useEffect(() => {
     if (!drag) return
@@ -108,12 +118,6 @@ export function WorkflowCanvas({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drag, nodes, edges, onChange])
-
-  const nodeAtPoint = (clientX: number, clientY: number): string | null => {
-    const el = document.elementFromPoint(clientX, clientY)
-    const host = el?.closest("[data-node-id]") as HTMLElement | null
-    return host?.dataset.nodeId ?? null
-  }
 
   const removeEdge = (id: string) => {
     if (readOnly) return
