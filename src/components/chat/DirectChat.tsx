@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Send, Paperclip, NotebookPen, FileText, Loader2, Pencil, Trash2 } from "lucide-react"
+import { ArrowLeft, Send, Paperclip, NotebookPen, FileText, Loader2, Pencil, Trash2, SmilePlus } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { mustOk } from "@/lib/supabase/mustOk"
@@ -53,6 +53,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
   const [otherStatus, setOtherStatus] = useState<string | null>(null)
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [messages, setMessages] = useState<DirectMessage[]>([])
+  const [reactions, setReactions] = useState<{ id: string; message_id: string; emoji: string; user_id: string }[]>([])
   const [fileUrls, setFileUrls] = useState<Record<string, string>>({})
   const [input, setInput] = useState("")
   const [sending, setSending] = useState(false)
@@ -80,6 +81,37 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
       if (Object.keys(resolved).length > 0) setFileUrls((prev) => ({ ...prev, ...resolved }))
     },
     [supabase, fileUrls]
+  )
+
+  // 이 대화의 모든 메시지 반응을 한 번에 로드(inner join 필터).
+  const loadReactions = useCallback(
+    async (convId: string) => {
+      const { data } = await supabase
+        .from("message_reactions")
+        .select("id, message_id, emoji, user_id, direct_messages!inner(conversation_id)")
+        .eq("direct_messages.conversation_id", convId)
+      setReactions(
+        (data ?? []).map((r) => ({ id: r.id, message_id: r.message_id, emoji: r.emoji, user_id: r.user_id }))
+      )
+    },
+    [supabase]
+  )
+
+  // 반응 토글 — 내 같은 이모지 있으면 삭제, 없으면 추가. (RLS: 본인만)
+  const toggleReaction = useCallback(
+    async (messageId: string, emoji: string) => {
+      if (!meId || !conversationId) return
+      const existing = reactions.find(
+        (r) => r.message_id === messageId && r.user_id === meId && r.emoji === emoji
+      )
+      if (existing) {
+        await supabase.from("message_reactions").delete().eq("id", existing.id)
+      } else {
+        await supabase.from("message_reactions").insert({ message_id: messageId, user_id: meId, emoji })
+      }
+      void loadReactions(conversationId)
+    },
+    [supabase, meId, conversationId, reactions, loadReactions]
   )
 
   // 초기화
@@ -114,6 +146,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
       const list = msgs ?? []
       setMessages(list)
       void resolveAttachments(list)
+      void loadReactions(convId)
 
       // 나와의 채팅이 아니면 상대 메시지 + 관련 알림을 읽음 처리.
       // SECURITY DEFINER RPC 로 처리해 RLS/세션 변수를 배제하고 한 번에 갱신한다.
@@ -151,6 +184,11 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
           setMessages((prev) => prev.map((m) => (m.id === updated.id ? updated : m)))
         }
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "message_reactions" },
+        () => void loadReactions(conversationId)
+      )
       .subscribe()
     return () => {
       supabase.removeChannel(channel)
@@ -171,6 +209,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
       const list = msgs ?? []
       setMessages(list)
       void resolveAttachments(list)
+      void loadReactions(conversationId)
       if (meId !== otherUserId) {
         void supabase.rpc("mark_dm_read", { conv_id: conversationId }).then(() => {})
       }
@@ -281,6 +320,13 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
 
   if (error) return <p className="text-sm text-destructive">{error}</p>
 
+  const reactionsByMsg = new Map<string, { emoji: string; user_id: string }[]>()
+  for (const r of reactions) {
+    const arr = reactionsByMsg.get(r.message_id) ?? []
+    arr.push({ emoji: r.emoji, user_id: r.user_id })
+    reactionsByMsg.set(r.message_id, arr)
+  }
+
   return (
     <div className="flex h-full flex-col">
       <div className="mb-3 flex items-center gap-2 border-b pb-3">
@@ -341,7 +387,8 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
           }
 
           return (
-            <div key={m.id} className={cn("group flex items-end gap-1", mine ? "justify-end" : "justify-start")}>
+            <div key={m.id} className={cn("group flex flex-col gap-0.5", mine ? "items-end" : "items-start")}>
+              <div className={cn("flex items-end gap-1", mine ? "justify-end" : "justify-start")}>
               {/* 본인 메시지 호버 액션 (텍스트만 수정 가능, 삭제는 모두) */}
               {mine && (
                 <div className="flex items-center gap-0.5 self-center opacity-0 transition-opacity group-hover:opacity-100">
@@ -406,6 +453,13 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
                   )}
                 </div>
               )}
+              </div>
+              <MessageReactionBar
+                reactions={reactionsByMsg.get(m.id) ?? []}
+                meId={meId}
+                mine={mine}
+                onToggle={(emoji) => toggleReaction(m.id, emoji)}
+              />
             </div>
           )
         })}
@@ -434,6 +488,83 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
           <Send />
         </Button>
       </form>
+    </div>
+  )
+}
+
+const QUICK_EMOJIS = ["👍", "❤️", "😂", "🎉", "👀", "✅"]
+
+/** 메시지 버블 아래 반응 바 — 이모지별 칩(개수·내반응 강조) + 추가 버튼(호버 시). */
+function MessageReactionBar({
+  reactions,
+  meId,
+  mine,
+  onToggle,
+}: {
+  reactions: { emoji: string; user_id: string }[]
+  meId: string | null
+  mine: boolean
+  onToggle: (emoji: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const groups: Record<string, string[]> = {}
+  for (const r of reactions) (groups[r.emoji] ??= []).push(r.user_id)
+  const entries = Object.entries(groups)
+
+  return (
+    <div className={cn("flex items-center gap-1", mine && "flex-row-reverse")}>
+      {entries.map(([emoji, users]) => {
+        const reacted = meId != null && users.includes(meId)
+        return (
+          <button
+            key={emoji}
+            onClick={() => onToggle(emoji)}
+            className={cn(
+              "flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-xs transition-colors",
+              reacted ? "border-primary bg-primary/10" : "bg-background hover:bg-muted"
+            )}
+          >
+            <span>{emoji}</span>
+            <span className="text-[10px] text-muted-foreground">{users.length}</span>
+          </button>
+        )
+      })}
+      <div className="relative">
+        <button
+          onClick={() => setOpen((o) => !o)}
+          aria-label="반응 추가"
+          className={cn(
+            "flex size-5 items-center justify-center rounded-full text-muted-foreground hover:bg-muted",
+            entries.length === 0 && "opacity-0 transition-opacity group-hover:opacity-100"
+          )}
+        >
+          <SmilePlus className="size-3.5" />
+        </button>
+        {open && (
+          <>
+            <button className="fixed inset-0 z-10 cursor-default" aria-hidden onClick={() => setOpen(false)} />
+            <div
+              className={cn(
+                "absolute bottom-full z-20 mb-1 flex gap-0.5 rounded-full border bg-popover p-1 shadow-lg",
+                mine ? "right-0" : "left-0"
+              )}
+            >
+              {QUICK_EMOJIS.map((e) => (
+                <button
+                  key={e}
+                  onClick={() => {
+                    onToggle(e)
+                    setOpen(false)
+                  }}
+                  className="rounded-full px-1 text-base hover:bg-muted"
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }
