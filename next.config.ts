@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname),
   },
+  // 좌하단 Next.js 개발 표시기("N") 숨김 — 개발 편의용(배포본엔 영향 없음)
+  devIndicators: false,
 };
 
 export default nextConfig;
