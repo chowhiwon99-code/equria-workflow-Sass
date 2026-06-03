@@ -1,94 +1,519 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Mail, PenSquare, Inbox, Send, FileText, Trash2 } from "lucide-react"
+import { useCallback, useEffect, useState } from "react"
+import {
+  Mail,
+  PenSquare,
+  Inbox,
+  Send,
+  FileText,
+  Trash2,
+  Star,
+  Reply,
+  Archive,
+  MailOpen,
+  Paperclip,
+  RefreshCw,
+  Search,
+  Loader2,
+} from "lucide-react"
+import { toast } from "sonner"
+import DOMPurify from "isomorphic-dompurify"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
+import { Modal, fieldClass } from "@/components/shared/Modal"
+import { cn } from "@/lib/utils"
+import type { MailThreadSummary, MailThreadDetail } from "@/lib/google/gmail"
 
 const FOLDERS = [
-  { icon: Inbox, label: "받은편지함" },
-  { icon: Send, label: "보낸편지함" },
-  { icon: FileText, label: "임시보관" },
-  { icon: Trash2, label: "휴지통" },
+  { id: "INBOX", label: "받은편지함", icon: Inbox },
+  { id: "STARRED", label: "별표", icon: Star },
+  { id: "SENT", label: "보낸편지함", icon: Send },
+  { id: "DRAFT", label: "임시보관", icon: FileText },
+  { id: "TRASH", label: "휴지통", icon: Trash2 },
 ]
+
+type Compose = {
+  open: boolean
+  to: string
+  cc: string
+  subject: string
+  body: string
+  threadId?: string
+  inReplyTo?: string
+  references?: string
+  sending: boolean
+}
+const EMPTY_COMPOSE: Compose = { open: false, to: "", cc: "", subject: "", body: "", sending: false }
+
+function parseName(from: string): string {
+  const m = from.match(/^\s*"?([^"<]*)"?\s*<([^>]+)>/)
+  if (m) return (m[1].trim() || m[2].trim())
+  return from.trim()
+}
+function parseEmail(from: string): string {
+  const m = from.match(/<([^>]+)>/)
+  return (m ? m[1] : from).trim()
+}
+function fmtDate(d: string | null): string {
+  if (!d) return ""
+  const date = new Date(d)
+  if (Number.isNaN(date.getTime())) return ""
+  const now = new Date()
+  return date.toDateString() === now.toDateString()
+    ? date.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
+    : date.toLocaleDateString("ko-KR", { month: "short", day: "numeric" })
+}
+function sanitize(html: string): string {
+  return DOMPurify.sanitize(html, { USE_PROFILES: { html: true }, FORBID_TAGS: ["style"] })
+}
 
 export function MailShell() {
   const supabase = createClient()
   const [connected, setConnected] = useState<boolean | null>(null)
+  const [googleEmail, setGoogleEmail] = useState<string | null>(null)
 
-  useEffect(() => {
-    ;(async () => {
-      const { data: auth } = await supabase.auth.getUser()
-      if (!auth.user) {
-        setConnected(false)
-        return
-      }
-      const { data } = await supabase
-        .from("google_connections")
-        .select("is_active")
-        .eq("user_id", auth.user.id)
-        .maybeSingle()
-      setConnected(!!data?.is_active)
-    })()
+  const [activeLabel, setActiveLabel] = useState("INBOX")
+  const [queryInput, setQueryInput] = useState("")
+  const [appliedQ, setAppliedQ] = useState("")
+
+  const [threads, setThreads] = useState<MailThreadSummary[]>([])
+  const [nextPageToken, setNextPageToken] = useState<string | null>(null)
+  const [loadingList, setLoadingList] = useState(false)
+
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [detail, setDetail] = useState<MailThreadDetail | null>(null)
+  const [loadingDetail, setLoadingDetail] = useState(false)
+
+  const [compose, setCompose] = useState<Compose>(EMPTY_COMPOSE)
+
+  const checkConnection = useCallback(async () => {
+    const { data: auth } = await supabase.auth.getUser()
+    if (!auth.user) {
+      setConnected(false)
+      return
+    }
+    const { data } = await supabase
+      .from("google_connections")
+      .select("is_active, google_email")
+      .eq("user_id", auth.user.id)
+      .maybeSingle()
+    setConnected(!!data?.is_active)
+    setGoogleEmail(data?.google_email ?? null)
   }, [supabase])
 
-  return (
-    <div className="flex flex-col gap-5">
-      <div className="flex items-center justify-between">
+  useEffect(() => {
+    checkConnection()
+  }, [checkConnection])
+
+  // 연결 콜백 결과 토스트
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search).get("google")
+    if (!p) return
+    if (p === "connected") toast.success("Gmail이 연결되었어요.")
+    else if (p === "error") toast.error("Gmail 연결에 실패했어요. 다시 시도해 주세요.")
+    else if (p === "not_configured") toast.error("Google 연동이 아직 설정되지 않았어요(관리자).")
+    window.history.replaceState({}, "", window.location.pathname)
+  }, [])
+
+  const loadThreads = useCallback(
+    async (label: string, q: string, pageToken?: string) => {
+      setLoadingList(true)
+      try {
+        const params = new URLSearchParams({ label })
+        if (q) params.set("q", q)
+        if (pageToken) params.set("pageToken", pageToken)
+        const res = await fetch(`/api/google/gmail/threads?${params.toString()}`)
+        if (res.status === 412) {
+          setConnected(false)
+          return
+        }
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error ?? "목록을 불러오지 못했어요.")
+        setThreads((prev) => (pageToken ? [...prev, ...json.threads] : json.threads))
+        setNextPageToken(json.nextPageToken ?? null)
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "목록 오류")
+      } finally {
+        setLoadingList(false)
+      }
+    },
+    []
+  )
+
+  // 연결됨 + 라벨/검색 변경 시 목록 로드
+  useEffect(() => {
+    if (connected) {
+      setSelectedId(null)
+      setDetail(null)
+      loadThreads(activeLabel, appliedQ)
+    }
+  }, [connected, activeLabel, appliedQ, loadThreads])
+
+  const selectThread = useCallback(async (id: string) => {
+    setSelectedId(id)
+    setLoadingDetail(true)
+    setDetail(null)
+    try {
+      const res = await fetch(`/api/google/gmail/threads/${id}`)
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? "메일을 불러오지 못했어요.")
+      setDetail(json)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "상세 오류")
+    } finally {
+      setLoadingDetail(false)
+    }
+  }, [])
+
+  const modify = async (
+    id: string,
+    add: string[],
+    remove: string[],
+    opts?: { dropFromList?: boolean }
+  ) => {
+    try {
+      const res = await fetch(`/api/google/gmail/threads/${id}/modify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ add, remove }),
+      })
+      if (!res.ok) throw new Error("변경에 실패했어요.")
+      if (opts?.dropFromList) {
+        setThreads((prev) => prev.filter((t) => t.id !== id))
+        setSelectedId(null)
+        setDetail(null)
+      } else {
+        await Promise.all([loadThreads(activeLabel, appliedQ), selectThread(id)])
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "변경 오류")
+    }
+  }
+
+  const openReply = () => {
+    if (!detail) return
+    const last = detail.messages[detail.messages.length - 1]
+    setCompose({
+      ...EMPTY_COMPOSE,
+      open: true,
+      to: parseEmail(last.from),
+      subject: detail.subject.startsWith("Re:") ? detail.subject : `Re: ${detail.subject}`,
+      threadId: detail.id,
+      inReplyTo: last.rfcMessageId ?? undefined,
+      references: last.rfcMessageId ?? undefined,
+    })
+  }
+
+  const sendMail = async () => {
+    if (!compose.to.trim()) {
+      toast.error("받는 사람을 입력하세요.")
+      return
+    }
+    setCompose((c) => ({ ...c, sending: true }))
+    try {
+      const res = await fetch("/api/google/gmail/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: compose.to,
+          cc: compose.cc || undefined,
+          subject: compose.subject,
+          body: compose.body,
+          threadId: compose.threadId,
+          inReplyTo: compose.inReplyTo,
+          references: compose.references,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? "전송에 실패했어요.")
+      toast.success("메일을 보냈어요.")
+      setCompose(EMPTY_COMPOSE)
+      if (activeLabel === "SENT") loadThreads(activeLabel, appliedQ)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "전송 오류")
+    } finally {
+      setCompose((c) => ({ ...c, sending: false }))
+    }
+  }
+
+  const disconnect = async () => {
+    await fetch("/api/google/disconnect", { method: "POST" })
+    setConnected(false)
+    setGoogleEmail(null)
+    setThreads([])
+    setDetail(null)
+    setSelectedId(null)
+    toast.success("Gmail 연결을 끊었어요.")
+  }
+
+  // ---- 미연결 게이트 ----
+  if (connected !== true) {
+    return (
+      <div className="flex flex-col gap-5">
         <div>
           <h1 className="text-lg font-semibold">메일</h1>
           <p className="text-sm text-muted-foreground">
-            Gmail을 연결하면 받은 편지함을 여기서 확인할 수 있어요.
+            각자 본인 Gmail 계정을 연결하면 받은 편지함을 여기서 확인하고 보낼 수 있어요.
           </p>
         </div>
-        <Button size="sm" disabled>
-          <PenSquare /> 메일쓰기
-        </Button>
+        <div className="grid place-items-center rounded-2xl border border-dashed py-16">
+          <div className="flex max-w-sm flex-col items-center gap-3 text-center">
+            <div className="grid size-12 place-items-center rounded-full bg-muted">
+              <Mail className="size-6" />
+            </div>
+            <p className="text-sm font-semibold">Gmail 연결이 필요합니다</p>
+            <p className="text-xs text-muted-foreground">
+              {connected === null ? "연결 상태 확인 중…" : "내 Gmail을 연결하면 메일을 우리 화면에서 읽고 보낼 수 있어요."}
+            </p>
+            <Button
+              size="sm"
+              disabled={connected === null}
+              onClick={() => {
+                window.location.href = "/api/google/connect"
+              }}
+            >
+              내 Gmail 연결
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const isStarred = detail?.messages.some((m) => m.labelIds.includes("STARRED")) ?? false
+  const isUnread = detail?.messages.some((m) => m.labelIds.includes("UNREAD")) ?? false
+
+  // ---- 연결됨: 3분할 ----
+  return (
+    <div className="flex h-[calc(100vh-9rem)] flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h1 className="text-lg font-semibold">메일</h1>
+          <p className="text-xs text-muted-foreground">{googleEmail ? `${googleEmail} 연결됨` : "연결됨"}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="ghost" onClick={() => loadThreads(activeLabel, appliedQ)}>
+            <RefreshCw className={cn("size-4", loadingList && "animate-spin")} />
+          </Button>
+          <Button size="sm" variant="ghost" onClick={disconnect} className="text-muted-foreground">
+            연결 끊기
+          </Button>
+          <Button size="sm" onClick={() => setCompose({ ...EMPTY_COMPOSE, open: true })}>
+            <PenSquare /> 메일쓰기
+          </Button>
+        </div>
       </div>
 
-      <div className="relative">
-        {/* 메일 UI 골격 (블러 처리된 더미) */}
-        <div className="pointer-events-none grid grid-cols-[180px_1fr] gap-4 opacity-40 blur-[1px]">
-          <div className="flex flex-col gap-1 rounded-xl border p-2">
-            {FOLDERS.map((f) => (
-              <div
-                key={f.label}
-                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground"
-              >
-                <f.icon className="size-4" /> {f.label}
+      <div className="grid min-h-0 flex-1 grid-cols-[160px_minmax(260px,340px)_1fr] gap-3">
+        {/* 좌측 폴더 */}
+        <div className="flex flex-col gap-1 overflow-y-auto rounded-xl border p-2">
+          {FOLDERS.map((f) => (
+            <button
+              key={f.id}
+              onClick={() => {
+                setActiveLabel(f.id)
+                setQueryInput("")
+                setAppliedQ("")
+              }}
+              className={cn(
+                "flex items-center gap-2 rounded-md px-3 py-2 text-left text-sm",
+                activeLabel === f.id ? "bg-muted font-medium" : "text-muted-foreground hover:bg-muted/50"
+              )}
+            >
+              <f.icon className="size-4 shrink-0" /> {f.label}
+            </button>
+          ))}
+        </div>
+
+        {/* 중앙 목록 */}
+        <div className="flex min-h-0 flex-col rounded-xl border">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              setAppliedQ(queryInput.trim())
+            }}
+            className="flex items-center gap-1.5 border-b p-2"
+          >
+            <Search className="size-3.5 shrink-0 text-muted-foreground" />
+            <input
+              value={queryInput}
+              onChange={(e) => setQueryInput(e.target.value)}
+              placeholder="메일 검색 (Gmail 문법)"
+              className="h-7 w-full bg-transparent text-sm outline-none"
+            />
+          </form>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {loadingList && threads.length === 0 ? (
+              <p className="p-4 text-sm text-muted-foreground">불러오는 중…</p>
+            ) : threads.length === 0 ? (
+              <p className="p-4 text-sm text-muted-foreground">메일이 없어요.</p>
+            ) : (
+              <div className="flex flex-col divide-y">
+                {threads.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => selectThread(t.id)}
+                    className={cn(
+                      "flex flex-col gap-0.5 px-3 py-2.5 text-left hover:bg-muted/40",
+                      selectedId === t.id && "bg-muted/60",
+                      t.unread && "bg-primary/[0.03]"
+                    )}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span className={cn("min-w-0 flex-1 truncate text-sm", t.unread && "font-semibold")}>
+                        {parseName(t.from) || "(보낸이 없음)"}
+                      </span>
+                      {t.hasAttachment && <Paperclip className="size-3 shrink-0 text-muted-foreground" />}
+                      <span className="shrink-0 text-[10px] text-muted-foreground">{fmtDate(t.date)}</span>
+                    </div>
+                    <span className={cn("truncate text-xs", t.unread ? "font-medium" : "text-muted-foreground")}>
+                      {t.subject}
+                    </span>
+                    <span className="truncate text-[11px] text-muted-foreground/70">{t.snippet}</span>
+                  </button>
+                ))}
+                {nextPageToken && (
+                  <button
+                    onClick={() => loadThreads(activeLabel, appliedQ, nextPageToken)}
+                    disabled={loadingList}
+                    className="px-3 py-2 text-center text-xs text-muted-foreground hover:bg-muted/40"
+                  >
+                    {loadingList ? "불러오는 중…" : "더 보기"}
+                  </button>
+                )}
               </div>
-            ))}
-          </div>
-          <div className="flex flex-col divide-y rounded-xl border">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="flex flex-col gap-1.5 px-4 py-3">
-                <div className="h-3 w-1/3 rounded bg-muted" />
-                <div className="h-3 w-2/3 rounded bg-muted" />
-              </div>
-            ))}
+            )}
           </div>
         </div>
 
-        {/* 연결 게이트 오버레이 */}
-        {connected !== true && (
-          <div className="absolute inset-0 grid place-items-center">
-            <div className="flex max-w-sm flex-col items-center gap-3 rounded-2xl border bg-background p-6 text-center shadow-sm">
-              <div className="grid size-12 place-items-center rounded-full bg-muted">
-                <Mail className="size-6" />
+        {/* 우측 상세 */}
+        <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border">
+          {!selectedId ? (
+            <div className="grid flex-1 place-items-center text-sm text-muted-foreground">
+              메일을 선택하세요.
+            </div>
+          ) : loadingDetail || !detail ? (
+            <div className="grid flex-1 place-items-center text-sm text-muted-foreground">불러오는 중…</div>
+          ) : (
+            <>
+              <div className="flex items-center gap-1 border-b p-2.5">
+                <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">{detail.subject}</h2>
+                <Button size="icon-sm" variant="ghost" title="답장" onClick={openReply}>
+                  <Reply className="size-4" />
+                </Button>
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  title={isStarred ? "별표 해제" : "별표"}
+                  onClick={() => modify(detail.id, isStarred ? [] : ["STARRED"], isStarred ? ["STARRED"] : [])}
+                >
+                  <Star className={cn("size-4", isStarred && "fill-yellow-400 text-yellow-400")} />
+                </Button>
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  title={isUnread ? "읽음으로" : "안읽음으로"}
+                  onClick={() => modify(detail.id, isUnread ? [] : ["UNREAD"], isUnread ? ["UNREAD"] : [])}
+                >
+                  <MailOpen className="size-4" />
+                </Button>
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  title="보관"
+                  onClick={() => modify(detail.id, [], ["INBOX"], { dropFromList: activeLabel === "INBOX" })}
+                >
+                  <Archive className="size-4" />
+                </Button>
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  title="휴지통"
+                  onClick={() => modify(detail.id, ["TRASH"], [], { dropFromList: true })}
+                >
+                  <Trash2 className="size-4" />
+                </Button>
               </div>
-              <p className="text-sm font-semibold">Gmail 연결이 필요합니다</p>
-              <p className="text-xs text-muted-foreground">
-                {connected === null
-                  ? "연결 상태 확인 중…"
-                  : "Gmail을 연결하면 메일을 여기서 읽고 보낼 수 있어요. (연동 준비 중)"}
-              </p>
-              <Button size="sm" variant="outline" disabled>
-                Gmail 연결 (곧)
+              <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+                {detail.messages.map((m) => (
+                  <div key={m.id} className="rounded-lg border">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 border-b px-3 py-2 text-xs">
+                      <span className="font-medium">{parseName(m.from)}</span>
+                      <span className="text-muted-foreground">{parseEmail(m.from)}</span>
+                      <span className="ml-auto text-muted-foreground">{fmtDate(m.date)}</span>
+                    </div>
+                    <div className="px-3 py-2.5">
+                      {m.html ? (
+                        <div
+                          className="prose prose-sm max-w-none text-sm [&_a]:text-primary [&_img]:max-w-full"
+                          dangerouslySetInnerHTML={{ __html: sanitize(m.html) }}
+                        />
+                      ) : (
+                        <pre className="whitespace-pre-wrap font-sans text-sm">{m.text || "(내용 없음)"}</pre>
+                      )}
+                      {m.attachments.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-2 border-t pt-2.5">
+                          {m.attachments.map((a) => (
+                            <a
+                              key={a.attachmentId}
+                              href={`/api/google/gmail/attachments/${m.id}/${a.attachmentId}?name=${encodeURIComponent(a.filename)}&mime=${encodeURIComponent(a.mimeType)}`}
+                              className="flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs text-muted-foreground hover:bg-muted/40"
+                            >
+                              <Paperclip className="size-3" /> {a.filename}
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* 작성/답장 모달 */}
+      {compose.open && (
+        <Modal title={compose.threadId ? "답장" : "메일쓰기"} onClose={() => setCompose(EMPTY_COMPOSE)} className="max-w-lg">
+          <div className="flex flex-col gap-2">
+            <input
+              className={fieldClass}
+              placeholder="받는 사람 (이메일)"
+              value={compose.to}
+              onChange={(e) => setCompose((c) => ({ ...c, to: e.target.value }))}
+            />
+            <input
+              className={fieldClass}
+              placeholder="참조 (선택)"
+              value={compose.cc}
+              onChange={(e) => setCompose((c) => ({ ...c, cc: e.target.value }))}
+            />
+            <input
+              className={fieldClass}
+              placeholder="제목"
+              value={compose.subject}
+              onChange={(e) => setCompose((c) => ({ ...c, subject: e.target.value }))}
+            />
+            <textarea
+              className={cn(fieldClass, "min-h-[180px] resize-y py-2")}
+              placeholder="내용"
+              value={compose.body}
+              onChange={(e) => setCompose((c) => ({ ...c, body: e.target.value }))}
+            />
+            <div className="flex justify-end gap-2">
+              <Button size="sm" variant="ghost" onClick={() => setCompose(EMPTY_COMPOSE)}>
+                취소
+              </Button>
+              <Button size="sm" onClick={sendMail} disabled={compose.sending}>
+                {compose.sending ? <Loader2 className="animate-spin" /> : <Send />}
+                보내기
               </Button>
             </div>
           </div>
-        )}
-      </div>
+        </Modal>
+      )}
     </div>
   )
 }
