@@ -657,38 +657,88 @@ export type Database = {
       mcp_servers: {
         Row: {
           args: string[] | null
+          auth_type: string
           command: string | null
           created_at: string
           env_vars: Json
           id: string
           is_active: boolean
+          last_test_error: string | null
+          last_test_ok: boolean | null
+          last_tested_at: string | null
           name: string
           type: string
           url: string | null
         }
         Insert: {
           args?: string[] | null
+          auth_type?: string
           command?: string | null
           created_at?: string
           env_vars?: Json
           id?: string
           is_active?: boolean
+          last_test_error?: string | null
+          last_test_ok?: boolean | null
+          last_tested_at?: string | null
           name: string
           type: string
           url?: string | null
         }
         Update: {
           args?: string[] | null
+          auth_type?: string
           command?: string | null
           created_at?: string
           env_vars?: Json
           id?: string
           is_active?: boolean
+          last_test_error?: string | null
+          last_test_ok?: boolean | null
+          last_tested_at?: string | null
           name?: string
           type?: string
           url?: string | null
         }
         Relationships: []
+      }
+      mcp_tools: {
+        Row: {
+          created_at: string
+          description: string | null
+          enabled: boolean
+          id: string
+          input_schema: Json
+          name: string
+          server_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          input_schema?: Json
+          name: string
+          server_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          input_schema?: Json
+          name?: string
+          server_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mcp_tools_server_id_fkey"
+            columns: ["server_id"]
+            isOneToOne: false
+            referencedRelation: "mcp_servers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       messages: {
         Row: {
