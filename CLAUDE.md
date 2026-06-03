@@ -32,7 +32,7 @@
 1. TypeScript strict mode — 타입 any 금지
 2. ANTHROPIC_API_KEY는 서버사이드 전용 — 클라이언트에 절대 노출 금지
 3. 모든 DB 쿼리는 Supabase RLS 통과 필수 — service_role_key는 서버 전용
-4. 모든 에이전트 대화는 conversations + messages 테이블에 저장
+4. 모든 대화는 도메인별 메시지 테이블에 저장 (에이전트=conversations/messages · 어시스턴트=assistant_conversations/assistant_messages · 팀 DM=direct_conversations/direct_messages)
 5. Claude API 스트리밍 응답 사용 (Vercel AI SDK — useChat 훅 + streamText)
 6. 컴포넌트 파일명: PascalCase / 유틸리티: camelCase / 상수: UPPER_SNAKE_CASE
 7. 한국어 UI 텍스트 / 영어 코드 & 주석
@@ -44,13 +44,15 @@
 
 | 레이어 | 기술 | 버전 | 이유 |
 |--------|------|------|------|
-| 프레임워크 | Next.js | 16.x (App Router) | 서버/클라이언트 분리, Vercel 배포 최적화 (React 19) |
-| 스타일 | TailwindCSS + shadcn/ui | latest | 빠른 UI 구성 |
-| 인증/DB | Supabase | latest | Auth + PostgreSQL + Realtime + Storage |
+| 프레임워크 | Next.js | 16.2.6 (App Router, Turbopack) | 서버/클라이언트 분리, Vercel 배포 최적화 (React 19.2.4) |
+| 스타일 | TailwindCSS + shadcn/ui | Tailwind 4 (globals.css `@theme`) | 빠른 UI 구성 |
+| 인증/DB | Supabase | supabase-js ^2.106 / ssr ^0.10 | Auth + PostgreSQL + Realtime + Storage |
 | AI 엔진 | Anthropic Claude API | claude-sonnet-4-6 (기본) / claude-opus-4-7 (복잡) | 성능/비용 균형 |
-| AI SDK | Vercel AI SDK (`ai` + `@ai-sdk/anthropic`) | latest | 스트리밍 훅 (useChat) + streamText |
+| AI SDK | Vercel AI SDK (`ai` + `@ai-sdk/anthropic` + `@ai-sdk/react`) | ai ^6.0 / anthropic ^3.0 / react ^3.0 | 스트리밍 (streamText + useChat) |
+| 외부 연동 | googleapis (Gmail) · MCP 클라이언트 | googleapis ^173 | OAuth 메일 · MCP 도구 런타임 |
+| 테마 | next-themes | ^0.4 | 라이트/다크/시스템 (루트 layout의 ThemeProvider) |
 | 배포 | Vercel | — | Next.js 최적화 |
-| 패키지 | pnpm | latest | 빠른 설치 |
+| 패키지 | pnpm | — | 빠른 설치 |
 
 ---
 
@@ -65,6 +67,15 @@ NEXT_PUBLIC_SUPABASE_URL=https://[project-id].supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 SUPABASE_SERVICE_ROLE_KEY=eyJ...  # 서버사이드 전용
 
+# Google OAuth (서버 전용 — Gmail 연동, 직원 개인계정 로그인)
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+GOOGLE_OAUTH_REDIRECT_URI=http://localhost:3000/api/google/callback
+GOOGLE_TOKEN_ENC_KEY=...           # AES-256-GCM 토큰 암호화 키 (서버 전용)
+
+# 워크스페이스 게이트 (사내 공용 진입 비밀번호 — 서버 전용, NEXT_PUBLIC_ 금지)
+WORKSPACE_PASSWORD=...
+
 # App
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 NEXT_PUBLIC_APP_NAME=이큐리아 워크스페이스
@@ -74,117 +85,76 @@ NEXT_PUBLIC_APP_NAME=이큐리아 워크스페이스
 
 ## 5. 프로젝트 파일 구조 (전체)
 
+> ⚠️ 이 트리는 대표 구조다(전수 아님). 실제 파일은 `find src -type f`로 확인하고, 트리 변경 시 이 절을 갱신한다.
+
 ```
 equria-workspace/
-├── CLAUDE.md                     ← 이 파일
-├── PLAN.md                       ← 상세 기획서
-├── .env.local                    ← 환경변수 (git 제외)
-├── .env.example                  ← 환경변수 템플릿
-├── next.config.js
-├── tailwind.config.js
-├── tsconfig.json
-├── package.json
+├── CLAUDE.md  PLAN.md  HANDOFF.md      ← 매니페스트 · 기획 · 세션 인수인계
+├── .env.local  .env.example
+├── next.config.ts  tsconfig.json  package.json
+├── .claude/skills/                     ← safe-changes · latest-stack · known-issues
 ├── supabase/
-│   ├── migrations/
-│   │   └── 001_initial_schema.sql   ← 전체 DB 스키마
-│   └── seed.sql                     ← 기본 에이전트 데이터
+│   ├── migrations/                     ← 001_initial_schema … 022b (24개 파일, DB SSOT)
+│   └── seed.sql                        ← 기본 에이전트 8개 시드
 │
 └── src/
     ├── app/
-    │   ├── layout.tsx               ← 루트 레이아웃 (폰트, 메타)
-    │   ├── page.tsx                 ← / → /dashboard 리다이렉트
-    │   ├── (auth)/                  ← 인증 레이아웃 그룹
-    │   │   ├── layout.tsx
-    │   │   ├── login/page.tsx
-    │   │   └── signup/page.tsx
-    │   ├── (app)/                   ← 앱 레이아웃 그룹 (로그인 필요)
-    │   │   ├── layout.tsx           ← Sidebar + Header 포함
-    │   │   ├── dashboard/page.tsx   ← 홈 대시보드
-    │   │   ├── agents/
-    │   │   │   ├── page.tsx         ← 에이전트 허브 (목록)
-    │   │   │   ├── new/page.tsx     ← 에이전트 생성/등록
-    │   │   │   └── [id]/page.tsx    ← 에이전트 채팅 화면
-    │   │   ├── calendar/
-    │   │   │   └── page.tsx
-    │   │   ├── workflows/
-    │   │   │   ├── page.tsx
-    │   │   │   └── [id]/page.tsx
-    │   │   └── settings/
-    │   │       └── page.tsx
-    │   └── api/                     ← API 라우트 (서버사이드)
-    │       ├── agents/
-    │       │   ├── route.ts         ← GET 목록, POST 생성
-    │       │   └── [id]/
-    │       │       ├── route.ts     ← GET, PUT, DELETE
-    │       │       └── chat/
-    │       │           └── route.ts ← POST 채팅 (Claude API 프록시)
-    │       ├── calendar/
-    │       │   └── route.ts
-    │       └── workflows/
-    │           └── route.ts
+    │   ├── layout.tsx                  ← 루트(폰트·메타·ThemeProvider)
+    │   ├── page.tsx                    ← / → 리다이렉트
+    │   ├── (auth)/                     ← login · signup · 워크스페이스 게이트
+    │   ├── (app)/                      ← 로그인 필요 (layout = Sidebar+Header+UndoProvider+AgentChatProvider)
+    │   │   ├── dashboard  agents  calendar  workflows  settings  mypage
+    │   │   └── chat  files  finance  cards  mail  mcp  projects   ← 세션4 섹션
+    │   └── api/                        ← 서버 라우트
+    │       ├── agents/[id]/chat        ← Claude 스트리밍 프록시 (streamText)
+    │       ├── agents/generate-prompt  ← 에이전트 시스템프롬프트 생성
+    │       ├── assistant + assistant/conversations[/[id]]  ← 대시보드 어시스턴트
+    │       ├── workflows/[id]/run      ← 워크플로우 순차 실행(NDJSON)
+    │       ├── cards/ocr  finance/ocr  finance/tax-invoice
+    │       ├── google/{connect,callback,disconnect,gmail/*}   ← OAuth + Gmail BFF
+    │       └── mcp/servers[/[id][/test]]                      ← MCP 서버 CRUD/테스트
     │
     ├── components/
-    │   ├── ui/                      ← shadcn/ui 컴포넌트 (수정 금지)
-    │   ├── layout/
-    │   │   ├── Sidebar.tsx
-    │   │   ├── Header.tsx
-    │   │   └── Navigation.tsx
-    │   ├── agents/
-    │   │   ├── AgentCard.tsx        ← 에이전트 카드 UI
-    │   │   ├── AgentChat.tsx        ← 채팅 인터페이스 (useChat)
-    │   │   ├── AgentBuilder.tsx     ← 에이전트 생성 폼
-    │   │   └── MessageBubble.tsx
-    │   ├── calendar/
-    │   │   └── CalendarView.tsx
-    │   └── shared/
-    │       ├── LoadingSpinner.tsx
-    │       └── ErrorBoundary.tsx
+    │   ├── ui/                         ← shadcn/ui (수정 금지)
+    │   ├── layout/  shared/  theme/  undo/  agent-chat/
+    │   ├── agents/  calendar/  workflows/  chat/  dashboard/
+    │   └── files/ finance/ cards/ mail/ mcp/ projects/ settings/ mypage/
     │
     ├── lib/
-    │   ├── supabase/
-    │   │   ├── client.ts            ← 브라우저용 createBrowserClient
-    │   │   ├── server.ts            ← 서버용 createServerClient
-    │   │   └── types.ts             ← Database 타입 (supabase gen types)
-    │   ├── claude/
-    │   │   ├── client.ts            ← Anthropic provider 초기화 (@ai-sdk/anthropic)
-    │   │   └── agents/
-    │   │       ├── index.ts         ← 에이전트 설정 map
-    │   │       ├── tax-invoice.ts
-    │   │       ├── customer-service.ts
-    │   │       ├── higgsfield-prompt.ts
-    │   │       ├── sns-content.ts
-    │   │       ├── translation.ts
-    │   │       ├── document-writing.ts
-    │   │       ├── data-analytics.ts
-    │   │       └── legal-review.ts
-    │   └── utils.ts
+    │   ├── supabase/                   ← client · server · admin · types · mustOk
+    │   ├── claude/                     ← client(@ai-sdk/anthropic) · schemas
+    │   ├── google/                     ← oauth · client · gmail · crypto(AES-256-GCM)
+    │   ├── config/features.ts          ← 섹션/기능 SSOT
+    │   ├── agents.ts  agentBuilder.ts  ← 에이전트 프리셋·빌더 위저드
+    │   ├── workflows.ts  workflowTools.ts  mcp.ts  mcp/connect.ts
+    │   ├── finance.ts  projects.ts  calendar.ts  files.ts  figma.ts
+    │   └── upload.ts  csv.ts  auth.ts  utils.ts
     │
-    ├── hooks/
-    │   ├── useAgents.ts             ← 에이전트 목록/CRUD
-    │   └── useCalendar.ts
-    │   # 채팅은 Vercel AI SDK의 useChat를 직접 사용 (자체 훅 불필요)
-    │
-    └── types/
-        └── index.ts                 ← 공통 타입 정의
+    ├── hooks/                          ← usePresence 등 (채팅은 useChat 직접 사용)
+    └── types/index.ts                  ← 공통 타입 (Tables<> 파생)
 ```
 
 ---
 
-## 6. DB 스키마 요약 (9개 테이블)
+## 6. DB 스키마 요약 (26개 테이블 · 마이그 001~022b)
 
-| 테이블 | 역할 |
-|--------|------|
-| `profiles` | 직원 프로필 (auth.users 연동) |
-| `agents` | 에이전트 정의 (이름, 카테고리, 공개여부) |
-| `agent_versions` | 시스템 프롬프트 버전 관리 |
-| `conversations` | 대화 세션 (에이전트 × 사용자) |
-| `messages` | 개별 메시지 (role: user/assistant) |
-| `workflows` | 에이전트 체이닝 정의 |
-| `calendar_events` | 팀 일정 |
-| `mcp_servers` | MCP 서버 연결 설정 |
-| `agent_usage` | 토큰 사용량/통계 |
+| 영역 | 테이블 |
+|------|--------|
+| 직원/인증 | `profiles` |
+| 에이전트 | `agents` · `agent_versions` · `user_agent_pins` · `agent_usage` |
+| 에이전트 대화 | `conversations` · `messages` |
+| 어시스턴트(대시보드) | `assistant_conversations` · `assistant_messages` |
+| 팀 채팅(DM) | `direct_conversations` · `direct_messages` · `message_attachments` · `message_reactions` |
+| 워크플로우 | `workflows` · `workflow_runs` |
+| 캘린더 | `calendar_events` |
+| MCP | `mcp_servers` · `mcp_tools` |
+| 파일/문서 | `files` · `business_cards` · `tax_invoices` |
+| 재무 | `finance_entries` |
+| 프로젝트 | `projects` · `project_members` |
+| 알림 | `notifications` |
+| 구글 연동 | `google_connections` |
 
-> 전체 SQL: `supabase/migrations/001_initial_schema.sql` 참고
+> 전체 SQL: `supabase/migrations/` (001_initial_schema 기초 + 002~022b 기능 확장). 원격 24개 ↔ 디스크 1:1, drift 없음.
 > 기본 에이전트 8개 시드: `supabase/seed.sql` 참고
 
 ---
