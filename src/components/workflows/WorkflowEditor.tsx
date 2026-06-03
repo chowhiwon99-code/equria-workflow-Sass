@@ -16,12 +16,33 @@ import {
   normalizeGraph,
   genId,
   topoOrder,
+  linearEdges,
   type WorkflowGraph,
   type WorkflowToolType,
 } from "@/lib/workflows"
 import { WORKFLOW_TOOLS } from "@/lib/workflowTools"
 
 type AgentOpt = { id: string; name: string; icon: string; description: string | null }
+
+type RunNodeResult = {
+  nodeId: string
+  agent_name: string
+  status: "done" | "error"
+  output?: string
+  toolNote?: string
+  error?: string
+}
+type RunRow = {
+  id: string
+  status: string
+  input: string | null
+  final_output: string | null
+  error: string | null
+  node_results: RunNodeResult[]
+  node_count: number
+  duration_ms: number | null
+  created_at: string
+}
 
 export function WorkflowEditor({ id }: { id: string }) {
   const supabase = createClient()
@@ -47,6 +68,10 @@ export function WorkflowEditor({ id }: { id: string }) {
   const [finalOutput, setFinalOutput] = useState<string | null>(null)
   const [runError, setRunError] = useState<string | null>(null)
 
+  // 실행 이력(workflow_runs) — 새로고침 후에도 조회 가능
+  const [runs, setRuns] = useState<RunRow[]>([])
+  const [openRunId, setOpenRunId] = useState<string | null>(null)
+
   const load = useCallback(async () => {
     const [{ data: wf }, { data: ag }] = await Promise.all([
       supabase.from("workflows").select("name, description, steps, is_active, is_public").eq("id", id).maybeSingle(),
@@ -69,32 +94,42 @@ export function WorkflowEditor({ id }: { id: string }) {
     setLoading(false)
   }, [supabase, id])
 
+  const loadRuns = useCallback(async () => {
+    const { data } = await supabase
+      .from("workflow_runs")
+      .select("id, status, input, final_output, error, node_results, node_count, duration_ms, created_at")
+      .eq("workflow_id", id)
+      .order("created_at", { ascending: false })
+      .limit(10)
+    setRuns((data as unknown as RunRow[]) ?? [])
+  }, [supabase, id])
+
   useEffect(() => {
     load()
-  }, [load])
+    loadRuns()
+  }, [load, loadRuns])
 
   const addNode = () => {
     const a = agents.find((x) => x.id === pickAgent)
     if (!a) return
-    const last = graph.nodes[graph.nodes.length - 1]
-    const x = last ? last.x + 180 : 40
-    const y = last ? last.y : 40
-    setGraph((g) => ({
-      ...g,
-      nodes: [
-        ...g.nodes,
-        {
-          id: genId(),
-          agent_id: a.id,
-          agent_name: a.name,
-          agent_icon: a.icon,
-          agent_desc: a.description ?? undefined,
-          note: "",
-          x,
-          y,
-        },
-      ],
-    }))
+    setGraph((g) => {
+      // 새 노드는 실행 순서의 맨 끝에 붙이고, 끈을 선형으로 자동 재연결.
+      const cur = topoOrder(g)
+      const ordered = cur.ok ? [...cur.order] : [...g.nodes]
+      const last = g.nodes[g.nodes.length - 1]
+      const newNode = {
+        id: genId(),
+        agent_id: a.id,
+        agent_name: a.name,
+        agent_icon: a.icon,
+        agent_desc: a.description ?? undefined,
+        note: "",
+        x: last ? last.x + 180 : 40,
+        y: last ? last.y : 40,
+      }
+      const nodes = [...ordered, newNode]
+      return { nodes, edges: linearEdges(nodes) }
+    })
     setPickAgent("")
   }
 
@@ -220,6 +255,7 @@ export function WorkflowEditor({ id }: { id: string }) {
       setRunError(e instanceof Error ? e.message : "실행 중 오류")
     } finally {
       setRunning(false)
+      loadRuns()
     }
   }
 
@@ -376,6 +412,13 @@ export function WorkflowEditor({ id }: { id: string }) {
                 </span>
               </label>
             )}
+            {(selected.tool?.type === "save_file" || selected.tool?.type === "notify") && (
+              <p className="text-[10px] text-muted-foreground/70">
+                {selected.tool.type === "save_file"
+                  ? "이 단계 결과를 .md 파일로 ‘파일 관리’에 저장합니다."
+                  : "이 단계 결과를 내 알림으로 보냅니다."}
+              </p>
+            )}
             {nodeToolNotes[selected.id] && (
               <p className="rounded-md bg-muted/40 px-2 py-1 text-[11px] text-muted-foreground">
                 🔗 {nodeToolNotes[selected.id]}
@@ -432,6 +475,79 @@ export function WorkflowEditor({ id }: { id: string }) {
           </div>
         )}
       </div>
+
+      {/* 최근 실행 이력 — 새로고침 후에도 남음 */}
+      {runs.length > 0 && (
+        <div className="flex flex-col gap-1 rounded-xl border p-3">
+          <span className="text-sm font-semibold">최근 실행</span>
+          <div className="flex flex-col divide-y">
+            {runs.map((r) => {
+              const open = openRunId === r.id
+              return (
+                <div key={r.id} className="py-1.5">
+                  <button
+                    onClick={() => setOpenRunId(open ? null : r.id)}
+                    className="flex w-full items-center gap-2 text-left text-xs"
+                  >
+                    <span
+                      className={cn(
+                        "inline-block size-2 shrink-0 rounded-full",
+                        r.status === "done"
+                          ? "bg-green-500"
+                          : r.status === "error"
+                            ? "bg-destructive"
+                            : "bg-muted-foreground animate-pulse"
+                      )}
+                    />
+                    <span className="text-muted-foreground">
+                      {new Date(r.created_at).toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" })}
+                    </span>
+                    <span className="text-muted-foreground">· {r.node_count}단계</span>
+                    {r.duration_ms != null && (
+                      <span className="text-muted-foreground">· {(r.duration_ms / 1000).toFixed(1)}s</span>
+                    )}
+                    {r.status === "error" && <span className="text-destructive">· 오류</span>}
+                    <span className="ml-auto text-muted-foreground">{open ? "▲" : "▼"}</span>
+                  </button>
+                  {open && (
+                    <div className="mt-2 flex flex-col gap-2">
+                      {r.input && (
+                        <div className="text-[11px]">
+                          <span className="font-medium text-muted-foreground">입력</span>
+                          <pre className="mt-0.5 max-h-32 overflow-auto whitespace-pre-wrap rounded-md bg-muted/40 p-2">
+                            {r.input}
+                          </pre>
+                        </div>
+                      )}
+                      {(r.node_results ?? []).map((n, i) => (
+                        <div key={`${n.nodeId}-${i}`} className="text-[11px]">
+                          <span className="font-medium text-muted-foreground">
+                            {i + 1}. {n.agent_name || "단계"}
+                            {n.status === "error" ? " ⚠️" : ""}
+                          </span>
+                          {n.toolNote && <p className="text-muted-foreground/70">🔗 {n.toolNote}</p>}
+                          <pre className="mt-0.5 max-h-40 overflow-auto whitespace-pre-wrap rounded-md bg-muted/40 p-2">
+                            {n.error ?? n.output ?? ""}
+                          </pre>
+                        </div>
+                      ))}
+                      {r.error && <p className="text-[11px] text-destructive">{r.error}</p>}
+                      {r.final_output && (
+                        <div className="text-[11px]">
+                          <span className="font-medium text-muted-foreground">최종 결과</span>
+                          <pre className="mt-0.5 max-h-52 overflow-auto whitespace-pre-wrap rounded-md bg-muted/40 p-2">
+                            {r.final_output}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="flex border-t pt-3">
         <Button

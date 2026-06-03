@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
 import type { WorkflowNode, WorkflowEdge, WorkflowGraph } from "@/lib/workflows"
-import { genId } from "@/lib/workflows"
+import { genId, topoOrder, linearEdges } from "@/lib/workflows"
 import { toolEmoji } from "@/lib/workflowTools"
 
 const NODE = 72 // 원 지름
@@ -124,12 +124,31 @@ export function WorkflowCanvas({
     onChange({ nodes, edges: edges.filter((e) => e.id !== id) })
   }
 
+  // 번호 편집 = 실행 순서 변경. 해당 노드를 새 위치로 옮기고 끈을 선형(1→2→…)으로 자동 재연결.
+  const reorderNode = (nodeId: string, newNum: number) => {
+    if (readOnly || !newNum) return
+    const cur = topoOrder(graph)
+    const ordered = cur.ok ? [...cur.order] : [...nodes].sort((a, b) => a.x - b.x || a.y - b.y)
+    const from = ordered.findIndex((n) => n.id === nodeId)
+    if (from < 0) return
+    const to = Math.max(0, Math.min(ordered.length - 1, newNum - 1))
+    if (to === from) return
+    const [moved] = ordered.splice(from, 1)
+    ordered.splice(to, 0, moved)
+    onChange({ nodes: ordered, edges: linearEdges(ordered) })
+  }
+
   const stateRing: Record<NodeRunState, string> = {
     idle: "",
     running: "ring-4 ring-primary/40 animate-pulse",
     done: "ring-4 ring-green-500/50",
     error: "ring-4 ring-destructive/50",
   }
+
+  // 노드 배지 = 실제 실행 순서(끈 위상정렬, 끈 없으면 좌→우 위치 순).
+  // 드래그/끈 연결 시 즉시 갱신된다. 순환(고리)이면 순서를 못 정하므로 "•".
+  const topo = topoOrder(graph)
+  const orderById = new Map(topo.ok ? topo.order.map((n, i) => [n.id, i + 1]) : [])
 
   return (
     <div
@@ -209,7 +228,7 @@ export function WorkflowCanvas({
       </svg>
 
       {/* 노드 레이어 — 원형 + 아래 라벨(이름·하는 일) */}
-      {nodes.map((n, idx) => {
+      {nodes.map((n) => {
         const selected = n.id === selectedId
         const st = runStates?.[n.id] ?? "idle"
         const subtitle = n.note?.trim() || n.agent_desc?.trim() || "역할 미설정"
@@ -231,10 +250,14 @@ export function WorkflowCanvas({
                 stateRing[st]
               )}
             >
-              {/* 순서 배지 */}
-              <span className="absolute -left-1.5 -top-1.5 grid size-5 place-items-center rounded-full bg-foreground text-[10px] font-semibold text-background">
-                {idx + 1}
-              </span>
+              {/* 순서 번호 — 클릭/입력해 실행 순서 변경(Enter·Tab 확정). 바꾸면 끈이 자동 재연결됨. */}
+              <OrderBadge
+                key={`${n.id}-${orderById.get(n.id) ?? 0}`}
+                order={orderById.get(n.id) ?? 1}
+                max={nodes.length}
+                readOnly={readOnly}
+                onCommit={(num) => reorderNode(n.id, num)}
+              />
               {/* 도구 배지 — 완료 후 행동이 있으면 표시 */}
               {n.tool?.type === "webhook" && (
                 <span
@@ -276,6 +299,52 @@ export function WorkflowCanvas({
 function bezier(a: { x: number; y: number }, b: { x: number; y: number }): string {
   const dx = Math.max(40, Math.abs(b.x - a.x) * 0.5)
   return `M ${a.x} ${a.y} C ${a.x + dx} ${a.y}, ${b.x - dx} ${b.y}, ${b.x} ${b.y}`
+}
+
+/**
+ * 노드 좌상단 실행순서 번호 — 편집 가능한 입력.
+ * 타이핑은 자유롭게(로컬 상태), Enter 또는 포커스 이동(Tab/blur) 시 확정 → 부모가 재정렬.
+ * 확정 후엔 항상 실제 순서(order)로 되돌리고, 순서가 바뀌면 key 변경으로 remount되어 새 번호를 반영.
+ */
+function OrderBadge({
+  order,
+  max,
+  readOnly,
+  onCommit,
+}: {
+  order: number
+  max: number
+  readOnly: boolean
+  onCommit: (n: number) => void
+}) {
+  const [val, setVal] = useState(String(order))
+  const commit = () => {
+    const n = parseInt(val, 10)
+    setVal(String(order)) // 진실(order)로 스냅백 — 재정렬되면 key remount가 새 번호로 덮어씀
+    if (!Number.isNaN(n) && n >= 1 && n !== order) onCommit(n)
+  }
+  return (
+    <input
+      type="number"
+      min={1}
+      max={max}
+      value={val}
+      tabIndex={order}
+      disabled={readOnly}
+      title="실행 순서 — 숫자를 바꾸고 Enter 또는 Tab. 끈이 자동으로 다시 연결됩니다."
+      onPointerDown={(e) => e.stopPropagation()}
+      onFocus={(e) => e.currentTarget.select()}
+      onChange={(e) => setVal(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault()
+          e.currentTarget.blur()
+        }
+      }}
+      className="absolute -left-2 -top-2 z-10 size-5 cursor-text rounded-full border border-background bg-foreground text-center text-[10px] font-semibold text-background outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-100 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+    />
+  )
 }
 
 export type { WorkflowNode, WorkflowEdge, WorkflowGraph }

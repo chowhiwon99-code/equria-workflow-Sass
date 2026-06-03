@@ -4,14 +4,15 @@
 
 /**
  * 노드 실행 후 실제 "행동"을 하는 도구(선택).
- * 지금은 webhook(HTTP POST)만 실작동. youtube/figma/higgsfield 등은 고도화 시 추가
+ * 실작동: webhook(HTTP POST) · save_file(결과를 파일로 저장) · notify(내 알림으로 전송).
+ * youtube/figma/higgsfield 등 외부 연동은 고도화 시 추가
  * (lib/workflowTools.ts 의 카탈로그에 정의 추가 → 실행 라우트에 케이스 추가).
  */
-export type WorkflowToolType = "none" | "webhook"
+export type WorkflowToolType = "none" | "webhook" | "save_file" | "notify"
 
 export type WorkflowTool = {
   type: WorkflowToolType
-  /** webhook: 전송할 URL */
+  /** webhook: 전송할 URL (save_file/notify는 추가 설정 없음) */
   url?: string
 }
 
@@ -48,6 +49,18 @@ export function genId(prefix = "n"): string {
   return `${prefix}_${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`
 }
 
+/**
+ * 노드 배열 순서대로 선형 끈(1→2→…→n)을 재생성한다.
+ * "번호가 주인" 모델: 사용자가 번호로 순서를 정하면 끈은 이 함수로 자동 연결된다.
+ */
+export function linearEdges(nodes: WorkflowNode[]): WorkflowEdge[] {
+  const edges: WorkflowEdge[] = []
+  for (let i = 0; i < nodes.length - 1; i++) {
+    edges.push({ id: genId("e"), source: nodes[i].id, target: nodes[i + 1].id })
+  }
+  return edges
+}
+
 function asObj(v: unknown): Record<string, unknown> | null {
   return v && typeof v === "object" ? (v as Record<string, unknown>) : null
 }
@@ -63,6 +76,8 @@ function asTool(v: unknown): WorkflowTool | undefined {
   if (!o) return undefined
   const type = asStr(o.type)
   if (type === "webhook") return { type: "webhook", url: asStr(o.url) }
+  if (type === "save_file") return { type: "save_file" }
+  if (type === "notify") return { type: "notify" }
   return undefined
 }
 

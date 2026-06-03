@@ -15,13 +15,27 @@ export type ToolCatalogItem = {
 export const WORKFLOW_TOOLS: ToolCatalogItem[] = [
   { type: "none", label: "행동 없음", emoji: "💬", desc: "텍스트 결과만 생성", enabled: true },
   {
+    type: "save_file",
+    label: "파일로 저장",
+    emoji: "📄",
+    desc: "이 단계 결과를 .md 파일로 ‘파일 관리’에 저장",
+    enabled: true,
+  },
+  {
+    type: "notify",
+    label: "완료 알림",
+    emoji: "🔔",
+    desc: "이 단계 결과를 내 알림으로 전송",
+    enabled: true,
+  },
+  {
     type: "webhook",
     label: "웹훅 전송",
     emoji: "🔗",
     desc: "결과를 외부 URL로 POST (Make·Zapier·Slack·n8n → 유튜브 업로드 등으로 분기)",
     enabled: true,
   },
-  // 고도화 예정 — 자리만 노출
+  // 고도화 예정 — 외부 연동(자리만 노출)
   { type: "none", label: "유튜브 업로드", emoji: "▶️", desc: "Google OAuth 연결 후 (준비 중)", enabled: false },
   { type: "none", label: "Higgsfield 제작", emoji: "🎬", desc: "이미지·영상 생성 (준비 중)", enabled: false },
   { type: "none", label: "Figma 제작", emoji: "🎨", desc: "디자인 생성 (준비 중)", enabled: false },

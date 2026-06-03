@@ -67,7 +67,7 @@ export function WorkflowsView() {
         <div>
           <h1 className="text-lg font-semibold">워크플로우</h1>
           <p className="text-sm text-muted-foreground">
-            에이전트를 순서대로 엮어 반복 업무를 정의해 두세요. (실행 기능은 곧 제공됩니다)
+            에이전트를 순서대로 엮어 실행하면 앞 단계 결과가 다음 단계로 이어집니다.
           </p>
         </div>
         <Button size="sm" onClick={create} disabled={creating}>

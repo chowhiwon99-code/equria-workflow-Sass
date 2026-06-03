@@ -609,8 +609,10 @@ export type Database = {
           google_email: string | null
           id: string
           is_active: boolean
+          last_history_id: string | null
           refresh_token: string | null
           scopes: string[]
+          token_type: string | null
           updated_at: string
           user_id: string
         }
@@ -621,8 +623,10 @@ export type Database = {
           google_email?: string | null
           id?: string
           is_active?: boolean
+          last_history_id?: string | null
           refresh_token?: string | null
           scopes?: string[]
+          token_type?: string | null
           updated_at?: string
           user_id: string
         }
@@ -633,8 +637,10 @@ export type Database = {
           google_email?: string | null
           id?: string
           is_active?: boolean
+          last_history_id?: string | null
           refresh_token?: string | null
           scopes?: string[]
+          token_type?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -996,6 +1002,63 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_runs: {
+        Row: {
+          created_at: string
+          duration_ms: number | null
+          error: string | null
+          final_output: string | null
+          id: string
+          input: string | null
+          node_count: number
+          node_results: Json
+          status: string
+          user_id: string
+          workflow_id: string
+        }
+        Insert: {
+          created_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          final_output?: string | null
+          id?: string
+          input?: string | null
+          node_count?: number
+          node_results?: Json
+          status?: string
+          user_id: string
+          workflow_id: string
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          final_output?: string | null
+          id?: string
+          input?: string | null
+          node_count?: number
+          node_results?: Json
+          status?: string
+          user_id?: string
+          workflow_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_runs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_runs_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "workflows"
             referencedColumns: ["id"]
           },
         ]

@@ -7,6 +7,7 @@ export const FILE_SOURCE_LABEL: Record<string, string> = {
   gdrive: "Google Drive",
   link: "링크",
   figma: "Figma",
+  workflow: "워크플로우 결과",
 }
 
 export function fileSourceLabel(source: string): string {
