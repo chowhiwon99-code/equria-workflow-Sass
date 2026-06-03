@@ -1340,9 +1340,9 @@ export type Database = {
       directory_contact: {
         Args: { target: string }
         Returns: {
-          email: string
-          mobile: string
-          work_phone: string
+          email: string | null
+          mobile: string | null
+          work_phone: string | null
         }[]
       }
       get_or_create_direct_conversation: {

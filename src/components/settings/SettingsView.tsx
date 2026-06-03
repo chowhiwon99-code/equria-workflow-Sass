@@ -17,6 +17,16 @@ const THEMES = [
   { value: "system", label: "시스템" },
 ]
 
+// 구성원 디렉터리에서 항목별 공개 여부 (directory_contact RPC가 이 정책으로 게이팅)
+const PRIVACY_FIELDS = [
+  { key: "email", label: "이메일" },
+  { key: "work_phone", label: "사내 전화" },
+  { key: "mobile", label: "휴대폰" },
+] as const
+
+type ContactVisibility = "all" | "private"
+type ContactPrivacy = Record<(typeof PRIVACY_FIELDS)[number]["key"], ContactVisibility>
+
 export function SettingsView() {
   const supabase = createClient()
   const router = useRouter()
@@ -29,6 +39,14 @@ export function SettingsView() {
   const [role, setRole] = useState("member")
   const [email, setEmail] = useState("")
   const [status, setStatus] = useState<string | null>(null)
+  const [position, setPosition] = useState("")
+  const [workPhone, setWorkPhone] = useState("")
+  const [mobile, setMobile] = useState("")
+  const [privacy, setPrivacy] = useState<ContactPrivacy>({
+    email: "all",
+    work_phone: "all",
+    mobile: "private",
+  })
 
   // 테마는 클라이언트에서만 확정(hydration mismatch 방지)
   useEffect(() => setMounted(true), [])
@@ -41,7 +59,7 @@ export function SettingsView() {
     }
     const { data } = await supabase
       .from("profiles")
-      .select("name, department, role, email, status_manual")
+      .select("name, department, role, email, status_manual, position, work_phone, mobile, contact_privacy")
       .eq("id", auth.user.id)
       .single()
     if (data) {
@@ -50,6 +68,15 @@ export function SettingsView() {
       setRole(data.role ?? "member")
       setEmail(data.email ?? "")
       setStatus(data.status_manual ?? "active")
+      setPosition(data.position ?? "")
+      setWorkPhone(data.work_phone ?? "")
+      setMobile(data.mobile ?? "")
+      const cp = (data.contact_privacy ?? {}) as Partial<ContactPrivacy>
+      setPrivacy({
+        email: cp.email ?? "all",
+        work_phone: cp.work_phone ?? "all",
+        mobile: cp.mobile ?? "private",
+      })
     }
     setLoading(false)
   }, [supabase])
@@ -70,7 +97,14 @@ export function SettingsView() {
       await mustOk(
         supabase
           .from("profiles")
-          .update({ name: name.trim(), department: department.trim() || null })
+          .update({
+            name: name.trim(),
+            department: department.trim() || null,
+            position: position.trim() || null,
+            work_phone: workPhone.trim() || null,
+            mobile: mobile.trim() || null,
+            contact_privacy: privacy,
+          })
           .eq("id", auth.user.id)
       )
       toast.success("프로필을 저장했어요.")
@@ -116,6 +150,35 @@ export function SettingsView() {
             placeholder="예: 마케팅팀"
           />
         </label>
+        <label className="flex flex-col gap-1.5 text-sm">
+          <span className="text-xs text-muted-foreground">직급</span>
+          <input
+            className={fieldClass}
+            value={position}
+            onChange={(e) => setPosition(e.target.value)}
+            placeholder="예: 팀장 / 매니저 / 사원"
+          />
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="flex flex-col gap-1.5 text-sm">
+            <span className="text-xs text-muted-foreground">사내 전화</span>
+            <input
+              className={fieldClass}
+              value={workPhone}
+              onChange={(e) => setWorkPhone(e.target.value)}
+              placeholder="예: 02-000-0000"
+            />
+          </label>
+          <label className="flex flex-col gap-1.5 text-sm">
+            <span className="text-xs text-muted-foreground">휴대폰</span>
+            <input
+              className={fieldClass}
+              value={mobile}
+              onChange={(e) => setMobile(e.target.value)}
+              placeholder="예: 010-0000-0000"
+            />
+          </label>
+        </div>
         <p className="text-xs text-muted-foreground">역할: {role === "admin" ? "관리자" : "멤버"}</p>
         <div className="flex flex-col gap-1.5">
           <span className="text-xs text-muted-foreground">상태 (다른 직원에게 표시)</span>
@@ -135,6 +198,29 @@ export function SettingsView() {
               </button>
             ))}
           </div>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs text-muted-foreground">연락처 공개 범위 (구성원 디렉터리에서 다른 직원에게)</span>
+          {PRIVACY_FIELDS.map((f) => (
+            <div key={f.key} className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm">
+              <span>{f.label}</span>
+              <div className="flex gap-1">
+                {(["all", "private"] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setPrivacy((p) => ({ ...p, [f.key]: v }))}
+                    className={cn(
+                      "rounded-md px-2.5 py-1 text-xs transition-colors",
+                      privacy[f.key] === v ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                    )}
+                  >
+                    {v === "all" ? "공개" : "비공개"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
         <div className="flex justify-end">
           <Button size="sm" onClick={saveProfile} disabled={!name.trim() || saving}>
