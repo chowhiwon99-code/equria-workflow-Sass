@@ -5,7 +5,7 @@ import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 
-type Profile = { name: string; department: string | null; role: string; email: string }
+type Profile = { name: string; department: string | null; role: string }
 type AgentLite = { id: string; name: string; description: string | null; icon: string }
 type Stats = { calls: number; tokensIn: number; tokensOut: number; agentsUsed: number }
 
@@ -24,7 +24,7 @@ export function MyPageView() {
     }
     const me = auth.user.id
     const [{ data: prof }, { data: agents }, { data: usage }] = await Promise.all([
-      supabase.from("profiles").select("name, department, role, email").eq("id", me).single(),
+      supabase.from("profiles").select("name, department, role").eq("id", me).single(),
       supabase
         .from("agents")
         .select("id, name, description, icon")

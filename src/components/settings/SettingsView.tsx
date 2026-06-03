@@ -59,18 +59,15 @@ export function SettingsView() {
     }
     const { data } = await supabase
       .from("profiles")
-      .select("name, department, role, email, status_manual, position, work_phone, mobile, contact_privacy")
+      .select("name, department, role, status_manual, position, contact_privacy")
       .eq("id", auth.user.id)
       .single()
     if (data) {
       setName(data.name ?? "")
       setDepartment(data.department ?? "")
       setRole(data.role ?? "member")
-      setEmail(data.email ?? "")
       setStatus(data.status_manual ?? "active")
       setPosition(data.position ?? "")
-      setWorkPhone(data.work_phone ?? "")
-      setMobile(data.mobile ?? "")
       const cp = (data.contact_privacy ?? {}) as Partial<ContactPrivacy>
       setPrivacy({
         email: cp.email ?? "all",
@@ -78,6 +75,12 @@ export function SettingsView() {
         mobile: cp.mobile ?? "private",
       })
     }
+    // 연락처(email/work_phone/mobile)는 컬럼 권한 회수(마이그 023b)로 직접 select 불가 → RPC(self)로 조회
+    const { data: contact } = await supabase.rpc("directory_contact", { target: auth.user.id })
+    const c = contact?.[0]
+    setEmail(c?.email ?? "")
+    setWorkPhone(c?.work_phone ?? "")
+    setMobile(c?.mobile ?? "")
     setLoading(false)
   }, [supabase])
 
