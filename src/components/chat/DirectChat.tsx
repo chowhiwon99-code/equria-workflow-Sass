@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Send, Paperclip, NotebookPen, FileText, Loader2, Pencil, Trash2, SmilePlus } from "lucide-react"
+import { ArrowLeft, Send, Paperclip, NotebookPen, FileText, Loader2, Pencil, Trash2, SmilePlus, CornerUpLeft, X } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { mustOk } from "@/lib/supabase/mustOk"
@@ -21,6 +21,13 @@ const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|bmp|svg|avif|heic|heif)$/i
 /** 첨부 파일명이 이미지 확장자인지 */
 function isImageAttachment(name: string | null | undefined): boolean {
   return !!name && IMAGE_EXT_RE.test(name)
+}
+
+/** 답장 인용·배너에 쓸 한 줄 요약 (삭제/첨부/본문 순) */
+function quoteSnippet(m: DirectMessage): string {
+  if (m.deleted_at) return "삭제된 메시지"
+  if (m.attachment_url) return m.attachment_name ?? "첨부파일"
+  return m.content
 }
 
 /** 메시지 본문 안의 URL을 클릭 가능한 링크로 렌더 */
@@ -59,8 +66,13 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
   const [sending, setSending] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [replyTo, setReplyTo] = useState<DirectMessage | null>(null)
+  const [highlightId, setHighlightId] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const messageRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const highlightTimer = useRef<number | null>(null)
 
   const isSelf = meId != null && otherUserId === meId
   const online = useOnlineUsers(meId)
@@ -227,24 +239,52 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
+  // 답장 시작 시 입력창 포커스
+  useEffect(() => {
+    if (replyTo) inputRef.current?.focus()
+  }, [replyTo])
+
+  // 인용 클릭 → 원본 메시지로 스크롤 + 잠시 하이라이트 (타이머는 ref로 관리: 재클릭 리셋·언마운트 정리)
+  const scrollToMessage = useCallback((id: string) => {
+    const el = messageRefs.current[id]
+    if (!el) return
+    el.scrollIntoView({ behavior: "smooth", block: "center" })
+    setHighlightId(id)
+    if (highlightTimer.current) window.clearTimeout(highlightTimer.current)
+    highlightTimer.current = window.setTimeout(() => setHighlightId(null), 1600)
+  }, [])
+
+  // 언마운트 시 하이라이트 타이머 정리
+  useEffect(() => () => { if (highlightTimer.current) window.clearTimeout(highlightTimer.current) }, [])
+
   const send = useCallback(async () => {
     const text = input.trim()
     if (!text || !conversationId || !meId) return
     setSending(true)
     setInput("")
-    const { error: insErr } = await supabase
-      .from("direct_messages")
-      .insert({ conversation_id: conversationId, sender_id: meId, content: text })
+    const replyParent = replyTo
+    setReplyTo(null)
+    const { error: insErr } = await supabase.from("direct_messages").insert({
+      conversation_id: conversationId,
+      sender_id: meId,
+      content: text,
+      parent_id: replyParent?.id ?? null,
+      // root_id: 답장 체인이 같은 스레드로 묶이도록 부모의 root 승계(없으면 부모가 root)
+      root_id: replyParent ? replyParent.root_id ?? replyParent.id : null,
+    })
     setSending(false)
     if (insErr) {
       toast.error(insErr.message)
       setInput(text)
+      setReplyTo(replyParent)
     }
-  }, [input, conversationId, meId, supabase])
+  }, [input, conversationId, meId, supabase, replyTo])
 
   const onAttach = async (file: File) => {
     if (!conversationId || !meId) return
     setUploading(true)
+    const replyParent = replyTo
+    setReplyTo(null)
     try {
       const path = await uploadImage("chat-files", file)
       const { error: insErr } = await supabase.from("direct_messages").insert({
@@ -253,10 +293,13 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
         content: file.name,
         attachment_url: path,
         attachment_name: file.name,
+        parent_id: replyParent?.id ?? null,
+        root_id: replyParent ? replyParent.root_id ?? replyParent.id : null,
       })
       if (insErr) throw insErr
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "첨부 실패")
+      setReplyTo(replyParent) // 실패 시 답장 대상 복원 (send()와 일관)
     } finally {
       setUploading(false)
       if (fileRef.current) fileRef.current.value = ""
@@ -326,6 +369,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
     arr.push({ emoji: r.emoji, user_id: r.user_id })
     reactionsByMsg.set(r.message_id, arr)
   }
+  const messagesById = new Map(messages.map((m) => [m.id, m]))
 
   return (
     <div className="flex h-full flex-col">
@@ -347,11 +391,21 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
         {messages.map((m) => {
           const mine = m.sender_id === meId
           const url = m.attachment_url ? fileUrls[m.id] : undefined
+          const parent = m.parent_id ? messagesById.get(m.parent_id) : undefined
+          const parentClickable = !!parent && !parent.deleted_at // 삭제·미발견 부모는 스크롤 불가
 
           // 삭제된 메시지 → placeholder (양쪽 모두)
           if (m.deleted_at) {
             return (
-              <div key={m.id} className={cn("flex", mine ? "justify-end" : "justify-start")}>
+              <div
+                key={m.id}
+                ref={(el) => { messageRefs.current[m.id] = el }}
+                className={cn(
+                  "flex rounded-xl transition-colors",
+                  mine ? "justify-end" : "justify-start",
+                  highlightId === m.id && "bg-primary/10"
+                )}
+              >
                 <span className="max-w-[70%] rounded-2xl border border-dashed px-3 py-1.5 text-sm italic text-muted-foreground">
                   삭제된 메시지입니다
                 </span>
@@ -387,11 +441,38 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
           }
 
           return (
-            <div key={m.id} className={cn("group flex flex-col gap-0.5", mine ? "items-end" : "items-start")}>
+            <div
+              key={m.id}
+              ref={(el) => { messageRefs.current[m.id] = el }}
+              className={cn(
+                "group flex flex-col gap-0.5 rounded-xl transition-colors",
+                mine ? "items-end" : "items-start",
+                highlightId === m.id && "bg-primary/10"
+              )}
+            >
+              {/* 답장 인용 미리보기 — 클릭 시 원본으로 스크롤 */}
+              {m.parent_id && (
+                <button
+                  onClick={() => { if (parentClickable && parent) scrollToMessage(parent.id) }}
+                  className={cn(
+                    "flex max-w-[70%] items-center gap-1.5 rounded-lg border-l-2 border-primary/50 bg-muted/50 px-2 py-1 text-left text-xs text-muted-foreground transition-colors hover:bg-muted",
+                    !parentClickable && "pointer-events-none opacity-60"
+                  )}
+                >
+                  <CornerUpLeft className="size-3 shrink-0" />
+                  <span className="min-w-0 flex-1 truncate">
+                    <span className="font-medium">{parent ? (parent.sender_id === meId ? "나" : otherName) : "원본"}</span>{" "}
+                    {parent ? quoteSnippet(parent) : "원본 메시지를 찾을 수 없어요"}
+                  </span>
+                </button>
+              )}
               <div className={cn("flex items-end gap-1", mine ? "justify-end" : "justify-start")}>
-              {/* 본인 메시지 호버 액션 (텍스트만 수정 가능, 삭제는 모두) */}
+              {/* 본인 메시지 호버 액션 (답장·텍스트 수정·삭제) */}
               {mine && (
                 <div className="flex items-center gap-0.5 self-center opacity-0 transition-opacity group-hover:opacity-100">
+                  <button onClick={() => setReplyTo(m)} className="text-muted-foreground hover:text-foreground" aria-label="답장">
+                    <CornerUpLeft className="size-3.5" />
+                  </button>
                   {!m.attachment_url && (
                     <button onClick={() => startEdit(m)} className="text-muted-foreground hover:text-foreground" aria-label="메시지 수정">
                       <Pencil className="size-3.5" />
@@ -453,6 +534,13 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
                   )}
                 </div>
               )}
+              {!mine && (
+                <div className="flex items-center gap-0.5 self-center opacity-0 transition-opacity group-hover:opacity-100">
+                  <button onClick={() => setReplyTo(m)} className="text-muted-foreground hover:text-foreground" aria-label="답장">
+                    <CornerUpLeft className="size-3.5" />
+                  </button>
+                </div>
+              )}
               </div>
               <MessageReactionBar
                 reactions={reactionsByMsg.get(m.id) ?? []}
@@ -466,22 +554,38 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
         <div ref={bottomRef} />
       </div>
 
+      {replyTo && (
+        <div className="flex items-center gap-2 border-t bg-muted/30 px-3 py-2 text-xs">
+          <CornerUpLeft className="size-3.5 shrink-0 text-primary" />
+          <div className="min-w-0 flex-1">
+            <p className="font-medium">{replyTo.sender_id === meId ? "나" : otherName}에게 답장</p>
+            <p className="truncate text-muted-foreground">{quoteSnippet(replyTo)}</p>
+          </div>
+          <button onClick={() => setReplyTo(null)} aria-label="답장 취소" className="text-muted-foreground hover:text-foreground">
+            <X className="size-4" />
+          </button>
+        </div>
+      )}
       <form
         onSubmit={(e) => {
           e.preventDefault()
           send()
         }}
-        className="flex items-center gap-2 border-t pt-3"
+        className={cn("flex items-center gap-2 pt-3", !replyTo && "border-t")}
       >
         <input ref={fileRef} type="file" className="hidden" onChange={(e) => e.target.files?.[0] && onAttach(e.target.files[0])} />
         <Button type="button" variant="ghost" size="icon-sm" onClick={() => fileRef.current?.click()} disabled={!conversationId || uploading}>
           {uploading ? <Loader2 className="animate-spin" /> : <Paperclip />}
         </Button>
         <input
+          ref={inputRef}
           className={fieldClass}
           placeholder="메시지 입력…"
           value={input}
           onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && replyTo) setReplyTo(null)
+          }}
           disabled={!conversationId}
         />
         <Button type="submit" size="icon-sm" disabled={sending || !input.trim()}>
