@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Send, Paperclip, NotebookPen, FileText, Loader2, Pencil, Trash2, SmilePlus, CornerUpLeft, X } from "lucide-react"
+import { ArrowLeft, Paperclip, NotebookPen, FileText, Loader2, Pencil, Trash2, SmilePlus, CornerUpLeft, X } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { mustOk } from "@/lib/supabase/mustOk"
@@ -12,10 +12,11 @@ import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/shared/Modal"
 import { useUndo } from "@/components/undo/UndoProvider"
 import { StatusDot } from "@/components/chat/StatusDot"
+import { MessageBody } from "@/components/chat/MessageBody"
+import { RichComposer, type ComposerPayload } from "@/components/chat/RichComposer"
 import { useOnlineUsers } from "@/hooks/usePresence"
 import type { DirectMessage } from "@/types"
 
-const URL_SPLIT_RE = /(https?:\/\/[^\s]+)/g
 const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|bmp|svg|avif|heic|heif)$/i
 
 /** 첨부 파일명이 이미지 확장자인지 */
@@ -23,31 +24,11 @@ function isImageAttachment(name: string | null | undefined): boolean {
   return !!name && IMAGE_EXT_RE.test(name)
 }
 
-/** 답장 인용·배너에 쓸 한 줄 요약 (삭제/첨부/본문 순) */
+/** 답장 인용·배너에 쓸 한 줄 요약 (삭제/첨부/본문 순). content는 항상 plain SSOT라 리치여도 안전. */
 function quoteSnippet(m: DirectMessage): string {
   if (m.deleted_at) return "삭제된 메시지"
   if (m.attachment_url) return m.attachment_name ?? "첨부파일"
   return m.content
-}
-
-/** 메시지 본문 안의 URL을 클릭 가능한 링크로 렌더 */
-function renderContent(text: string, mine: boolean) {
-  const parts = text.split(URL_SPLIT_RE)
-  return parts.map((part, i) =>
-    /^https?:\/\//.test(part) ? (
-      <a
-        key={i}
-        href={part}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={cn("underline underline-offset-2", mine ? "text-primary-foreground" : "text-primary")}
-      >
-        {part}
-      </a>
-    ) : (
-      <span key={i}>{part}</span>
-    )
-  )
 }
 
 export function DirectChat({ otherUserId }: { otherUserId: string }) {
@@ -62,15 +43,12 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
   const [messages, setMessages] = useState<DirectMessage[]>([])
   const [reactions, setReactions] = useState<{ id: string; message_id: string; emoji: string; user_id: string }[]>([])
   const [fileUrls, setFileUrls] = useState<Record<string, string>>({})
-  const [input, setInput] = useState("")
-  const [sending, setSending] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [replyTo, setReplyTo] = useState<DirectMessage | null>(null)
   const [highlightId, setHighlightId] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const highlightTimer = useRef<number | null>(null)
 
@@ -239,11 +217,6 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  // 답장 시작 시 입력창 포커스
-  useEffect(() => {
-    if (replyTo) inputRef.current?.focus()
-  }, [replyTo])
-
   // 인용 클릭 → 원본 메시지로 스크롤 + 잠시 하이라이트 (타이머는 ref로 관리: 재클릭 리셋·언마운트 정리)
   const scrollToMessage = useCallback((id: string) => {
     const el = messageRefs.current[id]
@@ -257,28 +230,29 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
   // 언마운트 시 하이라이트 타이머 정리
   useEffect(() => () => { if (highlightTimer.current) window.clearTimeout(highlightTimer.current) }, [])
 
-  const send = useCallback(async () => {
-    const text = input.trim()
-    if (!text || !conversationId || !meId) return
-    setSending(true)
-    setInput("")
-    const replyParent = replyTo
-    setReplyTo(null)
-    const { error: insErr } = await supabase.from("direct_messages").insert({
-      conversation_id: conversationId,
-      sender_id: meId,
-      content: text,
-      parent_id: replyParent?.id ?? null,
-      // root_id: 답장 체인이 같은 스레드로 묶이도록 부모의 root 승계(없으면 부모가 root)
-      root_id: replyParent ? replyParent.root_id ?? replyParent.id : null,
-    })
-    setSending(false)
-    if (insErr) {
-      toast.error(insErr.message)
-      setInput(text)
-      setReplyTo(replyParent)
-    }
-  }, [input, conversationId, meId, supabase, replyTo])
+  // RichComposer가 { text(plain SSOT), bodyJson(리치) }를 올려보낸다. 실패 시 throw → 컴포저가 입력 보존.
+  const send = useCallback(
+    async ({ text, bodyJson }: ComposerPayload) => {
+      if (!conversationId || !meId) return
+      const replyParent = replyTo
+      setReplyTo(null)
+      const { error: insErr } = await supabase.from("direct_messages").insert({
+        conversation_id: conversationId,
+        sender_id: meId,
+        content: text, // plain 미러(SSOT)
+        body_json: bodyJson as unknown as DirectMessage["body_json"], // 리치 본문
+        parent_id: replyParent?.id ?? null,
+        // root_id: 답장 체인이 같은 스레드로 묶이도록 부모의 root 승계(없으면 부모가 root)
+        root_id: replyParent ? replyParent.root_id ?? replyParent.id : null,
+      })
+      if (insErr) {
+        toast.error(insErr.message)
+        setReplyTo(replyParent)
+        throw insErr
+      }
+    },
+    [conversationId, meId, supabase, replyTo]
+  )
 
   const onAttach = async (file: File) => {
     if (!conversationId || !meId) return
@@ -320,9 +294,11 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
     if (!text || text === m.content) return cancelEdit()
     const prevContent = m.content
     const prevEdited = m.edited_at
+    const prevBody = m.body_json
+    // 편집은 plain 텍스트이므로 body_json을 비워 리치 잔류를 막는다(편집본은 plain 렌더)
     const { error: e } = await supabase
       .from("direct_messages")
-      .update({ content: text, edited_at: new Date().toISOString() })
+      .update({ content: text, body_json: null, edited_at: new Date().toISOString() })
       .eq("id", m.id)
     if (e) {
       toast.error(e.message)
@@ -332,10 +308,10 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
     push({
       label: "메시지 수정",
       undo: async () => {
-        await mustOk(supabase.from("direct_messages").update({ content: prevContent, edited_at: prevEdited }).eq("id", m.id))
+        await mustOk(supabase.from("direct_messages").update({ content: prevContent, body_json: prevBody, edited_at: prevEdited }).eq("id", m.id))
       },
       redo: async () => {
-        await mustOk(supabase.from("direct_messages").update({ content: text, edited_at: new Date().toISOString() }).eq("id", m.id))
+        await mustOk(supabase.from("direct_messages").update({ content: text, body_json: null, edited_at: new Date().toISOString() }).eq("id", m.id))
       },
     })
   }
@@ -523,14 +499,14 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
                       {m.attachment_name ?? "첨부파일"}
                     </a>
                   ) : (
-                    <span className="whitespace-pre-wrap">
-                      {renderContent(m.content, mine)}
+                    <>
+                      <MessageBody bodyJson={m.body_json} content={m.content} mine={mine} />
                       {m.edited_at && (
                         <span className={cn("ml-1 align-baseline text-[10px]", mine ? "text-primary-foreground/60" : "text-muted-foreground")}>
                           수정됨
                         </span>
                       )}
-                    </span>
+                    </>
                   )}
                 </div>
               )}
@@ -566,32 +542,24 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
           </button>
         </div>
       )}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          send()
-        }}
-        className={cn("flex items-center gap-2 pt-3", !replyTo && "border-t")}
-      >
+      <div className={cn("pt-3", !replyTo && "border-t")}>
         <input ref={fileRef} type="file" className="hidden" onChange={(e) => e.target.files?.[0] && onAttach(e.target.files[0])} />
-        <Button type="button" variant="ghost" size="icon-sm" onClick={() => fileRef.current?.click()} disabled={!conversationId || uploading}>
-          {uploading ? <Loader2 className="animate-spin" /> : <Paperclip />}
-        </Button>
-        <input
-          ref={inputRef}
-          className={fieldClass}
-          placeholder="메시지 입력…"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape" && replyTo) setReplyTo(null)
-          }}
+        <RichComposer
+          onSend={send}
           disabled={!conversationId}
+          leftSlot={
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => fileRef.current?.click()}
+              disabled={!conversationId || uploading}
+            >
+              {uploading ? <Loader2 className="animate-spin" /> : <Paperclip />}
+            </Button>
+          }
         />
-        <Button type="submit" size="icon-sm" disabled={sending || !input.trim()}>
-          <Send />
-        </Button>
-      </form>
+      </div>
     </div>
   )
 }
