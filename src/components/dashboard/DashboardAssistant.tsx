@@ -1,29 +1,77 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useChat } from "@ai-sdk/react"
 import { DefaultChatTransport, type UIMessage } from "ai"
-import { ArrowUp, Sparkle, Loader2, RotateCcw, Plus, Paperclip, Globe, Plug, X } from "lucide-react"
+import {
+  ArrowUp,
+  Sparkle,
+  Loader2,
+  Plus,
+  Paperclip,
+  Globe,
+  Plug,
+  X,
+  History,
+  SquarePen,
+  Trash2,
+} from "lucide-react"
+
+type Convo = { id: string; title: string | null; updated_at: string }
 
 function messageText(m: UIMessage): string {
   return m.parts.map((p) => (p.type === "text" ? p.text : "")).join("")
 }
 
-/** 대시보드 메인 — 범용 Claude 어시스턴트 채팅(우리 디자인). */
+/** 대시보드 메인 — 범용 Claude 어시스턴트(대화 영속화 + 최근 대화). */
 export function DashboardAssistant() {
-  const transport = useMemo(() => new DefaultChatTransport({ api: "/api/assistant" }), [])
+  const conversationIdRef = useRef<string | null>(null)
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: "/api/assistant",
+        body: () => ({ conversationId: conversationIdRef.current }),
+        fetch: async (url, options) => {
+          const res = await fetch(url, options)
+          const cid = res.headers.get("X-Conversation-Id")
+          if (cid) conversationIdRef.current = cid
+          return res
+        },
+      }),
+    []
+  )
   const { messages, sendMessage, status, error, setMessages } = useChat({ transport })
+
   const [input, setInput] = useState("")
   const [files, setFiles] = useState<File[]>([])
   const [menuOpen, setMenuOpen] = useState(false)
+  const [recentsOpen, setRecentsOpen] = useState(false)
+  const [convos, setConvos] = useState<Convo[]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const hasChat = messages.length > 0
+
+  const loadConvos = useCallback(async () => {
+    const res = await fetch("/api/assistant/conversations")
+    if (res.ok) {
+      const j = await res.json()
+      setConvos(j.conversations ?? [])
+    }
+  }, [])
+
+  useEffect(() => {
+    loadConvos()
+  }, [loadConvos])
 
   useEffect(() => {
     const el = scrollRef.current
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
   }, [messages, status])
+
+  // 턴 완료 시 최근 대화 목록 갱신(새 대화방·제목 반영)
+  useEffect(() => {
+    if (status === "ready" && messages.length > 0) void loadConvos()
+  }, [status, messages.length, loadConvos])
 
   const submit = () => {
     const t = input.trim()
@@ -35,8 +83,92 @@ export function DashboardAssistant() {
     if (fileRef.current) fileRef.current.value = ""
   }
 
+  const newChat = () => {
+    conversationIdRef.current = null
+    setMessages([])
+    setInput("")
+    setFiles([])
+    setRecentsOpen(false)
+  }
+
+  const openConvo = async (id: string) => {
+    setRecentsOpen(false)
+    conversationIdRef.current = id
+    const res = await fetch(`/api/assistant/conversations/${id}`)
+    if (!res.ok) return
+    const j = (await res.json()) as { messages: { id: string; role: string; content: string }[] }
+    setMessages(
+      j.messages.map((m) => ({
+        id: m.id,
+        role: m.role === "user" ? "user" : "assistant",
+        parts: [{ type: "text", text: m.content }],
+      }))
+    )
+  }
+
+  const deleteConvo = async (id: string) => {
+    await fetch(`/api/assistant/conversations/${id}`, { method: "DELETE" })
+    if (conversationIdRef.current === id) newChat()
+    loadConvos()
+  }
+
   return (
-    <div className="mx-auto w-full max-w-2xl">
+    <div className="mx-auto w-full max-w-3xl">
+      {/* 상단 바: 최근 대화 / 새 대화 */}
+      <div className="mb-2 flex items-center justify-end gap-1">
+        <div className="relative">
+          <button
+            onClick={() => {
+              setRecentsOpen((o) => !o)
+              if (!recentsOpen) loadConvos()
+            }}
+            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <History className="size-3.5" /> 최근 대화
+          </button>
+          {recentsOpen && (
+            <>
+              <button className="fixed inset-0 z-10 cursor-default" aria-hidden onClick={() => setRecentsOpen(false)} />
+              <div className="absolute right-0 top-full z-20 mt-1 max-h-[60vh] w-72 overflow-y-auto rounded-xl border bg-popover p-1 shadow-lg">
+                {convos.length === 0 ? (
+                  <p className="px-3 py-4 text-center text-xs text-muted-foreground">대화 기록이 없어요.</p>
+                ) : (
+                  convos.map((c) => (
+                    <div
+                      key={c.id}
+                      className="group flex items-center gap-1 rounded-lg px-2 py-1.5 hover:bg-muted"
+                    >
+                      <button
+                        onClick={() => openConvo(c.id)}
+                        className="min-w-0 flex-1 truncate text-left text-sm"
+                        title={c.title ?? "새 대화"}
+                      >
+                        {c.title || "새 대화"}
+                      </button>
+                      <button
+                        onClick={() => deleteConvo(c.id)}
+                        className="shrink-0 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+                        aria-label="삭제"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </>
+          )}
+        </div>
+        {hasChat && (
+          <button
+            onClick={newChat}
+            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <SquarePen className="size-3.5" /> 새 대화
+          </button>
+        )}
+      </div>
+
       {!hasChat && (
         <div className="mb-5 flex flex-col items-center gap-2 text-center">
           <div className="animate-soft-pulse grid size-12 place-items-center rounded-2xl bg-primary/10 text-primary">
@@ -48,10 +180,7 @@ export function DashboardAssistant() {
       )}
 
       {hasChat && (
-        <div
-          ref={scrollRef}
-          className="mb-3 max-h-[48vh] space-y-4 overflow-y-auto px-1 py-2 [scrollbar-width:thin]"
-        >
+        <div ref={scrollRef} className="mb-3 max-h-[58vh] space-y-4 overflow-y-auto px-1 py-2 [scrollbar-width:thin]">
           {messages.map((m) =>
             m.role === "user" ? (
               <div key={m.id} className="flex justify-end">
@@ -94,8 +223,7 @@ export function DashboardAssistant() {
       )}
 
       {/* 입력 바 */}
-      <div className="flex items-center gap-2 rounded-2xl border bg-card px-2.5 py-2 shadow-lg shadow-primary/5 transition-all focus-within:border-ring focus-within:shadow-primary/10 focus-within:ring-4 focus-within:ring-ring/15">
-        {/* + 메뉴 */}
+      <div className="flex items-center gap-2 rounded-2xl border bg-card px-3 py-2.5 shadow-lg shadow-primary/5 transition-all focus-within:border-ring focus-within:shadow-primary/10 focus-within:ring-4 focus-within:ring-ring/15">
         <div className="relative shrink-0">
           <button
             onClick={() => setMenuOpen((o) => !o)}
@@ -139,34 +267,22 @@ export function DashboardAssistant() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
+            // 한글 등 IME 조합 중 Enter는 무시(마지막 글자 잔류 버그 방지)
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault()
               submit()
             }
           }}
           placeholder="무엇이든 물어보세요…"
           rows={1}
-          className="max-h-32 flex-1 resize-none bg-transparent py-1 text-sm outline-none placeholder:text-muted-foreground"
+          className="max-h-40 flex-1 resize-none bg-transparent py-1 text-sm outline-none placeholder:text-muted-foreground"
         />
 
-        {hasChat && (
-          <button
-            onClick={() => {
-              setMessages([])
-              setInput("")
-              setFiles([])
-            }}
-            title="새 대화"
-            className="shrink-0 text-muted-foreground hover:text-foreground"
-          >
-            <RotateCcw className="size-4" />
-          </button>
-        )}
         <button
           onClick={submit}
           disabled={status !== "ready" || (!input.trim() && files.length === 0)}
           aria-label="전송"
-          className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:hover:scale-100"
+          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:hover:scale-100"
         >
           {status === "streaming" ? <Loader2 className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
         </button>
