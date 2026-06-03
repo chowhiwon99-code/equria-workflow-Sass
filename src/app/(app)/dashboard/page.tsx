@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { FEATURES } from "@/lib/config/features"
+import { DashboardAssistant } from "@/components/dashboard/DashboardAssistant"
 import {
   Card,
   CardDescription,
@@ -17,6 +18,11 @@ export default function DashboardPage() {
         <p className="text-sm text-muted-foreground">
           이큐리아 워크스페이스에 오신 것을 환영합니다.
         </p>
+      </div>
+
+      {/* 메인 — 범용 Claude 어시스턴트 */}
+      <div className="rounded-2xl border bg-gradient-to-b from-muted/40 to-transparent p-5 sm:p-8">
+        <DashboardAssistant />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
