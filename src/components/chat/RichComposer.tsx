@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, type ReactNode } from "react"
+import { toast } from "sonner"
 import { useEditor, EditorContent } from "@tiptap/react"
 import Placeholder from "@tiptap/extension-placeholder"
 import { Bold, Italic, Strikethrough, Code, List, ListOrdered, Link2, Send } from "lucide-react"
@@ -92,8 +93,16 @@ export function RichComposer({
     const prev = editor.getAttributes("link").href
     const url = window.prompt("링크 URL", typeof prev === "string" ? prev : "https://")
     if (url === null) return
-    if (url === "") editor.chain().focus().extendMarkRange("link").unsetLink().run()
-    else editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run()
+    if (url === "") {
+      editor.chain().focus().extendMarkRange("link").unsetLink().run()
+      return
+    }
+    // 저장 시점에도 스킴 검증(렌더 화이트리스트와 동일) — javascript:/data: 등 위험 URL 차단
+    if (!/^(https?:|mailto:)/i.test(url)) {
+      toast.error("http/https/mailto 링크만 넣을 수 있어요.")
+      return
+    }
+    editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run()
   }, [editor])
 
   if (!editor) return null
