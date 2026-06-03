@@ -172,7 +172,7 @@ export function DashboardAssistant() {
             <p className="mt-1 text-sm text-muted-foreground">이큐리아 어시스턴트에게 무엇이든 물어보세요.</p>
           </div>
         ) : (
-          <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-5 [scrollbar-width:thin]">
+          <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-5 [scrollbar-gutter:stable] [scrollbar-width:thin]">
             <div className="mx-auto max-w-3xl space-y-4">
               {messages.map((m) =>
                 m.role === "user" ? (
