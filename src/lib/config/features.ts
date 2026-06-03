@@ -40,9 +40,10 @@ export interface Feature {
   group: FeatureGroup
 }
 
-/** 사이드바 그룹 순서 + 헤더 라벨 (label=null 이면 헤더 없이 최상단) */
+/** 사이드바 그룹 순서 + 헤더 라벨 (label=null 이면 헤더 없이 최상단)
+ *  ※ "main"(대시보드)은 사이드바에서 제외 — 로고 클릭으로 대시보드(메인 Claude 챗)로 이동.
+ *    대시보드 Feature 정의는 라우팅/제목/findFeatureByPath 용으로 FEATURES에 유지. */
 export const FEATURE_GROUPS: { id: FeatureGroup; label: string | null }[] = [
-  { id: "main", label: null },
   { id: "work", label: "업무" },
   { id: "ai", label: "AI" },
   { id: "connect", label: "연동" },
