@@ -3,6 +3,7 @@ import { generateObject } from "ai"
 import { createClient } from "@/lib/supabase/server"
 import { anthropic, MODELS } from "@/lib/claude/client"
 import { receiptSchema } from "@/lib/claude/schemas"
+import { buildOcrFilePart } from "@/lib/storage"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -26,25 +27,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "잘못된 경로입니다." }, { status: 403 })
   }
 
-  // 모델이 접근할 수 있는 임시 서명 URL 생성
-  const { data: signed, error: signErr } = await supabase.storage
-    .from("receipts")
-    .createSignedUrl(path, 120)
-  if (signErr || !signed) {
+  // 모델이 접근할 수 있는 임시 서명 URL → filePart (공용 헬퍼)
+  let filePart
+  try {
+    filePart = await buildOcrFilePart(supabase, "receipts", path)
+  } catch {
     return NextResponse.json({ error: "이미지 URL 생성 실패" }, { status: 500 })
   }
-
-  const isPdf = path.toLowerCase().endsWith(".pdf")
-  const filePart = isPdf
-    ? ({
-        type: "file" as const,
-        data: new URL(signed.signedUrl),
-        mediaType: "application/pdf",
-      })
-    : ({
-        type: "image" as const,
-        image: new URL(signed.signedUrl),
-      })
 
   let object
   try {
