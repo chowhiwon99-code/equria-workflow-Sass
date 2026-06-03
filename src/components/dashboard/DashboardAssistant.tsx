@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useChat } from "@ai-sdk/react"
 import { DefaultChatTransport, type UIMessage } from "ai"
 import { Search, ArrowUp, Sparkles, Loader2, RotateCcw } from "lucide-react"
-import { cn } from "@/lib/utils"
 
 function messageText(m: UIMessage): string {
   return m.parts.map((p) => (p.type === "text" ? p.text : "")).join("")
@@ -48,22 +47,27 @@ export function DashboardAssistant() {
       {hasChat && (
         <div
           ref={scrollRef}
-          className="mb-2 max-h-[42vh] space-y-3 overflow-y-auto rounded-xl border bg-card p-3 [scrollbar-width:thin]"
+          className="mb-3 max-h-[48vh] space-y-4 overflow-y-auto px-1 py-2 [scrollbar-width:thin]"
         >
-          {messages.map((m) => (
-            <div key={m.id} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
-              <div
-                className={cn(
-                  "max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm",
-                  m.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
-                )}
-              >
-                {messageText(m) || (m.role === "assistant" ? "…" : "")}
+          {messages.map((m) =>
+            m.role === "user" ? (
+              <div key={m.id} className="flex justify-end">
+                <div className="max-w-[80%] whitespace-pre-wrap break-words rounded-2xl rounded-tr-sm bg-primary px-3.5 py-2 text-sm text-primary-foreground shadow-sm">
+                  {messageText(m)}
+                </div>
               </div>
-            </div>
-          ))}
-          {status === "streaming" && <p className="text-xs text-muted-foreground">생각 중…</p>}
-          {error && <p className="text-xs text-destructive">오류: {error.message}</p>}
+            ) : (
+              <div key={m.id} className="flex items-start gap-2.5">
+                <div className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
+                  <Sparkles className="size-3.5" />
+                </div>
+                <div className="max-w-[82%] whitespace-pre-wrap break-words rounded-2xl rounded-tl-sm bg-muted px-3.5 py-2.5 text-sm leading-relaxed">
+                  {messageText(m) || <span className="text-muted-foreground">생각 중…</span>}
+                </div>
+              </div>
+            )
+          )}
+          {error && <p className="pl-9 text-xs text-destructive">오류: {error.message}</p>}
         </div>
       )}
 
