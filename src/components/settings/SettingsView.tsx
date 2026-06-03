@@ -9,6 +9,7 @@ import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/shared/Modal"
+import { MANUAL_STATUSES } from "@/components/chat/StatusDot"
 
 const THEMES = [
   { value: "light", label: "라이트" },
@@ -27,6 +28,7 @@ export function SettingsView() {
   const [department, setDepartment] = useState("")
   const [role, setRole] = useState("member")
   const [email, setEmail] = useState("")
+  const [status, setStatus] = useState<string | null>(null)
 
   // 테마는 클라이언트에서만 확정(hydration mismatch 방지)
   useEffect(() => setMounted(true), [])
@@ -39,7 +41,7 @@ export function SettingsView() {
     }
     const { data } = await supabase
       .from("profiles")
-      .select("name, department, role, email")
+      .select("name, department, role, email, status_manual")
       .eq("id", auth.user.id)
       .single()
     if (data) {
@@ -47,6 +49,7 @@ export function SettingsView() {
       setDepartment(data.department ?? "")
       setRole(data.role ?? "member")
       setEmail(data.email ?? "")
+      setStatus(data.status_manual ?? "active")
     }
     setLoading(false)
   }, [supabase])
@@ -79,6 +82,14 @@ export function SettingsView() {
     }
   }
 
+  const setMyStatus = async (value: string) => {
+    setStatus(value)
+    const { data: auth } = await supabase.auth.getUser()
+    if (!auth.user) return
+    await supabase.from("profiles").update({ status_manual: value }).eq("id", auth.user.id)
+    toast.success("상태를 변경했어요.")
+  }
+
   const logout = async () => {
     await supabase.auth.signOut()
     router.push("/login")
@@ -106,6 +117,25 @@ export function SettingsView() {
           />
         </label>
         <p className="text-xs text-muted-foreground">역할: {role === "admin" ? "관리자" : "멤버"}</p>
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs text-muted-foreground">상태 (다른 직원에게 표시)</span>
+          <div className="flex flex-wrap gap-1.5">
+            {MANUAL_STATUSES.map((s) => (
+              <button
+                key={s.value}
+                type="button"
+                onClick={() => setMyStatus(s.value)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors",
+                  (status ?? "active") === s.value ? "border-primary bg-primary/10" : "hover:bg-muted"
+                )}
+              >
+                <span className={cn("size-2 rounded-full", s.color)} />
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="flex justify-end">
           <Button size="sm" onClick={saveProfile} disabled={!name.trim() || saving}>
             {saving ? "저장 중…" : "저장"}

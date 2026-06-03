@@ -11,6 +11,8 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/shared/Modal"
 import { useUndo } from "@/components/undo/UndoProvider"
+import { StatusDot } from "@/components/chat/StatusDot"
+import { useOnlineUsers } from "@/hooks/usePresence"
 import type { DirectMessage } from "@/types"
 
 const URL_SPLIT_RE = /(https?:\/\/[^\s]+)/g
@@ -48,6 +50,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState("")
   const [otherName, setOtherName] = useState("")
+  const [otherStatus, setOtherStatus] = useState<string | null>(null)
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [messages, setMessages] = useState<DirectMessage[]>([])
   const [fileUrls, setFileUrls] = useState<Record<string, string>>({})
@@ -59,6 +62,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
   const fileRef = useRef<HTMLInputElement>(null)
 
   const isSelf = meId != null && otherUserId === meId
+  const online = useOnlineUsers(meId)
 
   // 첨부 메시지의 서명 URL 생성 (본인 파일 + 대화 참여자가 받은 파일 모두 — chat-files RLS 010)
   const resolveAttachments = useCallback(
@@ -85,8 +89,13 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
       const me = auth.user?.id ?? null
       setMeId(me)
 
-      const { data: other } = await supabase.from("profiles").select("name").eq("id", otherUserId).single()
+      const { data: other } = await supabase
+        .from("profiles")
+        .select("name, status_manual")
+        .eq("id", otherUserId)
+        .single()
       setOtherName(me === otherUserId ? "나와의 채팅" : other?.name ?? "직원")
+      setOtherStatus(other?.status_manual ?? null)
 
       const { data: convId, error: rpcErr } = await supabase.rpc("get_or_create_direct_conversation", {
         other_user: otherUserId,
@@ -280,6 +289,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
         </Link>
         {isSelf && <NotebookPen className="size-4 text-primary" />}
         <span className="text-sm font-semibold">{otherName}</span>
+        {!isSelf && <StatusDot online={online.has(otherUserId)} manual={otherStatus} />}
       </div>
 
       <div className="flex flex-1 flex-col gap-2 overflow-y-auto py-2">
