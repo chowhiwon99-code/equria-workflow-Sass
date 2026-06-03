@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useChat } from "@ai-sdk/react"
 import { DefaultChatTransport, type UIMessage } from "ai"
-import { Search, ArrowUp, Sparkles, Loader2, RotateCcw } from "lucide-react"
+import { ArrowUp, Sparkle, Loader2, RotateCcw, Plus, Paperclip, Globe, Plug, X } from "lucide-react"
 
 function messageText(m: UIMessage): string {
   return m.parts.map((p) => (p.type === "text" ? p.text : "")).join("")
@@ -14,7 +14,10 @@ export function DashboardAssistant() {
   const transport = useMemo(() => new DefaultChatTransport({ api: "/api/assistant" }), [])
   const { messages, sendMessage, status, error, setMessages } = useChat({ transport })
   const [input, setInput] = useState("")
+  const [files, setFiles] = useState<File[]>([])
+  const [menuOpen, setMenuOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
   const hasChat = messages.length > 0
 
   useEffect(() => {
@@ -24,20 +27,20 @@ export function DashboardAssistant() {
 
   const submit = () => {
     const t = input.trim()
-    if (!t || status !== "ready") return
-    sendMessage({ text: t })
+    if ((!t && files.length === 0) || status !== "ready") return
+    const fileList = files.length > 0 ? toFileList(files) : undefined
+    sendMessage({ text: t, files: fileList })
     setInput("")
+    setFiles([])
+    if (fileRef.current) fileRef.current.value = ""
   }
 
   return (
     <div className="mx-auto w-full max-w-2xl">
       {!hasChat && (
         <div className="mb-5 flex flex-col items-center gap-2 text-center">
-          <div className="relative">
-            <div className="animate-aura absolute -inset-2 -z-10 rounded-full bg-primary/25 blur-xl" />
-            <div className="animate-soft-pulse grid size-14 place-items-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 text-primary shadow-sm">
-              <Sparkles className="size-6" />
-            </div>
+          <div className="animate-soft-pulse grid size-12 place-items-center rounded-2xl bg-primary/10 text-primary">
+            <Sparkle className="size-5" />
           </div>
           <p className="text-xl font-semibold tracking-tight">무엇을 도와드릴까요?</p>
           <p className="text-sm text-muted-foreground">이큐리아 어시스턴트에게 무엇이든 물어보세요.</p>
@@ -59,7 +62,7 @@ export function DashboardAssistant() {
             ) : (
               <div key={m.id} className="flex items-start gap-2.5">
                 <div className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
-                  <Sparkles className="size-3.5" />
+                  <Sparkle className="size-3.5" />
                 </div>
                 <div className="max-w-[82%] whitespace-pre-wrap break-words rounded-2xl rounded-tl-sm bg-muted px-3.5 py-2.5 text-sm leading-relaxed">
                   {messageText(m) || <span className="text-muted-foreground">생각 중…</span>}
@@ -71,9 +74,67 @@ export function DashboardAssistant() {
         </div>
       )}
 
+      {/* 첨부 파일 칩 */}
+      {files.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {files.map((f, i) => (
+            <span key={`${f.name}-${i}`} className="flex items-center gap-1.5 rounded-lg border bg-card px-2 py-1 text-xs">
+              <Paperclip className="size-3 text-muted-foreground" />
+              <span className="max-w-[160px] truncate">{f.name}</span>
+              <button
+                onClick={() => setFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                className="text-muted-foreground hover:text-foreground"
+                aria-label="첨부 제거"
+              >
+                <X className="size-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
       {/* 입력 바 */}
-      <div className="flex items-center gap-2 rounded-2xl border bg-card px-4 py-2.5 shadow-lg shadow-primary/5 transition-all focus-within:border-ring focus-within:shadow-primary/10 focus-within:ring-4 focus-within:ring-ring/15">
-        <Search className="size-4 shrink-0 text-muted-foreground" />
+      <div className="flex items-center gap-2 rounded-2xl border bg-card px-2.5 py-2 shadow-lg shadow-primary/5 transition-all focus-within:border-ring focus-within:shadow-primary/10 focus-within:ring-4 focus-within:ring-ring/15">
+        {/* + 메뉴 */}
+        <div className="relative shrink-0">
+          <button
+            onClick={() => setMenuOpen((o) => !o)}
+            aria-label="추가"
+            className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <Plus className="size-5" />
+          </button>
+          {menuOpen && (
+            <>
+              <button className="fixed inset-0 z-10 cursor-default" aria-hidden onClick={() => setMenuOpen(false)} />
+              <div className="absolute bottom-full left-0 z-20 mb-2 w-56 overflow-hidden rounded-xl border bg-popover p-1 shadow-lg">
+                <MenuItem
+                  icon={<Paperclip className="size-4" />}
+                  label="파일·사진 첨부"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    fileRef.current?.click()
+                  }}
+                />
+                <div className="my-1 h-px bg-border" />
+                <MenuItem icon={<Globe className="size-4" />} label="웹 검색" soon />
+                <MenuItem icon={<Plug className="size-4" />} label="MCP 도구" soon />
+              </div>
+            </>
+          )}
+        </div>
+
+        <input
+          ref={fileRef}
+          type="file"
+          multiple
+          accept="image/*,application/pdf,.txt,.md,.csv"
+          className="hidden"
+          onChange={(e) => {
+            if (e.target.files) setFiles((prev) => [...prev, ...Array.from(e.target.files!)])
+          }}
+        />
+
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -87,21 +148,23 @@ export function DashboardAssistant() {
           rows={1}
           className="max-h-32 flex-1 resize-none bg-transparent py-1 text-sm outline-none placeholder:text-muted-foreground"
         />
+
         {hasChat && (
           <button
             onClick={() => {
               setMessages([])
               setInput("")
+              setFiles([])
             }}
             title="새 대화"
-            className="text-muted-foreground hover:text-foreground"
+            className="shrink-0 text-muted-foreground hover:text-foreground"
           >
             <RotateCcw className="size-4" />
           </button>
         )}
         <button
           onClick={submit}
-          disabled={status !== "ready" || !input.trim()}
+          disabled={status !== "ready" || (!input.trim() && files.length === 0)}
           aria-label="전송"
           className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:hover:scale-100"
         >
@@ -110,4 +173,35 @@ export function DashboardAssistant() {
       </div>
     </div>
   )
+}
+
+function MenuItem({
+  icon,
+  label,
+  onClick,
+  soon,
+}: {
+  icon: React.ReactNode
+  label: string
+  onClick?: () => void
+  soon?: boolean
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={soon}
+      className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-popover-foreground transition-colors hover:bg-muted disabled:cursor-default disabled:opacity-50 disabled:hover:bg-transparent"
+    >
+      <span className="text-muted-foreground">{icon}</span>
+      <span className="flex-1">{label}</span>
+      {soon && <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">곧</span>}
+    </button>
+  )
+}
+
+/** File[] → FileList (useChat sendMessage files 인자용). */
+function toFileList(files: File[]): FileList {
+  const dt = new DataTransfer()
+  for (const f of files) dt.items.add(f)
+  return dt.files
 }
