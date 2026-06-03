@@ -138,9 +138,9 @@ export const FEATURES: Feature[] = [
   {
     href: "/mail",
     label: "메일",
-    description: "Gmail 연동 (준비 중)",
+    description: "Gmail 연동 — 받은편지함·작성·발송 (개인 계정 연결)",
     icon: Mail,
-    status: "planned",
+    status: "ready",
     phase: 6,
     group: "connect",
   },
