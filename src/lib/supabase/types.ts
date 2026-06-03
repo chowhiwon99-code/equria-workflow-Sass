@@ -468,37 +468,46 @@ export type Database = {
         Row: {
           attachment_name: string | null
           attachment_url: string | null
+          body_json: Json | null
           content: string
           conversation_id: string
           created_at: string
           deleted_at: string | null
           edited_at: string | null
           id: string
+          parent_id: string | null
           read_at: string | null
+          root_id: string | null
           sender_id: string
         }
         Insert: {
           attachment_name?: string | null
           attachment_url?: string | null
+          body_json?: Json | null
           content: string
           conversation_id: string
           created_at?: string
           deleted_at?: string | null
           edited_at?: string | null
           id?: string
+          parent_id?: string | null
           read_at?: string | null
+          root_id?: string | null
           sender_id: string
         }
         Update: {
           attachment_name?: string | null
           attachment_url?: string | null
+          body_json?: Json | null
           content?: string
           conversation_id?: string
           created_at?: string
           deleted_at?: string | null
           edited_at?: string | null
           id?: string
+          parent_id?: string | null
           read_at?: string | null
+          root_id?: string | null
           sender_id?: string
         }
         Relationships: [
@@ -507,6 +516,13 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "direct_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "direct_messages_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "direct_messages"
             referencedColumns: ["id"]
           },
           {
@@ -804,6 +820,83 @@ export type Database = {
           },
         ]
       }
+      message_attachments: {
+        Row: {
+          created_at: string
+          id: string
+          message_id: string
+          mime_type: string | null
+          name: string | null
+          size: number | null
+          storage_path: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message_id: string
+          mime_type?: string | null
+          name?: string | null
+          size?: number | null
+          storage_path: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message_id?: string
+          mime_type?: string | null
+          name?: string | null
+          size?: number | null
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_attachments_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "direct_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      message_reactions: {
+        Row: {
+          created_at: string
+          emoji: string
+          id: string
+          message_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          emoji: string
+          id?: string
+          message_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          emoji?: string
+          id?: string
+          message_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_reactions_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "direct_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_reactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           content: string
@@ -889,33 +982,48 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          contact_privacy: Json
           created_at: string
           department: string | null
           email: string
           id: string
+          mobile: string | null
           name: string
+          position: string | null
           role: string
+          status_manual: string | null
           updated_at: string
+          work_phone: string | null
         }
         Insert: {
           avatar_url?: string | null
+          contact_privacy?: Json
           created_at?: string
           department?: string | null
           email: string
           id: string
+          mobile?: string | null
           name: string
+          position?: string | null
           role?: string
+          status_manual?: string | null
           updated_at?: string
+          work_phone?: string | null
         }
         Update: {
           avatar_url?: string | null
+          contact_privacy?: Json
           created_at?: string
           department?: string | null
           email?: string
           id?: string
+          mobile?: string | null
           name?: string
+          position?: string | null
           role?: string
+          status_manual?: string | null
           updated_at?: string
+          work_phone?: string | null
         }
         Relationships: []
       }
@@ -1229,6 +1337,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      directory_contact: {
+        Args: { target: string }
+        Returns: {
+          email: string
+          mobile: string
+          work_phone: string
+        }[]
+      }
       get_or_create_direct_conversation: {
         Args: { other_user: string }
         Returns: string
