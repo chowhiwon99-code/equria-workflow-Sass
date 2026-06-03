@@ -1,6 +1,7 @@
-import { streamText, convertToModelMessages, type UIMessage } from "ai"
+import { streamText, convertToModelMessages, stepCountIs, type UIMessage, type ToolSet } from "ai"
 import { anthropic } from "@/lib/claude/client"
 import { createClient } from "@/lib/supabase/server"
+import { connectMcp } from "@/lib/mcp/connect"
 
 export const maxDuration = 60
 export const runtime = "nodejs"
@@ -28,7 +29,7 @@ export async function POST(
 
   const { data: agentVersion } = await supabase
     .from("agent_versions")
-    .select("system_prompt, model, max_tokens, temperature")
+    .select("system_prompt, model, max_tokens, temperature, mcp_servers")
     .eq("agent_id", agentId)
     .eq("is_current", true)
     .maybeSingle()
@@ -63,12 +64,39 @@ export async function POST(
   const windowed = messages.slice(-HISTORY_WINDOW)
   const modelMessages = await convertToModelMessages(windowed)
 
+  // 에이전트에 연결된 MCP 서버의 도구 로드(있으면). 연결 실패 서버는 건너뜀.
+  const mcpClients: Awaited<ReturnType<typeof connectMcp>>[] = []
+  const mcpIds = agentVersion.mcp_servers ?? []
+  if (mcpIds.length > 0) {
+    const { data: mcpServers } = await supabase
+      .from("mcp_servers")
+      .select("id, name, type, url, auth_type, is_active")
+      .in("id", mcpIds)
+      .eq("is_active", true)
+    for (const srv of mcpServers ?? []) {
+      try {
+        mcpClients.push(await connectMcp(srv))
+      } catch {
+        /* 연결 실패 MCP 서버는 건너뜀 */
+      }
+    }
+  }
+  const toolSets = await Promise.all(mcpClients.map((c) => c.tools()))
+  const tools: ToolSet = Object.assign({}, ...toolSets)
+  const hasTools = Object.keys(tools).length > 0
+  const closeMcp = () => Promise.allSettled(mcpClients.map((c) => c.close()))
+
   const result = streamText({
     model: anthropic(agentVersion.model),
     system: agentVersion.system_prompt,
     messages: modelMessages,
     maxOutputTokens: agentVersion.max_tokens,
     temperature: Number(agentVersion.temperature),
+    // MCP 도구가 있으면 다단계 도구호출 허용(없으면 단일 응답)
+    ...(hasTools ? { tools, stopWhen: stepCountIs(5) } : {}),
+    onError() {
+      void closeMcp()
+    },
     async onFinish({ text, usage }) {
       const lastUser = [...messages].reverse().find((m) => m.role === "user")
       const lastUserText =
@@ -109,6 +137,7 @@ export async function POST(
           .update({ updated_at: new Date().toISOString() })
           .eq("id", conversationId!),
       ])
+      await closeMcp()
     },
   })
 

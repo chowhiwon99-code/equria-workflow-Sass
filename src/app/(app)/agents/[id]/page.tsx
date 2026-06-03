@@ -63,6 +63,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
         model: cur?.model ?? "claude-sonnet-4-6",
         temperature: Number(cur?.temperature ?? 0.7),
         max_tokens: cur?.max_tokens ?? 4096,
+        mcp_servers: cur?.mcp_servers ?? [],
       })
       setLoading(false)
     })()

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { mustOk } from "@/lib/supabase/mustOk"
@@ -39,6 +39,7 @@ export type AgentFormInitial = {
   model: string
   temperature: number
   max_tokens: number
+  mcp_servers: string[]
 }
 
 // 생성(create) 모드에서 위저드가 넘겨주는 초기값(부분). id 없음.
@@ -80,6 +81,22 @@ export function AgentBuilderForm({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // 이 에이전트가 사용할 MCP 서버(도구) 선택
+  const [mcpServers, setMcpServers] = useState<string[]>(
+    initial?.mcp_servers ?? prefill?.mcp_servers ?? []
+  )
+  const [availableMcp, setAvailableMcp] = useState<{ id: string; name: string }[]>([])
+  useEffect(() => {
+    fetch("/api/mcp/servers")
+      .then((r) => (r.ok ? r.json() : { servers: [] }))
+      .then((j: { servers?: { id: string; name: string; is_active: boolean }[] }) => {
+        setAvailableMcp((j.servers ?? []).filter((s) => s.is_active).map((s) => ({ id: s.id, name: s.name })))
+      })
+      .catch(() => {})
+  }, [])
+  const toggleMcp = (id: string) =>
+    setMcpServers((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+
   const valid = name.trim().length > 0 && systemPrompt.trim().length > 0
 
   const save = async () => {
@@ -119,6 +136,7 @@ export function AgentBuilderForm({
         model,
         temperature,
         max_tokens: maxTokens,
+        mcp_servers: mcpServers,
         version: 1,
         is_current: true,
         created_by: meId,
@@ -165,11 +183,13 @@ export function AgentBuilderForm({
       return
     }
 
+    const mcpKey = (arr: string[]) => JSON.stringify([...arr].sort())
     const versionChanged =
       systemPrompt.trim() !== initial.system_prompt ||
       model !== initial.model ||
       temperature !== initial.temperature ||
-      maxTokens !== initial.max_tokens
+      maxTokens !== initial.max_tokens ||
+      mcpKey(mcpServers) !== mcpKey(initial.mcp_servers)
     if (versionChanged) {
       // version 은 unique(agent_id, version) 라서 동시 수정 시 select max(version)+1 이
       // 경합한다(둘 다 같은 값 → 두 번째 insert 가 23505). 충돌하면 max 를 다시 읽고
@@ -191,6 +211,7 @@ export function AgentBuilderForm({
           model,
           temperature,
           max_tokens: maxTokens,
+          mcp_servers: mcpServers,
           version,
           is_current: true, // 트리거 handle_new_agent_version 가 이전 버전 is_current=false 처리
           created_by: meId,
@@ -338,6 +359,28 @@ export function AgentBuilderForm({
           />
         </details>
       </div>
+
+      {/* MCP 도구 — 등록된 MCP 서버가 있을 때만 노출 */}
+      {availableMcp.length > 0 && (
+        <div className="flex flex-col gap-2 text-sm">
+          <span className="text-xs text-muted-foreground">
+            MCP 도구 <span className="text-muted-foreground/70">— 이 에이전트가 대화 중 쓸 외부 도구 서버</span>
+          </span>
+          <div className="flex flex-col gap-1.5 rounded-lg border p-3">
+            {availableMcp.map((s) => (
+              <label key={s.id} className="flex cursor-pointer items-center gap-2.5">
+                <input
+                  type="checkbox"
+                  className="size-4"
+                  checked={mcpServers.includes(s.id)}
+                  onChange={() => toggleMcp(s.id)}
+                />
+                <span>{s.name}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 공유 토글 */}
       <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border p-3">
