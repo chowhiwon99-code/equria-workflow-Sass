@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/shared/Modal"
 import { MANUAL_STATUSES } from "@/components/chat/StatusDot"
+import { Loading, ErrorState } from "@/components/shared/States"
 
 const THEMES = [
   { value: "light", label: "라이트" },
@@ -33,6 +34,7 @@ export function SettingsView() {
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [name, setName] = useState("")
   const [department, setDepartment] = useState("")
@@ -52,36 +54,42 @@ export function SettingsView() {
   useEffect(() => setMounted(true), [])
 
   const load = useCallback(async () => {
-    const { data: auth } = await supabase.auth.getUser()
-    if (!auth.user) {
+    try {
+      const { data: auth } = await supabase.auth.getUser()
+      if (!auth.user) {
+        setLoading(false)
+        return
+      }
+      const { data } = await supabase
+        .from("profiles")
+        .select("name, department, role, status_manual, position, contact_privacy")
+        .eq("id", auth.user.id)
+        .single()
+      if (data) {
+        setName(data.name ?? "")
+        setDepartment(data.department ?? "")
+        setRole(data.role ?? "member")
+        setStatus(data.status_manual ?? "active")
+        setPosition(data.position ?? "")
+        const cp = (data.contact_privacy ?? {}) as Partial<ContactPrivacy>
+        setPrivacy({
+          email: cp.email ?? "all",
+          work_phone: cp.work_phone ?? "all",
+          mobile: cp.mobile ?? "private",
+        })
+      }
+      // 연락처(email/work_phone/mobile)는 컬럼 권한 회수(마이그 023b)로 직접 select 불가 → RPC(self)로 조회
+      const { data: contact } = await supabase.rpc("directory_contact", { target: auth.user.id })
+      const c = contact?.[0]
+      setEmail(c?.email ?? "")
+      setWorkPhone(c?.work_phone ?? "")
+      setMobile(c?.mobile ?? "")
+      setError(null)
+    } catch {
+      setError("설정을 불러오지 못했어요. 다시 시도해 주세요.")
+    } finally {
       setLoading(false)
-      return
     }
-    const { data } = await supabase
-      .from("profiles")
-      .select("name, department, role, status_manual, position, contact_privacy")
-      .eq("id", auth.user.id)
-      .single()
-    if (data) {
-      setName(data.name ?? "")
-      setDepartment(data.department ?? "")
-      setRole(data.role ?? "member")
-      setStatus(data.status_manual ?? "active")
-      setPosition(data.position ?? "")
-      const cp = (data.contact_privacy ?? {}) as Partial<ContactPrivacy>
-      setPrivacy({
-        email: cp.email ?? "all",
-        work_phone: cp.work_phone ?? "all",
-        mobile: cp.mobile ?? "private",
-      })
-    }
-    // 연락처(email/work_phone/mobile)는 컬럼 권한 회수(마이그 023b)로 직접 select 불가 → RPC(self)로 조회
-    const { data: contact } = await supabase.rpc("directory_contact", { target: auth.user.id })
-    const c = contact?.[0]
-    setEmail(c?.email ?? "")
-    setWorkPhone(c?.work_phone ?? "")
-    setMobile(c?.mobile ?? "")
-    setLoading(false)
   }, [supabase])
 
   useEffect(() => {
@@ -133,7 +141,18 @@ export function SettingsView() {
     router.refresh()
   }
 
-  if (loading) return <p className="text-sm text-muted-foreground">불러오는 중…</p>
+  if (loading) return <Loading rows={4} />
+  if (error)
+    return (
+      <ErrorState
+        message={error}
+        onRetry={() => {
+          setError(null)
+          setLoading(true)
+          load()
+        }}
+      />
+    )
 
   return (
     <div className="flex max-w-2xl flex-col gap-6">

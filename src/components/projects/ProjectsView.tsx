@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Modal, fieldClass } from "@/components/shared/Modal"
+import { Loading, EmptyState, ErrorState } from "@/components/shared/States"
 import { useUndo } from "@/components/undo/UndoProvider"
 import { PROJECT_STATUS, PROJECT_STATUS_ORDER } from "@/lib/projects"
 import type { Project, ProjectStatus, Profile } from "@/types"
@@ -20,6 +21,7 @@ export function ProjectsView() {
   const [projects, setProjects] = useState<ProjectRow[]>([])
   const [profiles, setProfiles] = useState<Pick<Profile, "id" | "name">[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [searchText, setSearchText] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("")
@@ -28,22 +30,30 @@ export function ProjectsView() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    let q = supabase
-      .from("projects")
-      .select("*, owner:profiles!projects_owner_id_fkey(name)", { count: "exact" })
-    if (statusFilter) q = q.eq("status", statusFilter)
-    if (searchText.trim()) {
-      const s = `%${searchText.trim()}%`
-      q = q.or(`name.ilike.${s},description.ilike.${s}`)
+    setError(null)
+    try {
+      let q = supabase
+        .from("projects")
+        .select("*, owner:profiles!projects_owner_id_fkey(name)", { count: "exact" })
+      if (statusFilter) q = q.eq("status", statusFilter)
+      if (searchText.trim()) {
+        const s = `%${searchText.trim()}%`
+        q = q.or(`name.ilike.${s},description.ilike.${s}`)
+      }
+      const [projRes, profRes] = await Promise.all([
+        q.order("created_at", { ascending: false }).range(0, pageCount * PAGE_SIZE - 1),
+        supabase.from("profiles").select("id, name").order("name"),
+      ])
+      if (projRes.error) throw projRes.error
+      if (profRes.error) throw profRes.error
+      setProjects((projRes.data as ProjectRow[]) ?? [])
+      setTotalCount(projRes.count ?? 0)
+      setProfiles(profRes.data ?? [])
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "프로젝트를 불러오지 못했습니다.")
+    } finally {
+      setLoading(false)
     }
-    const [projRes, profRes] = await Promise.all([
-      q.order("created_at", { ascending: false }).range(0, pageCount * PAGE_SIZE - 1),
-      supabase.from("profiles").select("id, name").order("name"),
-    ])
-    setProjects((projRes.data as ProjectRow[]) ?? [])
-    setTotalCount(projRes.count ?? 0)
-    setProfiles(profRes.data ?? [])
-    setLoading(false)
   }, [supabase, searchText, statusFilter, pageCount])
 
   useEffect(() => {
@@ -108,12 +118,20 @@ export function ProjectsView() {
       </div>
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">불러오는 중…</p>
+        <Loading rows={5} />
+      ) : error ? (
+        <ErrorState
+          message={error}
+          onRetry={() => {
+            setError(null)
+            load()
+          }}
+        />
       ) : projects.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-16 text-center text-muted-foreground">
-          <FolderKanban className="size-8" />
-          <p className="text-sm">아직 프로젝트가 없습니다. 첫 프로젝트를 만들어 보세요.</p>
-        </div>
+        <EmptyState
+          icon={FolderKanban}
+          title="아직 프로젝트가 없습니다. 첫 프로젝트를 만들어 보세요."
+        />
       ) : (
         <div className="overflow-hidden rounded-lg border">
           <table className="w-full text-sm tabular-nums [&_td]:align-middle [&_th]:align-middle">

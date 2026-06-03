@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { fieldClass } from "@/components/shared/Modal"
 import { StatusDot, statusLabel } from "@/components/chat/StatusDot"
 import { useOnlineUsers } from "@/hooks/usePresence"
+import { Loading, EmptyState, ErrorState } from "@/components/shared/States"
 import type { Profile } from "@/types"
 
 type Member = Pick<Profile, "id" | "name" | "department" | "position" | "status_manual">
@@ -27,21 +28,29 @@ export function MembersView() {
   const [members, setMembers] = useState<Member[]>([])
   const [meId, setMeId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
   const [contacts, setContacts] = useState<Record<string, Contact>>({})
   const [query, setQuery] = useState("")
   const online = useOnlineUsers(meId)
 
   const load = useCallback(async () => {
-    const { data: auth } = await supabase.auth.getUser()
-    setMeId(auth.user?.id ?? null)
-    // 목록은 비민감 필드만. 연락처(email/전화)는 펼칠 때 directory_contact RPC로 공개 항목만 가져온다.
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, name, department, position, status_manual")
-      .order("name")
-    setMembers(data ?? [])
-    setLoading(false)
+    try {
+      const { data: auth } = await supabase.auth.getUser()
+      setMeId(auth.user?.id ?? null)
+      // 목록은 비민감 필드만. 연락처(email/전화)는 펼칠 때 directory_contact RPC로 공개 항목만 가져온다.
+      const { data, error: queryError } = await supabase
+        .from("profiles")
+        .select("id, name, department, position, status_manual")
+        .order("name")
+      if (queryError) throw queryError
+      setMembers(data ?? [])
+      setError(null)
+    } catch {
+      setError("구성원 목록을 불러오지 못했어요.")
+    } finally {
+      setLoading(false)
+    }
   }, [supabase])
 
   useEffect(() => {
@@ -97,7 +106,9 @@ export function MembersView() {
     a === UNDEPT ? 1 : b === UNDEPT ? -1 : a.localeCompare(b, "ko")
   )
 
-  if (loading) return <p className="text-sm text-muted-foreground">불러오는 중…</p>
+  if (loading) return <Loading rows={5} />
+  if (error)
+    return <ErrorState message={error} onRetry={() => { setError(null); load() }} />
 
   return (
     <div className="flex flex-col gap-5">
@@ -109,10 +120,7 @@ export function MembersView() {
       />
 
       {members.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-16 text-center text-muted-foreground">
-          <Users className="size-8" />
-          <p className="text-sm">등록된 구성원이 없습니다.</p>
-        </div>
+        <EmptyState icon={Users} title="등록된 구성원이 없습니다." />
       ) : filtered.length === 0 ? (
         <p className="text-sm text-muted-foreground">검색 결과가 없습니다.</p>
       ) : (

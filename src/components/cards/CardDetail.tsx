@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Trash2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { Button } from "@/components/ui/button"
 import { BackLink } from "@/components/shared/BackLink"
+import { Loading, ErrorState } from "@/components/shared/States"
 import { useUndo } from "@/components/undo/UndoProvider"
 import type { BusinessCard } from "@/types"
 
@@ -32,15 +33,18 @@ export function CardDetail({ cardId }: { cardId: string }) {
   const [card, setCard] = useState<CardRow | null>(null)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    ;(async () => {
-      const { data } = await supabase
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const { data, error: queryError } = await supabase
         .from("business_cards")
         .select("*, owner:profiles!business_cards_owner_id_fkey(name)")
         .eq("id", cardId)
         .is("deleted_at", null)
         .single()
+      if (queryError) throw queryError
       setCard((data as CardRow) ?? null)
       if (data?.image_url) {
         const { data: signed } = await supabase.storage
@@ -48,9 +52,17 @@ export function CardDetail({ cardId }: { cardId: string }) {
           .createSignedUrl(data.image_url, 300)
         setImageUrl(signed?.signedUrl ?? null)
       }
+      setError(null)
+    } catch {
+      setError("명함을 불러오지 못했습니다.")
+    } finally {
       setLoading(false)
-    })()
+    }
   }, [supabase, cardId])
+
+  useEffect(() => {
+    void load()
+  }, [load])
 
   const remove = async () => {
     if (!card) return
@@ -75,7 +87,8 @@ export function CardDetail({ cardId }: { cardId: string }) {
     router.push("/cards")
   }
 
-  if (loading) return <p className="text-sm text-muted-foreground">불러오는 중…</p>
+  if (loading) return <Loading rows={4} />
+  if (error) return <ErrorState message={error} onRetry={() => { setError(null); void load() }} />
   if (!card) return <p className="text-sm text-muted-foreground">명함을 찾을 수 없습니다.</p>
 
   return (

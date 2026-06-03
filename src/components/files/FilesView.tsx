@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { useUndo } from "@/components/undo/UndoProvider"
 import { Button } from "@/components/ui/button"
+import { Loading, EmptyState, ErrorState } from "@/components/shared/States"
 import { uploadFile } from "@/lib/upload"
 import { FILES_BUCKET, fileSourceLabel, formatBytes } from "@/lib/files"
 
@@ -28,22 +29,30 @@ export function FilesView() {
   const inputRef = useRef<HTMLInputElement>(null)
   const [rows, setRows] = useState<FileRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
 
   const load = useCallback(async () => {
-    const { data: auth } = await supabase.auth.getUser()
-    if (!auth.user) {
+    try {
+      const { data: auth } = await supabase.auth.getUser()
+      if (!auth.user) {
+        setLoading(false)
+        return
+      }
+      const { data, error: queryError } = await supabase
+        .from("files")
+        .select("id, name, mime_type, size_bytes, source, metadata, created_at")
+        .eq("owner_id", auth.user.id)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false })
+      if (queryError) throw queryError
+      setRows((data as FileRow[]) ?? [])
+      setError(null)
+    } catch {
+      setError("파일 목록을 불러오지 못했어요.")
+    } finally {
       setLoading(false)
-      return
     }
-    const { data } = await supabase
-      .from("files")
-      .select("id, name, mime_type, size_bytes, source, metadata, created_at")
-      .eq("owner_id", auth.user.id)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-    setRows((data as FileRow[]) ?? [])
-    setLoading(false)
   }, [supabase])
 
   useEffect(() => {
@@ -145,11 +154,17 @@ export function FilesView() {
 
       {/* 파일 목록 */}
       {loading ? (
-        <p className="text-sm text-muted-foreground">불러오는 중…</p>
+        <Loading rows={5} />
+      ) : error ? (
+        <ErrorState
+          message={error}
+          onRetry={() => {
+            setError(null)
+            load()
+          }}
+        />
       ) : rows.length === 0 ? (
-        <p className="rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
-          아직 업로드한 파일이 없어요.
-        </p>
+        <EmptyState icon={FileText} title="아직 업로드한 파일이 없어요." />
       ) : (
         <div className="flex flex-col divide-y rounded-xl border">
           {rows.map((f) => (

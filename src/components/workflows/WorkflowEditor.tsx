@@ -10,6 +10,7 @@ import { useUndo } from "@/components/undo/UndoProvider"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { BackLink } from "@/components/shared/BackLink"
+import { Loading, ErrorState } from "@/components/shared/States"
 import { fieldClass } from "@/components/shared/Modal"
 import { WorkflowCanvas, type NodeRunState } from "@/components/workflows/WorkflowCanvas"
 import {
@@ -49,6 +50,7 @@ export function WorkflowEditor({ id }: { id: string }) {
   const router = useRouter()
   const { push } = useUndo()
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [notFound, setNotFound] = useState(false)
   const [saving, setSaving] = useState(false)
   const [name, setName] = useState("")
@@ -73,25 +75,33 @@ export function WorkflowEditor({ id }: { id: string }) {
   const [openRunId, setOpenRunId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    const [{ data: wf }, { data: ag }] = await Promise.all([
-      supabase.from("workflows").select("name, description, steps, is_active, is_public").eq("id", id).maybeSingle(),
-      supabase
-        .from("agents")
-        .select("id, name, icon, description")
-        .eq("is_active", true)
-        .order("created_at", { ascending: true }),
-    ])
-    if (!wf || wf.is_active === false) {
-      setNotFound(true)
+    try {
+      const [{ data: wf, error: wfErr }, { data: ag, error: agErr }] = await Promise.all([
+        supabase.from("workflows").select("name, description, steps, is_active, is_public").eq("id", id).maybeSingle(),
+        supabase
+          .from("agents")
+          .select("id, name, icon, description")
+          .eq("is_active", true)
+          .order("created_at", { ascending: true }),
+      ])
+      if (wfErr) throw wfErr
+      if (agErr) throw agErr
+      if (!wf || wf.is_active === false) {
+        setNotFound(true)
+        setLoading(false)
+        return
+      }
+      setName(wf.name ?? "")
+      setDescription(wf.description ?? "")
+      setIsPublic(wf.is_public ?? false)
+      setGraph(normalizeGraph(wf.steps))
+      setAgents((ag as AgentOpt[]) ?? [])
+      setLoadError(null)
       setLoading(false)
-      return
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "워크플로우를 불러오지 못했어요.")
+      setLoading(false)
     }
-    setName(wf.name ?? "")
-    setDescription(wf.description ?? "")
-    setIsPublic(wf.is_public ?? false)
-    setGraph(normalizeGraph(wf.steps))
-    setAgents((ag as AgentOpt[]) ?? [])
-    setLoading(false)
   }, [supabase, id])
 
   const loadRuns = useCallback(async () => {
@@ -276,7 +286,21 @@ export function WorkflowEditor({ id }: { id: string }) {
     router.push("/workflows")
   }
 
-  if (loading) return <p className="text-sm text-muted-foreground">불러오는 중…</p>
+  if (loading) return <Loading rows={5} />
+  if (loadError)
+    return (
+      <div className="flex flex-col gap-4">
+        <BackLink href="/workflows" label="워크플로우" />
+        <ErrorState
+          message={loadError}
+          onRetry={() => {
+            setLoadError(null)
+            setLoading(true)
+            load()
+          }}
+        />
+      </div>
+    )
   if (notFound)
     return (
       <div className="flex flex-col gap-4">

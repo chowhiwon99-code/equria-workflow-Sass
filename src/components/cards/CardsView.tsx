@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client"
 import { uploadImage } from "@/lib/upload"
 import { Button } from "@/components/ui/button"
 import { downloadCsv, todayStamp } from "@/lib/csv"
+import { Loading, EmptyState, ErrorState } from "@/components/shared/States"
 import type { BusinessCard } from "@/types"
 
 type CardRow = BusinessCard & { owner: { name: string } | null }
@@ -25,20 +26,27 @@ export function CardsView() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    let q = supabase
-      .from("business_cards")
-      .select("*, owner:profiles!business_cards_owner_id_fkey(name)", { count: "exact" })
-      .is("deleted_at", null)
-    if (searchText.trim()) {
-      const s = `%${searchText.trim()}%`
-      q = q.or(`name.ilike.${s},company.ilike.${s},email.ilike.${s}`)
+    try {
+      let q = supabase
+        .from("business_cards")
+        .select("*, owner:profiles!business_cards_owner_id_fkey(name)", { count: "exact" })
+        .is("deleted_at", null)
+      if (searchText.trim()) {
+        const s = `%${searchText.trim()}%`
+        q = q.or(`name.ilike.${s},company.ilike.${s},email.ilike.${s}`)
+      }
+      const { data, count, error: queryError } = await q
+        .order("created_at", { ascending: false })
+        .range(0, pageCount * PAGE_SIZE - 1)
+      if (queryError) throw new Error(queryError.message)
+      setCards((data as CardRow[]) ?? [])
+      setTotalCount(count ?? 0)
+      setError(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "명함을 불러오지 못했습니다.")
+    } finally {
+      setLoading(false)
     }
-    const { data, count } = await q
-      .order("created_at", { ascending: false })
-      .range(0, pageCount * PAGE_SIZE - 1)
-    setCards((data as CardRow[]) ?? [])
-    setTotalCount(count ?? 0)
-    setLoading(false)
   }, [supabase, searchText, pageCount])
 
   useEffect(() => {
@@ -146,15 +154,24 @@ export function CardsView() {
         <span className="ml-auto text-xs text-muted-foreground tabular-nums">총 {totalCount.toLocaleString()}개</span>
       </div>
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && cards.length > 0 && <p className="text-sm text-destructive">{error}</p>}
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">불러오는 중…</p>
+        <Loading rows={6} />
+      ) : error && cards.length === 0 ? (
+        <ErrorState
+          message={error}
+          onRetry={() => {
+            setError(null)
+            load()
+          }}
+        />
       ) : cards.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-16 text-center text-muted-foreground">
-          <Contact className="size-8" />
-          <p className="text-sm">명함 사진을 올리면 Claude가 자동으로 스캔·정리합니다.</p>
-        </div>
+        <EmptyState
+          icon={Contact}
+          title="등록된 명함이 없습니다"
+          description="명함 사진을 올리면 Claude가 자동으로 스캔·정리합니다."
+        />
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {cards.map((c) => (

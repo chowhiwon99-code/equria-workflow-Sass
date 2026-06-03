@@ -22,6 +22,7 @@ import DOMPurify from "isomorphic-dompurify"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Modal, fieldClass } from "@/components/shared/Modal"
+import { Loading } from "@/components/shared/States"
 import { cn } from "@/lib/utils"
 import type { MailThreadSummary, MailThreadDetail } from "@/lib/google/gmail"
 
@@ -345,7 +346,7 @@ export function MailShell() {
           </form>
           <div className="min-h-0 flex-1 overflow-y-auto">
             {loadingList && threads.length === 0 ? (
-              <p className="p-4 text-sm text-muted-foreground">불러오는 중…</p>
+              <Loading rows={6} />
             ) : threads.length === 0 ? (
               <p className="p-4 text-sm text-muted-foreground">메일이 없어요.</p>
             ) : (
@@ -394,7 +395,7 @@ export function MailShell() {
               메일을 선택하세요.
             </div>
           ) : loadingDetail || !detail ? (
-            <div className="grid flex-1 place-items-center text-sm text-muted-foreground">불러오는 중…</div>
+            <Loading rows={4} />
           ) : (
             <>
               <div className="flex items-center gap-1 border-b p-2.5">

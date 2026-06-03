@@ -6,6 +6,7 @@ import { Plus, Workflow as WorkflowIcon } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { normalizeGraph } from "@/lib/workflows"
+import { Loading, ErrorState } from "@/components/shared/States"
 
 type WorkflowRow = {
   id: string
@@ -21,15 +22,23 @@ export function WorkflowsView() {
   const [rows, setRows] = useState<WorkflowRow[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    const { data } = await supabase
-      .from("workflows")
-      .select("id, name, description, steps, run_count")
-      .eq("is_active", true)
-      .order("created_at", { ascending: false })
-    setRows((data as WorkflowRow[]) ?? [])
-    setLoading(false)
+    try {
+      const { data, error } = await supabase
+        .from("workflows")
+        .select("id, name, description, steps, run_count")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+      if (error) throw error
+      setRows((data as WorkflowRow[]) ?? [])
+      setError(null)
+    } catch {
+      setError("워크플로우를 불러오지 못했어요.")
+    } finally {
+      setLoading(false)
+    }
   }, [supabase])
 
   useEffect(() => {
@@ -76,7 +85,9 @@ export function WorkflowsView() {
       </div>
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">불러오는 중…</p>
+        <Loading rows={5} />
+      ) : error ? (
+        <ErrorState message={error} onRetry={() => { setError(null); load() }} />
       ) : rows.length === 0 ? (
         <p className="rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
           아직 워크플로우가 없어요. ‘새 워크플로우’로 시작하세요.

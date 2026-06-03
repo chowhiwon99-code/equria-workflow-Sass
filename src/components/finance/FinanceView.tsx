@@ -8,6 +8,7 @@ import { uploadImage } from "@/lib/upload"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Modal, fieldClass } from "@/components/shared/Modal"
+import { Loading } from "@/components/shared/States"
 import { useUndo } from "@/components/undo/UndoProvider"
 import { categoriesFor, computeAmounts, won, EXPENSE_CATEGORIES, REVENUE_CATEGORIES } from "@/lib/finance"
 import { downloadCsv, todayStamp } from "@/lib/csv"
@@ -298,7 +299,7 @@ export function FinanceView() {
 
       {/* 표 */}
       {loading ? (
-        <p className="text-sm text-muted-foreground">불러오는 중…</p>
+        <Loading rows={6} />
       ) : entries.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-16 text-center text-muted-foreground">
           <Upload className="size-8" />

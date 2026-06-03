@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Modal, fieldClass } from "@/components/shared/Modal"
 import { BackLink } from "@/components/shared/BackLink"
+import { Loading, ErrorState } from "@/components/shared/States"
 import { useUndo } from "@/components/undo/UndoProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { PROJECT_STATUS, PROJECT_STATUS_ORDER } from "@/lib/projects"
@@ -24,28 +25,35 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
   const [eventCount, setEventCount] = useState(0)
   const [financeTotal, setFinanceTotal] = useState<{ expense: number; revenue: number }>({ expense: 0, revenue: 0 })
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [addUserId, setAddUserId] = useState("")
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [{ data: proj }, { data: mem }, { data: prof }, { count: evCount }, { data: fin }] = await Promise.all([
-      supabase.from("projects").select("*, owner:profiles!projects_owner_id_fkey(name)").eq("id", projectId).single(),
-      supabase.from("project_members").select("id, user_id, role, member:profiles!project_members_user_id_fkey(name)").eq("project_id", projectId),
-      supabase.from("profiles").select("id, name").order("name"),
-      supabase.from("calendar_events").select("id", { count: "exact", head: true }).eq("project_id", projectId),
-      supabase.from("finance_entries").select("kind, total_amount").eq("project_id", projectId).is("deleted_at", null),
-    ])
-    setProject((proj as (Project & { owner: { name: string } | null }) | null) ?? null)
-    setMembers((mem as MemberRow[]) ?? [])
-    setProfiles(prof ?? [])
-    setEventCount(evCount ?? 0)
-    const totals = { expense: 0, revenue: 0 }
-    for (const f of fin ?? []) {
-      if (f.kind === "expense") totals.expense += Number(f.total_amount)
-      else totals.revenue += Number(f.total_amount)
+    try {
+      const [{ data: proj }, { data: mem }, { data: prof }, { count: evCount }, { data: fin }] = await Promise.all([
+        supabase.from("projects").select("*, owner:profiles!projects_owner_id_fkey(name)").eq("id", projectId).single(),
+        supabase.from("project_members").select("id, user_id, role, member:profiles!project_members_user_id_fkey(name)").eq("project_id", projectId),
+        supabase.from("profiles").select("id, name").order("name"),
+        supabase.from("calendar_events").select("id", { count: "exact", head: true }).eq("project_id", projectId),
+        supabase.from("finance_entries").select("kind, total_amount").eq("project_id", projectId).is("deleted_at", null),
+      ])
+      setProject((proj as (Project & { owner: { name: string } | null }) | null) ?? null)
+      setMembers((mem as MemberRow[]) ?? [])
+      setProfiles(prof ?? [])
+      setEventCount(evCount ?? 0)
+      const totals = { expense: 0, revenue: 0 }
+      for (const f of fin ?? []) {
+        if (f.kind === "expense") totals.expense += Number(f.total_amount)
+        else totals.revenue += Number(f.total_amount)
+      }
+      setFinanceTotal(totals)
+      setError(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "프로젝트 정보를 불러오지 못했습니다.")
+    } finally {
+      setLoading(false)
     }
-    setFinanceTotal(totals)
-    setLoading(false)
   }, [supabase, projectId])
 
   useEffect(() => {
@@ -115,7 +123,8 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
     }
   }
 
-  if (loading) return <p className="text-sm text-muted-foreground">불러오는 중…</p>
+  if (loading) return <Loading rows={5} />
+  if (error) return <ErrorState message={error} onRetry={() => { setError(null); load() }} />
   if (!project) return <p className="text-sm text-muted-foreground">프로젝트를 찾을 수 없습니다.</p>
 
   const memberIds = new Set(members.map((m) => m.user_id))

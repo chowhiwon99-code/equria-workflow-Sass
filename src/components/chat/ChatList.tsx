@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { StatusDot } from "@/components/chat/StatusDot"
+import { Loading, ErrorState } from "@/components/shared/States"
 import { useOnlineUsers } from "@/hooks/usePresence"
 import type { Profile } from "@/types"
 
@@ -27,59 +28,66 @@ export function ChatList() {
   const [colleagues, setColleagues] = useState<Colleague[]>([])
   const [meId, setMeId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const online = useOnlineUsers(meId)
 
   const load = useCallback(async () => {
-    const { data: auth } = await supabase.auth.getUser()
-    const me = auth.user?.id
-    if (!me) {
+    try {
+      const { data: auth } = await supabase.auth.getUser()
+      const me = auth.user?.id
+      if (!me) {
+        setLoading(false)
+        return
+      }
+      setMeId(me)
+
+      const [{ data: convs }, { data: profs }] = await Promise.all([
+        supabase
+          .from("direct_conversations")
+          .select("*")
+          .order("last_message_at", { ascending: false, nullsFirst: false }),
+        supabase.from("profiles").select("id, name, department, status_manual").neq("id", me).order("name"),
+      ])
+
+      const nameById = new Map((profs ?? []).map((p) => [p.id, p.name]))
+      setColleagues(profs ?? [])
+
+      const convList = convs ?? []
+      const convIds = convList.map((c) => c.id)
+      let msgs: { conversation_id: string; sender_id: string; content: string; created_at: string; read_at: string | null; deleted_at: string | null }[] = []
+      if (convIds.length > 0) {
+        const { data } = await supabase
+          .from("direct_messages")
+          .select("conversation_id, sender_id, content, created_at, read_at, deleted_at")
+          .in("conversation_id", convIds)
+          .order("created_at", { ascending: false })
+        msgs = data ?? []
+      }
+
+      const summaries: RoomSummary[] = convList
+        .map((c) => {
+          const otherId = c.user_a === me ? c.user_b : c.user_a
+          const convMsgs = msgs.filter((m) => m.conversation_id === c.id)
+          const last = convMsgs[0]
+          // 삭제된 메시지는 안읽음 카운트에서 제외 (작성자가 지우면 상대 배지도 사라짐)
+          const unread = convMsgs.filter((m) => m.sender_id !== me && m.read_at === null && !m.deleted_at).length
+          return {
+            otherId,
+            otherName: nameById.get(otherId) ?? "직원",
+            lastMessage: last?.deleted_at ? "삭제된 메시지입니다" : last?.content ?? "",
+            lastAt: last?.created_at ?? null,
+            unread,
+          }
+        })
+        .filter((r) => r.lastMessage !== "" && r.otherId !== me) // 빈 방·셀프방 제외(셀프는 별도 표시)
+
+      setRooms(summaries)
+      setError(null)
+    } catch {
+      setError("채팅 목록을 불러오지 못했습니다.")
+    } finally {
       setLoading(false)
-      return
     }
-    setMeId(me)
-
-    const [{ data: convs }, { data: profs }] = await Promise.all([
-      supabase
-        .from("direct_conversations")
-        .select("*")
-        .order("last_message_at", { ascending: false, nullsFirst: false }),
-      supabase.from("profiles").select("id, name, department, status_manual").neq("id", me).order("name"),
-    ])
-
-    const nameById = new Map((profs ?? []).map((p) => [p.id, p.name]))
-    setColleagues(profs ?? [])
-
-    const convList = convs ?? []
-    const convIds = convList.map((c) => c.id)
-    let msgs: { conversation_id: string; sender_id: string; content: string; created_at: string; read_at: string | null; deleted_at: string | null }[] = []
-    if (convIds.length > 0) {
-      const { data } = await supabase
-        .from("direct_messages")
-        .select("conversation_id, sender_id, content, created_at, read_at, deleted_at")
-        .in("conversation_id", convIds)
-        .order("created_at", { ascending: false })
-      msgs = data ?? []
-    }
-
-    const summaries: RoomSummary[] = convList
-      .map((c) => {
-        const otherId = c.user_a === me ? c.user_b : c.user_a
-        const convMsgs = msgs.filter((m) => m.conversation_id === c.id)
-        const last = convMsgs[0]
-        // 삭제된 메시지는 안읽음 카운트에서 제외 (작성자가 지우면 상대 배지도 사라짐)
-        const unread = convMsgs.filter((m) => m.sender_id !== me && m.read_at === null && !m.deleted_at).length
-        return {
-          otherId,
-          otherName: nameById.get(otherId) ?? "직원",
-          lastMessage: last?.deleted_at ? "삭제된 메시지입니다" : last?.content ?? "",
-          lastAt: last?.created_at ?? null,
-          unread,
-        }
-      })
-      .filter((r) => r.lastMessage !== "" && r.otherId !== me) // 빈 방·셀프방 제외(셀프는 별도 표시)
-
-    setRooms(summaries)
-    setLoading(false)
   }, [supabase])
 
   useEffect(() => {
@@ -117,7 +125,9 @@ export function ChatList() {
       <h1 className="text-lg font-semibold">직원 채팅</h1>
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">불러오는 중…</p>
+        <Loading rows={5} />
+      ) : error ? (
+        <ErrorState message={error} onRetry={() => { setError(null); load() }} />
       ) : (
         <>
           {/* 나와의 채팅 (개인 메모·파일·링크 저장) */}

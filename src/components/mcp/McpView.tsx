@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Modal, fieldClass } from "@/components/shared/Modal"
+import { Loading, EmptyState, ErrorState } from "@/components/shared/States"
 import { cn } from "@/lib/utils"
 
 type Server = {
@@ -32,6 +33,7 @@ export function McpView() {
   const [servers, setServers] = useState<Server[]>([])
   const [tools, setTools] = useState<Record<string, Tool[]>>({})
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [testing, setTesting] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [addOpen, setAddOpen] = useState(false)
@@ -39,13 +41,18 @@ export function McpView() {
   const [form, setForm] = useState({ name: "", type: "http", url: "", auth_type: "none" })
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/mcp/servers")
-    if (res.ok) {
+    try {
+      const res = await fetch("/api/mcp/servers")
+      if (!res.ok) throw new Error("MCP 서버 목록을 불러오지 못했어요.")
       const j = await res.json()
       setServers(j.servers ?? [])
       setTools(j.tools ?? {})
+      setError(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "MCP 서버 목록을 불러오지 못했어요.")
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }, [])
 
   useEffect(() => {
@@ -132,15 +139,15 @@ export function McpView() {
       </div>
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">불러오는 중…</p>
+        <Loading rows={5} />
+      ) : error ? (
+        <ErrorState message={error} onRetry={() => { setError(null); load() }} />
       ) : servers.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed py-14 text-center">
-          <Plug className="size-7 text-muted-foreground" />
-          <p className="text-sm font-medium">연결된 MCP 서버가 없어요</p>
-          <p className="text-xs text-muted-foreground">
-            {isAdmin ? "‘서버 추가’로 원격 MCP(HTTP) 서버를 등록하세요." : "관리자가 서버를 등록하면 여기에 표시돼요."}
-          </p>
-        </div>
+        <EmptyState
+          icon={Plug}
+          title="연결된 MCP 서버가 없어요"
+          description={isAdmin ? "‘서버 추가’로 원격 MCP(HTTP) 서버를 등록하세요." : "관리자가 서버를 등록하면 여기에 표시돼요."}
+        />
       ) : (
         <div className="flex flex-col divide-y rounded-xl border">
           {servers.map((s) => {

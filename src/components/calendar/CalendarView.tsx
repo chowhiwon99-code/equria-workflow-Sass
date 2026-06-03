@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useUndo } from "@/components/undo/UndoProvider"
+import { Loading, ErrorState } from "@/components/shared/States"
 import type { CalendarEvent } from "@/types"
 import {
   WEEKDAYS_KO,
@@ -32,6 +33,7 @@ export function CalendarView() {
   const [viewDate, setViewDate] = useState(() => new Date())
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<CalendarEvent | null>(null)
   // 기간 일정 생성: {start, end} (단일 클릭이면 start === end)
   const [createRange, setCreateRange] = useState<{ start: Date; end: Date } | null>(null)
@@ -64,14 +66,21 @@ export function CalendarView() {
     // - 시작이 범위 끝 이후면 제외(.lt)
     // - 범위에 걸치려면: 종료가 범위 시작 이후거나(멀티데이가 안쪽으로 이어짐),
     //   종료가 없고 시작이 범위 시작 이후(단일일 이벤트)
-    const { data } = await supabase
-      .from("calendar_events")
-      .select("*")
-      .lt("start_time", endIso)
-      .or(`end_time.gte.${startIso},and(end_time.is.null,start_time.gte.${startIso})`)
-      .order("start_time", { ascending: true })
-    setEvents(data ?? [])
-    setLoading(false)
+    try {
+      const { data, error: qErr } = await supabase
+        .from("calendar_events")
+        .select("*")
+        .lt("start_time", endIso)
+        .or(`end_time.gte.${startIso},and(end_time.is.null,start_time.gte.${startIso})`)
+        .order("start_time", { ascending: true })
+      if (qErr) throw new Error(qErr.message)
+      setEvents(data ?? [])
+      setError(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "일정을 불러오지 못했습니다.")
+    } finally {
+      setLoading(false)
+    }
   }, [supabase, viewDate])
 
   useEffect(() => {
@@ -316,7 +325,17 @@ export function CalendarView() {
         })}
       </div>
 
-      {loading && <p className="text-center text-sm text-muted-foreground">불러오는 중…</p>}
+      {loading && <Loading rows={3} />}
+
+      {error && !loading && (
+        <ErrorState
+          message={error}
+          onRetry={() => {
+            setError(null)
+            loadEvents()
+          }}
+        />
+      )}
 
       {createRange && (
         <CreateEventModal
