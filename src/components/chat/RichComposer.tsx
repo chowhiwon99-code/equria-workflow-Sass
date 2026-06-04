@@ -39,11 +39,13 @@ function Tool({ on, active, label, children }: { on: () => void; active?: boolea
 export function RichComposer({
   onSend,
   disabled,
+  canSendEmpty = false,
   placeholder = "메시지 입력…  (Enter 전송 · Shift+Enter 줄바꿈)",
   leftSlot,
 }: {
   onSend: (payload: ComposerPayload) => void | Promise<void>
   disabled?: boolean
+  canSendEmpty?: boolean // 첨부 등 본문 외 전송거리가 있으면 빈 텍스트도 전송 허용
   placeholder?: string
   leftSlot?: ReactNode
 }) {
@@ -73,7 +75,7 @@ export function RichComposer({
   const submit = useCallback(async () => {
     if (!editor || disabled) return
     const text = editor.getText().trim()
-    if (!text) return
+    if (!text && !canSendEmpty) return // 텍스트도 첨부도 없으면 무시
     try {
       await onSend({ text, bodyJson: editor.getJSON() })
       editor.commands.clearContent() // 성공 시에만 비움 — 실패하면 입력 보존(재시도 가능)
@@ -81,7 +83,7 @@ export function RichComposer({
     } catch {
       /* onSend가 throw하면 입력을 남겨 둔다 */
     }
-  }, [editor, disabled, onSend])
+  }, [editor, disabled, canSendEmpty, onSend])
 
   // handleKeyDown은 에디터 생성 시 한 번 고정되므로, 최신 submit을 ref로 전달(stale 클로저 방지)
   useEffect(() => {
@@ -138,7 +140,7 @@ export function RichComposer({
         <div className="min-w-0 flex-1">
           <EditorContent editor={editor} />
         </div>
-        <Button type="button" size="icon-sm" onClick={submit} disabled={disabled || editor.isEmpty}>
+        <Button type="button" size="icon-sm" onClick={submit} disabled={disabled || (editor.isEmpty && !canSendEmpty)}>
           <Send />
         </Button>
       </div>

@@ -14,14 +14,20 @@ import { useUndo } from "@/components/undo/UndoProvider"
 import { StatusDot } from "@/components/chat/StatusDot"
 import { MessageBody } from "@/components/chat/MessageBody"
 import { RichComposer, type ComposerPayload } from "@/components/chat/RichComposer"
+import { AttachmentList, type AttachmentItem } from "@/components/chat/AttachmentList"
 import { useOnlineUsers } from "@/hooks/usePresence"
 import type { DirectMessage } from "@/types"
 
 const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|bmp|svg|avif|heic|heif)$/i
 
-/** 첨부 파일명이 이미지 확장자인지 */
+/** 첨부 파일명이 이미지 확장자인지 (레거시 단일 첨부 렌더용) */
 function isImageAttachment(name: string | null | undefined): boolean {
   return !!name && IMAGE_EXT_RE.test(name)
+}
+
+/** 첨부만 보낼 때 content(plain SSOT) 자동 요약 — ChatList 미리보기·답장 인용에 쓰임 */
+function attachmentSummary(files: File[]): string {
+  return files.length === 1 ? files[0].name : `파일 ${files.length}개`
 }
 
 /** 답장 인용·배너에 쓸 한 줄 요약 (삭제/첨부/본문 순). content는 항상 plain SSOT라 리치여도 안전. */
@@ -43,6 +49,8 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
   const [messages, setMessages] = useState<DirectMessage[]>([])
   const [reactions, setReactions] = useState<{ id: string; message_id: string; emoji: string; user_id: string }[]>([])
   const [fileUrls, setFileUrls] = useState<Record<string, string>>({})
+  const [stagedFiles, setStagedFiles] = useState<File[]>([])
+  const [attachments, setAttachments] = useState<(AttachmentItem & { message_id: string })[]>([])
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [replyTo, setReplyTo] = useState<DirectMessage | null>(null)
@@ -83,6 +91,25 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
       setReactions(
         (data ?? []).map((r) => ({ id: r.id, message_id: r.message_id, emoji: r.emoji, user_id: r.user_id }))
       )
+    },
+    [supabase]
+  )
+
+  // 이 대화의 모든 다중첨부(message_attachments)를 로드 + 서명 URL 일괄 생성(inner join 필터).
+  const loadAttachments = useCallback(
+    async (convId: string) => {
+      const { data } = await supabase
+        .from("message_attachments")
+        .select("id, message_id, storage_path, name, mime_type, direct_messages!inner(conversation_id)")
+        .eq("direct_messages.conversation_id", convId)
+      const rows = data ?? []
+      const resolved = await Promise.all(
+        rows.map(async (a) => {
+          const { data: s } = await supabase.storage.from("chat-files").createSignedUrl(a.storage_path, 3600)
+          return { id: a.id, message_id: a.message_id, name: a.name, mime_type: a.mime_type, url: s?.signedUrl ?? null }
+        })
+      )
+      setAttachments(resolved)
     },
     [supabase]
   )
@@ -137,6 +164,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
       setMessages(list)
       void resolveAttachments(list)
       void loadReactions(convId)
+      void loadAttachments(convId)
 
       // 나와의 채팅이 아니면 상대 메시지 + 관련 알림을 읽음 처리.
       // SECURITY DEFINER RPC 로 처리해 RLS/세션 변수를 배제하고 한 번에 갱신한다.
@@ -179,6 +207,11 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
         { event: "*", schema: "public", table: "message_reactions" },
         () => void loadReactions(conversationId)
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "message_attachments" },
+        () => void loadAttachments(conversationId)
+      )
       .subscribe()
     return () => {
       supabase.removeChannel(channel)
@@ -200,6 +233,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
       setMessages(list)
       void resolveAttachments(list)
       void loadReactions(conversationId)
+      void loadAttachments(conversationId)
       if (meId !== otherUserId) {
         void supabase.rpc("mark_dm_read", { conv_id: conversationId }).then(() => {})
       }
@@ -230,55 +264,67 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
   // 언마운트 시 하이라이트 타이머 정리
   useEffect(() => () => { if (highlightTimer.current) window.clearTimeout(highlightTimer.current) }, [])
 
-  // RichComposer가 { text(plain SSOT), bodyJson(리치) }를 올려보낸다. 실패 시 throw → 컴포저가 입력 보존.
+  // RichComposer가 { text(plain SSOT), bodyJson(리치) }를 올려보낸다. 스테이징된 파일이 있으면 함께 전송.
+  // 실패 시 throw → 컴포저가 텍스트 보존(여기선 첨부·답장도 복원).
   const send = useCallback(
     async ({ text, bodyJson }: ComposerPayload) => {
+      const trimmed = text.trim()
       if (!conversationId || !meId) return
+      if (!trimmed && stagedFiles.length === 0) return
+      const files = stagedFiles
       const replyParent = replyTo
+      setStagedFiles([])
       setReplyTo(null)
-      const { error: insErr } = await supabase.from("direct_messages").insert({
-        conversation_id: conversationId,
-        sender_id: meId,
-        content: text, // plain 미러(SSOT)
-        body_json: bodyJson as unknown as DirectMessage["body_json"], // 리치 본문
-        parent_id: replyParent?.id ?? null,
-        // root_id: 답장 체인이 같은 스레드로 묶이도록 부모의 root 승계(없으면 부모가 root)
-        root_id: replyParent ? replyParent.root_id ?? replyParent.id : null,
-      })
-      if (insErr) {
-        toast.error(insErr.message)
+      if (files.length) setUploading(true)
+      try {
+        const uploaded = await Promise.all(
+          files.map(async (f) => ({ path: await uploadImage("chat-files", f), name: f.name, type: f.type, size: f.size }))
+        )
+        const { data: msg, error: insErr } = await supabase
+          .from("direct_messages")
+          .insert({
+            conversation_id: conversationId,
+            sender_id: meId,
+            content: trimmed || attachmentSummary(files), // plain SSOT(첨부만이면 요약)
+            body_json: trimmed ? (bodyJson as unknown as DirectMessage["body_json"]) : null,
+            parent_id: replyParent?.id ?? null,
+            root_id: replyParent ? replyParent.root_id ?? replyParent.id : null,
+          })
+          .select("id")
+          .single()
+        if (insErr || !msg) throw insErr ?? new Error("전송에 실패했어요.")
+        if (uploaded.length) {
+          const { error: attErr } = await supabase.from("message_attachments").insert(
+            uploaded.map((u) => ({
+              message_id: msg.id,
+              storage_path: u.path,
+              name: u.name,
+              mime_type: u.type || null,
+              size: u.size,
+            }))
+          )
+          if (attErr) throw attErr
+          void loadAttachments(conversationId)
+        }
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "전송 실패")
+        setStagedFiles(files) // 첨부 복원
         setReplyTo(replyParent)
-        throw insErr
+        throw e // 컴포저가 텍스트 보존
+      } finally {
+        setUploading(false)
       }
     },
-    [conversationId, meId, supabase, replyTo]
+    [conversationId, meId, supabase, replyTo, stagedFiles, loadAttachments]
   )
 
-  const onAttach = async (file: File) => {
-    if (!conversationId || !meId) return
-    setUploading(true)
-    const replyParent = replyTo
-    setReplyTo(null)
-    try {
-      const path = await uploadImage("chat-files", file)
-      const { error: insErr } = await supabase.from("direct_messages").insert({
-        conversation_id: conversationId,
-        sender_id: meId,
-        content: file.name,
-        attachment_url: path,
-        attachment_name: file.name,
-        parent_id: replyParent?.id ?? null,
-        root_id: replyParent ? replyParent.root_id ?? replyParent.id : null,
-      })
-      if (insErr) throw insErr
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "첨부 실패")
-      setReplyTo(replyParent) // 실패 시 답장 대상 복원 (send()와 일관)
-    } finally {
-      setUploading(false)
-      if (fileRef.current) fileRef.current.value = ""
-    }
+  // 파일 스테이징(즉시 업로드 X — 전송 시 일괄). 여러 개 누적.
+  const addStagedFiles = (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    setStagedFiles((prev) => [...prev, ...Array.from(files)])
+    if (fileRef.current) fileRef.current.value = ""
   }
+  const removeStagedFile = (idx: number) => setStagedFiles((prev) => prev.filter((_, i) => i !== idx))
 
   // 본인 메시지 수정 (텍스트만) — 변경은 Realtime UPDATE 로 양쪽에 반영
   const startEdit = (m: DirectMessage) => {
@@ -346,6 +392,12 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
     reactionsByMsg.set(r.message_id, arr)
   }
   const messagesById = new Map(messages.map((m) => [m.id, m]))
+  const attachmentsByMsg = new Map<string, AttachmentItem[]>()
+  for (const a of attachments) {
+    const arr = attachmentsByMsg.get(a.message_id) ?? []
+    arr.push(a)
+    attachmentsByMsg.set(a.message_id, arr)
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -518,6 +570,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
                 </div>
               )}
               </div>
+              <AttachmentList items={attachmentsByMsg.get(m.id) ?? []} />
               <MessageReactionBar
                 reactions={reactionsByMsg.get(m.id) ?? []}
                 meId={meId}
@@ -542,11 +595,39 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
           </button>
         </div>
       )}
-      <div className={cn("pt-3", !replyTo && "border-t")}>
-        <input ref={fileRef} type="file" className="hidden" onChange={(e) => e.target.files?.[0] && onAttach(e.target.files[0])} />
+      <div className={cn("flex flex-col gap-1.5 pt-3", !replyTo && "border-t")}>
+        <input
+          ref={fileRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={(e) => addStagedFiles(e.target.files)}
+        />
+        {/* 스테이징된 첨부 미리보기 칩 (전송 전 제거 가능) */}
+        {stagedFiles.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {stagedFiles.map((f, i) => (
+              <span
+                key={`${f.name}-${i}`}
+                className="inline-flex items-center gap-1 rounded-lg border bg-muted/40 px-2 py-1 text-xs"
+              >
+                <Paperclip className="size-3 shrink-0 text-muted-foreground" />
+                <span className="max-w-[12rem] truncate">{f.name}</span>
+                <button
+                  onClick={() => removeStagedFile(i)}
+                  aria-label="첨부 제거"
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <X className="size-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
         <RichComposer
           onSend={send}
           disabled={!conversationId}
+          canSendEmpty={stagedFiles.length > 0}
           leftSlot={
             <Button
               type="button"
