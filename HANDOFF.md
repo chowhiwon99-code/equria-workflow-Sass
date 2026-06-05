@@ -9,10 +9,11 @@
 
 ## 🎯 지금 상태
 
-- **배포(main)**: `https://equria-workflow-sass.vercel.app` — main 최신 `3c171ba` READY. main push → Vercel 자동배포.
+- **배포(main)**: `https://equria-workflow-sass.vercel.app` — main 최신 `b671ea2` READY (**세션7 작업 18커밋 전체 배포 완료**, 2026-06-05). main push → Vercel 자동배포 · 직전 `3c171ba`는 1클릭 롤백 후보.
+  - Vercel은 GitHub 연결됨 → **브랜치 push마다 프리뷰 자동배포**(`...-git-feat-...vercel.app`, 라이브 무영향). main push만 프로덕션 배포.
 - **라이브 기능(배포됨)**: 에이전트 허브(우하단 위젯)·에이전트 빌더·워크플로우(n8n 캔버스+순차 실행)·캘린더·프로젝트·재무·명함·파일·**메일(Gmail)**·**MCP**·**구성원 디렉터리** + **직원 채팅 허브(단계0~5)**.
   - 채팅 단계0~5: 사용자 상태표시(온·오프+수동) · 이모지 반응 · 답장/스레드 · **리치 텍스트(Tiptap 서식·맞춤법 밑줄)** · **다중 첨부**.
-- **🔧 작업 브랜치 `feat/toss-ui-refresh`(세션7 · GitHub 푸시됨 · main 미머지=미배포)** — main 대비 16커밋:
+- **🔧 세션7 작업(배포됨 · `feat/toss-ui-refresh` → main FF 머지·배포 `b671ea2`. 이후 수정도 feat에서 → 머지 흐름)** — 주요 변경:
   - **채팅 단계6(완료)**: AI 보조(다듬기·번역·요약) + **한국어 맞춤법 검사**(`ComposerAiAssist`·`/api/chat/assist`).
   - **토스/애플 UI 리프레시**: Pretendard 전역 · 라운드↑(`--radius:1rem`) · 부드러운 그림자 · 파스텔 기능색 · 이모지→lucide. 토큰 SSOT=`globals.css`(`[data-slot]` 오버라이드, `components/ui/` 무수정).
   - **에이전트 재설계**: 그리드 카드→상세(skill.md/시스템프롬프트)·`/agents/[id]/edit` 분리 · 아이폰식 위저드(슬라이드) · 벌집 아이콘피커(물방울 fisheye).
@@ -22,16 +23,15 @@
   - **채팅 입력창**: 애플식 심플(서식 툴바 숨김→`Aa` 토글·둥근 pill) + **번역 후 전송 안 됨 수정**(Tiptap v3 stale `editor.isEmpty` → onCreate/onUpdate state 동기화).
   - **재무**: 세금계산서 초안 **수정·삭제**(`TaxInvoiceModal` + 마이그 028 DELETE 정책 · Undo).
   - **위젯 morph**: 채팅 열기/닫기 CSS-FLIP(`equria-morph-in/out` · 버블↔패널, 닫힘 역재생 · morph 중 드래그·확대 잠금).
-- **안정도(브랜치)**: `tsc` 0 · `pnpm lint` 30(전부 기존 `set-state-in-effect`·`refs` 부채, **0 warnings·신규 범주 없음**) · git clean · `any` 0 · 마이그 **원격31↔디스크31 drift 없음**.
-  - ⚠️ 로컬 `next build` 미검증(환경상 Google Fonts 네트워크 타임아웃) → `tsc`+`lint`+dev로 대체. 머지 시 Vercel 빌드가 진짜 게이트.
-  - ⚠️ **DB > 배포코드**: 마이그 `025`(에이전트 lucide)·`026`(캘린더 첨부)·`027`(채팅 첨부 Realtime)·`028`(세금계산서 DELETE 정책)은 **원격(프로덕션)에 이미 적용**됐고 사용 코드는 브랜치(미배포). 모두 **순수 additive**(`027`은 배포된 main 앱 첨부 수신도 바로 개선 · `028`은 정책만 추가라 무해). main 머지 시 코드·DB 정합.
+- **안정도(배포본 b671ea2)**: `tsc` 0 · `pnpm lint` 30(전부 기존 `set-state-in-effect`·`refs` 부채, **0 warnings·신규 범주 없음**) · git clean · `any` 0 · 마이그 **원격31↔디스크31 drift 없음** · **Vercel 프로덕션 빌드 READY**(로컬 `next build`는 환경상 Google Fonts 타임아웃이라 미실행 → Vercel 빌드가 실제 게이트, 이번 통과 확인).
+  - ✅ **DB·코드 정합**: 마이그 025~028(prod 적용·전부 additive)을 쓰는 코드가 이제 배포됨 → 기존 "DB > 배포코드" 격차 **해소**.
 - 전역 ⌘Z Undo · 휴지통(soft-delete).
 
 ---
 
 ## 🔴 다음 세션 우선순위
 
-1. **`feat/toss-ui-refresh` UI 수정 잔여 계속 → 완료 후 main 머지·배포**(머지 = Vercel 자동배포 + 코드/DB 정합). 사용자 의도 = "수정할 것 많다" → 브랜치에 계속 쌓고 한 번에 머지. **머지 전 `next build` Vercel에서 통과 확인**(로컬 폰트 이슈로 미검증분).
+1. **세션7 작업 배포 완료(b671ea2) → 직원 피드백 수집 단계**. 추가 수정은 `feat`에서 작업 → 프리뷰 자동확인 → main 머지(재배포). 심각 버그 시 Vercel 1클릭 롤백(직전 `3c171ba`). 사용자 의도 = "써보게 하고 피드백 받아 또 수정".
 2. **(사용자 작업) Gmail 프로덕션 연동** — Vercel 환경변수 5개 추가 후 재배포. 안 하면 메일 연결 시 `GOOGLE_OAUTH_NOT_CONFIGURED`(로컬은 정상):
    - `GOOGLE_CLIENT_ID` · `GOOGLE_CLIENT_SECRET` · `GOOGLE_TOKEN_ENC_KEY` ← 로컬 `.env.local`에서 복사
    - `GOOGLE_OAUTH_REDIRECT_URI=https://equria-workflow-sass.vercel.app/api/google/callback` (⚠️ localhost 아님)
