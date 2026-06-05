@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Sparkles, Check, ArrowLeft } from "lucide-react"
+import { Sparkles, Check, ArrowLeft, PenLine } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/shared/Modal"
@@ -91,9 +91,9 @@ export function AgentWizard() {
         <button
           type="button"
           onClick={() => setMode("wizard")}
-          className="self-start text-sm text-muted-foreground hover:text-foreground"
+          className="inline-flex items-center gap-1.5 self-start rounded-full border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-[var(--shadow-sm)] transition-colors hover:bg-muted hover:text-foreground"
         >
-          ← 가이드 마법사로 돌아가기
+          <Sparkles className="size-3.5" /> 가이드 마법사로 돌아가기
         </button>
         <AgentBuilderForm slides />
       </div>
@@ -204,9 +204,9 @@ export function AgentWizard() {
         <button
           type="button"
           onClick={() => setMode("manual")}
-          className="text-sm text-muted-foreground hover:text-foreground"
+          className="inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-[var(--shadow-sm)] transition-colors hover:bg-muted hover:text-foreground"
         >
-          직접 작성으로 전환
+          <PenLine className="size-3.5" /> 직접 작성으로 전환
         </button>
         <div className="flex gap-2">
           {index > 0 && (

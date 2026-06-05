@@ -1,108 +1,173 @@
 "use client"
 
-import { useCallback, useRef } from "react"
+import { useCallback, useRef, useState } from "react"
 import { Check } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { AGENT_ICONS, type AgentIcon } from "@/lib/agents"
+import { AGENT_ICONS } from "@/lib/agents"
 import { renderAgentIcon } from "@/components/agents/AgentIcon"
 
 /**
- * 회전초밥식 아이콘 피커.
- * - 회전초밥처럼 끊김 없이 계속 흘러간다(멈추지 않음). 클릭/방향키로 선택(움직이는 중에도 클릭 가능).
- * - 접근성: role="radiogroup" + roving tabindex(←/→/Home/End/Enter).
- * - prefers-reduced-motion: 흐름을 끄고 줄바꿈 그리드로 폴백.
- * - 렌더는 renderAgentIcon(lucide). AgentIcon.image 가 있으면 <img> 우선.
- * 저장값(value)은 "lucide:Name". 기존 이모지 저장값도 렌더러가 폴백 처리(하위호환).
+ * 애플워치식 벌집(honeycomb) 아이콘 피커.
+ * - 버블을 오프셋 행으로 군집 배치. 커서에 가까운 버블이 물방울처럼 커지고 멀면 작아지는 fisheye 모션.
+ * - 위치는 해석적으로 계산(DOM 측정 X) → 스케일은 캐시된 중심 vs 커서 거리로만. 가볍다.
+ * - 저장값(value)은 "lucide:Name"(renderAgentIcon으로 렌더). 접근성: role=radiogroup + roving tabindex(←/→/Enter).
+ * - prefers-reduced-motion: 모션 비활성(스케일 고정).
  */
+
+const B = 52 // 버블 지름(scale 1)
+const PITCH_X = 60 // 가로 중심 간격
+const PITCH_Y = 50 // 세로 중심 간격
+const PAD = 18 // 스케일된 가장자리 버블이 잘리지 않게
+const RADIUS = 130 // fisheye 영향 반경(px)
+const MAX_BOOST = 0.55 // 최대 확대(=1.55배)
+
+/** 아이콘 개수를 5/6 교차 행으로 분할(벌집). */
+function buildRows(total: number): number[] {
+  const rows: number[] = []
+  let i = 0
+  let big = false
+  while (i < total) {
+    const n = Math.min(big ? 6 : 5, total - i)
+    rows.push(n)
+    i += n
+    big = !big
+  }
+  return rows
+}
+
+type Bubble = { idx: number; cx: number; cy: number }
+
+function layout(): { bubbles: Bubble[]; width: number; height: number } {
+  const rows = buildRows(AGENT_ICONS.length)
+  const maxN = Math.max(...rows)
+  const width = PAD * 2 + (maxN - 1) * PITCH_X + B
+  const height = PAD * 2 + (rows.length - 1) * PITCH_Y + B
+  const bubbles: Bubble[] = []
+  let idx = 0
+  rows.forEach((n, r) => {
+    const rowW = (n - 1) * PITCH_X
+    const startX = PAD + B / 2 + ((maxN - 1) * PITCH_X - rowW) / 2 // 각 행을 가운데 정렬(5행은 자연히 오프셋)
+    const cy = PAD + B / 2 + r * PITCH_Y
+    for (let c = 0; c < n; c++) bubbles.push({ idx: idx++, cx: startX + c * PITCH_X, cy })
+  })
+  return { bubbles, width, height }
+}
+
+const { bubbles: BUBBLES, width: WIDTH, height: HEIGHT } = layout()
+
 export function IconPicker({
   value,
   onChange,
 }: {
   value: string
-  onChange: (emoji: string) => void
+  onChange: (value: string) => void
 }) {
+  const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const rafRef = useRef<number | null>(null)
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
+
+  const reduced =
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+
+  const onMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (reduced) return
+      const rect = containerRef.current?.getBoundingClientRect()
+      if (!rect) return
+      const x = e.clientX - rect.left
+      const y = e.clientY - rect.top
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      rafRef.current = requestAnimationFrame(() => setCursor({ x, y }))
+    },
+    [reduced]
+  )
+  const onLeave = useCallback(() => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    setCursor(null)
+  }, [])
+
+  const scaleAt = (cx: number, cy: number): number => {
+    if (!cursor) return 1
+    const d = Math.hypot(cx - cursor.x, cy - cursor.y)
+    const boost = Math.max(0, 1 - d / RADIUS)
+    return 1 + boost * boost * MAX_BOOST // 제곱 ease로 물방울 느낌
+  }
+
   const selectedIdx = Math.max(
     0,
     AGENT_ICONS.findIndex((i) => i.value === value)
   )
 
-  const onKeyDown = useCallback(
-    (e: React.KeyboardEvent, idx: number) => {
-      const n = AGENT_ICONS.length
-      let next = -1
-      if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (idx + 1) % n
-      else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (idx - 1 + n) % n
-      else if (e.key === "Home") next = 0
-      else if (e.key === "End") next = n - 1
-      else if (e.key === " " || e.key === "Enter") {
-        e.preventDefault()
-        onChange(AGENT_ICONS[idx].value)
-        return
-      } else return
+  const onKeyDown = (e: React.KeyboardEvent, idx: number) => {
+    const n = AGENT_ICONS.length
+    let next = -1
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (idx + 1) % n
+    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (idx - 1 + n) % n
+    else if (e.key === "Home") next = 0
+    else if (e.key === "End") next = n - 1
+    else if (e.key === " " || e.key === "Enter") {
       e.preventDefault()
-      onChange(AGENT_ICONS[next].value)
-      const btn = itemRefs.current[next]
-      btn?.focus()
-      btn?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" })
-    },
-    [onChange]
-  )
-
-  const renderBtn = (it: AgentIcon, idx: number, clone: boolean) => {
-    const selected = it.value === value
-    return (
-      <button
-        key={`${clone ? "c" : "r"}${idx}`}
-        ref={clone ? undefined : (el) => { itemRefs.current[idx] = el }}
-        type="button"
-        role={clone ? "presentation" : "radio"}
-        aria-checked={clone ? undefined : selected}
-        aria-hidden={clone || undefined}
-        aria-label={clone ? undefined : `아이콘 ${it.label}`}
-        tabIndex={clone ? -1 : idx === selectedIdx ? 0 : -1}
-        onClick={() => onChange(it.value)}
-        onKeyDown={clone ? undefined : (e) => onKeyDown(e, idx)}
-        className={cn(
-          "relative grid size-14 shrink-0 place-items-center rounded-2xl border outline-none transition-all duration-200",
-          "hover:-translate-y-0.5 hover:scale-110 focus-visible:ring-2 focus-visible:ring-ring",
-          selected
-            ? "scale-110 border-primary bg-primary/10 shadow-lg shadow-primary/20 ring-2 ring-primary"
-            : "border-transparent bg-card hover:bg-accent"
-        )}
-      >
-        {it.image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={it.image} alt="" className="size-8 object-contain" />
-        ) : (
-          renderAgentIcon(it.value, "size-7")
-        )}
-        {selected && !clone && (
-          <Check className="absolute -right-1 -top-1 size-4 rounded-full bg-primary p-0.5 text-primary-foreground" />
-        )}
-      </button>
-    )
+      onChange(AGENT_ICONS[idx].value)
+      return
+    } else return
+    e.preventDefault()
+    onChange(AGENT_ICONS[next].value)
+    itemRefs.current[next]?.focus()
   }
 
   return (
-    <div
-      role="radiogroup"
-      aria-label="에이전트 아이콘 선택"
-      className="group/rail relative overflow-hidden rounded-2xl border bg-muted/30 py-4"
-    >
-      {/* 양끝 페이드 */}
-      <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-background to-transparent motion-reduce:hidden" />
-      <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-background to-transparent motion-reduce:hidden" />
-
-      <div className="flex w-max motion-safe:animate-[equria-marquee_34s_linear_infinite] motion-reduce:w-full motion-reduce:animate-none">
-        {/* 실제 라디오 그룹 */}
-        <div className="flex shrink-0 gap-3 pr-3 motion-reduce:w-full motion-reduce:flex-wrap motion-reduce:justify-center motion-reduce:gap-2">
-          {AGENT_ICONS.map((it, i) => renderBtn(it, i, false))}
-        </div>
-        {/* 끊김 없는 루프를 위한 복제(스크린리더에는 숨김) */}
-        <div aria-hidden className="flex shrink-0 gap-3 pr-3 motion-reduce:hidden">
-          {AGENT_ICONS.map((it, i) => renderBtn(it, i, true))}
-        </div>
+    <div className="flex justify-center rounded-2xl bg-muted/40 p-2">
+      <div
+        ref={containerRef}
+        role="radiogroup"
+        aria-label="에이전트 아이콘 선택"
+        onMouseMove={onMove}
+        onMouseLeave={onLeave}
+        className="relative"
+        style={{ width: WIDTH, height: HEIGHT }}
+      >
+        {BUBBLES.map(({ idx, cx, cy }) => {
+          const item = AGENT_ICONS[idx]
+          const selected = item.value === value
+          const s = scaleAt(cx, cy)
+          return (
+            <button
+              key={item.value}
+              ref={(el) => {
+                itemRefs.current[idx] = el
+              }}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              aria-label={`아이콘 ${item.label}`}
+              tabIndex={idx === selectedIdx ? 0 : -1}
+              onClick={() => onChange(item.value)}
+              onKeyDown={(e) => onKeyDown(e, idx)}
+              style={{
+                left: cx - B / 2,
+                top: cy - B / 2,
+                width: B,
+                height: B,
+                transform: `scale(${s})`,
+                zIndex: Math.round(s * 10),
+              }}
+              className={cn(
+                "absolute grid place-items-center rounded-full border outline-none transition-transform duration-200 ease-out will-change-transform focus-visible:ring-2 focus-visible:ring-ring",
+                selected
+                  ? "border-primary bg-primary/10 text-primary ring-2 ring-primary"
+                  : "border-transparent bg-card text-foreground shadow-[var(--shadow-sm)] hover:bg-accent"
+              )}
+            >
+              {renderAgentIcon(item.value, "size-5")}
+              {selected && (
+                <Check className="absolute -right-0.5 -top-0.5 size-4 rounded-full bg-primary p-0.5 text-primary-foreground" />
+              )}
+            </button>
+          )
+        })}
       </div>
     </div>
   )
