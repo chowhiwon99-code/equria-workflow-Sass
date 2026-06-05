@@ -64,7 +64,7 @@ export function RichComposer({
     editorProps: {
       attributes: {
         spellcheck: "true", // 네이티브 맞춤법 빨간 밑줄
-        class: "tiptap-input min-h-[2.5rem] max-h-40 overflow-y-auto py-1.5 text-sm focus:outline-none",
+        class: "tiptap-input max-h-40 overflow-y-auto py-1 text-sm focus:outline-none",
         "aria-label": "메시지 입력",
       },
       handleKeyDown: (_view, event) => {
@@ -151,7 +151,7 @@ export function RichComposer({
           </Tool>
         </div>
       )}
-      <div className="flex items-end gap-1">
+      <div className="flex items-center gap-1">
         {leftSlot}
         <div className="min-w-0 flex-1 px-1">
           <EditorContent editor={editor} />
