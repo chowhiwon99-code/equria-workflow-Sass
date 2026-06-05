@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { Send, X, Plus, Maximize2, Minimize2, Copy, Check, Sparkles } from "lucide-react"
+import { ArrowUp, X, Plus, Maximize2, Minimize2, Copy, Check, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { renderAgentIcon } from "@/components/agents/AgentIcon"
 import { useAgentChat, type Agent, type WidgetPosition } from "./AgentChatContext"
@@ -15,7 +15,7 @@ const WIDGET_SIZE = 56 // size-14
 const EDGE_PADDING = 8
 const DEFAULT_MARGIN = 24 // CSS bottom-6 right-6
 
-const PANEL_SIZE_NORMAL = { width: 380, height: 540 }
+const PANEL_SIZE_NORMAL = { width: 440, height: 620 }
 const PANEL_SIZE_EXPANDED = { width: 720, height: 720 }
 
 function clamp(v: number, min: number, max: number) {
@@ -332,8 +332,10 @@ function ChatPanel({ hidden }: { hidden: boolean }) {
         touchAction: isExpanded ? "auto" : "none",
       }}
       className={cn(
-        "z-50 flex flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl transition-opacity",
-        hidden && "pointer-events-none opacity-0"
+        "z-50 flex flex-col overflow-hidden rounded-3xl border bg-card shadow-2xl",
+        // 런처 코너에서 촤르륵 스프링으로 펼쳐짐(overshoot)
+        "origin-bottom-right transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.34,1.5,0.6,1)]",
+        hidden ? "pointer-events-none scale-90 opacity-0" : "scale-100 opacity-100"
       )}
       aria-hidden={hidden}
     >
@@ -387,6 +389,15 @@ function ChatPanel({ hidden }: { hidden: boolean }) {
             {renderAgentIcon(a.icon, "size-5")}
           </button>
         ))}
+        <Link
+          href="/agents"
+          onClick={close}
+          className="flex size-8 shrink-0 items-center justify-center rounded-full border border-dashed text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
+          title="에이전트 추가·관리"
+          aria-label="에이전트 추가·관리"
+        >
+          <Plus className="size-4" />
+        </Link>
       </div>
 
       {/* 채팅 본체 — agentId 또는 chatVersion 바뀌면 remount */}
@@ -488,8 +499,8 @@ function ChatBody({ agent }: { agent: Agent }) {
         {error && <p className="text-xs text-destructive">오류: {error.message}</p>}
       </div>
 
-      <div className="border-t bg-card p-2">
-        <div className="flex items-end gap-2">
+      <div className="border-t bg-card p-3">
+        <div className="flex items-end gap-1.5 rounded-3xl border bg-muted/40 py-1.5 pl-4 pr-1.5 transition-colors focus-within:border-ring focus-within:bg-card">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -499,18 +510,18 @@ function ChatBody({ agent }: { agent: Agent }) {
                 submit()
               }
             }}
-            placeholder="메시지 입력… (Enter 전송, Shift+Enter 줄바꿈)"
+            placeholder="메시지 입력…"
             rows={1}
-            className="max-h-32 flex-1 resize-none rounded-lg border bg-card px-2.5 py-1.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
+            className="max-h-32 flex-1 resize-none self-center bg-transparent py-1 text-sm outline-none placeholder:text-muted-foreground"
             disabled={status !== "ready"}
           />
           <button
             onClick={submit}
             disabled={status !== "ready" || !input.trim()}
-            className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-opacity disabled:opacity-40"
+            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:hover:scale-100"
             aria-label="전송"
           >
-            <Send className="size-4" />
+            <ArrowUp className="size-4" />
           </button>
         </div>
       </div>
