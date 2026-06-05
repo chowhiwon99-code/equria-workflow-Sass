@@ -22,9 +22,12 @@
   - **채팅 송수신 개선**: 첨부 Realtime publication 추가(마이그 027 — 누락 버그 수정) · **낙관적 송신**(insert 직후 즉시 표시) · 반응/답장을 버블 옆 인라인·반응칩 조건부·간격 압축(`gap-1`).
   - **채팅 입력창**: 애플식 심플(서식 툴바 숨김→`Aa` 토글·둥근 pill) + **번역 후 전송 안 됨 수정**(Tiptap v3 stale `editor.isEmpty` → onCreate/onUpdate state 동기화).
   - **재무**: 세금계산서 초안 **수정·삭제**(`TaxInvoiceModal` + 마이그 028 DELETE 정책 · Undo).
-  - **위젯 morph**: 채팅 열기/닫기 CSS-FLIP(`equria-morph-in/out` · 버블↔패널, 닫힘 역재생 · morph 중 드래그·확대 잠금).
-- **안정도(배포본 b671ea2)**: `tsc` 0 · `pnpm lint` 30(전부 기존 `set-state-in-effect`·`refs` 부채, **0 warnings·신규 범주 없음**) · git clean · `any` 0 · 마이그 **원격31↔디스크31 drift 없음** · **Vercel 프로덕션 빌드 READY**(로컬 `next build`는 환경상 Google Fonts 타임아웃이라 미실행 → Vercel 빌드가 실제 게이트, 이번 통과 확인).
-  - ✅ **DB·코드 정합**: 마이그 025~028(prod 적용·전부 additive)을 쓰는 코드가 이제 배포됨 → 기존 "DB > 배포코드" 격차 **해소**.
+  - **위젯 morph**: 채팅 열기/닫기 CSS-FLIP(`equria-morph-in/out` · 버블↔패널, 닫힘 역재생 · morph 중 드래그·확대 잠금) · FAB 메뉴 닫힘도 역스태거(`equria-pop-out`).
+  - **입력창 정렬 수정**: 메인 행 `items-center`+에디터 min-h 제거(텍스트·아이콘 어긋남 해소).
+  - **알림(마이그 029)**: 제목에 보낸사람 이름(`{이름}님의 새 메시지`, 기존 73건 백필) · 클릭 즉시 이동(제어형 드롭다운+await 제거).
+  - **멀티테넌시 A단계(마이그 030)**: ↓ 아래 별도 섹션 참조.
+- **안정도(배포본 b671ea2 · 이후 feat에 알림·입력창·멀티테넌시 추가분)**: `tsc` 0 · `pnpm lint` 30(전부 기존 `set-state-in-effect`·`refs` 부채, **0 warnings·신규 범주 없음**) · git clean · `any` 0 · 마이그 **원격33↔디스크33 drift 없음** · **Vercel 프로덕션 빌드 READY**(로컬 `next build`는 환경상 Google Fonts 타임아웃이라 미실행 → Vercel 빌드가 실제 게이트, 이번 통과 확인).
+  - **DB·코드**: 025~028 사용 코드는 배포됨(b671ea2). **029(알림 제목)·030(멀티테넌시 workspace_id)은 prod 적용**됐고 feat 코드(알림 클릭수정·입력창 정렬)는 **미머지**. 단 029 제목개선은 배포코드가 이미 활용(라이브 반영됨), 030은 컬럼 DEFAULT로 배포코드 무해. **전부 additive·안전** — feat 머지 시 코드도 정합.
 - 전역 ⌘Z Undo · 휴지통(soft-delete).
 
 ---
@@ -49,7 +52,7 @@
 
 - **GitHub** `chowhiwon99-code/equria-workflow-Sass` (main 단일 + 작업브랜치 `feat/toss-ui-refresh` 푸시됨).
 - **Vercel** team `team_wcW0NMU7oiIxNndyV1afigbp` · project `prj_CcCTUr8eIYpaStaj6RNq7VoLPZG6` · 배포보호 off(앱이 자체 인증).
-- **Supabase** project `dutovtfdckhayyvhtuxu` (ap-northeast-2 서울) · 마이그 001~028 적용(**원격31↔디스크31 drift 없음**). DDL은 MCP `apply_migration`(`project_id` 필수) **+** `supabase/migrations/` 파일 둘 다(SSOT).
+- **Supabase** project `dutovtfdckhayyvhtuxu` (ap-northeast-2 서울) · 마이그 001~030 적용(**원격33↔디스크33 drift 없음**). DDL은 MCP `apply_migration`(`project_id` 필수) **+** `supabase/migrations/` 파일 둘 다(SSOT).
 - **.env.local**: ANTHROPIC · Supabase(URL·anon·service_role) · Google 4종 · `WORKSPACE_PASSWORD` 채워짐. ⚠️ **시크릿 값은 이 문서/채팅에 적지 말 것**(HANDOFF는 git 추적됨).
 - **테스트 계정**: 조휘원 · 이동규 · 김건 (워크스페이스 비번으로 로그인).
 - 모델: 기본 `claude-sonnet-4-6` / 복잡 `claude-opus-4-7`.
@@ -65,6 +68,21 @@
 - **연락처 공개 = `directory_contact` RPC로만**: 이메일/전화 컬럼은 RLS 컬럼권한으로 직접 select 차단(마이그 023b·024). 본인/관리자만 전체.
 - 세금계산서 = 작성·정리만(발행 X). 브랜드 표기 **EQURIA / 이큐리아**.
 - **캘린더(브랜치 세션7)** = 네이티브 Date 자체구현 · **종일 전용**(날짜만, 시간 입력 없음) · 첨부는 jsonb 메타(`calendar_events.attachments`)+`calendar-files` 버킷(읽기=인증 전체·쓰기=본인 폴더, 워크스페이스 공유 정책과 일치). 상세 모달은 공용 Modal 미사용·자체 `ModalShell`(known-issues I11①).
+
+---
+
+## 🏢 멀티테넌시 (슬랙형 — 회사별 워크스페이스 격리, B2B 판매 대비)
+
+> 목표: 회사별 데이터 완전 격리. **A단계(구조)=완료**, **B단계(격리 활성화)=차후**. 캐주얼하게 깨면 회사 간 데이터 누출 = 치명적이니 B단계는 반드시 검증하며.
+
+- **A단계(완료 · 마이그 030 · 비파괴)**: `workspaces`·`workspace_members`(슬랙형 다대다) 신설 + 데이터 **24개 테이블에 `workspace_id`**(NOT NULL DEFAULT=equria, FK on delete cascade)+인덱스. 기존 전원/데이터는 기본 워크스페이스 **`equria`**(고정 sentinel UUID **`00000000-0000-0000-0000-0000000000e1`**) 귀속. 컬럼 DEFAULT 덕에 현재 RLS·앱 무변경.
+  - 제외 테이블: `profiles`(=계정 자체, 전역) · `google_connections`(개인 연동). 신규 workspace엔 8개 프리셋 에이전트가 없음(현재 전부 equria 소속) → B단계 고려.
+- **B단계(차후 · 신중·검증 필수)**:
+  1. **RLS 격리**: 24개 테이블 정책을 `workspace_id in (select workspace_id from workspace_members where user_id=auth.uid())`로 전환(진짜 격리). 라이브 25개 정책 일괄 변경이라 Supabase 브랜치/프리뷰에서 누출 0 검증 후 적용.
+  2. **앱 배선**: "현재 워크스페이스" 컨텍스트(세션/URL) → 모든 쿼리 필터 + insert 시 `workspace_id` 세팅(현재는 DEFAULT 의존).
+  3. **워크스페이스 생성/초대/전환 UI** + 회사별 가입 흐름(현 `WORKSPACE_PASSWORD` 단일 공용 → 워크스페이스별 초대로 교체, 채팅 단계7과 합류).
+  4. 프리셋 에이전트·MCP 등 "공용 자원"을 전역 vs 워크스페이스별로 결정.
+- 향후 포장: **Electron 데스크톱 앱 + 모바일 웹앱**으로 판매 예정(현 Next.js 구조 그대로 래핑 가능).
 
 ---
 
