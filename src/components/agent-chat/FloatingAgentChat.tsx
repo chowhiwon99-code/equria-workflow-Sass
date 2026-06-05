@@ -6,9 +6,8 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { ArrowUp, ArrowLeft, X, Plus, Maximize2, Minimize2, Copy, Check, Sparkles } from "lucide-react"
+import { ArrowUp, ArrowLeft, X, Plus, Maximize2, Minimize2, Copy, Check, Sparkles, SlidersHorizontal } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { createClient } from "@/lib/supabase/client"
 import { renderAgentIcon } from "@/components/agents/AgentIcon"
 import { useAgentChat, type Agent, type WidgetPosition } from "./AgentChatContext"
 
@@ -316,8 +315,10 @@ function FabLauncher({ unread, onOpen }: { unread: boolean; onOpen: () => void }
 }
 
 /**
- * 에이전트 FAB 스택 메뉴 — 런처 위로 핀한 에이전트들이 스프링으로 촤르륵 펼쳐진다(라벨+아이콘).
- * 에이전트 선택 → 채팅. ＋로 추가(미핀 에이전트 핀), ✕로 제거(언핀). 맨 아래 FAB는 닫기(X).
+ * 에이전트 FAB 스택 메뉴 — 런처 위로 핀한 에이전트들이 둥근 사선 호를 그리며 촤르륵 펼쳐진다(라벨+아이콘).
+ * 위로 갈수록 화면 안쪽(우하단 기준 좌측)으로 가속하며 휘고, 라벨은 살짝 기운다.
+ * 에이전트 클릭 → 채팅. 위젯에 띄울 에이전트의 추가/제거/수정은 "에이전트 관리"(/agents)에서 한다.
+ * 맨 아래 FAB는 닫기(X) + 드래그 이동.
  */
 function AgentFabMenu({ onPick }: { onPick: (id: string) => void }) {
   const { agents, close, position, setPosition } = useAgentChat()
@@ -330,41 +331,17 @@ function AgentFabMenu({ onPick }: { onPick: (id: string) => void }) {
   const right = (typeof window !== "undefined" ? window.innerWidth : 1280) - (tl.left + WIDGET_SIZE)
   const bottom = (typeof window !== "undefined" ? window.innerHeight : 800) - (tl.top + WIDGET_SIZE)
 
-  const [manage, setManage] = useState(false)
-  const [allAgents, setAllAgents] = useState<Agent[]>([])
-
-  // 관리 진입 시점에 전체 에이전트 조회(effect 아님 → set-state-in-effect 회피)
-  const enterManage = async () => {
-    const supabase = createClient()
-    const { data } = await supabase
-      .from("agents")
-      .select("id, name, description, icon, category")
-      .eq("is_active", true)
-      .order("created_at", { ascending: true })
-    setAllAgents((data ?? []) as Agent[])
-    setManage(true)
-  }
-  const togglePin = async (agentId: string, pinned: boolean) => {
-    const supabase = createClient()
-    const { data: auth } = await supabase.auth.getUser()
-    if (!auth.user) return
-    if (pinned) {
-      await supabase.from("user_agent_pins").delete().eq("user_id", auth.user.id).eq("agent_id", agentId)
-    } else {
-      await supabase.from("user_agent_pins").insert({ user_id: auth.user.id, agent_id: agentId })
-    }
-    window.dispatchEvent(new Event("equria:agents-changed"))
-  }
-
-  const pinnedIds = new Set(agents.map((a) => a.id))
-  const list = manage ? allAgents : agents
-  // 둥근 사선 오프셋 — 아래(0)에서 위로 갈수록 좌측으로(sqrt 곡선)
-  const diag = (i: number) => Math.round(12 * Math.sqrt(i))
+  // 둥근 사선 호: 아래(0)→위로 갈수록 좌측 오프셋이 가속(power>1)하며 휘어진다(상한 60px).
+  // base +4 → 맨 아래 아이콘(size-12)이 FAB(size-14) 위에 중앙 정렬.
+  const arc = (i: number) => 4 + Math.min(60, Math.round(7 * Math.pow(i, 1.5)))
+  // 라벨 기울기 — 위로 갈수록 살짝 더 기운다(레퍼런스 느낌, 상한 8°). 애니메이션 없는 span에만 적용.
+  const tilt = (i: number) => -Math.min(8, i * 1.5)
+  const POP = "motion-safe:animate-[equria-pop_0.34s_cubic-bezier(0.34,1.5,0.6,1)_both]"
 
   return (
     <div
       style={{ position: "fixed", right: clamp(right, EDGE_PADDING, 4000), bottom: clamp(bottom, EDGE_PADDING, 4000) }}
-      className="z-50 flex flex-col-reverse items-end gap-3"
+      className="z-50 flex flex-col-reverse items-end gap-4"
     >
       {/* 맨 아래: FAB(X) — 드래그로 이동, 탭하면 닫기 */}
       <button
@@ -392,59 +369,50 @@ function AgentFabMenu({ onPick }: { onPick: (id: string) => void }) {
         <X className="pointer-events-none size-6" />
       </button>
 
-      {/* 에이전트 스택 — 둥근 사선으로 스태거 등장. 일반=클릭하면 채팅 / 관리=핀 토글(추가·빼기) */}
-      {list.map((a, i) => {
-        const pinned = pinnedIds.has(a.id)
-        return (
-          <div
-            key={a.id}
-            className="flex items-center gap-2.5 motion-safe:animate-[equria-pop_0.34s_cubic-bezier(0.34,1.5,0.6,1)_both]"
-            style={{ animationDelay: `${i * 0.04}s`, marginRight: diag(i) }}
-          >
-            <span className="rounded-lg bg-card px-2.5 py-1 text-sm font-medium shadow-[var(--shadow-sm)]">{a.name}</span>
-            <button
-              type="button"
-              onClick={() => (manage ? togglePin(a.id, pinned) : onPick(a.id))}
-              className={cn(
-                "relative grid size-12 place-items-center rounded-full border bg-card text-foreground shadow-[var(--shadow-md)] transition-transform hover:scale-110",
-                manage && pinned && "border-primary ring-2 ring-primary"
-              )}
-              title={manage ? (pinned ? `${a.name} 빼기` : `${a.name} 추가`) : a.name}
-              aria-label={manage ? (pinned ? `${a.name} 위젯에서 빼기` : `${a.name} 위젯에 추가`) : `${a.name} 채팅 열기`}
-            >
-              {renderAgentIcon(a.icon, "size-5")}
-              {manage && (
-                <span
-                  className={cn(
-                    "absolute -right-1 -top-1 grid size-5 place-items-center rounded-full text-primary-foreground",
-                    pinned ? "bg-destructive" : "bg-primary"
-                  )}
-                >
-                  {pinned ? <X className="size-3" /> : <Plus className="size-3" />}
-                </span>
-              )}
-            </button>
-          </div>
-        )
-      })}
-
-      {/* 관리/완료 토글 */}
-      <div
-        className="flex items-center gap-2.5 motion-safe:animate-[equria-pop_0.34s_cubic-bezier(0.34,1.5,0.6,1)_both]"
-        style={{ animationDelay: `${list.length * 0.04}s`, marginRight: diag(list.length) }}
-      >
-        <span className="rounded-lg bg-card px-2.5 py-1 text-sm font-medium shadow-[var(--shadow-sm)]">
-          {manage ? "완료" : "에이전트 추가·관리"}
-        </span>
-        <button
-          type="button"
-          onClick={() => (manage ? setManage(false) : enterManage())}
-          className="grid size-12 place-items-center rounded-full border border-dashed bg-card text-muted-foreground shadow-[var(--shadow-sm)] transition-transform hover:scale-110 hover:text-foreground"
-          aria-label={manage ? "관리 완료" : "에이전트 추가·관리"}
+      {/* 에이전트 스택 — 둥근 사선으로 스태거 등장. 클릭하면 채팅 */}
+      {agents.map((a, i) => (
+        <div
+          key={a.id}
+          className={cn("flex items-center gap-2.5", POP)}
+          style={{ animationDelay: `${i * 0.045}s`, marginRight: arc(i) }}
         >
-          {manage ? <Check className="size-5" /> : <Plus className="size-5" />}
-        </button>
-      </div>
+          <span
+            className="rounded-xl border bg-card px-2.5 py-1 text-sm font-medium shadow-[var(--shadow-sm)]"
+            style={{ transform: `rotate(${tilt(i)}deg)` }}
+          >
+            {a.name}
+          </span>
+          <button
+            type="button"
+            onClick={() => onPick(a.id)}
+            className="grid size-12 place-items-center rounded-full border bg-card text-foreground shadow-[var(--shadow-md)] transition-transform hover:scale-110"
+            title={a.name}
+            aria-label={`${a.name} 채팅 열기`}
+          >
+            {renderAgentIcon(a.icon, "size-5")}
+          </button>
+        </div>
+      ))}
+
+      {/* 맨 위: 에이전트 관리 — 추가/제거/수정은 관리 페이지(/agents)에서 */}
+      <Link
+        href="/agents"
+        onClick={close}
+        className={cn("flex items-center gap-2.5", POP)}
+        style={{ animationDelay: `${agents.length * 0.045}s`, marginRight: arc(agents.length) }}
+        title="에이전트 관리"
+        aria-label="에이전트 관리 페이지로 이동"
+      >
+        <span
+          className="rounded-xl border bg-card px-2.5 py-1 text-sm font-medium text-muted-foreground shadow-[var(--shadow-sm)]"
+          style={{ transform: `rotate(${tilt(agents.length)}deg)` }}
+        >
+          에이전트 관리
+        </span>
+        <span className="grid size-12 place-items-center rounded-full border border-dashed bg-card text-muted-foreground shadow-[var(--shadow-sm)] transition-transform hover:scale-110 hover:text-foreground">
+          <SlidersHorizontal className="size-5" />
+        </span>
+      </Link>
     </div>
   )
 }
