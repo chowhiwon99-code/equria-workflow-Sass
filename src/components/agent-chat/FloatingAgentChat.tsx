@@ -325,10 +325,28 @@ function FabLauncher({ unread, onOpen }: { unread: boolean; onOpen: () => void }
  */
 function AgentFabMenu({ onPick }: { onPick: (id: string, rect: { x: number; y: number; w: number; h: number }) => void }) {
   const { agents, close, position, setPosition } = useAgentChat()
+  // 닫힘 = 열림과 동일하게 스태거 애니(equria-pop-out 역재생) 후 실제 close. reduced면 즉시.
+  const reduced =
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  const [closing, setClosing] = useState(false)
+  const outDone = useRef(0)
+  const rowCount = agents.length + 1 // 에이전트들 + "에이전트 관리" 행
+  const requestClose = () => {
+    if (reduced) close()
+    else setClosing(true)
+  }
+  // 마지막 행의 닫힘 애니까지 끝나면 실제 close (in 애니 'equria-pop'은 무시)
+  const onRowsAnimEnd = (e: React.AnimationEvent<HTMLDivElement>) => {
+    if (!closing || e.animationName !== "equria-pop-out") return
+    outDone.current += 1
+    if (outDone.current >= rowCount) close()
+  }
   const { handlePointerDown, wasDraggedRef, dragging } = useDragWidget({
     width: WIDGET_SIZE,
     height: WIDGET_SIZE,
-    onTap: close,
+    onTap: requestClose,
   })
   const tl = widgetTopLeft(position)
   const right = (typeof window !== "undefined" ? window.innerWidth : 1280) - (tl.left + WIDGET_SIZE)
@@ -340,9 +358,19 @@ function AgentFabMenu({ onPick }: { onPick: (id: string, rect: { x: number; y: n
   // 라벨 기울기 — 위로 갈수록 살짝 더 기운다(레퍼런스 느낌, 상한 8°). 애니메이션 없는 span에만 적용.
   const tilt = (i: number) => -Math.min(8, i * 1.5)
   const POP = "motion-safe:animate-[equria-pop_0.34s_cubic-bezier(0.34,1.5,0.6,1)_both]"
+  // 행 스타일: 닫힘이면 inline animation(pop-out, 역스태거: 위쪽이 먼저)이 POP 클래스를 덮어쓴다.
+  const rowStyle = (idx: number): React.CSSProperties =>
+    closing
+      ? {
+          marginRight: arc(idx),
+          animation: `equria-pop-out 0.24s cubic-bezier(0.4,0,0.7,1) ${((agents.length - idx) * 0.04).toFixed(3)}s both`,
+          pointerEvents: "none",
+        }
+      : { marginRight: arc(idx), animationDelay: `${idx * 0.045}s` }
 
   return (
     <div
+      onAnimationEnd={onRowsAnimEnd}
       style={{ position: "fixed", right: clamp(right, EDGE_PADDING, 4000), bottom: clamp(bottom, EDGE_PADDING, 4000) }}
       className="z-50 flex flex-col-reverse items-end gap-4"
     >
@@ -377,7 +405,7 @@ function AgentFabMenu({ onPick }: { onPick: (id: string, rect: { x: number; y: n
         <div
           key={a.id}
           className={cn("flex items-center gap-2.5", POP)}
-          style={{ animationDelay: `${i * 0.045}s`, marginRight: arc(i) }}
+          style={rowStyle(i)}
         >
           <span
             className="rounded-xl border bg-card px-2.5 py-1 text-sm font-medium shadow-[var(--shadow-sm)]"
@@ -405,7 +433,7 @@ function AgentFabMenu({ onPick }: { onPick: (id: string, rect: { x: number; y: n
         href="/agents"
         onClick={close}
         className={cn("flex items-center gap-2.5", POP)}
-        style={{ animationDelay: `${agents.length * 0.045}s`, marginRight: arc(agents.length) }}
+        style={rowStyle(agents.length)}
         title="에이전트 관리"
         aria-label="에이전트 관리 페이지로 이동"
       >

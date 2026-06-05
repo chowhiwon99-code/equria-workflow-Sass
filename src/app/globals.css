@@ -299,6 +299,18 @@ body {
   }
 }
 
+/* 위젯 FAB 스택 닫힘 — equria-pop의 역방향(축소+페이드+하강). 역스태거로 촤르륵 접힘. */
+@keyframes equria-pop-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(10px) scale(0.5);
+  }
+}
+
 /* 위젯 채팅 morph(FLIP) — 에이전트 버블 rect에서 패널로 펼침/접힘.
    --morph-from = 패널(최종 rect)을 버블 rect로 매핑하는 transform(translate+scale), transform-origin: top left.
    in=버블→패널 / out=패널→버블(역재생). 콘텐츠는 opacity로 살짝 페이드. */
