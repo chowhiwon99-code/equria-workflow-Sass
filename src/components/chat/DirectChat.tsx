@@ -290,9 +290,11 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
             parent_id: replyParent?.id ?? null,
             root_id: replyParent ? replyParent.root_id ?? replyParent.id : null,
           })
-          .select("id")
+          .select("*")
           .single()
         if (insErr || !msg) throw insErr ?? new Error("전송에 실패했어요.")
+        // 낙관적 반영 — Realtime 왕복을 기다리지 않고 내 메시지를 즉시 표시(에코 INSERT는 id 중복으로 무시됨)
+        setMessages((prev) => (prev.some((mm) => mm.id === msg.id) ? prev : [...prev, msg]))
         if (uploaded.length) {
           const { error: attErr } = await supabase.from("message_attachments").insert(
             uploaded.map((u) => ({
@@ -410,7 +412,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
         {!isSelf && <StatusDot online={online.has(otherUserId)} manual={otherStatus} />}
       </div>
 
-      <div className="flex flex-1 flex-col gap-2 overflow-y-auto py-2">
+      <div className="flex flex-1 flex-col gap-1 overflow-y-auto py-2">
         {messages.length === 0 && (
           <p className="my-auto text-center text-sm text-muted-foreground">
             {isSelf ? "메모나 링크, 파일을 남겨보세요." : "첫 메시지를 보내보세요."}
@@ -495,12 +497,13 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
                 </button>
               )}
               <div className={cn("flex items-end gap-1", mine ? "justify-end" : "justify-start")}>
-              {/* 본인 메시지 호버 액션 (답장·텍스트 수정·삭제) */}
+              {/* 본인 메시지 호버 액션 (답장·이모지·텍스트 수정·삭제) — 버블 옆 인라인, 세로 중앙 */}
               {mine && (
-                <div className="flex items-center gap-0.5 self-center opacity-0 transition-opacity group-hover:opacity-100">
+                <div className="flex items-center gap-0.5 self-center opacity-0 transition-opacity group-hover:opacity-100 has-[[data-emoji-open]]:opacity-100">
                   <button onClick={() => setReplyTo(m)} className="text-muted-foreground hover:text-foreground" aria-label="답장">
                     <CornerUpLeft className="size-3.5" />
                   </button>
+                  <EmojiAddButton onPick={(e) => toggleReaction(m.id, e)} />
                   {!m.attachment_url && (
                     <button onClick={() => startEdit(m)} className="text-muted-foreground hover:text-foreground" aria-label="메시지 수정">
                       <Pencil className="size-3.5" />
@@ -563,15 +566,17 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
                 </div>
               )}
               {!mine && (
-                <div className="flex items-center gap-0.5 self-center opacity-0 transition-opacity group-hover:opacity-100">
+                <div className="flex items-center gap-0.5 self-center opacity-0 transition-opacity group-hover:opacity-100 has-[[data-emoji-open]]:opacity-100">
                   <button onClick={() => setReplyTo(m)} className="text-muted-foreground hover:text-foreground" aria-label="답장">
                     <CornerUpLeft className="size-3.5" />
                   </button>
+                  <EmojiAddButton onPick={(e) => toggleReaction(m.id, e)} />
                 </div>
               )}
               </div>
               <AttachmentList items={attachmentsByMsg.get(m.id) ?? []} />
-              <MessageReactionBar
+              {/* 반응 칩 — 실제 반응이 있을 때만 버블 아래 작게(없으면 빈 행 미생성 → 간격 압축) */}
+              <ReactionChips
                 reactions={reactionsByMsg.get(m.id) ?? []}
                 meId={meId}
                 mine={mine}
@@ -647,8 +652,45 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
 
 const QUICK_EMOJIS = ["👍", "❤️", "😂", "🎉", "👀", "✅"]
 
-/** 메시지 버블 아래 반응 바 — 이모지별 칩(개수·내반응 강조) + 추가 버튼(호버 시). */
-function MessageReactionBar({
+/** 버블 옆 인라인 "반응 추가" 트리거 — 클릭 시 빠른 이모지 팝오버. data-emoji-open으로 부모 호버클러스터를 열려있는 동안 유지. */
+function EmojiAddButton({ onPick }: { onPick: (emoji: string) => void }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="relative flex" {...(open ? { "data-emoji-open": "" } : {})}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-label="반응 추가"
+        className="text-muted-foreground hover:text-foreground"
+      >
+        <SmilePlus className="size-3.5" />
+      </button>
+      {open && (
+        <>
+          <button className="fixed inset-0 z-10 cursor-default" aria-hidden onClick={() => setOpen(false)} />
+          <div className="absolute bottom-full left-1/2 z-20 mb-1 flex -translate-x-1/2 gap-0.5 rounded-full border bg-popover p-1 shadow-lg">
+            {QUICK_EMOJIS.map((e) => (
+              <button
+                key={e}
+                type="button"
+                onClick={() => {
+                  onPick(e)
+                  setOpen(false)
+                }}
+                className="rounded-full px-1 text-base hover:bg-muted"
+              >
+                {e}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+/** 버블 아래 반응 칩 — 실제 반응이 있을 때만 렌더(없으면 null → 빈 행 미생성). 칩 클릭=토글. */
+function ReactionChips({
   reactions,
   meId,
   mine,
@@ -659,13 +701,13 @@ function MessageReactionBar({
   mine: boolean
   onToggle: (emoji: string) => void
 }) {
-  const [open, setOpen] = useState(false)
   const groups: Record<string, string[]> = {}
   for (const r of reactions) (groups[r.emoji] ??= []).push(r.user_id)
   const entries = Object.entries(groups)
+  if (entries.length === 0) return null
 
   return (
-    <div className={cn("flex items-center gap-1", mine && "flex-row-reverse")}>
+    <div className={cn("flex flex-wrap items-center gap-1", mine && "flex-row-reverse")}>
       {entries.map(([emoji, users]) => {
         const reacted = meId != null && users.includes(meId)
         return (
@@ -682,42 +724,6 @@ function MessageReactionBar({
           </button>
         )
       })}
-      <div className="relative">
-        <button
-          onClick={() => setOpen((o) => !o)}
-          aria-label="반응 추가"
-          className={cn(
-            "flex size-5 items-center justify-center rounded-full text-muted-foreground hover:bg-muted",
-            entries.length === 0 && "opacity-0 transition-opacity group-hover:opacity-100"
-          )}
-        >
-          <SmilePlus className="size-3.5" />
-        </button>
-        {open && (
-          <>
-            <button className="fixed inset-0 z-10 cursor-default" aria-hidden onClick={() => setOpen(false)} />
-            <div
-              className={cn(
-                "absolute bottom-full z-20 mb-1 flex gap-0.5 rounded-full border bg-popover p-1 shadow-lg",
-                mine ? "right-0" : "left-0"
-              )}
-            >
-              {QUICK_EMOJIS.map((e) => (
-                <button
-                  key={e}
-                  onClick={() => {
-                    onToggle(e)
-                    setOpen(false)
-                  }}
-                  className="rounded-full px-1 text-base hover:bg-muted"
-                >
-                  {e}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
     </div>
   )
 }
