@@ -115,7 +115,8 @@ export function ComposerAiAssist({ editor, disabled }: { editor: Editor | null; 
   // [적용] — 결과를 컴포저에 반영(평문 문단). 이때만 원문이 대체된다.
   const apply = useCallback(() => {
     if (!editor || result == null || !result.trim()) return
-    editor.commands.setContent(textToDoc(result.trim()))
+    // emitUpdate: true — RichComposer가 onUpdate로 isEmpty(전송 버튼 활성)를 재동기화하도록(번역 후 전송 안 됨 버그 수정)
+    editor.commands.setContent(textToDoc(result.trim()), { emitUpdate: true })
     editor.commands.focus("end")
     setResult(null)
   }, [editor, result])
@@ -139,7 +140,7 @@ export function ComposerAiAssist({ editor, disabled }: { editor: Editor | null; 
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          "flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted disabled:opacity-50",
+          "flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted disabled:opacity-50",
           (open || previewOpen) && "bg-muted text-foreground"
         )}
       >
