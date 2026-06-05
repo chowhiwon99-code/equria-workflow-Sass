@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { normalizeGraph } from "@/lib/workflows"
 import { Loading, ErrorState } from "@/components/shared/States"
+import { renderAgentIcon } from "@/components/agents/AgentIcon"
 
 type WorkflowRow = {
   id: string
@@ -115,7 +116,7 @@ export function WorkflowsView() {
                     {nodes.slice(0, 5).map((n, i) => (
                       <span key={n.id} className="flex items-center">
                         {i > 0 && <span className="px-0.5 text-[10px] text-muted-foreground/50">→</span>}
-                        <span title={n.agent_name}>{n.agent_icon || "🤖"}</span>
+                        <span title={n.agent_name}>{renderAgentIcon(n.agent_icon || "lucide:Bot", "size-4")}</span>
                       </span>
                     ))}
                     {nodes.length > 5 && (

@@ -2,24 +2,50 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { Plus, FolderKanban, ChevronRight } from "lucide-react"
+import { Plus, FolderKanban } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Modal, fieldClass } from "@/components/shared/Modal"
 import { Loading, EmptyState, ErrorState } from "@/components/shared/States"
 import { useUndo } from "@/components/undo/UndoProvider"
 import { PROJECT_STATUS, PROJECT_STATUS_ORDER } from "@/lib/projects"
 import type { Project, ProjectStatus, Profile } from "@/types"
 
-type ProjectRow = Project & { owner: { name: string } | null }
+type ProjectRow = Project
+type MemberLite = { id: string; name: string; avatar_url: string | null }
 
 const PAGE_SIZE = 50
+
+// 진행률(%) — 작업 단위 데이터가 없어 상태로 표현. 진행중/보류는 일정(시작~종료) 경과율, 완료=100, 예정/취소=0.
+const STATUS_BASE_PROGRESS: Record<ProjectStatus, number> = {
+  planned: 0,
+  in_progress: 50,
+  on_hold: 40,
+  done: 100,
+  canceled: 0,
+}
+function projectProgress(p: ProjectRow): number {
+  if (p.status === "done") return 100
+  if (p.status === "planned" || p.status === "canceled") return 0
+  if (p.start_date && p.due_date) {
+    const s = +new Date(p.start_date)
+    const d = +new Date(p.due_date)
+    const n = Date.now()
+    if (d > s) return Math.min(100, Math.max(0, Math.round(((n - s) / (d - s)) * 100)))
+  }
+  return STATUS_BASE_PROGRESS[p.status as ProjectStatus]
+}
+function fmtDate(d: string): string {
+  return d.length >= 10 ? d.slice(5).replace("-", ".") : d
+}
 
 export function ProjectsView() {
   const supabase = createClient()
   const [projects, setProjects] = useState<ProjectRow[]>([])
-  const [profiles, setProfiles] = useState<Pick<Profile, "id" | "name">[]>([])
+  const [profiles, setProfiles] = useState<Pick<Profile, "id" | "name" | "avatar_url">[]>([])
+  const [memberMap, setMemberMap] = useState<Record<string, string[]>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
@@ -34,7 +60,7 @@ export function ProjectsView() {
     try {
       let q = supabase
         .from("projects")
-        .select("*, owner:profiles!projects_owner_id_fkey(name)", { count: "exact" })
+        .select("*", { count: "exact" })
       if (statusFilter) q = q.eq("status", statusFilter)
       if (searchText.trim()) {
         const s = `%${searchText.trim()}%`
@@ -42,11 +68,25 @@ export function ProjectsView() {
       }
       const [projRes, profRes] = await Promise.all([
         q.order("created_at", { ascending: false }).range(0, pageCount * PAGE_SIZE - 1),
-        supabase.from("profiles").select("id, name").order("name"),
+        supabase.from("profiles").select("id, name, avatar_url").order("name"),
       ])
       if (projRes.error) throw projRes.error
       if (profRes.error) throw profRes.error
-      setProjects((projRes.data as ProjectRow[]) ?? [])
+      const projData = (projRes.data as ProjectRow[]) ?? []
+      // 참여 인원(project_members) → 프로젝트별 user_id 목록
+      const ids = projData.map((p) => p.id)
+      if (ids.length) {
+        const { data: pm } = await supabase
+          .from("project_members")
+          .select("project_id, user_id")
+          .in("project_id", ids)
+        const map: Record<string, string[]> = {}
+        for (const row of pm ?? []) (map[row.project_id] ??= []).push(row.user_id)
+        setMemberMap(map)
+      } else {
+        setMemberMap({})
+      }
+      setProjects(projData)
       setTotalCount(projRes.count ?? 0)
       setProfiles(profRes.data ?? [])
     } catch (e) {
@@ -72,6 +112,7 @@ export function ProjectsView() {
   }, [searchText, statusFilter])
 
   const hasMore = projects.length < totalCount
+  const profileById = new Map(profiles.map((pf) => [pf.id, pf] as const))
 
   return (
     <div className="flex flex-col gap-4">
@@ -86,13 +127,13 @@ export function ProjectsView() {
       <div className="flex flex-wrap items-center gap-2">
         <input
           type="search"
-          className="h-8 w-56 rounded-lg border border-border bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="h-8 w-56 rounded-lg border border-border bg-card px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
           placeholder="프로젝트명·설명 검색…"
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
         />
         <select
-          className="h-8 rounded-lg border border-border bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="h-8 rounded-lg border border-border bg-card px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
         >
@@ -133,45 +174,14 @@ export function ProjectsView() {
           title="아직 프로젝트가 없습니다. 첫 프로젝트를 만들어 보세요."
         />
       ) : (
-        <div className="overflow-hidden rounded-lg border">
-          <table className="w-full text-sm tabular-nums [&_td]:align-middle [&_th]:align-middle">
-            <thead className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2 font-medium">프로젝트명</th>
-                <th className="px-3 py-2 font-medium">상태</th>
-                <th className="px-3 py-2 font-medium">담당자</th>
-                <th className="px-3 py-2 font-medium">시작일</th>
-                <th className="px-3 py-2 font-medium">종료예정</th>
-              </tr>
-            </thead>
-            <tbody>
-              {projects.map((p) => {
-                const st = PROJECT_STATUS[p.status as ProjectStatus]
-                return (
-                  <tr key={p.id} className="border-b transition-colors last:border-0 hover:bg-muted/40">
-                    <td className="px-3 py-2 align-middle">
-                      <Link
-                        href={`/projects/${p.id}`}
-                        className="group inline-flex origin-left items-center gap-1 font-medium transition-all duration-150 hover:scale-[1.04] hover:text-primary"
-                      >
-                        {p.name}
-                        <ChevronRight className="size-3.5 -translate-x-1 opacity-0 transition-all duration-150 group-hover:translate-x-0 group-hover:opacity-100" />
-                      </Link>
-                    </td>
-                    <td className="px-3 py-2 align-middle">
-                      <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs", st.badge)}>
-                        <span className="size-1.5 rounded-full" style={{ backgroundColor: st.dot }} />
-                        {st.label}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 align-middle text-muted-foreground">{p.owner?.name ?? "—"}</td>
-                    <td className="px-3 py-2 align-middle text-muted-foreground">{p.start_date ?? "—"}</td>
-                    <td className="px-3 py-2 align-middle text-muted-foreground">{p.due_date ?? "—"}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {projects.map((p) => {
+            const ids = [p.owner_id, ...(memberMap[p.id] ?? [])].filter((v): v is string => !!v)
+            const members = Array.from(new Set(ids))
+              .map((uid) => profileById.get(uid))
+              .filter((m): m is MemberLite => !!m)
+            return <ProjectCard key={p.id} project={p} members={members} />
+          })}
         </div>
       )}
 
@@ -192,6 +202,70 @@ export function ProjectsView() {
             load()
           }}
         />
+      )}
+    </div>
+  )
+}
+
+function ProjectCard({ project: p, members }: { project: ProjectRow; members: MemberLite[] }) {
+  const st = PROJECT_STATUS[p.status as ProjectStatus]
+  const pct = projectProgress(p)
+  const canceled = p.status === "canceled"
+  return (
+    <Link
+      href={`/projects/${p.id}`}
+      className="group flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-[var(--shadow-sm)] transition-shadow hover:shadow-[var(--shadow-md)]"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <h3 className={cn("min-w-0 flex-1 truncate font-semibold", canceled && "text-muted-foreground line-through")}>
+          {p.name}
+        </h3>
+        <span className={cn("inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs", st.badge)}>
+          <span className="size-1.5 rounded-full" style={{ backgroundColor: st.dot }} />
+          {st.label}
+        </span>
+      </div>
+      {p.description && <p className="line-clamp-2 text-xs text-muted-foreground">{p.description}</p>}
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+          <span>진행률</span>
+          <span className="tabular-nums">{pct}%</span>
+        </div>
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+          <div
+            className="h-full rounded-full transition-all"
+            style={{ width: `${pct}%`, backgroundColor: canceled ? "var(--muted-foreground)" : st.dot }}
+          />
+        </div>
+      </div>
+      <div className="mt-auto flex items-center justify-between gap-2 pt-1">
+        <AvatarStack members={members} />
+        <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+          {p.start_date ? fmtDate(p.start_date) : "—"} ~ {p.due_date ? fmtDate(p.due_date) : "—"}
+        </span>
+      </div>
+    </Link>
+  )
+}
+
+function AvatarStack({ members }: { members: MemberLite[] }) {
+  if (members.length === 0) {
+    return <span className="text-[11px] text-muted-foreground">참여자 없음</span>
+  }
+  const shown = members.slice(0, 4)
+  const extra = members.length - shown.length
+  return (
+    <div className="flex items-center -space-x-2">
+      {shown.map((m) => (
+        <Avatar key={m.id} size="sm" className="ring-2 ring-card" title={m.name}>
+          {m.avatar_url && <AvatarImage src={m.avatar_url} alt={m.name} />}
+          <AvatarFallback className="text-[10px]">{m.name.slice(0, 2)}</AvatarFallback>
+        </Avatar>
+      ))}
+      {extra > 0 && (
+        <div className="grid size-6 place-items-center rounded-full border bg-muted text-[10px] text-muted-foreground ring-2 ring-card">
+          +{extra}
+        </div>
       )}
     </div>
   )

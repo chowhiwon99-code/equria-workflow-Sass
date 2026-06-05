@@ -164,7 +164,7 @@ export function McpView() {
                         {s.type}
                       </span>
                       {s.last_test_ok === true ? (
-                        <span className="text-[11px] text-green-600">● 연결됨</span>
+                        <span className="text-[11px] text-success">● 연결됨</span>
                       ) : s.last_test_ok === false ? (
                         <span className="text-[11px] text-destructive" title={s.last_test_error ?? ""}>
                           ● 실패

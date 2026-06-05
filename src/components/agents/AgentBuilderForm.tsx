@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/shared/Modal"
 import { useUndo } from "@/components/undo/UndoProvider"
 import { IconPicker } from "@/components/agents/IconPicker"
+import { renderAgentIcon, isLucideIcon } from "@/components/agents/AgentIcon"
 import {
   AGENT_MODELS,
   AGENT_CATEGORIES,
@@ -228,7 +229,7 @@ export function AgentBuilderForm({
       }
     }
     window.dispatchEvent(new Event("equria:agents-changed"))
-    router.push("/agents")
+    router.push(`/agents/${initial.id}`) // 수정 후엔 목록이 아니라 해당 에이전트 상세로
   }
 
   return (
@@ -239,13 +240,14 @@ export function AgentBuilderForm({
         <IconPicker value={icon} onChange={setIcon} />
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>선택됨</span>
-          <span className="text-xl leading-none">{icon}</span>
-          <span className="ml-2">직접 입력</span>
+          <span className="text-xl leading-none">{renderAgentIcon(icon, "size-5")}</span>
+          <span className="ml-2">이모지 직접 입력</span>
           <input
             className={cn(fieldClass, "w-14 text-center text-lg")}
-            value={icon}
+            value={isLucideIcon(icon) ? "" : icon}
             onChange={(e) => setIcon(firstGrapheme(e.target.value))}
-            aria-label="아이콘 직접 입력"
+            placeholder="😊"
+            aria-label="이모지 직접 입력"
           />
         </div>
       </div>

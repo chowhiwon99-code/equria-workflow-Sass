@@ -6,8 +6,9 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { Send, X, Plus, Maximize2, Minimize2, Copy, Check, GripHorizontal, Sparkles } from "lucide-react"
+import { Send, X, Plus, Maximize2, Minimize2, Copy, Check, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { renderAgentIcon } from "@/components/agents/AgentIcon"
 import { useAgentChat, type Agent, type WidgetPosition } from "./AgentChatContext"
 
 const WIDGET_SIZE = 56 // size-14
@@ -214,12 +215,10 @@ function EmptyAgentWidget() {
         right: clamp(right, EDGE_PADDING, vw - panelWidth - EDGE_PADDING),
         bottom: clamp(bottom, EDGE_PADDING, vh - EDGE_PADDING),
       }}
-      className="z-50 flex w-72 flex-col gap-3 overflow-hidden rounded-2xl border bg-background p-4 shadow-2xl"
+      className="z-50 flex w-72 flex-col gap-3 overflow-hidden rounded-2xl border bg-card p-4 shadow-2xl"
     >
       <div className="flex items-start justify-between gap-2">
-        <span className="text-2xl" aria-hidden>
-          ✨
-        </span>
+        <Sparkles className="size-6 text-muted-foreground" aria-hidden />
         <button
           onClick={close}
           className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -286,9 +285,9 @@ function FloatingButton({ agent, unread }: { agent: Agent; unread: boolean }) {
       aria-label="에이전트 채팅 열기 (⌘K)"
       title={`${agent.name} (⌘K)`}
     >
-      <span className="pointer-events-none">{agent.icon}</span>
+      <span className="pointer-events-none">{renderAgentIcon(agent.icon, "size-6")}</span>
       {unread && (
-        <span className="pointer-events-none absolute right-0 top-0 size-3 rounded-full bg-red-500 ring-2 ring-background" />
+        <span className="pointer-events-none absolute right-0 top-0 size-3 rounded-full bg-destructive ring-2 ring-background" />
       )}
     </button>
   )
@@ -333,7 +332,7 @@ function ChatPanel({ hidden }: { hidden: boolean }) {
         touchAction: isExpanded ? "auto" : "none",
       }}
       className={cn(
-        "z-50 flex flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl transition-opacity",
+        "z-50 flex flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl transition-opacity",
         hidden && "pointer-events-none opacity-0"
       )}
       aria-hidden={hidden}
@@ -346,15 +345,9 @@ function ChatPanel({ hidden }: { hidden: boolean }) {
           !isExpanded && (headerDrag.dragging ? "cursor-grabbing" : "cursor-grab")
         )}
       >
-        <div className="flex min-w-0 items-center gap-2">
-          {!isExpanded && (
-            <GripHorizontal className="size-3.5 shrink-0 text-muted-foreground/50" aria-hidden />
-          )}
-          <span className="text-2xl pointer-events-none">{selected.icon}</span>
-          <div className="min-w-0 pointer-events-none">
-            <p className="truncate text-sm font-semibold">{selected.name}</p>
-            <p className="truncate text-xs text-muted-foreground">{selected.description}</p>
-          </div>
+        <div className="flex min-w-0 items-center gap-2 pointer-events-none">
+          <span className="shrink-0">{renderAgentIcon(selected.icon, "size-5")}</span>
+          <p className="truncate text-sm font-semibold">{selected.name}</p>
         </div>
         <div
           className="flex shrink-0 items-center gap-1"
@@ -385,13 +378,13 @@ function ChatPanel({ hidden }: { hidden: boolean }) {
               "shrink-0 rounded-full px-2.5 py-1 text-base transition-colors",
               a.id === selectedAgentId
                 ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-background hover:text-foreground"
+                : "text-muted-foreground hover:bg-card hover:text-foreground"
             )}
             title={a.name}
             aria-label={a.name}
             aria-pressed={a.id === selectedAgentId}
           >
-            {a.icon}
+            {renderAgentIcon(a.icon, "size-5")}
           </button>
         ))}
       </div>
@@ -481,7 +474,7 @@ function ChatBody({ agent }: { agent: Agent }) {
       >
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center">
-            <span className="text-4xl">{agent.icon}</span>
+            <span className="text-4xl">{renderAgentIcon(agent.icon, "size-9")}</span>
             <p className="text-sm font-medium">{agent.name}</p>
             <p className="text-xs text-muted-foreground">{agent.description}</p>
             <p className="mt-2 text-xs text-muted-foreground">메시지를 입력해 시작하세요.</p>
@@ -495,7 +488,7 @@ function ChatBody({ agent }: { agent: Agent }) {
         {error && <p className="text-xs text-destructive">오류: {error.message}</p>}
       </div>
 
-      <div className="border-t bg-background p-2">
+      <div className="border-t bg-card p-2">
         <div className="flex items-end gap-2">
           <textarea
             value={input}
@@ -508,7 +501,7 @@ function ChatBody({ agent }: { agent: Agent }) {
             }}
             placeholder="메시지 입력… (Enter 전송, Shift+Enter 줄바꿈)"
             rows={1}
-            className="max-h-32 flex-1 resize-none rounded-lg border bg-background px-2.5 py-1.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
+            className="max-h-32 flex-1 resize-none rounded-lg border bg-card px-2.5 py-1.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
             disabled={status !== "ready"}
           />
           <button
@@ -546,7 +539,7 @@ function Bubble({ message, agentIcon }: { message: UIMessage; agentIcon: string 
     <div className={cn("flex gap-2", isUser ? "justify-end" : "justify-start")}>
       {!isUser && (
         <span className="mt-1 shrink-0 text-lg leading-none" aria-hidden>
-          {agentIcon}
+          {renderAgentIcon(agentIcon, "size-5")}
         </span>
       )}
       <div
@@ -560,14 +553,14 @@ function Bubble({ message, agentIcon }: { message: UIMessage; agentIcon: string 
         {isUser ? (
           <p className="whitespace-pre-wrap break-words">{text}</p>
         ) : (
-          <div className="prose prose-sm max-w-none break-words [&_*]:my-1 [&_code]:rounded [&_code]:bg-background/60 [&_code]:px-1 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-background/70 [&_pre]:p-2 [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4">
+          <div className="prose prose-sm max-w-none break-words [&_*]:my-1 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-muted [&_pre]:p-2 [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
           </div>
         )}
         {!isUser && text && (
           <button
             onClick={copy}
-            className="absolute -bottom-2 -right-2 flex size-6 items-center justify-center rounded-full border bg-background text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
+            className="absolute -bottom-2 -right-2 flex size-6 items-center justify-center rounded-full border bg-muted text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
             aria-label="복사"
             title="복사"
           >

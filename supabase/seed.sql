@@ -16,14 +16,14 @@ delete from public.agents where created_by is null;
 -- 1) 에이전트 8개 생성
 -- ============================================================
 insert into public.agents (name, description, category, icon, is_public) values
-  ('세금계산서 에이전트', '세금계산서 작성, 검토, 발행 관련 모든 업무를 도와드립니다', 'tax', '📄', true),
-  ('CS 응대 에이전트', '고객 문의, 불만, 반품 등 CS 응대 초안을 작성해드립니다', 'cs', '💬', true),
-  ('Higgsfield 프롬프트 에이전트', 'Higgsfield AI 이미지/영상 생성을 위한 최적화된 프롬프트를 작성합니다', 'content', '🎬', true),
-  ('SNS 콘텐츠 에이전트', '인스타그램, 유튜브, 틱톡 등 채널별 최적화 콘텐츠를 작성합니다', 'content', '📱', true),
-  ('번역 에이전트', '뷰티/코스메틱 전문 용어를 살린 한/영/중/일 번역', 'translation', '🌐', true),
-  ('문서 작성 에이전트', '기획서, 보고서, 이메일, 제안서 등 업무 문서를 작성합니다', 'document', '📝', true),
-  ('데이터 분석 에이전트', '판매, 마케팅, 재고 데이터를 분석하여 인사이트를 도출합니다', 'analytics', '📊', true),
-  ('법무 검토 에이전트', '계약서, 약관, 고지 사항의 리스크 포인트를 식별합니다', 'legal', '⚖️', true);
+  ('세금계산서 에이전트', '세금계산서 작성, 검토, 발행 관련 모든 업무를 도와드립니다', 'tax', 'lucide:Receipt', true),
+  ('CS 응대 에이전트', '고객 문의, 불만, 반품 등 CS 응대 초안을 작성해드립니다', 'cs', 'lucide:MessageCircle', true),
+  ('Higgsfield 프롬프트 에이전트', 'Higgsfield AI 이미지/영상 생성을 위한 최적화된 프롬프트를 작성합니다', 'content', 'lucide:Clapperboard', true),
+  ('SNS 콘텐츠 에이전트', '인스타그램, 유튜브, 틱톡 등 채널별 최적화 콘텐츠를 작성합니다', 'content', 'lucide:Smartphone', true),
+  ('번역 에이전트', '뷰티/코스메틱 전문 용어를 살린 한/영/중/일 번역', 'translation', 'lucide:Languages', true),
+  ('문서 작성 에이전트', '기획서, 보고서, 이메일, 제안서 등 업무 문서를 작성합니다', 'document', 'lucide:NotebookPen', true),
+  ('데이터 분석 에이전트', '판매, 마케팅, 재고 데이터를 분석하여 인사이트를 도출합니다', 'analytics', 'lucide:BarChart3', true),
+  ('법무 검토 에이전트', '계약서, 약관, 고지 사항의 리스크 포인트를 식별합니다', 'legal', 'lucide:Scale', true);
 
 -- ============================================================
 -- 2) 각 에이전트의 초기 시스템 프롬프트 버전 (이름으로 join)

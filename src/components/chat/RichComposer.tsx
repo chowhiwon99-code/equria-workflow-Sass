@@ -7,6 +7,7 @@ import Placeholder from "@tiptap/extension-placeholder"
 import { Bold, Italic, Strikethrough, Code, List, ListOrdered, Link2, Send } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { ComposerAiAssist } from "@/components/chat/ComposerAiAssist"
 import { CHAT_EXTENSIONS, type JSONContent } from "@/lib/tiptap"
 
 export type ComposerPayload = { text: string; bodyJson: JSONContent }
@@ -134,6 +135,10 @@ export function RichComposer({
         <Tool label="링크" active={editor.isActive("link")} on={setLink}>
           <Link2 className="size-3.5" />
         </Tool>
+        {/* AI 보조(단계6) — 우측 정렬. editor를 주입해 초안 다듬기·요약·번역 */}
+        <div className="ml-auto">
+          <ComposerAiAssist editor={editor} disabled={disabled} />
+        </div>
       </div>
       <div className="flex items-end gap-2">
         {leftSlot}

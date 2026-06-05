@@ -13,6 +13,7 @@ import { BackLink } from "@/components/shared/BackLink"
 import { Loading, ErrorState } from "@/components/shared/States"
 import { fieldClass } from "@/components/shared/Modal"
 import { WorkflowCanvas, type NodeRunState } from "@/components/workflows/WorkflowCanvas"
+import { agentIconText, renderAgentIcon } from "@/components/agents/AgentIcon"
 import {
   normalizeGraph,
   genId,
@@ -363,7 +364,7 @@ export function WorkflowEditor({ id }: { id: string }) {
           <option value="">에이전트 선택…</option>
           {agents.map((a) => (
             <option key={a.id} value={a.id}>
-              {a.icon} {a.name}
+              {agentIconText(a.icon)} {a.name}
             </option>
           ))}
         </select>
@@ -390,7 +391,7 @@ export function WorkflowEditor({ id }: { id: string }) {
         {selected && (
           <aside className="flex w-60 shrink-0 flex-col gap-2 rounded-xl border p-3">
             <div className="flex items-center gap-2">
-              <span className="text-lg">{selected.agent_icon || "🤖"}</span>
+              <span className="text-lg">{renderAgentIcon(selected.agent_icon || "lucide:Bot", "size-5")}</span>
               <span className="min-w-0 flex-1 truncate text-sm font-semibold">{selected.agent_name}</span>
             </div>
             {selected.agent_desc && (
@@ -517,7 +518,7 @@ export function WorkflowEditor({ id }: { id: string }) {
                       className={cn(
                         "inline-block size-2 shrink-0 rounded-full",
                         r.status === "done"
-                          ? "bg-green-500"
+                          ? "bg-success"
                           : r.status === "error"
                             ? "bg-destructive"
                             : "bg-muted-foreground animate-pulse"

@@ -409,7 +409,7 @@ export function MailShell() {
                   title={isStarred ? "별표 해제" : "별표"}
                   onClick={() => modify(detail.id, isStarred ? [] : ["STARRED"], isStarred ? ["STARRED"] : [])}
                 >
-                  <Star className={cn("size-4", isStarred && "fill-yellow-400 text-yellow-400")} />
+                  <Star className={cn("size-4", isStarred && "fill-warning text-warning")} />
                 </Button>
                 <Button
                   size="icon-sm"

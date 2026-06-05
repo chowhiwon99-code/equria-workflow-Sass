@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils"
 import type { WorkflowNode, WorkflowEdge, WorkflowGraph } from "@/lib/workflows"
 import { genId, topoOrder, linearEdges } from "@/lib/workflows"
 import { toolEmoji } from "@/lib/workflowTools"
+import { renderAgentIcon } from "@/components/agents/AgentIcon"
 
 const NODE = 72 // 원 지름
 const LABEL_W = 132 // 노드 아래 라벨 폭
@@ -141,7 +142,7 @@ export function WorkflowCanvas({
   const stateRing: Record<NodeRunState, string> = {
     idle: "",
     running: "ring-4 ring-primary/40 animate-pulse",
-    done: "ring-4 ring-green-500/50",
+    done: "ring-4 ring-success/50",
     error: "ring-4 ring-destructive/50",
   }
 
@@ -267,7 +268,7 @@ export function WorkflowCanvas({
                   {toolEmoji(n.tool.type)}
                 </span>
               )}
-              <span className="text-2xl">{n.agent_icon || "🤖"}</span>
+              <span className="text-2xl">{renderAgentIcon(n.agent_icon || "lucide:Bot", "size-6")}</span>
 
               {/* 입력 포트 */}
               <span

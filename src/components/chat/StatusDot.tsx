@@ -35,7 +35,7 @@ export function StatusDot({
     manual && manual !== "active" && COLOR[manual]
       ? COLOR[manual]
       : online
-        ? "bg-green-500"
+        ? "bg-success"
         : "bg-muted-foreground/40"
   const label = statusLabel(online, manual)
   return (

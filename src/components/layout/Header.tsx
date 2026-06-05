@@ -26,7 +26,7 @@ export function Header({ userName, userId }: { userName: string; userId: string 
   }
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b px-6">
+    <header className="flex h-[var(--header-height)] shrink-0 items-center justify-between border-b px-6">
       <h1 className="text-sm font-semibold">{feature?.label ?? "이큐리아 워크스페이스"}</h1>
 
       <div className="flex items-center gap-1">

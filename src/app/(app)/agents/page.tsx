@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Plus, Pencil, Pin, Lock, Globe } from "lucide-react"
+import { Plus, Pin, Lock, Globe } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { MarqueeRail } from "@/components/shared/MarqueeRail"
+import { renderAgentIcon } from "@/components/agents/AgentIcon"
 import type { Tables } from "@/lib/supabase/types"
 
 type AgentRow = Pick<
@@ -152,7 +152,7 @@ function Section({
           <p className="rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">{empty}</p>
         ) : null
       ) : (
-        <MarqueeRail>{children}</MarqueeRail>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{children}</div>
       )}
     </div>
   )
@@ -170,11 +170,20 @@ function AgentCard({
   editable?: boolean
 }) {
   return (
-    <div className="flex flex-col gap-2 rounded-lg border p-4">
+    <Link
+      href={`/agents/${agent.id}`}
+      className="group flex flex-col gap-2 rounded-xl border bg-card p-4 shadow-[var(--shadow-sm)] transition-shadow hover:shadow-[var(--shadow-md)]"
+    >
       <div className="flex items-start justify-between gap-2">
-        <span className="text-2xl">{agent.icon}</span>
+        <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted text-foreground">
+          {renderAgentIcon(agent.icon || "lucide:Bot", "size-5")}
+        </span>
         <button
-          onClick={onTogglePin}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            onTogglePin()
+          }}
           className={cn(
             "flex items-center gap-1 rounded-full px-2 py-1 text-xs transition-colors",
             pinned
@@ -190,12 +199,12 @@ function AgentCard({
       </div>
 
       <div className="flex items-center gap-1.5">
-        <span className="text-sm font-semibold">{agent.name}</span>
+        <span className="truncate text-sm font-semibold">{agent.name}</span>
         {editable &&
           (agent.is_public ? (
-            <Globe className="size-3 text-muted-foreground" aria-label="공유됨" />
+            <Globe className="size-3 shrink-0 text-muted-foreground" aria-label="공유됨" />
           ) : (
-            <Lock className="size-3 text-muted-foreground" aria-label="비공개" />
+            <Lock className="size-3 shrink-0 text-muted-foreground" aria-label="비공개" />
           ))}
       </div>
       {agent.description && (
@@ -206,15 +215,10 @@ function AgentCard({
         <span className="text-[11px] text-muted-foreground">
           {agent.creator?.name ? `by ${agent.creator.name}` : "기본 제공"}
         </span>
-        {editable && (
-          <Link
-            href={`/agents/${agent.id}`}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-          >
-            <Pencil className="size-3" /> 수정
-          </Link>
-        )}
+        <span className="text-[11px] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
+          상세 보기 →
+        </span>
       </div>
-    </div>
+    </Link>
   )
 }

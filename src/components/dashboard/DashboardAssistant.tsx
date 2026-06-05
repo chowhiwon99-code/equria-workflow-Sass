@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useChat } from "@ai-sdk/react"
 import { DefaultChatTransport, type UIMessage } from "ai"
-import { ArrowUp, Sparkle, Loader2, Plus, Paperclip, Globe, Plug, X, SquarePen, Trash2 } from "lucide-react"
+import { ArrowUp, Sparkles, Loader2, Plus, Paperclip, Globe, Plug, X, SquarePen, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 type Convo = { id: string; title: string | null; updated_at: string }
@@ -107,7 +107,7 @@ export function DashboardAssistant() {
         <div className="p-2">
           <button
             onClick={newChat}
-            className="flex w-full items-center gap-2 rounded-lg border bg-background px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
+            className="flex w-full items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
           >
             <SquarePen className="size-4" /> 새 대화
           </button>
@@ -160,16 +160,12 @@ export function DashboardAssistant() {
         </div>
 
         {!hasChat ? (
-          <div className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-4">
-            <div
-              aria-hidden
-              className="animate-aura pointer-events-none absolute left-1/2 top-1/3 -z-10 size-[360px] -translate-x-1/2 rounded-full bg-primary/10 blur-[90px]"
-            />
-            <div className="animate-soft-pulse grid size-12 place-items-center rounded-2xl bg-primary/10 text-primary">
-              <Sparkle className="size-5" />
+          <div className="flex flex-1 flex-col items-center justify-center px-4">
+            <div className="grid size-14 place-items-center rounded-[var(--radius-xl)] bg-primary/8 text-primary shadow-[var(--shadow-sm)]">
+              <Sparkles className="size-6" />
             </div>
-            <p className="mt-3 text-xl font-semibold tracking-tight">무엇을 도와드릴까요?</p>
-            <p className="mt-1 text-sm text-muted-foreground">이큐리아 어시스턴트에게 무엇이든 물어보세요.</p>
+            <p className="mt-4 text-xl font-semibold tracking-tight">무엇을 도와드릴까요?</p>
+            <p className="mt-1.5 text-sm text-muted-foreground">이큐리아 어시스턴트에게 무엇이든 물어보세요.</p>
           </div>
         ) : (
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-5 [scrollbar-gutter:stable] [scrollbar-width:thin]">
@@ -184,7 +180,7 @@ export function DashboardAssistant() {
                 ) : (
                   <div key={m.id} className="flex items-start gap-2.5">
                     <div className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
-                      <Sparkle className="size-3.5" />
+                      <Sparkles className="size-3.5" />
                     </div>
                     <div className="max-w-[82%] whitespace-pre-wrap break-words rounded-2xl rounded-tl-sm bg-muted px-3.5 py-2.5 text-sm leading-relaxed">
                       {messageText(m) || <span className="text-muted-foreground">생각 중…</span>}

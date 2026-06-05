@@ -33,7 +33,7 @@ export default async function AppLayout({
           <Sidebar />
           <div className="flex flex-1 flex-col overflow-hidden">
             <Header userName={profile?.name ?? "직원"} userId={user.id} />
-            <main className="flex-1 overflow-y-auto p-6">{children}</main>
+            <main className="flex-1 overflow-y-auto p-[var(--app-pad)]">{children}</main>
           </div>
         </div>
         <FloatingAgentChat />

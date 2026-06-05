@@ -191,7 +191,7 @@ export function CalendarView() {
           <Button variant="outline" size="icon-sm" onClick={() => setViewDate(addMonths(viewDate, 1))}>
             <ChevronRight />
           </Button>
-          <div className="ml-1 inline-flex overflow-hidden rounded-md border bg-background text-xs">
+          <div className="ml-1 inline-flex overflow-hidden rounded-md border bg-card text-xs">
             <button
               type="button"
               onClick={() => jumpTo(yesterday)}
@@ -223,7 +223,7 @@ export function CalendarView() {
       {/* 요일 행 */}
       <div className="grid grid-cols-7 border-b text-center text-xs font-medium text-muted-foreground">
         {WEEKDAYS_KO.map((w, i) => (
-          <div key={w} className={cn("py-2", i === 0 && "text-red-500", i === 6 && "text-blue-500")}>
+          <div key={w} className={cn("py-2", i === 0 && "text-destructive", i === 6 && "text-info")}>
             {w}
           </div>
         ))}
@@ -249,7 +249,7 @@ export function CalendarView() {
                 if (dragging) setDragEnd(day)
               }}
               className={cn(
-                "flex min-h-0 flex-col gap-1 bg-background p-1.5 text-left transition-colors duration-150 ease-out hover:bg-muted/50",
+                "flex min-h-0 flex-col gap-1 bg-card p-1.5 text-left transition-colors duration-150 ease-out hover:bg-muted/50",
                 !inMonth && "bg-muted/30 text-muted-foreground",
                 isDragged && "bg-primary/15 hover:bg-primary/15",
                 isHighlighted && "bg-primary/5 ring-2 ring-inset ring-primary"
@@ -370,7 +370,7 @@ function ModalShell({ title, onClose, children }: { title: string; onClose: () =
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-md rounded-xl border bg-background p-5 shadow-lg"
+        className="w-full max-w-md rounded-xl border bg-card p-5 shadow-[var(--shadow-lg)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
@@ -413,7 +413,7 @@ function CreateEventModal({
   const multiDay = startDateStr !== endDateStr
 
   const inputCls =
-    "h-9 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+    "h-9 w-full rounded-lg border border-border bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
   const dateCls = cn(inputCls, "accent-primary [color-scheme:light] dark:[color-scheme:dark]")
 
   // YYYY-MM-DD → "2026년 5월 12일"
@@ -624,7 +624,7 @@ function EventDetailModal({
           </span>
         </div>
         {event.description && <p className="text-sm text-muted-foreground">{event.description}</p>}
-        {event.status === "done" && <p className="text-sm font-medium text-green-600">✓ 완료된 일정</p>}
+        {event.status === "done" && <p className="text-sm font-medium text-success">✓ 완료된 일정</p>}
         <div className="flex justify-between gap-2">
           <Button variant="destructive" size="sm" onClick={remove} disabled={busy}>
             <Trash2 /> 삭제

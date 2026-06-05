@@ -53,7 +53,7 @@ export function AttachmentList({ items, className }: { items: AttachmentItem[]; 
           rel="noopener noreferrer"
           download
           className={cn(
-            "inline-flex items-center gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs transition-colors hover:bg-muted",
+            "inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-xs transition-colors hover:bg-muted",
             !a.url && "pointer-events-none opacity-60"
           )}
         >

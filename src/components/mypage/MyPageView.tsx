@@ -5,6 +5,7 @@ import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Loading, ErrorState } from "@/components/shared/States"
+import { renderAgentIcon } from "@/components/agents/AgentIcon"
 
 type Profile = { name: string; department: string | null; role: string }
 type AgentLite = { id: string; name: string; description: string | null; icon: string }
@@ -126,7 +127,7 @@ export function MyPageView() {
                 href={`/agents/${a.id}`}
                 className="hover-grow flex flex-col gap-1 rounded-lg border p-4"
               >
-                <span className="text-2xl">{a.icon}</span>
+                <span className="text-2xl">{renderAgentIcon(a.icon, "size-6")}</span>
                 <span className="text-sm font-semibold">{a.name}</span>
                 {a.description && (
                   <span className="line-clamp-2 text-xs text-muted-foreground">{a.description}</span>

@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
+import { Sparkles, Check, ArrowLeft } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/shared/Modal"
@@ -13,19 +14,19 @@ import {
 import { AgentBuilderForm } from "@/components/agents/AgentBuilderForm"
 
 type Mode = "wizard" | "manual"
+type Phase = "input" | "result"
 
-const STEP_TITLES = ["기본 정보", "상세 입력", "검토 · 저장"] as const
+// 한 화면에 한 질문씩 — 아이폰 초기 설정처럼 가로 슬라이드로 진행.
+const QUESTIONS = WIZARD_FIELDS
 
 export function AgentWizard() {
   const [mode, setMode] = useState<Mode>("wizard")
-  const [step, setStep] = useState<1 | 2 | 3>(1)
+  const [phase, setPhase] = useState<Phase>("input")
+  const [index, setIndex] = useState(0)
   const [inputs, setInputs] = useState<WizardInputs>({})
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
   const [generated, setGenerated] = useState("")
-
-  const step1 = WIZARD_FIELDS.filter((f) => f.step === 1)
-  const step2 = WIZARD_FIELDS.filter((f) => f.step === 2)
 
   const setText = (key: string, v: string) => setInputs((p) => ({ ...p, [key]: v }))
   const toggleMulti = (key: string, opt: string) =>
@@ -38,14 +39,26 @@ export function AgentWizard() {
     const v = inputs[f.key]
     return Array.isArray(v) ? v.length > 0 : !!(v && String(v).trim())
   }
-  const step1Valid = step1.filter((f) => f.required).every(filled)
-  const step2Valid = step2.filter((f) => f.required).every(filled)
+
+  const current = QUESTIONS[index]
+  const isLast = index === QUESTIONS.length - 1
+  const canNext = !current.required || filled(current)
+
+  // 가드는 '다음' 버튼 disabled + 텍스트 Enter 인라인 검증으로 — 여기선 무가드(select 자동넘김의 stale 방지)
+  const goNext = () => {
+    if (isLast) {
+      void generate()
+      return
+    }
+    setIndex((i) => Math.min(QUESTIONS.length - 1, i + 1))
+  }
+  const goPrev = () => setIndex((i) => Math.max(0, i - 1))
 
   const generate = async () => {
+    setPhase("result")
     setGenerating(true)
     setGenError(null)
     setGenerated("")
-    setStep(3)
     try {
       const res = await fetch("/api/agents/generate-prompt", {
         method: "POST",
@@ -87,48 +100,16 @@ export function AgentWizard() {
     )
   }
 
-  return (
-    <div className="flex max-w-2xl flex-col gap-5">
-      {/* Stepper */}
-      <ol className="flex items-center gap-2 text-sm">
-        {STEP_TITLES.map((t, i) => {
-          const n = (i + 1) as 1 | 2 | 3
-          const active = step === n
-          const done = step > n
-          return (
-            <li key={t} className="flex items-center gap-2">
-              <span
-                className={cn(
-                  "grid size-6 place-items-center rounded-full border text-xs font-medium",
-                  active && "border-primary bg-primary text-primary-foreground",
-                  done && "border-primary bg-primary/10 text-primary",
-                  !active && !done && "text-muted-foreground"
-                )}
-              >
-                {n}
-              </span>
-              <span className={cn(active ? "font-medium" : "text-muted-foreground")}>{t}</span>
-              {i < STEP_TITLES.length - 1 && <span className="mx-1 text-muted-foreground/40">›</span>}
-            </li>
-          )
-        })}
-      </ol>
-
-      {/* Step 1 / 2 — 입력 */}
-      {(step === 1 || step === 2) && (
-        <div className="flex flex-col gap-4 rounded-xl border p-4">
-          {(step === 1 ? step1 : step2).map((f) => (
-            <FieldRow key={f.key} field={f} inputs={inputs} onText={setText} onToggle={toggleMulti} />
-          ))}
-        </div>
-      )}
-
-      {/* Step 3 — 생성 + 검토/편집/저장 */}
-      {step === 3 &&
-        (generating || genError || !generated ? (
-          <div className="flex flex-col gap-3 rounded-xl border p-4">
+  // ── 결과: AI 생성 + 검토/저장 (기존 흐름) ──
+  if (phase === "result") {
+    return (
+      <div className="flex max-w-2xl flex-col gap-4">
+        {generating || genError || !generated ? (
+          <div className="flex flex-col gap-3 rounded-xl border bg-card p-4">
             {generating && (
-              <p className="text-sm text-muted-foreground">✨ AI가 시스템 프롬프트를 작성하는 중…</p>
+              <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <Sparkles className="size-3.5" /> AI가 시스템 프롬프트를 작성하는 중…
+              </p>
             )}
             {genError && <p className="text-sm text-destructive">{genError}</p>}
             <pre className="max-h-[320px] min-h-[120px] overflow-auto whitespace-pre-wrap rounded-lg bg-muted/40 p-3 font-mono text-[13px] leading-relaxed">
@@ -136,8 +117,8 @@ export function AgentWizard() {
               {generating && <span className="animate-pulse">▍</span>}
             </pre>
             <div className="flex justify-between">
-              <Button variant="ghost" size="sm" onClick={() => setStep(2)}>
-                ← 입력 수정
+              <Button variant="ghost" size="sm" onClick={() => setPhase("input")}>
+                <ArrowLeft className="size-4" /> 입력 수정
               </Button>
               {!generating && (
                 <Button size="sm" onClick={generate}>
@@ -149,7 +130,9 @@ export function AgentWizard() {
         ) : (
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
-              <span>✨ AI가 초안을 만들었어요. 아래에서 검토·수정 후 저장하세요.</span>
+              <span className="inline-flex items-center gap-1.5">
+                <Sparkles className="size-3.5" /> AI가 초안을 만들었어요. 아래에서 검토·수정 후 저장하세요.
+              </span>
               <button type="button" onClick={generate} className="underline hover:text-foreground">
                 다시 생성
               </button>
@@ -161,90 +144,206 @@ export function AgentWizard() {
                 category: inferCategory(inputs),
                 system_prompt: generated,
               }}
-              onBack={() => setStep(2)}
+              onBack={() => setPhase("input")}
             />
           </div>
-        ))}
+        )}
+      </div>
+    )
+  }
 
-      {/* 하단 내비게이션 (Step 1/2 전용 — Step 3은 폼이 버튼을 가짐) */}
-      {(step === 1 || step === 2) && (
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => setMode("manual")}
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
-            직접 작성으로 전환
-          </button>
-          <div className="flex gap-2">
-            {step === 2 && (
-              <Button variant="outline" size="sm" onClick={() => setStep(1)}>
-                이전
-              </Button>
-            )}
-            {step === 1 && (
-              <Button size="sm" onClick={() => setStep(2)} disabled={!step1Valid}>
-                다음
-              </Button>
-            )}
-            {step === 2 && (
-              <Button size="sm" onClick={generate} disabled={!step2Valid}>
-                ✨ AI로 시스템 프롬프트 생성
-              </Button>
-            )}
-          </div>
+  // ── 입력: 한 질문씩 가로 슬라이드 ──
+  return (
+    <div className="flex max-w-xl flex-col gap-6">
+      {/* 진행바 */}
+      <div className="flex flex-col gap-2 px-2">
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span className="tabular-nums">
+            {index + 1} / {QUESTIONS.length}
+          </span>
+          <span>{current.step === 1 ? "기본 정보" : "상세 입력"}</span>
         </div>
-      )}
+        <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
+          <div
+            className="h-full rounded-full bg-primary transition-[width] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]"
+            style={{ width: `${((index + 1) / QUESTIONS.length) * 100}%` }}
+          />
+        </div>
+      </div>
+
+      {/* 슬라이드 트랙 */}
+      <div className="overflow-hidden">
+        <div
+          className="flex transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]"
+          style={{ transform: `translateX(-${index * 100}%)` }}
+        >
+          {QUESTIONS.map((f, i) => (
+            <div
+              key={f.key}
+              className={cn(
+                "w-full shrink-0 px-2 transition-opacity duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]",
+                i === index ? "opacity-100" : "opacity-0 pointer-events-none"
+              )}
+              aria-hidden={i !== index}
+            >
+              <QuestionSlide
+                field={f}
+                active={i === index}
+                inputs={inputs}
+                onText={setText}
+                onToggle={toggleMulti}
+                onAdvance={goNext}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 내비게이션 */}
+      <div className="flex items-center justify-between px-2">
+        <button
+          type="button"
+          onClick={() => setMode("manual")}
+          className="text-sm text-muted-foreground hover:text-foreground"
+        >
+          직접 작성으로 전환
+        </button>
+        <div className="flex gap-2">
+          {index > 0 && (
+            <Button variant="outline" size="sm" onClick={goPrev}>
+              <ArrowLeft className="size-4" /> 이전
+            </Button>
+          )}
+          <Button size="sm" onClick={goNext} disabled={!canNext}>
+            {isLast ? (
+              <>
+                <Sparkles className="size-4" /> AI로 생성
+              </>
+            ) : (
+              "다음"
+            )}
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }
 
-function FieldRow({
-  field,
+function QuestionSlide({
+  field: f,
+  active,
   inputs,
   onText,
   onToggle,
+  onAdvance,
 }: {
   field: WizardField
+  active: boolean
   inputs: WizardInputs
   onText: (key: string, v: string) => void
   onToggle: (key: string, opt: string) => void
+  onAdvance: () => void
 }) {
-  const value = inputs[field.key]
-  return (
-    <label className="flex flex-col gap-1.5 text-sm">
-      <span className="text-xs text-muted-foreground">
-        {field.label} {field.required && <span className="text-primary">*</span>}
-      </span>
+  const inputRef = useRef<HTMLElement | null>(null)
+  const value = inputs[f.key]
 
-      {field.type === "select" && (
-        <select
-          className={fieldClass}
+  // 슬라이드 전환이 끝난 뒤 활성 슬라이드의 텍스트 입력에 포커스
+  useEffect(() => {
+    if (!active) return
+    if (f.type !== "text" && f.type !== "textarea") return
+    const t = window.setTimeout(() => inputRef.current?.focus(), 520)
+    return () => window.clearTimeout(t)
+  }, [active, f.type])
+
+  return (
+    <div className="flex min-h-[280px] flex-col gap-4 py-1">
+      <div className="flex flex-col gap-1.5">
+        <h2 className="text-xl font-semibold tracking-tight">
+          {f.label}
+          {f.required && <span className="text-primary"> *</span>}
+        </h2>
+        {(f.type === "select" || f.type === "multiselect") && (
+          <p className="text-sm text-muted-foreground">
+            {f.type === "multiselect" ? "해당하는 항목을 모두 골라주세요." : "하나를 고르면 다음으로 넘어가요."}
+          </p>
+        )}
+        {f.placeholder && (f.type === "text" || f.type === "textarea") && (
+          <p className="text-sm text-muted-foreground">{f.placeholder}</p>
+        )}
+      </div>
+
+      {f.type === "text" && (
+        <input
+          ref={(el) => {
+            inputRef.current = el
+          }}
+          className={cn(fieldClass, "h-12 rounded-xl text-base")}
           value={(value as string) ?? ""}
-          onChange={(e) => onText(field.key, e.target.value)}
-        >
-          <option value="" disabled>
-            선택하세요
-          </option>
-          {field.options!.map((o) => (
-            <option key={o} value={o}>
-              {o}
-            </option>
-          ))}
-        </select>
+          onChange={(e) => onText(f.key, e.target.value)}
+          placeholder={f.placeholder}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+              e.preventDefault()
+              if (!f.required || String((value as string) ?? "").trim()) onAdvance()
+            }
+          }}
+        />
       )}
 
-      {field.type === "multiselect" && (
-        <div className="flex flex-wrap gap-1.5">
-          {field.options!.map((o) => {
+      {f.type === "textarea" && (
+        <textarea
+          ref={(el) => {
+            inputRef.current = el
+          }}
+          className={cn(fieldClass, "min-h-[140px] resize-y rounded-xl py-2.5 text-base")}
+          value={(value as string) ?? ""}
+          onChange={(e) => onText(f.key, e.target.value)}
+          placeholder={f.placeholder}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault()
+              if (!f.required || String((value as string) ?? "").trim()) onAdvance()
+            }
+          }}
+        />
+      )}
+
+      {f.type === "select" && (
+        <div className="flex flex-col gap-2">
+          {f.options!.map((o) => {
+            const on = value === o
+            return (
+              <button
+                type="button"
+                key={o}
+                onClick={() => {
+                  onText(f.key, o)
+                  window.setTimeout(onAdvance, 140) // 선택 표시 후 스윽 넘어감
+                }}
+                className={cn(
+                  "flex items-center justify-between rounded-xl border px-4 py-3 text-left text-sm transition-colors",
+                  on ? "border-primary bg-primary/5 text-foreground" : "hover:bg-muted"
+                )}
+              >
+                {o}
+                {on && <Check className="size-4 text-primary" />}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {f.type === "multiselect" && (
+        <div className="flex flex-wrap gap-2">
+          {f.options!.map((o) => {
             const on = ((value as string[]) ?? []).includes(o)
             return (
               <button
                 type="button"
                 key={o}
-                onClick={() => onToggle(field.key, o)}
+                onClick={() => onToggle(f.key, o)}
                 className={cn(
-                  "rounded-full border px-3 py-1 text-sm transition-colors",
+                  "rounded-full border px-3.5 py-1.5 text-sm transition-colors",
                   on ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted"
                 )}
               >
@@ -254,24 +353,6 @@ function FieldRow({
           })}
         </div>
       )}
-
-      {field.type === "textarea" && (
-        <textarea
-          className={cn(fieldClass, "min-h-[88px] resize-y")}
-          value={(value as string) ?? ""}
-          onChange={(e) => onText(field.key, e.target.value)}
-          placeholder={field.placeholder}
-        />
-      )}
-
-      {field.type === "text" && (
-        <input
-          className={fieldClass}
-          value={(value as string) ?? ""}
-          onChange={(e) => onText(field.key, e.target.value)}
-          placeholder={field.placeholder}
-        />
-      )}
-    </label>
+    </div>
   )
 }

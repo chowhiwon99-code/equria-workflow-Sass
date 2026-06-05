@@ -3,75 +3,112 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * EQURIA 디자인 시스템 — 토스/애플 결(둥근 라운드 · 회색 페이지 위 흰 플로팅 카드 · 은은한 그림자).
+ * primary는 모노톤(검정/흰) 유지, 파스텔은 기능 신호색(success/warning/info)만. 쿨 뉴트럴 hue≈264.
+ * 모든 값이 토큰 — 여기 한 줄씩 바꾸면 전 화면이 따라온다(계속 미세조정 가능).
+ */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --radius: 1rem; /* 토스식 큰 라운드 — sm/md/lg/xl이 calc로 파생 */
+  /* 셸 치수 SSOT — 헤더/사이드바/패딩을 한 곳에서. 값은 기존(h-14·w-60·p-6)과 동일 */
+  --header-height: 3.5rem;
+  --sidebar-width: 15rem;
+  --app-pad: 1.5rem;
+  --app-content-height: calc(100vh - var(--header-height) - 2 * var(--app-pad));
+  --background: oklch(0.961 0.004 264); /* 회색 페이지 — 흰 카드가 또렷이 뜨도록 */
+  --foreground: oklch(0.18 0.004 264);
+  --card: oklch(1 0 0); /* 흰 카드(페이지 위에 뜸) */
+  --card-foreground: oklch(0.18 0.004 264);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.18 0.004 264);
+  --primary: oklch(0.205 0.003 264); /* 모노톤 검정 */
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.965 0.004 264);
+  --secondary-foreground: oklch(0.205 0.004 264);
+  --muted: oklch(0.965 0.004 264);
+  --muted-foreground: oklch(0.52 0.006 264);
+  --accent: oklch(0.955 0.005 264);
+  --accent-foreground: oklch(0.205 0.004 264);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
+  --destructive-bg: oklch(0.95 0.03 25);
+  --success: oklch(0.62 0.15 150);
+  --success-foreground: oklch(0.985 0 0);
+  --success-bg: oklch(0.945 0.045 150);
+  --warning: oklch(0.72 0.15 70);
+  --warning-foreground: oklch(0.3 0.05 70);
+  --warning-bg: oklch(0.95 0.05 80);
+  --info: oklch(0.62 0.13 250);
+  --info-foreground: oklch(0.985 0 0);
+  --info-bg: oklch(0.945 0.035 250);
+  --border: oklch(0.92 0.004 264);
+  --input: oklch(0.92 0.004 264);
+  --ring: oklch(0.6 0.006 264);
+  --chart-1: oklch(0.62 0.13 264);
+  --chart-2: oklch(0.68 0.12 165);
+  --chart-3: oklch(0.75 0.12 75);
+  --chart-4: oklch(0.65 0.13 320);
+  --chart-5: oklch(0.68 0.11 200);
+  --sidebar: oklch(0.985 0.002 264);
+  --sidebar-foreground: oklch(0.18 0.004 264);
+  --sidebar-primary: oklch(0.205 0.003 264);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar-accent: oklch(0.955 0.005 264);
+  --sidebar-accent-foreground: oklch(0.205 0.004 264);
+  --sidebar-border: oklch(0.92 0.004 264);
+  --sidebar-ring: oklch(0.6 0.006 264);
+  /* elevation — 애플식 저투명 다층(데이터-slot/컴포넌트에서 box-shadow로 소비) */
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.04), 0 1px 1px oklch(0 0 0 / 0.04);
+  --shadow-md: 0 1px 2px oklch(0 0 0 / 0.04), 0 6px 16px oklch(0 0 0 / 0.06);
+  --shadow-lg: 0 4px 8px oklch(0 0 0 / 0.05), 0 16px 40px oklch(0 0 0 / 0.1);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --background: oklch(0.15 0.004 264);
+  --foreground: oklch(0.985 0.002 264);
+  --card: oklch(0.225 0.006 264); /* 페이지보다 또렷이 밝게(표면 상승·깊이감) */
+  --card-foreground: oklch(0.985 0.002 264);
+  --popover: oklch(0.225 0.006 264);
+  --popover-foreground: oklch(0.985 0.002 264);
+  --primary: oklch(0.922 0.002 264);
+  --primary-foreground: oklch(0.21 0.004 264);
+  --secondary: oklch(0.27 0.006 264);
+  --secondary-foreground: oklch(0.985 0.002 264);
+  --muted: oklch(0.27 0.006 264);
+  --muted-foreground: oklch(0.71 0.006 264);
+  --accent: oklch(0.3 0.008 264);
+  --accent-foreground: oklch(0.985 0.002 264);
   --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --destructive-bg: oklch(0.32 0.07 25);
+  --success: oklch(0.72 0.15 152);
+  --success-foreground: oklch(0.18 0.03 152);
+  --success-bg: oklch(0.3 0.06 152);
+  --warning: oklch(0.82 0.15 80);
+  --warning-foreground: oklch(0.22 0.04 80);
+  --warning-bg: oklch(0.32 0.06 80);
+  --info: oklch(0.7 0.13 252);
+  --info-foreground: oklch(0.18 0.03 252);
+  --info-bg: oklch(0.3 0.05 252);
+  --border: oklch(1 0 0 / 14%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.55 0.006 264);
+  --chart-1: oklch(0.66 0.13 264);
+  --chart-2: oklch(0.72 0.13 165);
+  --chart-3: oklch(0.78 0.13 75);
+  --chart-4: oklch(0.7 0.14 320);
+  --chart-5: oklch(0.72 0.12 200);
+  --sidebar: oklch(0.18 0.004 264);
+  --sidebar-foreground: oklch(0.985 0.002 264);
+  --sidebar-primary: oklch(0.922 0.002 264);
+  --sidebar-primary-foreground: oklch(0.21 0.004 264);
+  --sidebar-accent: oklch(0.3 0.008 264);
+  --sidebar-accent-foreground: oklch(0.985 0.002 264);
+  --sidebar-border: oklch(1 0 0 / 14%);
+  --sidebar-ring: oklch(0.55 0.006 264);
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.3);
+  --shadow-md: 0 1px 2px oklch(0 0 0 / 0.3), 0 6px 16px oklch(0 0 0 / 0.4);
+  --shadow-lg: 0 4px 8px oklch(0 0 0 / 0.4), 0 16px 40px oklch(0 0 0 / 0.5);
 }
 
 @theme inline {
@@ -95,6 +132,16 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-bg: var(--destructive-bg);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-bg: var(--success-bg);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-bg: var(--warning-bg);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-bg: var(--info-bg);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -111,8 +158,9 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-pretendard);
   --font-mono: var(--font-geist-mono);
+  --font-pretendard: "Pretendard Variable", "Pretendard", var(--font-geist-sans), system-ui, sans-serif;
 }
 
 * {
@@ -123,6 +171,20 @@
 body {
   background-color: var(--background);
   color: var(--foreground);
+  font-family: var(--font-pretendard);
+}
+
+/*
+ * shadcn data-slot 글로벌 리스타일 — components/ui/* 무수정으로 토스/애플 플로팅을 입힌다.
+ * Card는 흰 카드 + 은은한 그림자(회색 페이지 위에 뜸), 플로팅 메뉴는 큰 그림자.
+ * 라운드는 --radius 캐스케이드로 자동. 이 블록 삭제 시 즉시 원복.
+ */
+[data-slot="card"] {
+  box-shadow: var(--shadow-md);
+}
+[data-slot="dropdown-menu-content"],
+[data-slot="dropdown-menu-sub-content"] {
+  box-shadow: var(--shadow-lg);
 }
 
 /* 클릭 가능한 요소 hover 시 살짝 확대 — 강도는 여기서 한 번에 조절 */

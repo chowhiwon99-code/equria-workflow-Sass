@@ -506,12 +506,12 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
                       <Pencil className="size-3.5" />
                     </button>
                   )}
-                  <button onClick={() => deleteMessage(m)} className="text-muted-foreground hover:text-red-600" aria-label="메시지 삭제">
+                  <button onClick={() => deleteMessage(m)} className="text-muted-foreground hover:text-destructive" aria-label="메시지 삭제">
                     <Trash2 className="size-3.5" />
                   </button>
                 </div>
               )}
-              {mine && !isSelf && m.read_at === null && <span className="mb-0.5 shrink-0 text-[10px] text-amber-500">1</span>}
+              {mine && !isSelf && m.read_at === null && <span className="mb-0.5 shrink-0 text-[10px] text-warning">1</span>}
               {m.attachment_url && isImageAttachment(m.attachment_name) ? (
                 // 이미지 첨부 — 파일명 대신 썸네일을 바로 렌더 (클릭 시 원본 새 탭)
                 <a
@@ -674,7 +674,7 @@ function MessageReactionBar({
             onClick={() => onToggle(emoji)}
             className={cn(
               "flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-xs transition-colors",
-              reacted ? "border-primary bg-primary/10" : "bg-background hover:bg-muted"
+              reacted ? "border-primary bg-primary/10" : "bg-card hover:bg-muted"
             )}
           >
             <span>{emoji}</span>

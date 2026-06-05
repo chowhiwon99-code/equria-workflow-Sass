@@ -219,7 +219,7 @@ export function FinanceView() {
                 size="sm"
                 variant="outline"
                 onClick={deleteSelected}
-                className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                className="border-destructive/30 text-destructive hover:bg-destructive-bg hover:text-destructive"
               >
                 <Trash2 /> 삭제 ({selected.size})
               </Button>
@@ -241,9 +241,9 @@ export function FinanceView() {
 
       {/* 순수익 요약 */}
       <div className="grid grid-cols-3 gap-3">
-        <SummaryCard label="총 매출" value={won(totalRevenue)} className="text-emerald-600" />
-        <SummaryCard label="총 지출" value={won(totalExpense)} className="text-red-600" />
-        <SummaryCard label="순수익" value={won(net)} className={net >= 0 ? "text-foreground" : "text-red-600"} />
+        <SummaryCard label="총 매출" value={won(totalRevenue)} className="text-success" />
+        <SummaryCard label="총 지출" value={won(totalExpense)} className="text-destructive" />
+        <SummaryCard label="순수익" value={won(net)} className={net >= 0 ? "text-foreground" : "text-destructive"} />
       </div>
 
       {Object.keys(expenseByCat).length > 0 && (
@@ -342,7 +342,7 @@ export function FinanceView() {
                   </td>
                   <td className="px-3 py-2 text-muted-foreground">{e.entry_date}</td>
                   <td className="px-3 py-2">
-                    <span className={cn("rounded-full px-2 py-0.5 text-xs", e.kind === "revenue" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700")}>
+                    <span className={cn("rounded-full px-2 py-0.5 text-xs", e.kind === "revenue" ? "bg-success-bg text-success" : "bg-destructive-bg text-destructive")}>
                       {e.kind === "revenue" ? "매출" : "비용"}
                     </span>
                   </td>
@@ -371,12 +371,12 @@ export function FinanceView() {
                           })
                           load()
                         }}
-                        className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700 hover:bg-amber-200"
+                        className="rounded-full bg-warning-bg px-2 py-0.5 text-xs text-warning transition-opacity hover:opacity-80"
                       >
                         검토→확정
                       </button>
                     ) : (
-                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">확정</span>
+                      <span className="rounded-full bg-success-bg px-2 py-0.5 text-xs text-success">확정</span>
                     )}
                   </td>
                   <td className="px-3 py-2">
@@ -411,7 +411,7 @@ export function FinanceView() {
                           })
                           load()
                         }}
-                        className="text-muted-foreground hover:text-red-600"
+                        className="text-muted-foreground hover:text-destructive"
                         aria-label="삭제"
                       >
                         <Trash2 className="size-3.5" />
