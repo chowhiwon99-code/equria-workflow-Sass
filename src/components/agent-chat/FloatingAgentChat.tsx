@@ -264,13 +264,14 @@ function EmptyAgentWidget() {
 }
 
 function FabLauncher({ unread, onOpen }: { unread: boolean; onOpen: () => void }) {
-  const { position, setPosition } = useAgentChat()
+  const { position, setPosition, agents, unreadAgentId } = useAgentChat()
   const { handlePointerDown, wasDraggedRef, dragging } = useDragWidget({
     width: WIDGET_SIZE,
     height: WIDGET_SIZE,
     onTap: onOpen,
   })
   const tl = widgetTopLeft(position)
+  const unreadAgent = unread ? agents.find((a) => a.id === unreadAgentId) : undefined
 
   return (
     <button
@@ -294,11 +295,21 @@ function FabLauncher({ unread, onOpen }: { unread: boolean; onOpen: () => void }
         !dragging && "animate-float hover:scale-110"
       )}
       aria-label="에이전트 위젯 열기 (⌘K)"
-      title="에이전트 (⌘K)"
+      title={unreadAgent ? `${unreadAgent.name} · 새 메시지` : "에이전트 (⌘K)"}
     >
-      <Sparkles className="pointer-events-none size-6" />
+      {unreadAgent ? (
+        <span className="pointer-events-none">{renderAgentIcon(unreadAgent.icon, "size-6")}</span>
+      ) : (
+        <Sparkles className="pointer-events-none size-6" />
+      )}
       {unread && (
         <span className="pointer-events-none absolute right-0 top-0 size-3 rounded-full bg-destructive ring-2 ring-background" />
+      )}
+      {/* 누가 보냈는지 — 이름 배지(런처 왼쪽) */}
+      {unreadAgent && (
+        <span className="pointer-events-none absolute right-full top-1/2 mr-2 -translate-y-1/2 whitespace-nowrap rounded-full border bg-card px-2.5 py-1 text-xs font-medium text-foreground shadow-[var(--shadow-md)] motion-safe:animate-fade-up">
+          {unreadAgent.name}
+        </span>
       )}
     </button>
   )
@@ -319,38 +330,36 @@ function AgentFabMenu({ onPick }: { onPick: (id: string) => void }) {
   const right = (typeof window !== "undefined" ? window.innerWidth : 1280) - (tl.left + WIDGET_SIZE)
   const bottom = (typeof window !== "undefined" ? window.innerHeight : 800) - (tl.top + WIDGET_SIZE)
 
-  const [adding, setAdding] = useState(false)
-  const [addable, setAddable] = useState<Agent[]>([])
+  const [manage, setManage] = useState(false)
+  const [allAgents, setAllAgents] = useState<Agent[]>([])
 
-  // ＋ 클릭 시점에 미핀 에이전트 조회(effect 아님 → set-state-in-effect 회피)
-  const openAdd = async () => {
+  // 관리 진입 시점에 전체 에이전트 조회(effect 아님 → set-state-in-effect 회피)
+  const enterManage = async () => {
     const supabase = createClient()
     const { data } = await supabase
       .from("agents")
       .select("id, name, description, icon, category")
       .eq("is_active", true)
       .order("created_at", { ascending: true })
-    const pinnedIds = new Set(agents.map((a) => a.id))
-    setAddable(((data ?? []) as Agent[]).filter((a) => !pinnedIds.has(a.id)))
-    setAdding(true)
+    setAllAgents((data ?? []) as Agent[])
+    setManage(true)
   }
-  const pin = async (agentId: string) => {
+  const togglePin = async (agentId: string, pinned: boolean) => {
     const supabase = createClient()
     const { data: auth } = await supabase.auth.getUser()
     if (!auth.user) return
-    await supabase.from("user_agent_pins").insert({ user_id: auth.user.id, agent_id: agentId })
-    window.dispatchEvent(new Event("equria:agents-changed"))
-    setAddable((prev) => prev.filter((a) => a.id !== agentId))
-  }
-  const unpin = async (agentId: string) => {
-    const supabase = createClient()
-    const { data: auth } = await supabase.auth.getUser()
-    if (!auth.user) return
-    await supabase.from("user_agent_pins").delete().eq("user_id", auth.user.id).eq("agent_id", agentId)
+    if (pinned) {
+      await supabase.from("user_agent_pins").delete().eq("user_id", auth.user.id).eq("agent_id", agentId)
+    } else {
+      await supabase.from("user_agent_pins").insert({ user_id: auth.user.id, agent_id: agentId })
+    }
     window.dispatchEvent(new Event("equria:agents-changed"))
   }
 
-  const list = adding ? addable : agents
+  const pinnedIds = new Set(agents.map((a) => a.id))
+  const list = manage ? allAgents : agents
+  // 둥근 사선 오프셋 — 아래(0)에서 위로 갈수록 좌측으로(sqrt 곡선)
+  const diag = (i: number) => Math.round(12 * Math.sqrt(i))
 
   return (
     <div
@@ -383,55 +392,57 @@ function AgentFabMenu({ onPick }: { onPick: (id: string) => void }) {
         <X className="pointer-events-none size-6" />
       </button>
 
-      {/* 에이전트(또는 추가 가능한 에이전트) 스택 — 아래에서부터 스태거 등장 */}
-      {list.map((a, i) => (
-        <div
-          key={a.id}
-          className="flex items-center gap-2.5 motion-safe:animate-[equria-pop_0.34s_cubic-bezier(0.34,1.5,0.6,1)_both]"
-          style={{ animationDelay: `${i * 0.04}s` }}
-        >
-          <span className="rounded-lg bg-card px-2.5 py-1 text-sm font-medium shadow-[var(--shadow-sm)]">{a.name}</span>
-          <div className="group relative">
+      {/* 에이전트 스택 — 둥근 사선으로 스태거 등장. 일반=클릭하면 채팅 / 관리=핀 토글(추가·빼기) */}
+      {list.map((a, i) => {
+        const pinned = pinnedIds.has(a.id)
+        return (
+          <div
+            key={a.id}
+            className="flex items-center gap-2.5 motion-safe:animate-[equria-pop_0.34s_cubic-bezier(0.34,1.5,0.6,1)_both]"
+            style={{ animationDelay: `${i * 0.04}s`, marginRight: diag(i) }}
+          >
+            <span className="rounded-lg bg-card px-2.5 py-1 text-sm font-medium shadow-[var(--shadow-sm)]">{a.name}</span>
             <button
               type="button"
-              onClick={() => (adding ? pin(a.id) : onPick(a.id))}
-              className="grid size-12 place-items-center rounded-full border bg-card text-foreground shadow-[var(--shadow-md)] transition-transform hover:scale-110"
-              title={adding ? `${a.name} 추가` : a.name}
-              aria-label={adding ? `${a.name} 위젯에 추가` : `${a.name} 채팅 열기`}
+              onClick={() => (manage ? togglePin(a.id, pinned) : onPick(a.id))}
+              className={cn(
+                "relative grid size-12 place-items-center rounded-full border bg-card text-foreground shadow-[var(--shadow-md)] transition-transform hover:scale-110",
+                manage && pinned && "border-primary ring-2 ring-primary"
+              )}
+              title={manage ? (pinned ? `${a.name} 빼기` : `${a.name} 추가`) : a.name}
+              aria-label={manage ? (pinned ? `${a.name} 위젯에서 빼기` : `${a.name} 위젯에 추가`) : `${a.name} 채팅 열기`}
             >
               {renderAgentIcon(a.icon, "size-5")}
+              {manage && (
+                <span
+                  className={cn(
+                    "absolute -right-1 -top-1 grid size-5 place-items-center rounded-full text-primary-foreground",
+                    pinned ? "bg-destructive" : "bg-primary"
+                  )}
+                >
+                  {pinned ? <X className="size-3" /> : <Plus className="size-3" />}
+                </span>
+              )}
             </button>
-            {adding ? (
-              <span className="pointer-events-none absolute -right-1 -top-1 grid size-5 place-items-center rounded-full bg-primary text-primary-foreground">
-                <Plus className="size-3" />
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={() => unpin(a.id)}
-                className="absolute -right-1 -top-1 grid size-5 place-items-center rounded-full bg-destructive text-destructive-foreground opacity-0 transition-opacity group-hover:opacity-100"
-                title="위젯에서 제거"
-                aria-label={`${a.name} 위젯에서 제거`}
-              >
-                <X className="size-3" />
-              </button>
-            )}
           </div>
-        </div>
-      ))}
+        )
+      })}
 
-      {/* 추가/완료 토글 */}
-      <div className="flex items-center gap-2.5 motion-safe:animate-[equria-pop_0.34s_cubic-bezier(0.34,1.5,0.6,1)_both]" style={{ animationDelay: `${list.length * 0.04}s` }}>
+      {/* 관리/완료 토글 */}
+      <div
+        className="flex items-center gap-2.5 motion-safe:animate-[equria-pop_0.34s_cubic-bezier(0.34,1.5,0.6,1)_both]"
+        style={{ animationDelay: `${list.length * 0.04}s`, marginRight: diag(list.length) }}
+      >
         <span className="rounded-lg bg-card px-2.5 py-1 text-sm font-medium shadow-[var(--shadow-sm)]">
-          {adding ? "완료" : "에이전트 추가"}
+          {manage ? "완료" : "에이전트 추가·관리"}
         </span>
         <button
           type="button"
-          onClick={() => (adding ? setAdding(false) : openAdd())}
+          onClick={() => (manage ? setManage(false) : enterManage())}
           className="grid size-12 place-items-center rounded-full border border-dashed bg-card text-muted-foreground shadow-[var(--shadow-sm)] transition-transform hover:scale-110 hover:text-foreground"
-          aria-label={adding ? "추가 완료" : "에이전트 추가"}
+          aria-label={manage ? "관리 완료" : "에이전트 추가·관리"}
         >
-          {adding ? <Check className="size-5" /> : <Plus className="size-5" />}
+          {manage ? <Check className="size-5" /> : <Plus className="size-5" />}
         </button>
       </div>
     </div>
@@ -519,7 +530,7 @@ function IconBtn({
 }
 
 function ChatBody({ agent }: { agent: Agent }) {
-  const { conversationIdByAgent, setConversationId, setUnread, isOpen } = useAgentChat()
+  const { conversationIdByAgent, setConversationId, markUnread, isOpen } = useAgentChat()
   const [input, setInput] = useState("")
 
   // 매 요청마다 최신 conversationId를 보내기 위한 ref
@@ -558,8 +569,8 @@ function ChatBody({ agent }: { agent: Agent }) {
   // 위젯 닫힌 상태에서 새 응답 도착 → unread 표시
   const lastMessageId = messages.at(-1)?.id
   useEffect(() => {
-    if (!isOpen && messages.at(-1)?.role === "assistant") setUnread(true)
-  }, [lastMessageId, isOpen, messages, setUnread])
+    if (!isOpen && messages.at(-1)?.role === "assistant") markUnread(agent.id)
+  }, [lastMessageId, isOpen, messages, markUnread, agent.id])
 
   const submit = () => {
     const text = input.trim()

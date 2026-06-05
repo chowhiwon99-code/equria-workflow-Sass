@@ -17,6 +17,8 @@ type AgentChatState = {
   isOpen: boolean
   isExpanded: boolean
   unread: boolean
+  /** 마지막으로 안 읽은 응답을 보낸 에이전트(누구한테 왔는지 표시용) */
+  unreadAgentId: string | null
   selectedAgentId: string | null
   conversationIdByAgent: Record<string, string>
   /** 에이전트별 chat 인스턴스 nonce — "새 대화" 클릭 시 증가시켜 ChatBody를 강제 remount한다 */
@@ -34,6 +36,8 @@ type AgentChatActions = {
   setConversationId: (agentId: string, conversationId: string) => void
   startNewConversation: () => void
   setUnread: (v: boolean) => void
+  /** 특정 에이전트로부터 안 읽은 응답 도착 표시 */
+  markUnread: (agentId: string) => void
   setPosition: (pos: WidgetPosition | null) => void
 }
 
@@ -63,6 +67,7 @@ export function AgentChatProvider({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
   const [unread, setUnread] = useState(false)
+  const [unreadAgentId, setUnreadAgentId] = useState<string | null>(null)
   const [selectedAgentId, setSelectedAgentIdState] = useState<string | null>(null)
   const [conversationIdByAgent, setConversationIdByAgentState] = useState<
     Record<string, string>
@@ -121,13 +126,21 @@ export function AgentChatProvider({ children }: { children: React.ReactNode }) {
   const open = useCallback(() => {
     setIsOpen(true)
     setUnread(false)
+    setUnreadAgentId(null)
   }, [])
   const close = useCallback(() => setIsOpen(false), [])
   const toggle = useCallback(() => {
     setIsOpen((v) => {
-      if (!v) setUnread(false)
+      if (!v) {
+        setUnread(false)
+        setUnreadAgentId(null)
+      }
       return !v
     })
+  }, [])
+  const markUnread = useCallback((agentId: string) => {
+    setUnread(true)
+    setUnreadAgentId(agentId)
   }, [])
   const setExpanded = useCallback((v: boolean) => setIsExpanded(v), [])
   const setSelectedAgent = useCallback((id: string) => {
@@ -163,6 +176,7 @@ export function AgentChatProvider({ children }: { children: React.ReactNode }) {
         isOpen,
         isExpanded,
         unread,
+        unreadAgentId,
         selectedAgentId,
         conversationIdByAgent,
         chatVersionByAgent,
@@ -175,6 +189,7 @@ export function AgentChatProvider({ children }: { children: React.ReactNode }) {
         setConversationId,
         startNewConversation,
         setUnread,
+        markUnread,
         setPosition,
       }}
     >
