@@ -95,7 +95,7 @@ export function AgentWizard() {
         >
           ← 가이드 마법사로 돌아가기
         </button>
-        <AgentBuilderForm />
+        <AgentBuilderForm slides />
       </div>
     )
   }
