@@ -8,18 +8,18 @@ import { renderAgentIcon } from "@/components/agents/AgentIcon"
 
 /**
  * 애플워치식 벌집(honeycomb) 아이콘 피커.
- * - 버블을 오프셋 행으로 군집 배치. 커서에 가까운 버블이 물방울처럼 커지고 멀면 작아지는 fisheye 모션.
- * - 위치는 해석적으로 계산(DOM 측정 X) → 스케일은 캐시된 중심 vs 커서 거리로만. 가볍다.
- * - 저장값(value)은 "lucide:Name"(renderAgentIcon으로 렌더). 접근성: role=radiogroup + roving tabindex(←/→/Enter).
- * - prefers-reduced-motion: 모션 비활성(스케일 고정).
+ * - 버블을 오프셋 행으로 군집 배치. 크기가 불규칙(sizeFactor)하고 상시 부드럽게 호흡(equria-bubble 애니, 버블별 delay).
+ * - 커서에 가까운 버블이 물방울처럼 추가로 커짐(fisheye, 안쪽 버튼 transform). 두 모션은 중첩 transform(외:호흡 / 내:fisheye).
+ * - 위치는 해석적 계산(DOM 측정 X). 저장값(value)은 "lucide:Name"(renderAgentIcon 렌더).
+ * - 접근성: role=radiogroup + roving tabindex(←/→/Enter). prefers-reduced-motion: 모션 비활성.
  */
 
-const B = 52 // 버블 지름(scale 1)
-const PITCH_X = 60 // 가로 중심 간격
-const PITCH_Y = 50 // 세로 중심 간격
-const PAD = 18 // 스케일된 가장자리 버블이 잘리지 않게
-const RADIUS = 130 // fisheye 영향 반경(px)
-const MAX_BOOST = 0.55 // 최대 확대(=1.55배)
+const B = 46 // 기준 버블 지름
+const PITCH_X = 62 // 가로 중심 간격
+const PITCH_Y = 54 // 세로 중심 간격
+const PAD = 22 // 스케일된 가장자리 버블 여유
+const RADIUS = 140 // fisheye 영향 반경(px)
+const MAX_BOOST = 0.42 // 커서 근접 최대 확대
 
 /** 아이콘 개수를 5/6 교차 행으로 분할(벌집). */
 function buildRows(total: number): number[] {
@@ -35,7 +35,13 @@ function buildRows(total: number): number[] {
   return rows
 }
 
-type Bubble = { idx: number; cx: number; cy: number }
+/** 인덱스별 불규칙 기준 크기 배율(0.8~1.12, 황금비 스프레드). */
+function sizeFactor(idx: number): number {
+  const t = (idx * 0.6180339887) % 1
+  return 0.8 + t * 0.32
+}
+
+type Bubble = { idx: number; cx: number; cy: number; size: number }
 
 function layout(): { bubbles: Bubble[]; width: number; height: number } {
   const rows = buildRows(AGENT_ICONS.length)
@@ -46,9 +52,12 @@ function layout(): { bubbles: Bubble[]; width: number; height: number } {
   let idx = 0
   rows.forEach((n, r) => {
     const rowW = (n - 1) * PITCH_X
-    const startX = PAD + B / 2 + ((maxN - 1) * PITCH_X - rowW) / 2 // 각 행을 가운데 정렬(5행은 자연히 오프셋)
+    const startX = PAD + B / 2 + ((maxN - 1) * PITCH_X - rowW) / 2 // 각 행 가운데 정렬(5행은 자연히 오프셋)
     const cy = PAD + B / 2 + r * PITCH_Y
-    for (let c = 0; c < n; c++) bubbles.push({ idx: idx++, cx: startX + c * PITCH_X, cy })
+    for (let c = 0; c < n; c++) {
+      bubbles.push({ idx, cx: startX + c * PITCH_X, cy, size: B * sizeFactor(idx) })
+      idx++
+    }
   })
   return { bubbles, width, height }
 }
@@ -89,7 +98,7 @@ export function IconPicker({
     setCursor(null)
   }, [])
 
-  const scaleAt = (cx: number, cy: number): number => {
+  const fisheyeAt = (cx: number, cy: number): number => {
     if (!cursor) return 1
     const d = Math.hypot(cx - cursor.x, cy - cursor.y)
     const boost = Math.max(0, 1 - d / RADIUS)
@@ -129,43 +138,51 @@ export function IconPicker({
         className="relative"
         style={{ width: WIDTH, height: HEIGHT }}
       >
-        {BUBBLES.map(({ idx, cx, cy }) => {
+        {BUBBLES.map(({ idx, cx, cy, size }) => {
           const item = AGENT_ICONS[idx]
           const selected = item.value === value
-          const s = scaleAt(cx, cy)
+          const fish = fisheyeAt(cx, cy)
+          const dur = 3.2 + (idx % 5) * 0.35 // 3.2~4.6s
           return (
-            <button
+            <div
               key={item.value}
-              ref={(el) => {
-                itemRefs.current[idx] = el
-              }}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              aria-label={`아이콘 ${item.label}`}
-              tabIndex={idx === selectedIdx ? 0 : -1}
-              onClick={() => onChange(item.value)}
-              onKeyDown={(e) => onKeyDown(e, idx)}
+              // 외곽: 위치+기준크기+상시 호흡(transform scale) + fisheye에 따른 z-index
               style={{
-                left: cx - B / 2,
-                top: cy - B / 2,
-                width: B,
-                height: B,
-                transform: `scale(${s})`,
-                zIndex: Math.round(s * 10),
+                position: "absolute",
+                left: cx - size / 2,
+                top: cy - size / 2,
+                width: size,
+                height: size,
+                zIndex: Math.round(fish * 10),
+                animation: reduced ? undefined : `equria-bubble ${dur}s ease-in-out ${-(idx * 0.43)}s infinite`,
               }}
-              className={cn(
-                "absolute grid place-items-center rounded-full border outline-none transition-transform duration-200 ease-out will-change-transform focus-visible:ring-2 focus-visible:ring-ring",
-                selected
-                  ? "border-primary bg-primary/10 text-primary ring-2 ring-primary"
-                  : "border-transparent bg-card text-foreground shadow-[var(--shadow-sm)] hover:bg-accent"
-              )}
             >
-              {renderAgentIcon(item.value, "size-5")}
-              {selected && (
-                <Check className="absolute -right-0.5 -top-0.5 size-4 rounded-full bg-primary p-0.5 text-primary-foreground" />
-              )}
-            </button>
+              <button
+                ref={(el) => {
+                  itemRefs.current[idx] = el
+                }}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                aria-label={`아이콘 ${item.label}`}
+                tabIndex={idx === selectedIdx ? 0 : -1}
+                onClick={() => onChange(item.value)}
+                onKeyDown={(e) => onKeyDown(e, idx)}
+                // 안쪽: 커서 fisheye(transform scale) — 외곽 호흡과 중첩
+                style={{ transform: `scale(${fish})` }}
+                className={cn(
+                  "grid size-full place-items-center rounded-full border outline-none transition-transform duration-200 ease-out will-change-transform focus-visible:ring-2 focus-visible:ring-ring",
+                  selected
+                    ? "border-primary bg-primary/10 text-primary ring-2 ring-primary"
+                    : "border-transparent bg-card text-foreground shadow-[var(--shadow-sm)] hover:bg-accent"
+                )}
+              >
+                {renderAgentIcon(item.value, "size-5")}
+                {selected && (
+                  <Check className="absolute -right-0.5 -top-0.5 size-4 rounded-full bg-primary p-0.5 text-primary-foreground" />
+                )}
+              </button>
+            </div>
           )
         })}
       </div>

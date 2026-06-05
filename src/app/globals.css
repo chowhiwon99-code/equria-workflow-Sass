@@ -273,6 +273,16 @@ body {
   }
 }
 
+/* 아이콘 피커 버블 — 상시 부드러운 호흡(스케일). 버블별 delay/duration으로 비동기 군집 모션 */
+@keyframes equria-bubble {
+  0%, 100% {
+    transform: scale(0.93);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
 /* 아이콘 피커 — 회전초밥식 가로 무한 마퀴(트랙을 2벌 렌더 → -50% 이동으로 끊김 없는 루프) */
 @keyframes equria-marquee {
   from {

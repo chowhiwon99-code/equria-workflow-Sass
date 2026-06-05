@@ -9,25 +9,12 @@ import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/shared/Modal"
 import { useUndo } from "@/components/undo/UndoProvider"
 import { IconPicker } from "@/components/agents/IconPicker"
-import { renderAgentIcon, isLucideIcon } from "@/components/agents/AgentIcon"
 import {
   AGENT_MODELS,
   AGENT_CATEGORIES,
   AGENT_DEFAULTS,
   TEMPERATURE_PRESETS,
 } from "@/lib/agents"
-
-// Take the first user-perceived grapheme cluster (keeps ZWJ sequences, flags,
-// skin-tone modifiers intact). Falls back to a code-point-aware slice when
-// Intl.Segmenter is unavailable.
-function firstGrapheme(s: string): string {
-  if (typeof Intl !== "undefined" && typeof Intl.Segmenter === "function") {
-    const segmenter = new Intl.Segmenter()
-    for (const { segment } of segmenter.segment(s)) return segment
-    return ""
-  }
-  return [...s][0] ?? ""
-}
 
 export type AgentFormInitial = {
   id: string
@@ -272,23 +259,7 @@ export function AgentBuilderForm({
       {
         key: "icon",
         title: "아이콘을 골라주세요",
-        node: (
-          <div className="flex flex-col gap-2">
-            <IconPicker value={icon} onChange={setIcon} />
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span>선택됨</span>
-              <span className="text-xl leading-none">{renderAgentIcon(icon, "size-5")}</span>
-              <span className="ml-2">이모지 직접 입력</span>
-              <input
-                className={cn(fieldClass, "w-14 text-center text-lg")}
-                value={isLucideIcon(icon) ? "" : icon}
-                onChange={(e) => setIcon(firstGrapheme(e.target.value))}
-                placeholder="😊"
-                aria-label="이모지 직접 입력"
-              />
-            </div>
-          </div>
-        ),
+        node: <IconPicker value={icon} onChange={setIcon} />,
       },
       {
         key: "meta",
@@ -401,7 +372,7 @@ export function AgentBuilderForm({
     ]
 
     return (
-      <div className="flex max-w-xl flex-col gap-6">
+      <div className="mx-auto flex w-full max-w-xl flex-col gap-6 pt-2">
         {/* 진행바 */}
         <div className="flex flex-col gap-2 px-2">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -435,8 +406,8 @@ export function AgentBuilderForm({
                 )}
                 aria-hidden={i !== slideIndex}
               >
-                <div className="flex min-h-[300px] flex-col gap-4 py-1">
-                  <h2 className="text-xl font-semibold tracking-tight">{b.title}</h2>
+                <div className="flex min-h-[260px] flex-col gap-5 py-1">
+                  <h2 className="text-center text-2xl font-semibold tracking-tight">{b.title}</h2>
                   {b.node}
                 </div>
               </div>
@@ -464,23 +435,11 @@ export function AgentBuilderForm({
   }
 
   return (
-    <div className="flex max-w-2xl flex-col gap-5">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
       {/* 아이콘 */}
       <div className="flex flex-col gap-2">
         <span className="text-xs text-muted-foreground">아이콘</span>
         <IconPicker value={icon} onChange={setIcon} />
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span>선택됨</span>
-          <span className="text-xl leading-none">{renderAgentIcon(icon, "size-5")}</span>
-          <span className="ml-2">이모지 직접 입력</span>
-          <input
-            className={cn(fieldClass, "w-14 text-center text-lg")}
-            value={isLucideIcon(icon) ? "" : icon}
-            onChange={(e) => setIcon(firstGrapheme(e.target.value))}
-            placeholder="😊"
-            aria-label="이모지 직접 입력"
-          />
-        </div>
       </div>
 
       {/* 이름 */}

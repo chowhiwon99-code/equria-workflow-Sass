@@ -87,7 +87,7 @@ export function AgentWizard() {
   // ── 직접 작성 모드(파워유저 / 기존 흐름 보존) ──
   if (mode === "manual") {
     return (
-      <div className="flex max-w-2xl flex-col gap-4">
+      <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
         <button
           type="button"
           onClick={() => setMode("wizard")}
@@ -103,7 +103,7 @@ export function AgentWizard() {
   // ── 결과: AI 생성 + 검토/저장 (기존 흐름) ──
   if (phase === "result") {
     return (
-      <div className="flex max-w-2xl flex-col gap-4">
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
         {generating || genError || !generated ? (
           <div className="flex flex-col gap-3 rounded-xl border bg-card p-4">
             {generating && (
@@ -154,9 +154,18 @@ export function AgentWizard() {
 
   // ── 입력: 한 질문씩 가로 슬라이드 ──
   return (
-    <div className="flex max-w-xl flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-xl flex-col items-center gap-6 pt-2">
+      {/* 직접 작성 전환 — 상단 중앙 */}
+      <button
+        type="button"
+        onClick={() => setMode("manual")}
+        className="inline-flex items-center gap-1.5 rounded-full border bg-card px-4 py-2 text-xs font-medium text-muted-foreground shadow-[var(--shadow-sm)] transition-colors hover:bg-muted hover:text-foreground"
+      >
+        <PenLine className="size-3.5" /> 직접 작성으로 전환
+      </button>
+
       {/* 진행바 */}
-      <div className="flex flex-col gap-2 px-2">
+      <div className="flex w-full flex-col gap-2">
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span className="tabular-nums">
             {index + 1} / {QUESTIONS.length}
@@ -172,7 +181,7 @@ export function AgentWizard() {
       </div>
 
       {/* 슬라이드 트랙 */}
-      <div className="overflow-hidden">
+      <div className="w-full overflow-hidden">
         <div
           className="flex transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]"
           style={{ transform: `translateX(-${index * 100}%)` }}
@@ -200,30 +209,23 @@ export function AgentWizard() {
       </div>
 
       {/* 내비게이션 */}
-      <div className="flex items-center justify-between px-2">
-        <button
-          type="button"
-          onClick={() => setMode("manual")}
-          className="inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-[var(--shadow-sm)] transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <PenLine className="size-3.5" /> 직접 작성으로 전환
-        </button>
-        <div className="flex gap-2">
-          {index > 0 && (
-            <Button variant="outline" size="sm" onClick={goPrev}>
-              <ArrowLeft className="size-4" /> 이전
-            </Button>
-          )}
-          <Button size="sm" onClick={goNext} disabled={!canNext}>
-            {isLast ? (
-              <>
-                <Sparkles className="size-4" /> AI로 생성
-              </>
-            ) : (
-              "다음"
-            )}
+      <div className="flex w-full items-center justify-between">
+        {index > 0 ? (
+          <Button variant="outline" size="sm" onClick={goPrev}>
+            <ArrowLeft className="size-4" /> 이전
           </Button>
-        </div>
+        ) : (
+          <span />
+        )}
+        <Button size="sm" onClick={goNext} disabled={!canNext}>
+          {isLast ? (
+            <>
+              <Sparkles className="size-4" /> AI로 생성
+            </>
+          ) : (
+            "다음"
+          )}
+        </Button>
       </div>
     </div>
   )
@@ -256,9 +258,9 @@ function QuestionSlide({
   }, [active, f.type])
 
   return (
-    <div className="flex min-h-[280px] flex-col gap-4 py-1">
-      <div className="flex flex-col gap-1.5">
-        <h2 className="text-xl font-semibold tracking-tight">
+    <div className="flex min-h-[240px] flex-col gap-5 py-1">
+      <div className="flex flex-col items-center gap-1.5 text-center">
+        <h2 className="text-2xl font-semibold tracking-tight">
           {f.label}
           {f.required && <span className="text-primary"> *</span>}
         </h2>
@@ -334,7 +336,7 @@ function QuestionSlide({
       )}
 
       {f.type === "multiselect" && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap justify-center gap-2">
           {f.options!.map((o) => {
             const on = ((value as string[]) ?? []).includes(o)
             return (
