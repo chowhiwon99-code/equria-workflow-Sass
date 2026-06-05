@@ -12,16 +12,19 @@
 - **배포(main)**: `https://equria-workflow-sass.vercel.app` — main 최신 `3c171ba` READY. main push → Vercel 자동배포.
 - **라이브 기능(배포됨)**: 에이전트 허브(우하단 위젯)·에이전트 빌더·워크플로우(n8n 캔버스+순차 실행)·캘린더·프로젝트·재무·명함·파일·**메일(Gmail)**·**MCP**·**구성원 디렉터리** + **직원 채팅 허브(단계0~5)**.
   - 채팅 단계0~5: 사용자 상태표시(온·오프+수동) · 이모지 반응 · 답장/스레드 · **리치 텍스트(Tiptap 서식·맞춤법 밑줄)** · **다중 첨부**.
-- **🔧 작업 브랜치 `feat/toss-ui-refresh`(세션7 · GitHub 푸시됨 · main 미머지=미배포)** — main 대비 12커밋:
+- **🔧 작업 브랜치 `feat/toss-ui-refresh`(세션7 · GitHub 푸시됨 · main 미머지=미배포)** — main 대비 16커밋:
   - **채팅 단계6(완료)**: AI 보조(다듬기·번역·요약) + **한국어 맞춤법 검사**(`ComposerAiAssist`·`/api/chat/assist`).
   - **토스/애플 UI 리프레시**: Pretendard 전역 · 라운드↑(`--radius:1rem`) · 부드러운 그림자 · 파스텔 기능색 · 이모지→lucide. 토큰 SSOT=`globals.css`(`[data-slot]` 오버라이드, `components/ui/` 무수정).
   - **에이전트 재설계**: 그리드 카드→상세(skill.md/시스템프롬프트)·`/agents/[id]/edit` 분리 · 아이폰식 위저드(슬라이드) · 벌집 아이콘피커(물방울 fisheye).
   - **위젯 재설계**: FAB 탭→에이전트들이 **둥근 호**로 펼쳐짐 · 발신 에이전트 표시(unread 배지) · 큰 라운드 패널 · 추가/제거/수정은 **/agents**에서(위젯 내 +/- 제거).
   - **캘린더**: 종일(날짜만·시간 입력 제거) · 색상 12종 · **일정 편집** · **파일 첨부**(마이그 026 · `calendar-files` 버킷).
   - **채팅 송수신 개선**: 첨부 Realtime publication 추가(마이그 027 — 누락 버그 수정) · **낙관적 송신**(insert 직후 즉시 표시) · 반응/답장을 버블 옆 인라인·반응칩 조건부·간격 압축(`gap-1`).
-- **안정도(브랜치)**: `tsc` 0 · `pnpm lint` 30(전부 기존 `set-state-in-effect`·`refs` 부채, **0 warnings·신규 범주 없음**) · git clean · `any` 0 · 마이그 **원격30↔디스크30 drift 없음**.
+  - **채팅 입력창**: 애플식 심플(서식 툴바 숨김→`Aa` 토글·둥근 pill) + **번역 후 전송 안 됨 수정**(Tiptap v3 stale `editor.isEmpty` → onCreate/onUpdate state 동기화).
+  - **재무**: 세금계산서 초안 **수정·삭제**(`TaxInvoiceModal` + 마이그 028 DELETE 정책 · Undo).
+  - **위젯 morph**: 채팅 열기/닫기 CSS-FLIP(`equria-morph-in/out` · 버블↔패널, 닫힘 역재생 · morph 중 드래그·확대 잠금).
+- **안정도(브랜치)**: `tsc` 0 · `pnpm lint` 30(전부 기존 `set-state-in-effect`·`refs` 부채, **0 warnings·신규 범주 없음**) · git clean · `any` 0 · 마이그 **원격31↔디스크31 drift 없음**.
   - ⚠️ 로컬 `next build` 미검증(환경상 Google Fonts 네트워크 타임아웃) → `tsc`+`lint`+dev로 대체. 머지 시 Vercel 빌드가 진짜 게이트.
-  - ⚠️ **DB > 배포코드**: 마이그 `025`(에이전트 lucide 아이콘)·`026`(캘린더 첨부)·`027`(채팅 첨부 Realtime publication)은 **원격(프로덕션)에 이미 적용**됐고 사용 코드는 브랜치(미배포). 셋 다 **순수 additive**(`027`은 배포된 main 앱의 첨부 수신도 바로 개선). main 머지 시 코드·DB 정합.
+  - ⚠️ **DB > 배포코드**: 마이그 `025`(에이전트 lucide)·`026`(캘린더 첨부)·`027`(채팅 첨부 Realtime)·`028`(세금계산서 DELETE 정책)은 **원격(프로덕션)에 이미 적용**됐고 사용 코드는 브랜치(미배포). 모두 **순수 additive**(`027`은 배포된 main 앱 첨부 수신도 바로 개선 · `028`은 정책만 추가라 무해). main 머지 시 코드·DB 정합.
 - 전역 ⌘Z Undo · 휴지통(soft-delete).
 
 ---
@@ -46,7 +49,7 @@
 
 - **GitHub** `chowhiwon99-code/equria-workflow-Sass` (main 단일 + 작업브랜치 `feat/toss-ui-refresh` 푸시됨).
 - **Vercel** team `team_wcW0NMU7oiIxNndyV1afigbp` · project `prj_CcCTUr8eIYpaStaj6RNq7VoLPZG6` · 배포보호 off(앱이 자체 인증).
-- **Supabase** project `dutovtfdckhayyvhtuxu` (ap-northeast-2 서울) · 마이그 001~027 적용(**원격30↔디스크30 drift 없음**). DDL은 MCP `apply_migration`(`project_id` 필수) **+** `supabase/migrations/` 파일 둘 다(SSOT).
+- **Supabase** project `dutovtfdckhayyvhtuxu` (ap-northeast-2 서울) · 마이그 001~028 적용(**원격31↔디스크31 drift 없음**). DDL은 MCP `apply_migration`(`project_id` 필수) **+** `supabase/migrations/` 파일 둘 다(SSOT).
 - **.env.local**: ANTHROPIC · Supabase(URL·anon·service_role) · Google 4종 · `WORKSPACE_PASSWORD` 채워짐. ⚠️ **시크릿 값은 이 문서/채팅에 적지 말 것**(HANDOFF는 git 추적됨).
 - **테스트 계정**: 조휘원 · 이동규 · 김건 (워크스페이스 비번으로 로그인).
 - 모델: 기본 `claude-sonnet-4-6` / 복잡 `claude-opus-4-7`.
