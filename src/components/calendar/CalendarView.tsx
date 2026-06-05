@@ -1,13 +1,16 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ChevronLeft, ChevronRight, Plus, X, Check, Trash2, CalendarDays, Pencil } from "lucide-react"
+import { ChevronLeft, ChevronRight, Plus, X, Check, Trash2, CalendarDays, Pencil, Paperclip, Download, Loader2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useUndo } from "@/components/undo/UndoProvider"
 import { Loading, ErrorState } from "@/components/shared/States"
+import { uploadFile } from "@/lib/upload"
+import { formatBytes } from "@/lib/files"
 import type { CalendarEvent } from "@/types"
+import type { Json } from "@/lib/supabase/types"
 import {
   WEEKDAYS_KO,
   addMonths,
@@ -33,6 +36,31 @@ const COLORS = [
   { label: "남색", value: "#6366F1" },
   { label: "회색", value: "#64748B" },
 ]
+
+const CALENDAR_BUCKET = "calendar-files"
+
+/** 일정 첨부 메타(실파일은 Storage calendar-files, jsonb엔 메타만 보관). */
+type CalendarAttachment = { path: string; name: string; mime_type: string; size: number }
+
+/** event.attachments(Json) → 안전 파싱(형식 안 맞는 원소는 버림). */
+function parseAttachments(raw: Json | null | undefined): CalendarAttachment[] {
+  if (!Array.isArray(raw)) return []
+  const out: CalendarAttachment[] = []
+  for (const it of raw) {
+    if (it && typeof it === "object" && !Array.isArray(it)) {
+      const o = it as Record<string, unknown>
+      if (typeof o.path === "string" && typeof o.name === "string") {
+        out.push({
+          path: o.path,
+          name: o.name,
+          mime_type: typeof o.mime_type === "string" ? o.mime_type : "application/octet-stream",
+          size: typeof o.size === "number" ? o.size : 0,
+        })
+      }
+    }
+  }
+  return out
+}
 
 export function CalendarView() {
   const supabase = createClient()
@@ -436,10 +464,36 @@ function CreateEventModal({
     event ? toDateInputValue(new Date(event.end_time ?? event.start_time)) : toDateInputValue(end ?? start ?? new Date())
   )
   const [color, setColor] = useState(event?.color ?? COLORS[0].value)
+  const [attachments, setAttachments] = useState<CalendarAttachment[]>(
+    event ? parseAttachments(event.attachments) : []
+  )
+  const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const multiDay = startDateStr !== endDateStr
+
+  const addFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    setUploading(true)
+    setError(null)
+    try {
+      const uploaded = await Promise.all(
+        Array.from(files).map(async (f) => {
+          const up = await uploadFile(CALENDAR_BUCKET, f)
+          return { path: up.path, name: up.name, mime_type: up.mimeType, size: up.size }
+        })
+      )
+      setAttachments((prev) => [...prev, ...uploaded])
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "파일 업로드에 실패했습니다.")
+    } finally {
+      setUploading(false)
+    }
+  }
+  const removeAttachment = (path: string) => {
+    setAttachments((prev) => prev.filter((a) => a.path !== path))
+  }
 
   const inputCls =
     "h-9 w-full rounded-lg border border-border bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
@@ -485,6 +539,7 @@ function CreateEventModal({
       end_time: endIso,
       all_day: true,
       color,
+      attachments: attachments as unknown as Json,
     }
     // 편집 모드 — 업데이트(+Undo)
     if (isEdit && event) {
@@ -495,6 +550,7 @@ function CreateEventModal({
         end_time: event.end_time,
         all_day: event.all_day,
         color: event.color,
+        attachments: event.attachments,
       }
       const { error: uErr } = await supabase.from("calendar_events").update(payload).eq("id", event.id)
       setSaving(false)
@@ -589,12 +645,59 @@ function CreateEventModal({
             />
           ))}
         </div>
+        {/* 첨부파일 — 업로드 후 메타만 jsonb에 저장(실파일은 calendar-files 버킷) */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">첨부파일</span>
+            <label
+              className={cn(
+                "inline-flex cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent",
+                uploading && "pointer-events-none opacity-60"
+              )}
+            >
+              {uploading ? <Loader2 className="size-3.5 animate-spin" /> : <Paperclip className="size-3.5" />}
+              파일 추가
+              <input
+                type="file"
+                multiple
+                className="hidden"
+                disabled={uploading}
+                onChange={(e) => {
+                  addFiles(e.target.files)
+                  e.target.value = ""
+                }}
+              />
+            </label>
+          </div>
+          {attachments.length > 0 && (
+            <ul className="flex flex-col gap-1.5">
+              {attachments.map((a) => (
+                <li
+                  key={a.path}
+                  className="flex items-center gap-2 rounded-lg border bg-muted/30 px-2.5 py-1.5 text-sm"
+                >
+                  <Paperclip className="size-3.5 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0 flex-1 truncate">{a.name}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">{formatBytes(a.size)}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeAttachment(a.path)}
+                    className="shrink-0 text-muted-foreground transition-colors hover:text-destructive"
+                    aria-label="첨부 제거"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
         {error && <p className="text-sm text-destructive">{error}</p>}
         <div className="flex justify-end gap-2">
           <Button variant="outline" size="sm" onClick={onClose}>
             취소
           </Button>
-          <Button size="sm" onClick={submit} disabled={saving}>
+          <Button size="sm" onClick={submit} disabled={saving || uploading}>
             {saving ? "저장 중…" : "저장"}
           </Button>
         </div>
@@ -622,6 +725,12 @@ function EventDetailModal({
   const start = new Date(event.start_time)
   const end = event.end_time ? new Date(event.end_time) : null
   const multiDay = end ? !isSameDay(start, end) : false
+  const attachments = parseAttachments(event.attachments)
+
+  const download = async (path: string) => {
+    const { data } = await supabase.storage.from(CALENDAR_BUCKET).createSignedUrl(path, 60)
+    if (data?.signedUrl) window.open(data.signedUrl, "_blank")
+  }
 
   const toggleDone = async () => {
     const prev = event.status
@@ -673,6 +782,28 @@ function EventDetailModal({
           </span>
         </div>
         {event.description && <p className="text-sm text-muted-foreground">{event.description}</p>}
+        {attachments.length > 0 && (
+          <ul className="flex flex-col gap-1.5">
+            {attachments.map((a) => (
+              <li
+                key={a.path}
+                className="flex items-center gap-2 rounded-lg border bg-muted/30 px-2.5 py-1.5 text-sm"
+              >
+                <Paperclip className="size-3.5 shrink-0 text-muted-foreground" />
+                <span className="min-w-0 flex-1 truncate">{a.name}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">{formatBytes(a.size)}</span>
+                <button
+                  type="button"
+                  onClick={() => download(a.path)}
+                  className="shrink-0 text-muted-foreground transition-colors hover:text-primary"
+                  aria-label="다운로드"
+                >
+                  <Download className="size-3.5" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
         {event.status === "done" && <p className="text-sm font-medium text-success">✓ 완료된 일정</p>}
         <div className="flex items-center justify-between gap-2">
           <Button variant="destructive" size="sm" onClick={remove} disabled={busy}>

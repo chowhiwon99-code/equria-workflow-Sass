@@ -314,6 +314,7 @@ export type Database = {
       calendar_events: {
         Row: {
           all_day: boolean
+          attachments: Json
           attendees: string[]
           color: string
           created_at: string
@@ -330,6 +331,7 @@ export type Database = {
         }
         Insert: {
           all_day?: boolean
+          attachments?: Json
           attendees?: string[]
           color?: string
           created_at?: string
@@ -346,6 +348,7 @@ export type Database = {
         }
         Update: {
           all_day?: boolean
+          attachments?: Json
           attendees?: string[]
           color?: string
           created_at?: string
