@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ChevronLeft, ChevronRight, Plus, X, Check, Trash2, CalendarDays } from "lucide-react"
+import { ChevronLeft, ChevronRight, Plus, X, Check, Trash2, CalendarDays, Pencil } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -21,11 +21,17 @@ import {
 
 const COLORS = [
   { label: "파랑", value: "#3B82F6" },
+  { label: "하늘", value: "#0EA5E9" },
+  { label: "청록", value: "#14B8A6" },
   { label: "초록", value: "#10B981" },
+  { label: "라임", value: "#84CC16" },
+  { label: "노랑", value: "#EAB308" },
   { label: "주황", value: "#F59E0B" },
   { label: "빨강", value: "#EF4444" },
-  { label: "보라", value: "#8B5CF6" },
   { label: "분홍", value: "#EC4899" },
+  { label: "보라", value: "#8B5CF6" },
+  { label: "남색", value: "#6366F1" },
+  { label: "회색", value: "#64748B" },
 ]
 
 export function CalendarView() {
@@ -35,6 +41,8 @@ export function CalendarView() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<CalendarEvent | null>(null)
+  // 일정 편집: 상세 모달에서 "수정" → 같은 폼을 편집 모드로 재사용
+  const [editEvent, setEditEvent] = useState<CalendarEvent | null>(null)
   // 기간 일정 생성: {start, end} (단일 클릭이면 start === end)
   const [createRange, setCreateRange] = useState<{ start: Date; end: Date } | null>(null)
   const [highlightDate, setHighlightDate] = useState<Date | null>(null)
@@ -359,6 +367,22 @@ export function CalendarView() {
             setSelected(null)
             loadEvents()
           }}
+          onEdit={() => {
+            setEditEvent(selected)
+            setSelected(null)
+          }}
+        />
+      )}
+
+      {editEvent && (
+        <CreateEventModal
+          event={editEvent}
+          reload={loadEvents}
+          onClose={() => setEditEvent(null)}
+          onCreated={() => {
+            setEditEvent(null)
+            loadEvents()
+          }}
         />
       )}
     </div>
@@ -388,25 +412,30 @@ function ModalShell({ title, onClose, children }: { title: string; onClose: () =
 function CreateEventModal({
   start,
   end,
+  event,
   reload,
   onClose,
   onCreated,
 }: {
-  start: Date
-  end: Date
+  start?: Date
+  end?: Date
+  event?: CalendarEvent
   reload: () => void
   onClose: () => void
   onCreated: () => void
 }) {
   const supabase = createClient()
   const { push } = useUndo()
-  const [title, setTitle] = useState("")
-  const [description, setDescription] = useState("")
-  const [startDateStr, setStartDateStr] = useState(toDateInputValue(start))
-  const [endDateStr, setEndDateStr] = useState(toDateInputValue(end))
-  const [startTime, setStartTime] = useState("")
-  const [endTime, setEndTime] = useState("")
-  const [color, setColor] = useState(COLORS[0].value)
+  const isEdit = !!event
+  const [title, setTitle] = useState(event?.title ?? "")
+  const [description, setDescription] = useState(event?.description ?? "")
+  const [startDateStr, setStartDateStr] = useState(
+    event ? toDateInputValue(new Date(event.start_time)) : toDateInputValue(start ?? new Date())
+  )
+  const [endDateStr, setEndDateStr] = useState(
+    event ? toDateInputValue(new Date(event.end_time ?? event.start_time)) : toDateInputValue(end ?? start ?? new Date())
+  )
+  const [color, setColor] = useState(event?.color ?? COLORS[0].value)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -447,23 +476,49 @@ function CreateEventModal({
       setSaving(false)
       return
     }
-    // 종료 시각 규칙: 멀티데이면 종료일 23:59(시간 미지정 시), 단일일이면 종료시간 입력 시에만 설정
-    const endIso = multiDay
-      ? combineDateTimeToIso(endDateStr, endTime || "23:59")
-      : endTime
-        ? combineDateTimeToIso(startDateStr, endTime)
-        : null
+    // 날짜만(종일) — 멀티데이면 종료일 23:59까지, 단일일이면 종료 없음
+    const endIso = multiDay ? combineDateTimeToIso(endDateStr, "23:59") : null
+    const payload = {
+      title: title.trim(),
+      description: description.trim() || null,
+      start_time: combineDateTimeToIso(startDateStr, "00:00"),
+      end_time: endIso,
+      all_day: true,
+      color,
+    }
+    // 편집 모드 — 업데이트(+Undo)
+    if (isEdit && event) {
+      const prev = {
+        title: event.title,
+        description: event.description,
+        start_time: event.start_time,
+        end_time: event.end_time,
+        all_day: event.all_day,
+        color: event.color,
+      }
+      const { error: uErr } = await supabase.from("calendar_events").update(payload).eq("id", event.id)
+      setSaving(false)
+      if (uErr) {
+        setError(uErr.message)
+        return
+      }
+      push({
+        label: "일정 수정",
+        undo: async () => {
+          await supabase.from("calendar_events").update(prev).eq("id", event.id)
+          reload()
+        },
+        redo: async () => {
+          await supabase.from("calendar_events").update(payload).eq("id", event.id)
+          reload()
+        },
+      })
+      onCreated()
+      return
+    }
     const { data: inserted, error: insErr } = await supabase
       .from("calendar_events")
-      .insert({
-        title: title.trim(),
-        description: description.trim() || null,
-        start_time: combineDateTimeToIso(startDateStr, startTime || "00:00"),
-        end_time: endIso,
-        all_day: multiDay && !startTime && !endTime,
-        color,
-        created_by: auth.user.id,
-      })
+      .insert({ ...payload, created_by: auth.user.id })
       .select()
       .single()
     setSaving(false)
@@ -488,7 +543,7 @@ function CreateEventModal({
   }
 
   return (
-    <ModalShell title={multiDay ? "기간 일정 추가" : "일정 추가"} onClose={onClose}>
+    <ModalShell title={isEdit ? "일정 수정" : multiDay ? "기간 일정 추가" : "일정 추가"} onClose={onClose}>
       <div className="flex flex-col gap-3">
         <input className={inputCls} placeholder="제목" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
         <textarea
@@ -519,24 +574,16 @@ function CreateEventModal({
               <span className="mb-1 block">종료일</span>
               <input type="date" className={dateCls} value={endDateStr} min={startDateStr} onChange={(e) => setEndDateStr(e.target.value)} />
             </label>
-            <label className="text-xs text-muted-foreground">
-              <span className="mb-1 block">시작 시간 (선택)</span>
-              <input type="time" className={dateCls} value={startTime} onChange={(e) => setStartTime(e.target.value)} />
-            </label>
-            <label className="text-xs text-muted-foreground">
-              <span className="mb-1 block">종료 시간 (선택)</span>
-              <input type="time" className={dateCls} value={endTime} onChange={(e) => setEndTime(e.target.value)} />
-            </label>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted-foreground">색상</span>
           {COLORS.map((c) => (
             <button
               key={c.value}
               type="button"
               onClick={() => setColor(c.value)}
-              className={cn("size-5 rounded-full ring-offset-2", color === c.value && "ring-2 ring-ring")}
+              className={cn("size-6 rounded-full ring-offset-2 transition-transform hover:scale-110", color === c.value && "ring-2 ring-ring")}
               style={{ backgroundColor: c.value }}
               aria-label={c.label}
             />
@@ -561,11 +608,13 @@ function EventDetailModal({
   reload,
   onClose,
   onChanged,
+  onEdit,
 }: {
   event: CalendarEvent
   reload: () => void
   onClose: () => void
   onChanged: () => void
+  onEdit: () => void
 }) {
   const supabase = createClient()
   const { push } = useUndo()
@@ -620,18 +669,23 @@ function EventDetailModal({
           <span>
             {multiDay && end
               ? `${start.toLocaleDateString("ko-KR", { dateStyle: "long" })} ~ ${end.toLocaleDateString("ko-KR", { dateStyle: "long" })}`
-              : start.toLocaleString("ko-KR", { dateStyle: "long", timeStyle: "short" })}
+              : start.toLocaleDateString("ko-KR", { dateStyle: "long" })}
           </span>
         </div>
         {event.description && <p className="text-sm text-muted-foreground">{event.description}</p>}
         {event.status === "done" && <p className="text-sm font-medium text-success">✓ 완료된 일정</p>}
-        <div className="flex justify-between gap-2">
+        <div className="flex items-center justify-between gap-2">
           <Button variant="destructive" size="sm" onClick={remove} disabled={busy}>
             <Trash2 /> 삭제
           </Button>
-          <Button size="sm" onClick={toggleDone} disabled={busy}>
-            <Check /> {event.status === "done" ? "완료 취소" : "완료 처리"}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={onEdit} disabled={busy}>
+              <Pencil /> 수정
+            </Button>
+            <Button size="sm" onClick={toggleDone} disabled={busy}>
+              <Check /> {event.status === "done" ? "완료 취소" : "완료 처리"}
+            </Button>
+          </div>
         </div>
       </div>
     </ModalShell>
