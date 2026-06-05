@@ -6,8 +6,9 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { ArrowUp, X, Plus, Maximize2, Minimize2, Copy, Check, Sparkles } from "lucide-react"
+import { ArrowUp, ArrowLeft, X, Plus, Maximize2, Minimize2, Copy, Check, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { createClient } from "@/lib/supabase/client"
 import { renderAgentIcon } from "@/components/agents/AgentIcon"
 import { useAgentChat, type Agent, type WidgetPosition } from "./AgentChatContext"
 
@@ -131,6 +132,7 @@ function panelTopLeft(
 
 export function FloatingAgentChat() {
   const ctx = useAgentChat()
+  const [view, setView] = useState<"menu" | "chat">("menu")
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -164,14 +166,30 @@ export function FloatingAgentChat() {
   // 핀한 에이전트가 0개 → 위젯을 숨기지 않고 같은 우하단에 빈 상태를 띄운다.
   if (ctx.agents.length === 0) return <EmptyAgentWidget />
 
-  const selected = ctx.agents.find((a) => a.id === ctx.selectedAgentId)
-  if (!selected) return null
+  const selected = ctx.agents.find((a) => a.id === ctx.selectedAgentId) ?? ctx.agents[0]
 
+  // 닫힘 → FAB 런처 / 열림 → 에이전트 스택 메뉴 또는 선택된 에이전트 채팅
+  if (!ctx.isOpen) {
+    return (
+      <FabLauncher
+        unread={ctx.unread}
+        onOpen={() => {
+          setView("menu")
+          ctx.open()
+        }}
+      />
+    )
+  }
+  if (view === "chat" && selected) {
+    return <ChatPanel agent={selected} onBack={() => setView("menu")} />
+  }
   return (
-    <>
-      {!ctx.isOpen && <FloatingButton agent={selected} unread={ctx.unread} />}
-      <ChatPanel hidden={!ctx.isOpen} />
-    </>
+    <AgentFabMenu
+      onPick={(id) => {
+        ctx.setSelectedAgent(id)
+        setView("chat")
+      }}
+    />
   )
 }
 
@@ -245,12 +263,12 @@ function EmptyAgentWidget() {
   )
 }
 
-function FloatingButton({ agent, unread }: { agent: Agent; unread: boolean }) {
-  const { open, position, setPosition } = useAgentChat()
+function FabLauncher({ unread, onOpen }: { unread: boolean; onOpen: () => void }) {
+  const { position, setPosition } = useAgentChat()
   const { handlePointerDown, wasDraggedRef, dragging } = useDragWidget({
     width: WIDGET_SIZE,
     height: WIDGET_SIZE,
-    onTap: open,
+    onTap: onOpen,
   })
   const tl = widgetTopLeft(position)
 
@@ -259,33 +277,26 @@ function FloatingButton({ agent, unread }: { agent: Agent; unread: boolean }) {
       type="button"
       onPointerDown={handlePointerDown}
       onClick={(e) => {
-        // pointer-up onTap에서 이미 처리됨. 드래그 후 발생하는 합성 click은 차단.
         if (wasDraggedRef.current) {
           e.preventDefault()
           e.stopPropagation()
         }
       }}
       onDoubleClick={(e) => {
-        // 더블클릭으로 기본 위치(우하단)로 리셋
         e.preventDefault()
         e.stopPropagation()
         setPosition(null)
       }}
-      style={{
-        position: "fixed",
-        left: tl.left,
-        top: tl.top,
-        touchAction: "none",
-      }}
+      style={{ position: "fixed", left: tl.left, top: tl.top, touchAction: "none" }}
       className={cn(
-        "z-50 flex size-14 items-center justify-center rounded-full bg-primary text-2xl text-primary-foreground shadow-xl shadow-primary/30 transition-shadow",
+        "z-50 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-primary/30 transition-transform",
         dragging ? "cursor-grabbing" : "cursor-grab",
         !dragging && "animate-float hover:scale-110"
       )}
-      aria-label="에이전트 채팅 열기 (⌘K)"
-      title={`${agent.name} (⌘K)`}
+      aria-label="에이전트 위젯 열기 (⌘K)"
+      title="에이전트 (⌘K)"
     >
-      <span className="pointer-events-none">{renderAgentIcon(agent.icon, "size-6")}</span>
+      <Sparkles className="pointer-events-none size-6" />
       {unread && (
         <span className="pointer-events-none absolute right-0 top-0 size-3 rounded-full bg-destructive ring-2 ring-background" />
       )}
@@ -293,33 +304,152 @@ function FloatingButton({ agent, unread }: { agent: Agent; unread: boolean }) {
   )
 }
 
-function ChatPanel({ hidden }: { hidden: boolean }) {
-  const {
-    agents,
-    selectedAgentId,
-    isExpanded,
-    setExpanded,
-    close,
-    setSelectedAgent,
-    startNewConversation,
-    chatVersionByAgent,
-    position,
-  } = useAgentChat()
-  const selected = agents.find((a) => a.id === selectedAgentId)
+/**
+ * 에이전트 FAB 스택 메뉴 — 런처 위로 핀한 에이전트들이 스프링으로 촤르륵 펼쳐진다(라벨+아이콘).
+ * 에이전트 선택 → 채팅. ＋로 추가(미핀 에이전트 핀), ✕로 제거(언핀). 맨 아래 FAB는 닫기(X).
+ */
+function AgentFabMenu({ onPick }: { onPick: (id: string) => void }) {
+  const { agents, close, position, setPosition } = useAgentChat()
+  const { handlePointerDown, wasDraggedRef, dragging } = useDragWidget({
+    width: WIDGET_SIZE,
+    height: WIDGET_SIZE,
+    onTap: close,
+  })
+  const tl = widgetTopLeft(position)
+  const right = (typeof window !== "undefined" ? window.innerWidth : 1280) - (tl.left + WIDGET_SIZE)
+  const bottom = (typeof window !== "undefined" ? window.innerHeight : 800) - (tl.top + WIDGET_SIZE)
+
+  const [adding, setAdding] = useState(false)
+  const [addable, setAddable] = useState<Agent[]>([])
+
+  // ＋ 클릭 시점에 미핀 에이전트 조회(effect 아님 → set-state-in-effect 회피)
+  const openAdd = async () => {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from("agents")
+      .select("id, name, description, icon, category")
+      .eq("is_active", true)
+      .order("created_at", { ascending: true })
+    const pinnedIds = new Set(agents.map((a) => a.id))
+    setAddable(((data ?? []) as Agent[]).filter((a) => !pinnedIds.has(a.id)))
+    setAdding(true)
+  }
+  const pin = async (agentId: string) => {
+    const supabase = createClient()
+    const { data: auth } = await supabase.auth.getUser()
+    if (!auth.user) return
+    await supabase.from("user_agent_pins").insert({ user_id: auth.user.id, agent_id: agentId })
+    window.dispatchEvent(new Event("equria:agents-changed"))
+    setAddable((prev) => prev.filter((a) => a.id !== agentId))
+  }
+  const unpin = async (agentId: string) => {
+    const supabase = createClient()
+    const { data: auth } = await supabase.auth.getUser()
+    if (!auth.user) return
+    await supabase.from("user_agent_pins").delete().eq("user_id", auth.user.id).eq("agent_id", agentId)
+    window.dispatchEvent(new Event("equria:agents-changed"))
+  }
+
+  const list = adding ? addable : agents
+
+  return (
+    <div
+      style={{ position: "fixed", right: clamp(right, EDGE_PADDING, 4000), bottom: clamp(bottom, EDGE_PADDING, 4000) }}
+      className="z-50 flex flex-col-reverse items-end gap-3"
+    >
+      {/* 맨 아래: FAB(X) — 드래그로 이동, 탭하면 닫기 */}
+      <button
+        type="button"
+        onPointerDown={handlePointerDown}
+        onClick={(e) => {
+          if (wasDraggedRef.current) {
+            e.preventDefault()
+            e.stopPropagation()
+          }
+        }}
+        onDoubleClick={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          setPosition(null)
+        }}
+        style={{ touchAction: "none" }}
+        className={cn(
+          "flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-primary/30 transition-transform hover:scale-105",
+          dragging ? "cursor-grabbing" : "cursor-grab"
+        )}
+        aria-label="닫기"
+        title="닫기"
+      >
+        <X className="pointer-events-none size-6" />
+      </button>
+
+      {/* 에이전트(또는 추가 가능한 에이전트) 스택 — 아래에서부터 스태거 등장 */}
+      {list.map((a, i) => (
+        <div
+          key={a.id}
+          className="flex items-center gap-2.5 motion-safe:animate-[equria-pop_0.34s_cubic-bezier(0.34,1.5,0.6,1)_both]"
+          style={{ animationDelay: `${i * 0.04}s` }}
+        >
+          <span className="rounded-lg bg-card px-2.5 py-1 text-sm font-medium shadow-[var(--shadow-sm)]">{a.name}</span>
+          <div className="group relative">
+            <button
+              type="button"
+              onClick={() => (adding ? pin(a.id) : onPick(a.id))}
+              className="grid size-12 place-items-center rounded-full border bg-card text-foreground shadow-[var(--shadow-md)] transition-transform hover:scale-110"
+              title={adding ? `${a.name} 추가` : a.name}
+              aria-label={adding ? `${a.name} 위젯에 추가` : `${a.name} 채팅 열기`}
+            >
+              {renderAgentIcon(a.icon, "size-5")}
+            </button>
+            {adding ? (
+              <span className="pointer-events-none absolute -right-1 -top-1 grid size-5 place-items-center rounded-full bg-primary text-primary-foreground">
+                <Plus className="size-3" />
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => unpin(a.id)}
+                className="absolute -right-1 -top-1 grid size-5 place-items-center rounded-full bg-destructive text-destructive-foreground opacity-0 transition-opacity group-hover:opacity-100"
+                title="위젯에서 제거"
+                aria-label={`${a.name} 위젯에서 제거`}
+              >
+                <X className="size-3" />
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
+
+      {/* 추가/완료 토글 */}
+      <div className="flex items-center gap-2.5 motion-safe:animate-[equria-pop_0.34s_cubic-bezier(0.34,1.5,0.6,1)_both]" style={{ animationDelay: `${list.length * 0.04}s` }}>
+        <span className="rounded-lg bg-card px-2.5 py-1 text-sm font-medium shadow-[var(--shadow-sm)]">
+          {adding ? "완료" : "에이전트 추가"}
+        </span>
+        <button
+          type="button"
+          onClick={() => (adding ? setAdding(false) : openAdd())}
+          className="grid size-12 place-items-center rounded-full border border-dashed bg-card text-muted-foreground shadow-[var(--shadow-sm)] transition-transform hover:scale-110 hover:text-foreground"
+          aria-label={adding ? "추가 완료" : "에이전트 추가"}
+        >
+          {adding ? <Check className="size-5" /> : <Plus className="size-5" />}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function ChatPanel({ agent, onBack }: { agent: Agent; onBack: () => void }) {
+  const { isExpanded, setExpanded, close, startNewConversation, chatVersionByAgent, position } =
+    useAgentChat()
 
   const panelSize = isExpanded ? PANEL_SIZE_EXPANDED : PANEL_SIZE_NORMAL
   const widget = widgetTopLeft(position)
   const panel = panelTopLeft(widget, panelSize)
 
   // 풀스크린 모드에서 헤더 드래그 비활성
-  const headerDrag = useDragWidget({
-    width: WIDGET_SIZE,
-    height: WIDGET_SIZE,
-    enabled: !isExpanded,
-  })
+  const headerDrag = useDragWidget({ width: WIDGET_SIZE, height: WIDGET_SIZE, enabled: !isExpanded })
 
-  if (!selected) return null
-  const chatKey = `${selected.id}:${chatVersionByAgent[selected.id] ?? 0}`
+  const chatKey = `${agent.id}:${chatVersionByAgent[agent.id] ?? 0}`
 
   return (
     <div
@@ -331,37 +461,28 @@ function ChatPanel({ hidden }: { hidden: boolean }) {
         height: panelSize.height,
         touchAction: isExpanded ? "auto" : "none",
       }}
-      className={cn(
-        "z-50 flex flex-col overflow-hidden rounded-3xl border bg-card shadow-2xl",
-        // 런처 코너에서 촤르륵 스프링으로 펼쳐짐(overshoot)
-        "origin-bottom-right transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.34,1.5,0.6,1)]",
-        hidden ? "pointer-events-none scale-90 opacity-0" : "scale-100 opacity-100"
-      )}
-      aria-hidden={hidden}
+      className="z-50 flex origin-bottom-right flex-col overflow-hidden rounded-3xl border bg-card shadow-2xl motion-safe:animate-fade-up"
     >
-      {/* 헤더 — 빈 영역 드래그로 위젯 위치 이동 (expanded 시 비활성) */}
+      {/* 헤더 — 빈 영역 드래그로 이동. 좌측 ← 로 에이전트 목록(메뉴)로 */}
       <div
         onPointerDown={headerDrag.handlePointerDown}
         className={cn(
-          "flex items-center justify-between gap-2 border-b px-3 py-2 select-none",
+          "flex items-center justify-between gap-2 border-b px-2.5 py-2 select-none",
           !isExpanded && (headerDrag.dragging ? "cursor-grabbing" : "cursor-grab")
         )}
       >
-        <div className="flex min-w-0 items-center gap-2 pointer-events-none">
-          <span className="shrink-0">{renderAgentIcon(selected.icon, "size-5")}</span>
-          <p className="truncate text-sm font-semibold">{selected.name}</p>
+        <div className="flex min-w-0 items-center gap-1.5" onPointerDown={(e) => e.stopPropagation()}>
+          <IconBtn onClick={onBack} label="에이전트 목록">
+            <ArrowLeft className="size-4" />
+          </IconBtn>
+          <span className="pointer-events-none shrink-0">{renderAgentIcon(agent.icon, "size-5")}</span>
+          <p className="pointer-events-none truncate text-sm font-semibold">{agent.name}</p>
         </div>
-        <div
-          className="flex shrink-0 items-center gap-1"
-          onPointerDown={(e) => e.stopPropagation()}
-        >
+        <div className="flex shrink-0 items-center gap-1" onPointerDown={(e) => e.stopPropagation()}>
           <IconBtn onClick={startNewConversation} label="새 대화">
             <Plus className="size-4" />
           </IconBtn>
-          <IconBtn
-            onClick={() => setExpanded(!isExpanded)}
-            label={isExpanded ? "줄이기" : "확대"}
-          >
+          <IconBtn onClick={() => setExpanded(!isExpanded)} label={isExpanded ? "줄이기" : "확대"}>
             {isExpanded ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
           </IconBtn>
           <IconBtn onClick={close} label="닫기">
@@ -370,38 +491,8 @@ function ChatPanel({ hidden }: { hidden: boolean }) {
         </div>
       </div>
 
-      {/* 에이전트 가로 칩 */}
-      <div className="flex gap-1 overflow-x-auto border-b bg-muted/30 px-2 py-1.5 [scrollbar-width:thin]">
-        {agents.map((a) => (
-          <button
-            key={a.id}
-            onClick={() => setSelectedAgent(a.id)}
-            className={cn(
-              "shrink-0 rounded-full px-2.5 py-1 text-base transition-colors",
-              a.id === selectedAgentId
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-card hover:text-foreground"
-            )}
-            title={a.name}
-            aria-label={a.name}
-            aria-pressed={a.id === selectedAgentId}
-          >
-            {renderAgentIcon(a.icon, "size-5")}
-          </button>
-        ))}
-        <Link
-          href="/agents"
-          onClick={close}
-          className="flex size-8 shrink-0 items-center justify-center rounded-full border border-dashed text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
-          title="에이전트 추가·관리"
-          aria-label="에이전트 추가·관리"
-        >
-          <Plus className="size-4" />
-        </Link>
-      </div>
-
       {/* 채팅 본체 — agentId 또는 chatVersion 바뀌면 remount */}
-      <ChatBody key={chatKey} agent={selected} />
+      <ChatBody key={chatKey} agent={agent} />
     </div>
   )
 }
@@ -500,7 +591,11 @@ function ChatBody({ agent }: { agent: Agent }) {
       </div>
 
       <div className="border-t bg-card p-3">
-        <div className="flex items-end gap-1.5 rounded-3xl border bg-muted/40 py-1.5 pl-4 pr-1.5 transition-colors focus-within:border-ring focus-within:bg-card">
+        <div className="flex items-end gap-2">
+          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
+            {renderAgentIcon(agent.icon, "size-5")}
+          </span>
+          <div className="flex flex-1 items-end gap-1.5 rounded-3xl border bg-muted/40 py-1.5 pl-4 pr-1.5 transition-colors focus-within:border-ring focus-within:bg-card">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -523,6 +618,7 @@ function ChatBody({ agent }: { agent: Agent }) {
           >
             <ArrowUp className="size-4" />
           </button>
+          </div>
         </div>
       </div>
     </>

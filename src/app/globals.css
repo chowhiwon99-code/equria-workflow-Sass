@@ -283,6 +283,22 @@ body {
   }
 }
 
+/* 위젯 FAB 스택 — 아래(런처)에서 스프링으로 촤르륵 튀어오르는 등장. 항목별 delay로 스태거 */
+@keyframes equria-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.5);
+  }
+  65% {
+    opacity: 1;
+    transform: translateY(-3px) scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 /* 아이콘 피커 — 회전초밥식 가로 무한 마퀴(트랙을 2벌 렌더 → -50% 이동으로 끊김 없는 루프) */
 @keyframes equria-marquee {
   from {
