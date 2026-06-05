@@ -299,6 +299,33 @@ body {
   }
 }
 
+/* 위젯 채팅 morph(FLIP) — 에이전트 버블 rect에서 패널로 펼침/접힘.
+   --morph-from = 패널(최종 rect)을 버블 rect로 매핑하는 transform(translate+scale), transform-origin: top left.
+   in=버블→패널 / out=패널→버블(역재생). 콘텐츠는 opacity로 살짝 페이드. */
+@keyframes equria-morph-in {
+  from {
+    transform: var(--morph-from, none);
+    opacity: 0;
+  }
+  60% {
+    opacity: 1;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes equria-morph-out {
+  from {
+    transform: none;
+    opacity: 1;
+  }
+  to {
+    transform: var(--morph-from, none);
+    opacity: 0;
+  }
+}
+
 /* 아이콘 피커 — 회전초밥식 가로 무한 마퀴(트랙을 2벌 렌더 → -50% 이동으로 끊김 없는 루프) */
 @keyframes equria-marquee {
   from {

@@ -132,6 +132,8 @@ function panelTopLeft(
 export function FloatingAgentChat() {
   const ctx = useAgentChat()
   const [view, setView] = useState<"menu" | "chat">("menu")
+  // 채팅 열기 morph(FLIP)의 출발 rect — 클릭한 에이전트 버블의 화면 좌표/크기
+  const [morphRect, setMorphRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -180,11 +182,12 @@ export function FloatingAgentChat() {
     )
   }
   if (view === "chat" && selected) {
-    return <ChatPanel agent={selected} onBack={() => setView("menu")} />
+    return <ChatPanel agent={selected} onBack={() => setView("menu")} morphRect={morphRect} />
   }
   return (
     <AgentFabMenu
-      onPick={(id) => {
+      onPick={(id, rect) => {
+        setMorphRect(rect)
         ctx.setSelectedAgent(id)
         setView("chat")
       }}
@@ -320,7 +323,7 @@ function FabLauncher({ unread, onOpen }: { unread: boolean; onOpen: () => void }
  * 에이전트 클릭 → 채팅. 위젯에 띄울 에이전트의 추가/제거/수정은 "에이전트 관리"(/agents)에서 한다.
  * 맨 아래 FAB는 닫기(X) + 드래그 이동.
  */
-function AgentFabMenu({ onPick }: { onPick: (id: string) => void }) {
+function AgentFabMenu({ onPick }: { onPick: (id: string, rect: { x: number; y: number; w: number; h: number }) => void }) {
   const { agents, close, position, setPosition } = useAgentChat()
   const { handlePointerDown, wasDraggedRef, dragging } = useDragWidget({
     width: WIDGET_SIZE,
@@ -384,7 +387,10 @@ function AgentFabMenu({ onPick }: { onPick: (id: string) => void }) {
           </span>
           <button
             type="button"
-            onClick={() => onPick(a.id)}
+            onClick={(e) => {
+              const r = e.currentTarget.getBoundingClientRect()
+              onPick(a.id, { x: r.left, y: r.top, w: r.width, h: r.height })
+            }}
             className="grid size-12 place-items-center rounded-full border bg-card text-foreground shadow-[var(--shadow-md)] transition-transform hover:scale-110"
             title={a.name}
             aria-label={`${a.name} 채팅 열기`}
@@ -417,21 +423,68 @@ function AgentFabMenu({ onPick }: { onPick: (id: string) => void }) {
   )
 }
 
-function ChatPanel({ agent, onBack }: { agent: Agent; onBack: () => void }) {
+function ChatPanel({
+  agent,
+  onBack,
+  morphRect,
+}: {
+  agent: Agent
+  onBack: () => void
+  morphRect: { x: number; y: number; w: number; h: number } | null
+}) {
   const { isExpanded, setExpanded, close, startNewConversation, chatVersionByAgent, position } =
     useAgentChat()
+  // 닫힘 morph 진행 상태 — "back"=목록으로 / "close"=위젯 닫기. 애니 종료 후 실제 전환 실행.
+  const [exit, setExit] = useState<null | "back" | "close">(null)
 
   const panelSize = isExpanded ? PANEL_SIZE_EXPANDED : PANEL_SIZE_NORMAL
   const widget = widgetTopLeft(position)
   const panel = panelTopLeft(widget, panelSize)
 
-  // 풀스크린 모드에서 헤더 드래그 비활성
-  const headerDrag = useDragWidget({ width: WIDGET_SIZE, height: WIDGET_SIZE, enabled: !isExpanded })
+  // FLIP morph: 버블 rect ↔ 패널 rect. transform-origin: top-left 기준 translate+scale.
+  const reduced =
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  const canMorph = !!morphRect && !reduced
+  // morph 애니 진행 중(in 0.36s / out 0.26s)엔 드래그·확대를 잠가, panel rect가 바뀌며
+  // --morph-from이 재계산돼 생기는 잼/스케일 점프를 방지(검증 반영). 초기값=morph 재생 여부.
+  const [morphing, setMorphing] = useState(canMorph)
+  const morphFrom = morphRect
+    ? `translate(${Math.round(morphRect.x - panel.left)}px, ${Math.round(morphRect.y - panel.top)}px) scale(${(morphRect.w / panelSize.width).toFixed(4)}, ${(morphRect.h / panelSize.height).toFixed(4)})`
+    : undefined
+
+  // 풀스크린 모드 + morph 진행 중엔 헤더 드래그 비활성
+  const headerDrag = useDragWidget({ width: WIDGET_SIZE, height: WIDGET_SIZE, enabled: !isExpanded && !morphing })
 
   const chatKey = `${agent.id}:${chatVersionByAgent[agent.id] ?? 0}`
 
+  // 닫기 요청 — morph 가능하면 역재생 후(onAnimationEnd) 실제 전환, 아니면 즉시.
+  const requestBack = () => {
+    if (canMorph) { setMorphing(true); setExit("back") } else onBack()
+  }
+  const requestClose = () => {
+    if (canMorph) { setMorphing(true); setExit("close") } else close()
+  }
+  const onAnimEnd = (e: React.AnimationEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return
+    setMorphing(false) // in/out 어느 쪽이든 애니 종료 → 잠금 해제
+    if (exit === "back") onBack()
+    else if (exit === "close") close()
+  }
+  const morphStyle: React.CSSProperties = canMorph
+    ? {
+        transformOrigin: "top left",
+        ["--morph-from" as string]: morphFrom,
+        animation: exit
+          ? "equria-morph-out 0.26s cubic-bezier(0.4,0,0.7,1) both"
+          : "equria-morph-in 0.36s cubic-bezier(0.34,1.28,0.5,1) both",
+      }
+    : {}
+
   return (
     <div
+      onAnimationEnd={onAnimEnd}
       style={{
         position: "fixed",
         left: panel.left,
@@ -439,8 +492,12 @@ function ChatPanel({ agent, onBack }: { agent: Agent; onBack: () => void }) {
         width: panelSize.width,
         height: panelSize.height,
         touchAction: isExpanded ? "auto" : "none",
+        ...morphStyle,
       }}
-      className="z-50 flex origin-bottom-right flex-col overflow-hidden rounded-3xl border bg-card shadow-2xl motion-safe:animate-fade-up"
+      className={cn(
+        "z-50 flex flex-col overflow-hidden rounded-3xl border bg-card shadow-2xl",
+        !canMorph && "origin-bottom-right motion-safe:animate-fade-up"
+      )}
     >
       {/* 헤더 — 빈 영역 드래그로 이동. 좌측 ← 로 에이전트 목록(메뉴)로 */}
       <div
@@ -451,7 +508,7 @@ function ChatPanel({ agent, onBack }: { agent: Agent; onBack: () => void }) {
         )}
       >
         <div className="flex min-w-0 items-center gap-1.5" onPointerDown={(e) => e.stopPropagation()}>
-          <IconBtn onClick={onBack} label="에이전트 목록">
+          <IconBtn onClick={requestBack} label="에이전트 목록">
             <ArrowLeft className="size-4" />
           </IconBtn>
           <span className="pointer-events-none shrink-0">{renderAgentIcon(agent.icon, "size-5")}</span>
@@ -461,10 +518,10 @@ function ChatPanel({ agent, onBack }: { agent: Agent; onBack: () => void }) {
           <IconBtn onClick={startNewConversation} label="새 대화">
             <Plus className="size-4" />
           </IconBtn>
-          <IconBtn onClick={() => setExpanded(!isExpanded)} label={isExpanded ? "줄이기" : "확대"}>
+          <IconBtn onClick={() => { if (!morphing) setExpanded(!isExpanded) }} label={isExpanded ? "줄이기" : "확대"}>
             {isExpanded ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
           </IconBtn>
-          <IconBtn onClick={close} label="닫기">
+          <IconBtn onClick={requestClose} label="닫기">
             <X className="size-4" />
           </IconBtn>
         </div>
