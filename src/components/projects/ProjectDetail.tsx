@@ -1,10 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { UserPlus, X, Plus, ExternalLink, Frame, FileText, Trash2 } from "lucide-react"
+import { X, Plus, ExternalLink, Frame, FileText, Trash2, CalendarClock, Receipt, TrendingUp, type LucideIcon } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Select } from "@/components/shared/Select"
 import { Modal, fieldClass } from "@/components/shared/Modal"
 import { BackLink } from "@/components/shared/BackLink"
 import { Loading, ErrorState } from "@/components/shared/States"
@@ -26,7 +28,6 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
   const [financeTotal, setFinanceTotal] = useState<{ expense: number; revenue: number }>({ expense: 0, revenue: 0 })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [addUserId, setAddUserId] = useState("")
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -79,15 +80,13 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
     }
   }
 
-  const addMember = async () => {
-    if (!addUserId) return
-    const userId = addUserId
+  const addMember = async (userId: string) => {
+    if (!userId) return
     const { data: inserted } = await supabase
       .from("project_members")
       .insert({ project_id: projectId, user_id: userId })
       .select()
       .single()
-    setAddUserId("")
     load()
     if (inserted) {
       push({
@@ -129,72 +128,82 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
 
   const memberIds = new Set(members.map((m) => m.user_id))
   const addable = profiles.filter((p) => !memberIds.has(p.id))
+  const st = PROJECT_STATUS[project.status as ProjectStatus]
 
   return (
     <div className="flex flex-col gap-5">
+      {/* 헤더 — 제목 + 상태 배지 */}
       <div>
         <BackLink href="/projects" label="프로젝트 목록" />
-        <h1 className="mt-2 text-xl font-semibold">{project.name}</h1>
-        {project.description && <p className="mt-1 text-sm text-muted-foreground">{project.description}</p>}
+        <div className="mt-3 flex flex-wrap items-center gap-2.5">
+          <h1 className="text-2xl font-semibold tracking-tight">{project.name}</h1>
+          <span className={cn("inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium", st.badge)}>
+            <span className="size-1.5 rounded-full" style={{ backgroundColor: st.dot }} />
+            {st.label}
+          </span>
+        </div>
+        {project.description && <p className="mt-1.5 text-sm text-muted-foreground">{project.description}</p>}
       </div>
 
-      {/* 메타 정보 */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Field label="상태">
-          <select
-            className={cn(fieldClass, "w-auto")}
-            value={project.status}
-            onChange={(e) => changeStatus(e.target.value as ProjectStatus)}
-          >
-            {PROJECT_STATUS_ORDER.map((s) => (
-              <option key={s} value={s}>
-                {PROJECT_STATUS[s].label}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="담당자">{project.owner?.name ?? "미지정"}</Field>
-        <Field label="시작일">{project.start_date ?? "—"}</Field>
-        <Field label="종료예정">{project.due_date ?? "—"}</Field>
+      {/* 메타 카드 — 상태/담당자/일정 */}
+      <div className="rounded-2xl border bg-card p-5 shadow-[var(--shadow-sm)]">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4">
+          <MetaItem label="상태">
+            <Select
+              value={project.status}
+              onChange={(v) => changeStatus(v as ProjectStatus)}
+              options={PROJECT_STATUS_ORDER.map((s) => ({ value: s, label: PROJECT_STATUS[s].label }))}
+              className="h-9 w-full"
+            />
+          </MetaItem>
+          <MetaItem label="담당자">{project.owner?.name ?? "미지정"}</MetaItem>
+          <MetaItem label="시작일">{project.start_date ?? "—"}</MetaItem>
+          <MetaItem label="종료예정">{project.due_date ?? "—"}</MetaItem>
+        </div>
       </div>
 
       {/* 요약 카드 */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <SummaryCard label="연결된 일정" value={`${eventCount}건`} />
-        <SummaryCard label="비용 합계" value={`₩${financeTotal.expense.toLocaleString()}`} />
-        <SummaryCard label="매출 합계" value={`₩${financeTotal.revenue.toLocaleString()}`} />
+        <SummaryCard icon={CalendarClock} label="연결된 일정" value={`${eventCount}건`} accent="bg-muted text-foreground" />
+        <SummaryCard icon={Receipt} label="비용 합계" value={`₩${financeTotal.expense.toLocaleString()}`} accent="bg-rose-100 text-rose-600" />
+        <SummaryCard icon={TrendingUp} label="매출 합계" value={`₩${financeTotal.revenue.toLocaleString()}`} accent="bg-emerald-100 text-emerald-600" />
       </div>
 
-      {/* 멤버 */}
-      <div className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold">참여 멤버</h2>
-        <div className="flex flex-wrap gap-2">
-          {members.length === 0 && <span className="text-sm text-muted-foreground">참여 멤버가 없습니다.</span>}
-          {members.map((m) => (
-            <span key={m.id} className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs">
-              {m.member?.name ?? "(알 수 없음)"}
-              <button onClick={() => removeMember(m.id)} className="text-muted-foreground hover:text-destructive" aria-label="제거">
-                <X className="size-3" />
-              </button>
-            </span>
-          ))}
+      {/* 멤버 카드 */}
+      <section className="rounded-2xl border bg-card p-5 shadow-[var(--shadow-sm)]">
+        <h2 className="text-sm font-semibold">
+          참여 멤버 <span className="ml-0.5 text-muted-foreground tabular-nums">{members.length}</span>
+        </h2>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {members.length === 0 && <span className="text-sm text-muted-foreground">아직 참여 멤버가 없습니다.</span>}
+          {members.map((m) => {
+            const name = m.member?.name ?? "?"
+            return (
+              <span
+                key={m.id}
+                className="inline-flex items-center gap-1.5 rounded-full border bg-card py-0.5 pl-0.5 pr-2 text-xs shadow-[var(--shadow-sm)]"
+              >
+                <Avatar size="sm" className="size-5">
+                  <AvatarFallback className="text-[9px]">{name.slice(0, 2)}</AvatarFallback>
+                </Avatar>
+                <span className="font-medium">{name}</span>
+                <button onClick={() => removeMember(m.id)} className="text-muted-foreground hover:text-destructive" aria-label="제거">
+                  <X className="size-3" />
+                </button>
+              </span>
+            )
+          })}
+          {addable.length > 0 && (
+            <Select
+              value=""
+              onChange={(v) => addMember(v)}
+              options={addable.map((p) => ({ value: p.id, label: p.name }))}
+              placeholder="+ 멤버 추가"
+              className="h-7 rounded-full"
+            />
+          )}
         </div>
-        {addable.length > 0 && (
-          <div className="flex items-center gap-2">
-            <select className={cn(fieldClass, "w-auto")} value={addUserId} onChange={(e) => setAddUserId(e.target.value)}>
-              <option value="">멤버 선택…</option>
-              {addable.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-            <Button size="sm" variant="outline" onClick={addMember} disabled={!addUserId}>
-              <UserPlus /> 추가
-            </Button>
-          </div>
-        )}
-      </div>
+      </section>
 
       {/* 파일/링크 현황 */}
       <FilesSection projectId={projectId} />
@@ -241,7 +250,7 @@ function FilesSection({ projectId }: { projectId: string }) {
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <section className="rounded-2xl border bg-card p-5 shadow-[var(--shadow-sm)]">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold">파일 / 링크 현황</h2>
         <Button size="sm" variant="outline" onClick={() => setShowAdd(true)}>
@@ -249,9 +258,9 @@ function FilesSection({ projectId }: { projectId: string }) {
         </Button>
       </div>
       {files.length === 0 ? (
-        <p className="text-sm text-muted-foreground">등록된 파일/링크가 없습니다.</p>
+        <p className="mt-3 text-sm text-muted-foreground">등록된 파일/링크가 없습니다.</p>
       ) : (
-        <div className="flex flex-col divide-y rounded-lg border">
+        <div className="mt-3 flex flex-col divide-y rounded-xl border">
           {files.map((f) => {
             const figma = f.source === "figma" || (f.web_view_link ? isFigmaUrl(f.web_view_link) : false)
             return (
@@ -295,7 +304,7 @@ function FilesSection({ projectId }: { projectId: string }) {
           }}
         />
       )}
-    </div>
+    </section>
   )
 }
 
@@ -375,20 +384,25 @@ function AddFileModal({
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function MetaItem({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-1">
-      <span className="text-xs text-muted-foreground">{label}</span>
-      <span className="text-sm">{children}</span>
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <div className="text-sm font-medium">{children}</div>
     </div>
   )
 }
 
-function SummaryCard({ label, value }: { label: string; value: string }) {
+function SummaryCard({ icon: Icon, label, value, accent }: { icon: LucideIcon; label: string; value: string; accent: string }) {
   return (
-    <div className="rounded-lg border p-3">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-1 text-lg font-semibold tabular-nums">{value}</p>
+    <div className="rounded-2xl border bg-card p-4 shadow-[var(--shadow-sm)]">
+      <div className="flex items-center gap-2">
+        <span className={cn("grid size-7 shrink-0 place-items-center rounded-lg", accent)}>
+          <Icon className="size-4" />
+        </span>
+        <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      </div>
+      <p className="mt-2.5 text-2xl font-semibold tabular-nums">{value}</p>
     </div>
   )
 }
