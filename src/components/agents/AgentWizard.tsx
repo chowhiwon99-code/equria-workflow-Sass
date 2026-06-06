@@ -23,6 +23,7 @@ export function AgentWizard() {
   const [mode, setMode] = useState<Mode>("wizard")
   const [phase, setPhase] = useState<Phase>("input")
   const [index, setIndex] = useState(0)
+  const [dir, setDir] = useState<1 | -1>(1) // 슬라이드 방향(다음=1 오른쪽에서 / 이전=-1 왼쪽에서)
   const [inputs, setInputs] = useState<WizardInputs>({})
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
@@ -50,9 +51,13 @@ export function AgentWizard() {
       void generate()
       return
     }
+    setDir(1)
     setIndex((i) => Math.min(QUESTIONS.length - 1, i + 1))
   }
-  const goPrev = () => setIndex((i) => Math.max(0, i - 1))
+  const goPrev = () => {
+    setDir(-1)
+    setIndex((i) => Math.max(0, i - 1))
+  }
 
   const generate = async () => {
     setPhase("result")
@@ -180,31 +185,21 @@ export function AgentWizard() {
         </div>
       </div>
 
-      {/* 슬라이드 트랙 */}
-      <div className="w-full overflow-hidden">
+      {/* 슬라이드 — 활성 질문 1개만 렌더(높이=현재 질문) + 좌우 슬라이드-인. 빈공간 없이 내비가 바로 아래 붙음 */}
+      <div className="w-full overflow-hidden px-2">
         <div
-          className="flex transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]"
-          style={{ transform: `translateX(-${index * 100}%)` }}
+          key={index}
+          className="motion-safe:animate-[wizard-slide_0.42s_cubic-bezier(0.16,1,0.3,1)_both]"
+          style={{ ["--wiz-dir" as string]: dir }}
         >
-          {QUESTIONS.map((f, i) => (
-            <div
-              key={f.key}
-              className={cn(
-                "w-full shrink-0 px-2 transition-opacity duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]",
-                i === index ? "opacity-100" : "opacity-0 pointer-events-none"
-              )}
-              aria-hidden={i !== index}
-            >
-              <QuestionSlide
-                field={f}
-                active={i === index}
-                inputs={inputs}
-                onText={setText}
-                onToggle={toggleMulti}
-                onAdvance={goNext}
-              />
-            </div>
-          ))}
+          <QuestionSlide
+            field={current}
+            active
+            inputs={inputs}
+            onText={setText}
+            onToggle={toggleMulti}
+            onAdvance={goNext}
+          />
         </div>
       </div>
 

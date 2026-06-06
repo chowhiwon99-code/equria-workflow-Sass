@@ -299,6 +299,18 @@ body {
   }
 }
 
+/* 위저드 슬라이드 — 활성 질문이 방향(--wiz-dir: 다음 1 / 이전 -1)에서 슬라이드-인 + 페이드. */
+@keyframes wizard-slide {
+  from {
+    opacity: 0;
+    transform: translateX(calc(var(--wiz-dir, 1) * 28px));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* 위젯 FAB 스택 닫힘 — equria-pop의 역방향(축소+페이드+하강). 역스태거로 촤르륵 접힘. */
 @keyframes equria-pop-out {
   from {
