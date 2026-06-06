@@ -299,6 +299,32 @@ body {
   }
 }
 
+/* 테마 전환을 부드럽게(라이트↔다크 페이드) — 색 관련 속성만 짧게 트랜지션.
+   @layer base 라 Tailwind 유틸(utilities)이 이김 → transition-transform 등 기존 모션 무손상.
+   transform/opacity는 제외(기존 애니와 충돌 없음). reduced-motion이면 즉시. */
+@layer base {
+  @media (prefers-reduced-motion: no-preference) {
+    *,
+    ::before,
+    ::after {
+      transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, outline-color;
+      transition-duration: 200ms;
+      transition-timing-function: ease;
+    }
+  }
+}
+
+/* 세그먼트 컨트롤 썸 — 이전 칸(--seg-from)에서 현재 칸(--seg-to)으로 슬라이드.
+   transition이 아닌 animation이라 next-themes의 transition-끄기(테마 전환)에도 동작. */
+@keyframes seg-thumb {
+  from {
+    transform: translateX(var(--seg-from, 0%));
+  }
+  to {
+    transform: translateX(var(--seg-to, 0%));
+  }
+}
+
 /* 위저드 슬라이드 — 활성 질문이 방향(--wiz-dir: 다음 1 / 이전 -1)에서 슬라이드-인 + 페이드. */
 @keyframes wizard-slide {
   from {

@@ -70,16 +70,27 @@ function Segmented({
   block?: boolean
 }) {
   const activeIndex = options.findIndex((o) => o.value === value)
+  // 슬라이드 시작 인덱스 — 클릭 시점의 현재 위치를 이벤트 핸들러에서 저장(render중 ref접근/effect-setState 회피).
+  // keyframe(animation)으로 from→to 슬라이드: next-themes가 테마 전환 시 transition을 꺼도 animation은 동작.
+  const [fromIndex, setFromIndex] = useState(activeIndex)
+  const from = fromIndex >= 0 && fromIndex < options.length ? fromIndex : activeIndex
+  const handle = (target: string) => {
+    setFromIndex(activeIndex)
+    onChange(target)
+  }
   return (
     <div className={cn("relative flex items-center rounded-full bg-muted p-0.5", block ? "w-full" : "inline-flex")}>
-      {/* 슬라이딩 썸 — 활성 칸 위치로 미끄러짐 */}
+      {/* 슬라이딩 썸 — keyframe으로 이전→현재 칸으로 미끄러짐(transition 아님 → 테마 전환에도 동작) */}
       {activeIndex >= 0 && (
         <span
+          key={activeIndex}
           aria-hidden
-          className="pointer-events-none absolute inset-y-0.5 left-0.5 rounded-full bg-card shadow-[var(--shadow-sm)] transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
+          className="pointer-events-none absolute inset-y-0.5 left-0.5 rounded-full bg-card shadow-[var(--shadow-sm)] motion-safe:animate-[seg-thumb_0.32s_cubic-bezier(0.32,0.72,0,1)_both]"
           style={{
             width: `calc((100% - 0.25rem) / ${options.length})`,
-            transform: `translateX(calc(${activeIndex} * 100%))`,
+            transform: `translateX(${activeIndex * 100}%)`,
+            ["--seg-from" as string]: `${from * 100}%`,
+            ["--seg-to" as string]: `${activeIndex * 100}%`,
           }}
         />
       )}
@@ -87,7 +98,7 @@ function Segmented({
         <button
           key={o.value}
           type="button"
-          onClick={() => onChange(o.value)}
+          onClick={() => handle(o.value)}
           className={cn(
             "relative z-10 flex-1 rounded-full px-3 py-1 text-xs font-medium transition-colors",
             block && "py-2 text-sm",
