@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Paperclip, NotebookPen, FileText, Loader2, Pencil, Trash2, SmilePlus, CornerUpLeft, X } from "lucide-react"
+import { ArrowLeft, Paperclip, NotebookPen, FileText, Loader2, Pencil, Trash2, SmilePlus, CornerUpLeft, X, ThumbsUp, Heart, Laugh, PartyPopper, Eye, Check, type LucideIcon } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { mustOk } from "@/lib/supabase/mustOk"
@@ -652,6 +652,20 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
 
 const QUICK_EMOJIS = ["👍", "❤️", "😂", "🎉", "👀", "✅"]
 
+// 반응은 이모지로 저장(데이터 호환)하되, 표시는 lucide 아이콘으로 통일. 매핑에 없으면 이모지 그대로.
+const REACTION_ICON: Record<string, LucideIcon> = {
+  "👍": ThumbsUp,
+  "❤️": Heart,
+  "😂": Laugh,
+  "🎉": PartyPopper,
+  "👀": Eye,
+  "✅": Check,
+}
+function renderReaction(emoji: string, className: string) {
+  const Icon = REACTION_ICON[emoji]
+  return Icon ? <Icon className={className} /> : <span>{emoji}</span>
+}
+
 /** 버블 옆 인라인 "반응 추가" 트리거 — 클릭 시 빠른 이모지 팝오버. data-emoji-open으로 부모 호버클러스터를 열려있는 동안 유지. */
 function EmojiAddButton({ onPick }: { onPick: (emoji: string) => void }) {
   const [open, setOpen] = useState(false)
@@ -677,9 +691,9 @@ function EmojiAddButton({ onPick }: { onPick: (emoji: string) => void }) {
                   onPick(e)
                   setOpen(false)
                 }}
-                className="rounded-full px-1 text-base hover:bg-muted"
+                className="grid size-7 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
-                {e}
+                {renderReaction(e, "size-4")}
               </button>
             ))}
           </div>
@@ -715,11 +729,11 @@ function ReactionChips({
             key={emoji}
             onClick={() => onToggle(emoji)}
             className={cn(
-              "flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-xs transition-colors",
-              reacted ? "border-primary bg-primary/10" : "bg-card hover:bg-muted"
+              "flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors",
+              reacted ? "border-primary bg-primary/10 text-primary" : "bg-card text-foreground hover:bg-muted"
             )}
           >
-            <span>{emoji}</span>
+            {renderReaction(emoji, "size-3.5")}
             <span className="text-[10px] text-muted-foreground">{users.length}</span>
           </button>
         )
