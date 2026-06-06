@@ -13,7 +13,7 @@ import { BackLink } from "@/components/shared/BackLink"
 import { Loading, ErrorState } from "@/components/shared/States"
 import { fieldClass } from "@/components/shared/Modal"
 import { WorkflowCanvas, type NodeRunState } from "@/components/workflows/WorkflowCanvas"
-import { agentIconText, renderAgentIcon } from "@/components/agents/AgentIcon"
+import { agentIconText, renderAgentIcon, isLucideIcon } from "@/components/agents/AgentIcon"
 import {
   normalizeGraph,
   genId,
@@ -174,6 +174,11 @@ export function WorkflowEditor({ id }: { id: string }) {
     }))
 
   const selected = graph.nodes.find((n) => n.id === selectedId) ?? null
+  // 노드 아이콘을 에이전트의 현재 아이콘(lucide)으로 통일(스냅샷 이모지 대신). 맵에 없으면 lucide:Bot.
+  const agentIcons: Record<string, string> = {}
+  for (const a of agents) agentIcons[a.id] = a.icon
+  const resolveNodeIcon = (agentId: string, snapshot?: string) =>
+    agentIcons[agentId] || (isLucideIcon(snapshot ?? "") ? (snapshot as string) : "lucide:Bot")
 
   const savedRef = useRef(false)
   const save = async (): Promise<boolean> => {
@@ -386,12 +391,13 @@ export function WorkflowEditor({ id }: { id: string }) {
             onSelect={setSelectedId}
             runStates={runStates}
             readOnly={running}
+            agentIcons={agentIcons}
           />
         </div>
         {selected && (
           <aside className="flex w-60 shrink-0 flex-col gap-2 rounded-xl border p-3">
             <div className="flex items-center gap-2">
-              <span className="text-lg">{renderAgentIcon(selected.agent_icon || "lucide:Bot", "size-5")}</span>
+              <span className="text-lg">{renderAgentIcon(resolveNodeIcon(selected.agent_id, selected.agent_icon), "size-5")}</span>
               <span className="min-w-0 flex-1 truncate text-sm font-semibold">{selected.agent_name}</span>
             </div>
             {selected.agent_desc && (

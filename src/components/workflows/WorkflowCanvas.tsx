@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 import type { WorkflowNode, WorkflowEdge, WorkflowGraph } from "@/lib/workflows"
 import { genId, topoOrder, linearEdges } from "@/lib/workflows"
 import { toolEmoji } from "@/lib/workflowTools"
-import { renderAgentIcon } from "@/components/agents/AgentIcon"
+import { renderAgentIcon, isLucideIcon } from "@/components/agents/AgentIcon"
 
 const NODE = 72 // 원 지름
 const LABEL_W = 132 // 노드 아래 라벨 폭
@@ -25,6 +25,7 @@ export function WorkflowCanvas({
   onSelect,
   runStates,
   readOnly = false,
+  agentIcons = {},
 }: {
   graph: WorkflowGraph
   onChange: (g: WorkflowGraph) => void
@@ -32,6 +33,7 @@ export function WorkflowCanvas({
   onSelect: (id: string | null) => void
   runStates?: Record<string, NodeRunState>
   readOnly?: boolean
+  agentIcons?: Record<string, string>
 }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const [drag, setDrag] = useState<DragState>(null)
@@ -268,7 +270,12 @@ export function WorkflowCanvas({
                   {toolEmoji(n.tool.type)}
                 </span>
               )}
-              <span className="text-2xl">{renderAgentIcon(n.agent_icon || "lucide:Bot", "size-6")}</span>
+              <span className="text-2xl">
+                {renderAgentIcon(
+                  agentIcons[n.agent_id] || (isLucideIcon(n.agent_icon ?? "") ? (n.agent_icon as string) : "lucide:Bot"),
+                  "size-6"
+                )}
+              </span>
 
               {/* 입력 포트 */}
               <span
