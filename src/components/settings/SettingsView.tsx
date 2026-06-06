@@ -27,6 +27,16 @@ const PRIVACY_FIELDS = [
 type ContactVisibility = "all" | "private"
 type ContactPrivacy = Record<(typeof PRIVACY_FIELDS)[number]["key"], ContactVisibility>
 
+/** View Transitions API로 테마 전환을 화면 전체 크로스페이드(미지원 브라우저는 즉시 적용). */
+function applyThemeSmooth(apply: () => void) {
+  const doc = document as Document & { startViewTransition?: (cb: () => void) => void }
+  if (typeof document !== "undefined" && typeof doc.startViewTransition === "function") {
+    doc.startViewTransition(apply)
+  } else {
+    apply()
+  }
+}
+
 /** 섹션 카드 — 떠 있는 흰 카드(토스/애플) */
 function Card({ children }: { children: ReactNode }) {
   return (
@@ -330,7 +340,7 @@ export function SettingsView() {
           block
           options={THEMES}
           value={mounted ? resolvedTheme ?? "dark" : ""}
-          onChange={(v) => setTheme(v)}
+          onChange={(v) => applyThemeSmooth(() => setTheme(v))}
         />
       </Card>
 

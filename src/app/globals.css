@@ -299,18 +299,14 @@ body {
   }
 }
 
-/* 테마 전환을 부드럽게(라이트↔다크 페이드) — 색 관련 속성만 짧게 트랜지션.
-   @layer base 라 Tailwind 유틸(utilities)이 이김 → transition-transform 등 기존 모션 무손상.
-   transform/opacity는 제외(기존 애니와 충돌 없음). reduced-motion이면 즉시. */
-@layer base {
-  @media (prefers-reduced-motion: no-preference) {
-    *,
-    ::before,
-    ::after {
-      transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, outline-color;
-      transition-duration: 360ms;
-      transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-    }
+/* 테마 전환 — View Transitions API로 화면 전체를 한 번에 부드럽게 크로스페이드.
+   요소별 트랜지션의 불일치(어떤 건 페이드·어떤 건 즉시)가 사라지고 화면색만 매끄럽게 바뀐다.
+   (disableTransitionOnChange로 요소별 전환은 끄고, 화면 스냅샷만 교차 페이드) */
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0.45s;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   }
 }
 
