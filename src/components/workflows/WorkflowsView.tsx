@@ -90,43 +90,60 @@ export function WorkflowsView() {
       ) : error ? (
         <ErrorState message={error} onRetry={() => { setError(null); load() }} />
       ) : rows.length === 0 ? (
-        <p className="rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
-          아직 워크플로우가 없어요. ‘새 워크플로우’로 시작하세요.
-        </p>
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed bg-card/40 px-4 py-12 text-center">
+          <span className="grid size-11 place-items-center rounded-2xl bg-primary/8 text-primary">
+            <WorkflowIcon className="size-5" />
+          </span>
+          <p className="text-sm text-muted-foreground">
+            아직 워크플로우가 없어요. ‘새 워크플로우’로 시작하세요.
+          </p>
+        </div>
       ) : (
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {rows.map((w) => {
             const { nodes } = normalizeGraph(w.steps)
             return (
               <button
                 key={w.id}
                 onClick={() => router.push(`/workflows/${w.id}`)}
-                className="hover-grow flex flex-col gap-1.5 rounded-lg border p-3 text-left"
+                className="group flex flex-col gap-3 rounded-2xl border bg-card p-4 text-left shadow-[var(--shadow-sm)] transition-all hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)]"
               >
-                <div className="flex items-center gap-1.5">
-                  <WorkflowIcon className="size-3.5 shrink-0 text-muted-foreground" />
-                  <span className="truncate text-sm font-semibold">{w.name}</span>
+                <div className="flex items-center gap-2.5">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/8 text-primary">
+                    <WorkflowIcon className="size-4" />
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-base font-semibold">{w.name}</span>
                 </div>
-                {w.description && (
-                  <p className="line-clamp-1 text-xs text-muted-foreground">{w.description}</p>
-                )}
-                {/* 에이전트 아이콘 미리보기 — 한눈에 협력 흐름 */}
-                {nodes.length > 0 && (
-                  <div className="flex items-center gap-0.5 text-sm">
-                    {nodes.slice(0, 5).map((n, i) => (
-                      <span key={n.id} className="flex items-center">
-                        {i > 0 && <span className="px-0.5 text-[10px] text-muted-foreground/50">→</span>}
-                        <span title={n.agent_name}>{renderAgentIcon(n.agent_icon || "lucide:Bot", "size-4")}</span>
-                      </span>
-                    ))}
-                    {nodes.length > 5 && (
-                      <span className="ml-0.5 text-[10px] text-muted-foreground">+{nodes.length - 5}</span>
-                    )}
-                  </div>
-                )}
-                <div className="mt-0.5 flex items-center gap-1.5 border-t pt-1.5 text-[10px] text-muted-foreground">
-                  <span>{nodes.length}단계</span>
-                  <span>·</span>
+                <p className="line-clamp-1 text-xs text-muted-foreground">
+                  {w.description || "설명 없음"}
+                </p>
+                {/* 에이전트 협력 흐름 — 아이콘 칩 + 화살표 */}
+                <div className="flex min-h-7 flex-wrap items-center gap-1 text-sm">
+                  {nodes.length > 0 ? (
+                    <>
+                      {nodes.slice(0, 5).map((n, i) => (
+                        <span key={n.id} className="flex items-center gap-1">
+                          {i > 0 && <span className="text-muted-foreground/40">→</span>}
+                          <span
+                            className="grid size-7 place-items-center rounded-lg bg-muted"
+                            title={n.agent_name}
+                          >
+                            {renderAgentIcon(n.agent_icon || "lucide:Bot", "size-4")}
+                          </span>
+                        </span>
+                      ))}
+                      {nodes.length > 5 && (
+                        <span className="ml-0.5 text-xs text-muted-foreground">+{nodes.length - 5}</span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-xs text-muted-foreground/60">아직 단계가 없어요</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 border-t pt-2.5 text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">{nodes.length}</span>
+                  <span>단계</span>
+                  <span className="text-muted-foreground/40">·</span>
                   <span>실행 {w.run_count}회</span>
                 </div>
               </button>
