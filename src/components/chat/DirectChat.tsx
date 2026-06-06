@@ -475,7 +475,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
               key={m.id}
               ref={(el) => { messageRefs.current[m.id] = el }}
               className={cn(
-                "group flex flex-col gap-0.5 rounded-xl transition-colors",
+                "group flex w-full flex-col gap-0.5 rounded-xl transition-colors",
                 mine ? "items-end" : "items-start",
                 highlightId === m.id && "bg-primary/10"
               )}
@@ -496,7 +496,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
                   </span>
                 </button>
               )}
-              <div className={cn("flex items-end gap-1", mine ? "justify-end" : "justify-start")}>
+              <div className={cn("flex w-full items-end gap-1", mine ? "justify-end" : "justify-start")}>
               {/* 본인 메시지 호버 액션 (답장·이모지·텍스트 수정·삭제) — 버블 옆 인라인, 세로 중앙 */}
               {mine && (
                 <div className="flex items-center gap-0.5 self-center opacity-0 transition-opacity group-hover:opacity-100 has-[[data-emoji-open]]:opacity-100">
@@ -539,7 +539,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
               ) : (
                 <div
                   className={cn(
-                    "max-w-[70%] rounded-2xl px-3 py-1.5 text-sm break-words",
+                    "max-w-[min(78%,44rem)] rounded-2xl px-3 py-1.5 text-sm break-words",
                     mine ? "bg-primary text-primary-foreground" : "bg-muted"
                   )}
                 >
