@@ -15,7 +15,6 @@ import { Loading, ErrorState } from "@/components/shared/States"
 const THEMES = [
   { value: "light", label: "라이트" },
   { value: "dark", label: "다크" },
-  { value: "system", label: "시스템" },
 ]
 
 // 구성원 디렉터리에서 항목별 공개 여부 (directory_contact RPC가 이 정책으로 게이팅)
@@ -55,7 +54,10 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-/** iOS식 세그먼트 토글 — 알약 트랙 안에서 활성 칸만 떠 보임. block=가로 꽉 채움. */
+/**
+ * iOS식 세그먼트 컨트롤 — 활성 표시(썸)가 칸 사이를 부드럽게 슬라이드(translateX 트랜지션).
+ * 라이브러리 없이 절대위치 썸 + transform 전환. block=가로 꽉 채움.
+ */
 function Segmented({
   options,
   value,
@@ -67,19 +69,29 @@ function Segmented({
   onChange: (v: string) => void
   block?: boolean
 }) {
+  const activeIndex = options.findIndex((o) => o.value === value)
   return (
-    <div className={cn("flex items-center gap-0.5 rounded-full bg-muted p-0.5", block && "w-full")}>
+    <div className={cn("relative flex items-center rounded-full bg-muted p-0.5", block ? "w-full" : "inline-flex")}>
+      {/* 슬라이딩 썸 — 활성 칸 위치로 미끄러짐 */}
+      {activeIndex >= 0 && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0.5 left-0.5 rounded-full bg-card shadow-[var(--shadow-sm)] transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
+          style={{
+            width: `calc((100% - 0.25rem) / ${options.length})`,
+            transform: `translateX(calc(${activeIndex} * 100%))`,
+          }}
+        />
+      )}
       {options.map((o) => (
         <button
           key={o.value}
           type="button"
           onClick={() => onChange(o.value)}
           className={cn(
-            "rounded-full px-3 py-1 text-xs font-medium transition-colors",
-            block && "flex-1 py-2 text-sm",
-            value === o.value
-              ? "bg-card text-foreground shadow-[var(--shadow-sm)]"
-              : "text-muted-foreground hover:text-foreground"
+            "relative z-10 flex-1 rounded-full px-3 py-1 text-xs font-medium transition-colors",
+            block && "py-2 text-sm",
+            value === o.value ? "text-foreground" : "text-muted-foreground hover:text-foreground"
           )}
         >
           {o.label}
@@ -92,7 +104,7 @@ function Segmented({
 export function SettingsView() {
   const supabase = createClient()
   const router = useRouter()
-  const { theme, setTheme } = useTheme()
+  const { setTheme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -306,7 +318,7 @@ export function SettingsView() {
         <Segmented
           block
           options={THEMES}
-          value={mounted ? theme ?? "system" : ""}
+          value={mounted ? resolvedTheme ?? "dark" : ""}
           onChange={(v) => setTheme(v)}
         />
       </Card>
