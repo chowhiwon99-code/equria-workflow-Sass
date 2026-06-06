@@ -210,7 +210,7 @@ function EmptyAgentWidget() {
         onClick={toggle}
         style={{ position: "fixed", left: tl.left, top: tl.top }}
         className={cn(
-          "z-50 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-primary/30 transition-shadow",
+          "z-50 flex size-14 items-center justify-center rounded-full border border-white/15 bg-primary/85 text-primary-foreground shadow-[var(--shadow-lg)] backdrop-blur-xl transition-shadow",
           "animate-float hover:scale-110"
         )}
         aria-label="에이전트 위젯 열기 (⌘K)"
@@ -292,7 +292,7 @@ function FabLauncher({ unread, onOpen }: { unread: boolean; onOpen: () => void }
       }}
       style={{ position: "fixed", left: tl.left, top: tl.top, touchAction: "none" }}
       className={cn(
-        "z-50 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-primary/30 transition-transform",
+        "z-50 flex size-14 items-center justify-center rounded-full border border-white/15 bg-primary/85 text-primary-foreground shadow-[var(--shadow-lg)] backdrop-blur-xl transition-transform",
         dragging ? "cursor-grabbing" : "cursor-grab",
         !dragging && "animate-float hover:scale-110"
       )}
@@ -391,7 +391,7 @@ function AgentFabMenu({ onPick }: { onPick: (id: string, rect: { x: number; y: n
         }}
         style={{ touchAction: "none" }}
         className={cn(
-          "flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-primary/30 transition-transform hover:scale-105",
+          "flex size-14 items-center justify-center rounded-full border border-white/15 bg-primary/85 text-primary-foreground shadow-[var(--shadow-lg)] backdrop-blur-xl transition-transform hover:scale-105",
           dragging ? "cursor-grabbing" : "cursor-grab"
         )}
         aria-label="닫기"
