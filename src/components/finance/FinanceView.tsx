@@ -1,7 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Upload, FileText, Loader2, Plus, Pencil, Download, Trash2, ChevronDown } from "lucide-react"
+import { Upload, FileText, Loader2, Plus, Pencil, Download, Trash2 } from "lucide-react"
+import { Select } from "@/components/shared/Select"
 import { createClient } from "@/lib/supabase/client"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { uploadImage } from "@/lib/upload"
@@ -266,25 +267,20 @@ export function FinanceView() {
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
         />
-        <div className="relative">
-          <select className={cn(fieldClass, "w-auto appearance-none pr-8")} value={kindFilter} onChange={(e) => setKindFilter(e.target.value as KindFilter)}>
-            <option value="all">전체</option>
-            <option value="expense">비용</option>
-            <option value="revenue">매출</option>
-          </select>
-          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        </div>
-        <div className="relative">
-          <select className={cn(fieldClass, "w-auto appearance-none pr-8")} value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
-            <option value="">분류: 전체</option>
-            {allCategories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        </div>
+        <Select
+          value={kindFilter}
+          onChange={(v) => setKindFilter(v as KindFilter)}
+          options={[
+            { value: "all", label: "전체" },
+            { value: "expense", label: "비용" },
+            { value: "revenue", label: "매출" },
+          ]}
+        />
+        <Select
+          value={categoryFilter}
+          onChange={setCategoryFilter}
+          options={[{ value: "", label: "분류: 전체" }, ...allCategories.map((c) => ({ value: c, label: c }))]}
+        />
         {(searchText || kindFilter !== "all" || categoryFilter) && (
           <button
             className="text-xs text-muted-foreground hover:underline"
