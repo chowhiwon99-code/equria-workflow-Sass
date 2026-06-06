@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { Plus, FolderKanban } from "lucide-react"
+import { Plus, FolderKanban, ChevronDown } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -132,18 +132,21 @@ export function ProjectsView() {
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
         />
-        <select
-          className="h-8 rounded-lg border border-border bg-card px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option value="">상태: 전체</option>
-          {PROJECT_STATUS_ORDER.map((s) => (
-            <option key={s} value={s}>
-              {PROJECT_STATUS[s].label}
-            </option>
-          ))}
-        </select>
+        <div className="relative">
+          <select
+            className="h-8 appearance-none rounded-lg border border-border bg-card pl-2.5 pr-8 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="">상태: 전체</option>
+            {PROJECT_STATUS_ORDER.map((s) => (
+              <option key={s} value={s}>
+                {PROJECT_STATUS[s].label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        </div>
         {(searchText || statusFilter) && (
           <button
             className="text-xs text-muted-foreground hover:underline"
