@@ -503,7 +503,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
                   <button onClick={() => setReplyTo(m)} className="text-muted-foreground hover:text-foreground" aria-label="답장">
                     <CornerUpLeft className="size-3.5" />
                   </button>
-                  <EmojiAddButton onPick={(e) => toggleReaction(m.id, e)} />
+                  <EmojiAddButton align="right" onPick={(e) => toggleReaction(m.id, e)} />
                   {!m.attachment_url && (
                     <button onClick={() => startEdit(m)} className="text-muted-foreground hover:text-foreground" aria-label="메시지 수정">
                       <Pencil className="size-3.5" />
@@ -570,7 +570,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
                   <button onClick={() => setReplyTo(m)} className="text-muted-foreground hover:text-foreground" aria-label="답장">
                     <CornerUpLeft className="size-3.5" />
                   </button>
-                  <EmojiAddButton onPick={(e) => toggleReaction(m.id, e)} />
+                  <EmojiAddButton align="left" onPick={(e) => toggleReaction(m.id, e)} />
                 </div>
               )}
               </div>
@@ -652,22 +652,22 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
 
 const QUICK_EMOJIS = ["👍", "❤️", "😂", "🎉", "👀", "✅"]
 
-// 반응은 이모지로 저장(데이터 호환)하되, 표시는 lucide 아이콘으로 통일. 매핑에 없으면 이모지 그대로.
-const REACTION_ICON: Record<string, LucideIcon> = {
-  "👍": ThumbsUp,
-  "❤️": Heart,
-  "😂": Laugh,
-  "🎉": PartyPopper,
-  "👀": Eye,
-  "✅": Check,
+// 반응은 이모지로 저장(데이터 호환)하되, 표시는 lucide 아이콘 + 색으로 통일. 매핑에 없으면 이모지 그대로.
+const REACTION_ICON: Record<string, { Icon: LucideIcon; color: string }> = {
+  "👍": { Icon: ThumbsUp, color: "text-sky-500" },
+  "❤️": { Icon: Heart, color: "text-rose-500" },
+  "😂": { Icon: Laugh, color: "text-amber-500" },
+  "🎉": { Icon: PartyPopper, color: "text-violet-500" },
+  "👀": { Icon: Eye, color: "text-teal-500" },
+  "✅": { Icon: Check, color: "text-emerald-500" },
 }
 function renderReaction(emoji: string, className: string) {
-  const Icon = REACTION_ICON[emoji]
-  return Icon ? <Icon className={className} /> : <span>{emoji}</span>
+  const r = REACTION_ICON[emoji]
+  return r ? <r.Icon className={cn(className, r.color)} /> : <span>{emoji}</span>
 }
 
 /** 버블 옆 인라인 "반응 추가" 트리거 — 클릭 시 빠른 이모지 팝오버. data-emoji-open으로 부모 호버클러스터를 열려있는 동안 유지. */
-function EmojiAddButton({ onPick }: { onPick: (emoji: string) => void }) {
+function EmojiAddButton({ onPick, align = "left" }: { onPick: (emoji: string) => void; align?: "left" | "right" }) {
   const [open, setOpen] = useState(false)
   return (
     <div className="relative flex" {...(open ? { "data-emoji-open": "" } : {})}>
@@ -682,7 +682,13 @@ function EmojiAddButton({ onPick }: { onPick: (emoji: string) => void }) {
       {open && (
         <>
           <button className="fixed inset-0 z-10 cursor-default" aria-hidden onClick={() => setOpen(false)} />
-          <div className="absolute bottom-full left-1/2 z-20 mb-1 flex -translate-x-1/2 gap-0.5 rounded-full border bg-popover p-1 shadow-lg">
+          {/* 메시지 좌/우에 따라 화면 안쪽으로 펼쳐 잘림 방지(좌측 메시지=오른쪽으로, 우측 메시지=왼쪽으로) */}
+          <div
+            className={cn(
+              "absolute bottom-full z-20 mb-1 flex gap-0.5 rounded-full border bg-popover p-1 shadow-lg",
+              align === "right" ? "right-0" : "left-0"
+            )}
+          >
             {QUICK_EMOJIS.map((e) => (
               <button
                 key={e}
@@ -691,7 +697,7 @@ function EmojiAddButton({ onPick }: { onPick: (emoji: string) => void }) {
                   onPick(e)
                   setOpen(false)
                 }}
-                className="grid size-7 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="grid size-7 place-items-center rounded-full transition-colors hover:bg-muted"
               >
                 {renderReaction(e, "size-4")}
               </button>
