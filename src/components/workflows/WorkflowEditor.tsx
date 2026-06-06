@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Plus, Play, Trash2, Loader2 } from "lucide-react"
+import { Plus, Play, Trash2, Loader2, ChevronDown } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { mustOk } from "@/lib/supabase/mustOk"
@@ -538,7 +538,12 @@ export function WorkflowEditor({ id }: { id: string }) {
                       <span className="text-muted-foreground">· {(r.duration_ms / 1000).toFixed(1)}s</span>
                     )}
                     {r.status === "error" && <span className="text-destructive">· 오류</span>}
-                    <span className="ml-auto text-muted-foreground">{open ? "▲" : "▼"}</span>
+                    <ChevronDown
+                      className={cn(
+                        "ml-auto size-3.5 shrink-0 text-muted-foreground transition-transform",
+                        open && "rotate-180"
+                      )}
+                    />
                   </button>
                   {open && (
                     <div className="mt-2 flex flex-col gap-2">
