@@ -120,6 +120,14 @@ export function RichComposer({
     onPasteFilesRef.current = onPasteFiles
   }, [onPasteFiles])
 
+  // 첨부가 처음 스테이징되면(드롭·붙여넣기·클릭) 에디터에 포커스 → 곧바로 Enter로 전송 가능.
+  // false→true 전환에서만 포커스(타이핑 중 커서 점프 방지).
+  const prevCanSendEmpty = useRef(false)
+  useEffect(() => {
+    if (canSendEmpty && !prevCanSendEmpty.current) editor?.commands.focus()
+    prevCanSendEmpty.current = canSendEmpty
+  }, [canSendEmpty, editor])
+
   const setLink = useCallback(() => {
     if (!editor) return
     const prev = editor.getAttributes("link").href
