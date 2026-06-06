@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import { toast } from "sonner"
@@ -27,6 +27,67 @@ const PRIVACY_FIELDS = [
 
 type ContactVisibility = "all" | "private"
 type ContactPrivacy = Record<(typeof PRIVACY_FIELDS)[number]["key"], ContactVisibility>
+
+/** 섹션 카드 — 떠 있는 흰 카드(토스/애플) */
+function Card({ children }: { children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-4 rounded-2xl border bg-card p-5 shadow-[var(--shadow-sm)]">
+      {children}
+    </section>
+  )
+}
+
+function SectionTitle({ title, desc }: { title: string; desc?: string }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <h2 className="text-base font-semibold">{title}</h2>
+      {desc && <p className="text-xs text-muted-foreground">{desc}</p>}
+    </div>
+  )
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      {children}
+    </label>
+  )
+}
+
+/** iOS식 세그먼트 토글 — 알약 트랙 안에서 활성 칸만 떠 보임. block=가로 꽉 채움. */
+function Segmented({
+  options,
+  value,
+  onChange,
+  block,
+}: {
+  options: readonly { value: string; label: string }[]
+  value: string
+  onChange: (v: string) => void
+  block?: boolean
+}) {
+  return (
+    <div className={cn("flex items-center gap-0.5 rounded-full bg-muted p-0.5", block && "w-full")}>
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          onClick={() => onChange(o.value)}
+          className={cn(
+            "rounded-full px-3 py-1 text-xs font-medium transition-colors",
+            block && "flex-1 py-2 text-sm",
+            value === o.value
+              ? "bg-card text-foreground shadow-[var(--shadow-sm)]"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
 
 export function SettingsView() {
   const supabase = createClient()
@@ -155,55 +216,41 @@ export function SettingsView() {
     )
 
   return (
-    <div className="flex max-w-2xl flex-col gap-6">
+    <div className="flex max-w-2xl flex-col gap-5">
       {/* 프로필 */}
-      <section className="flex flex-col gap-3 rounded-xl border p-4">
-        <h2 className="text-sm font-semibold">프로필</h2>
-        <label className="flex flex-col gap-1.5 text-sm">
-          <span className="text-xs text-muted-foreground">이름</span>
-          <input className={fieldClass} value={name} onChange={(e) => setName(e.target.value)} />
-        </label>
-        <label className="flex flex-col gap-1.5 text-sm">
-          <span className="text-xs text-muted-foreground">부서</span>
-          <input
-            className={fieldClass}
-            value={department}
-            onChange={(e) => setDepartment(e.target.value)}
-            placeholder="예: 마케팅팀"
-          />
-        </label>
-        <label className="flex flex-col gap-1.5 text-sm">
-          <span className="text-xs text-muted-foreground">직급</span>
-          <input
-            className={fieldClass}
-            value={position}
-            onChange={(e) => setPosition(e.target.value)}
-            placeholder="예: 팀장 / 매니저 / 사원"
-          />
-        </label>
-        <div className="grid grid-cols-2 gap-3">
-          <label className="flex flex-col gap-1.5 text-sm">
-            <span className="text-xs text-muted-foreground">사내 전화</span>
-            <input
-              className={fieldClass}
-              value={workPhone}
-              onChange={(e) => setWorkPhone(e.target.value)}
-              placeholder="예: 02-000-0000"
-            />
-          </label>
-          <label className="flex flex-col gap-1.5 text-sm">
-            <span className="text-xs text-muted-foreground">휴대폰</span>
-            <input
-              className={fieldClass}
-              value={mobile}
-              onChange={(e) => setMobile(e.target.value)}
-              placeholder="예: 010-0000-0000"
-            />
-          </label>
+      <Card>
+        <SectionTitle title="프로필" desc="이름·부서·연락처와 다른 직원에게 보일 정보를 관리해요." />
+        <div className="flex flex-col gap-3.5">
+          <Field label="이름">
+            <input className={fieldClass} value={name} onChange={(e) => setName(e.target.value)} />
+          </Field>
+          <Field label="부서">
+            <input className={fieldClass} value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="예: 마케팅팀" />
+          </Field>
+          <Field label="직급">
+            <input className={fieldClass} value={position} onChange={(e) => setPosition(e.target.value)} placeholder="예: 팀장 / 매니저 / 사원" />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="사내 전화">
+              <input className={fieldClass} value={workPhone} onChange={(e) => setWorkPhone(e.target.value)} placeholder="예: 02-000-0000" />
+            </Field>
+            <Field label="휴대폰">
+              <input className={fieldClass} value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="예: 010-0000-0000" />
+            </Field>
+          </div>
         </div>
-        <p className="text-xs text-muted-foreground">역할: {role === "admin" ? "관리자" : "멤버"}</p>
-        <div className="flex flex-col gap-1.5">
-          <span className="text-xs text-muted-foreground">상태 (다른 직원에게 표시)</span>
+
+        {/* 역할 */}
+        <div className="flex items-center justify-between rounded-xl bg-muted/40 px-3.5 py-2.5 text-sm">
+          <span className="text-muted-foreground">역할</span>
+          <span className="font-medium">{role === "admin" ? "관리자" : "멤버"}</span>
+        </div>
+
+        {/* 상태 */}
+        <div className="flex flex-col gap-2">
+          <span className="text-xs font-medium text-muted-foreground">
+            상태 <span className="font-normal">· 다른 직원에게 표시</span>
+          </span>
           <div className="flex flex-wrap gap-1.5">
             {MANUAL_STATUSES.map((s) => (
               <button
@@ -211,8 +258,10 @@ export function SettingsView() {
                 type="button"
                 onClick={() => setMyStatus(s.value)}
                 className={cn(
-                  "flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors",
-                  (status ?? "active") === s.value ? "border-primary bg-primary/10" : "hover:bg-muted"
+                  "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                  (status ?? "active") === s.value
+                    ? "border-primary bg-primary/10 text-foreground"
+                    : "text-muted-foreground hover:bg-muted"
                 )}
               >
                 <span className={cn("size-2 rounded-full", s.color)} />
@@ -221,80 +270,71 @@ export function SettingsView() {
             ))}
           </div>
         </div>
-        <div className="flex flex-col gap-1.5">
-          <span className="text-xs text-muted-foreground">연락처 공개 범위 (구성원 디렉터리에서 다른 직원에게)</span>
-          {PRIVACY_FIELDS.map((f) => (
-            <div key={f.key} className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm">
-              <span>{f.label}</span>
-              <div className="flex gap-1">
-                {(["all", "private"] as const).map((v) => (
-                  <button
-                    key={v}
-                    type="button"
-                    onClick={() => setPrivacy((p) => ({ ...p, [f.key]: v }))}
-                    className={cn(
-                      "rounded-md px-2.5 py-1 text-xs transition-colors",
-                      privacy[f.key] === v ? "bg-primary text-primary-foreground" : "hover:bg-muted"
-                    )}
-                  >
-                    {v === "all" ? "공개" : "비공개"}
-                  </button>
-                ))}
+
+        {/* 연락처 공개 범위 */}
+        <div className="flex flex-col gap-2">
+          <span className="text-xs font-medium text-muted-foreground">
+            연락처 공개 범위 <span className="font-normal">· 구성원 디렉터리</span>
+          </span>
+          <div className="flex flex-col gap-1.5">
+            {PRIVACY_FIELDS.map((f) => (
+              <div key={f.key} className="flex items-center justify-between rounded-xl bg-muted/40 px-3.5 py-2 text-sm">
+                <span>{f.label}</span>
+                <Segmented
+                  options={[
+                    { value: "all", label: "공개" },
+                    { value: "private", label: "비공개" },
+                  ]}
+                  value={privacy[f.key]}
+                  onChange={(v) => setPrivacy((p) => ({ ...p, [f.key]: v as ContactVisibility }))}
+                />
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-        <div className="flex justify-end">
+
+        <div className="flex justify-end pt-0.5">
           <Button size="sm" onClick={saveProfile} disabled={!name.trim() || saving}>
             {saving ? "저장 중…" : "저장"}
           </Button>
         </div>
-      </section>
+      </Card>
 
       {/* 화면(테마) */}
-      <section className="flex flex-col gap-3 rounded-xl border p-4">
-        <h2 className="text-sm font-semibold">화면</h2>
-        <span className="text-xs text-muted-foreground">테마</span>
-        <div className="flex gap-2">
-          {THEMES.map((t) => (
-            <button
-              key={t.value}
-              type="button"
-              onClick={() => setTheme(t.value)}
-              className={cn(
-                "flex-1 rounded-lg border px-3 py-2 text-sm transition-colors",
-                mounted && theme === t.value ? "border-primary bg-primary/10" : "hover:bg-muted"
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </section>
+      <Card>
+        <SectionTitle title="화면" desc="밝기 테마를 선택해요." />
+        <Segmented
+          block
+          options={THEMES}
+          value={mounted ? theme ?? "system" : ""}
+          onChange={(v) => setTheme(v)}
+        />
+      </Card>
 
       {/* 워크스페이스 */}
-      <section className="flex flex-col gap-2 rounded-xl border p-4 text-sm">
-        <h2 className="text-sm font-semibold">워크스페이스</h2>
-        <div className="flex justify-between text-muted-foreground">
-          <span>이름</span>
-          <span>이큐리아 워크스페이스</span>
+      <Card>
+        <SectionTitle title="워크스페이스" desc="현재 소속된 워크스페이스예요." />
+        <div className="overflow-hidden rounded-xl border text-sm">
+          <div className="flex items-center justify-between border-b px-3.5 py-2.5">
+            <span className="text-muted-foreground">이름</span>
+            <span className="font-medium">이큐리아 워크스페이스</span>
+          </div>
+          <div className="flex items-center justify-between px-3.5 py-2.5">
+            <span className="text-muted-foreground">로그인 계정</span>
+            <span className="font-medium">{name || email}</span>
+          </div>
         </div>
-        <div className="flex justify-between text-muted-foreground">
-          <span>로그인 계정</span>
-          <span>{name || email}</span>
-        </div>
-      </section>
+      </Card>
 
       {/* 계정 */}
-      <section className="flex items-center justify-between rounded-xl border p-4">
-        <div>
-          <h2 className="text-sm font-semibold">계정</h2>
-          <p className="text-xs text-muted-foreground">이 기기에서 로그아웃합니다.</p>
+      <Card>
+        <div className="flex items-center justify-between">
+          <SectionTitle title="계정" desc="이 기기에서 로그아웃합니다." />
+          <Button size="sm" variant="outline" onClick={logout}>
+            로그아웃
+          </Button>
         </div>
-        <Button size="sm" variant="outline" onClick={logout}>
-          로그아웃
-        </Button>
-      </section>
+      </Card>
     </div>
   )
 }
