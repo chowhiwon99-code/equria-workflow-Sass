@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Paperclip, NotebookPen, FileText, Loader2, Pencil, Trash2, SmilePlus, CornerUpLeft, X, ThumbsUp, Heart, Laugh, PartyPopper, Eye, Check, type LucideIcon } from "lucide-react"
+import { ArrowLeft, Paperclip, Upload, NotebookPen, FileText, Loader2, Pencil, Trash2, SmilePlus, CornerUpLeft, X, ThumbsUp, Heart, Laugh, PartyPopper, Eye, Check, type LucideIcon } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { mustOk } from "@/lib/supabase/mustOk"
@@ -19,6 +19,9 @@ import { useOnlineUsers } from "@/hooks/usePresence"
 import type { DirectMessage } from "@/types"
 
 const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|bmp|svg|avif|heic|heif)$/i
+
+// 첨부 파일 1개당 용량 상한(초과 시 토스트로 안내·제외). 대용량의 '조용한 실패' 방지.
+const MAX_FILE_BYTES = 50 * 1024 * 1024 // 50MB
 
 /** 첨부 파일명이 이미지 확장자인지 (레거시 단일 첨부 렌더용) */
 function isImageAttachment(name: string | null | undefined): boolean {
@@ -52,11 +55,13 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
   const [stagedFiles, setStagedFiles] = useState<File[]>([])
   const [attachments, setAttachments] = useState<(AttachmentItem & { message_id: string })[]>([])
   const [uploading, setUploading] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [replyTo, setReplyTo] = useState<DirectMessage | null>(null)
   const [highlightId, setHighlightId] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const dragDepth = useRef(0) // 드롭존 자식 위를 지날 때 enter/leave 플리커 방지용 깊이 카운터
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const highlightTimer = useRef<number | null>(null)
 
@@ -320,13 +325,65 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
     [conversationId, meId, supabase, replyTo, stagedFiles, loadAttachments]
   )
 
-  // 파일 스테이징(즉시 업로드 X — 전송 시 일괄). 여러 개 누적.
-  const addStagedFiles = (files: FileList | null) => {
+  // 파일 스테이징(즉시 업로드 X — 전송 시 일괄). 여러 개 누적. 모든 형식 허용, 50MB 초과만 제외.
+  // useCallback: onPasteFiles로 RichComposer에 넘기므로 참조 안정화(자식 effect 불필요 재실행 방지).
+  const addStagedFiles = useCallback((files: FileList | null) => {
     if (!files || files.length === 0) return
-    setStagedFiles((prev) => [...prev, ...Array.from(files)])
-    if (fileRef.current) fileRef.current.value = ""
-  }
+    const ok: File[] = []
+    const tooBig: string[] = []
+    for (const f of Array.from(files)) {
+      if (f.size > MAX_FILE_BYTES) tooBig.push(f.name)
+      else ok.push(f)
+    }
+    if (tooBig.length > 0) {
+      toast.error(`50MB를 넘는 파일은 첨부할 수 없어요: ${tooBig.join(", ")}`)
+    }
+    if (ok.length === 0) return // 전부 제외되면 스테이징·입력 리셋 모두 생략
+    setStagedFiles((prev) => [...prev, ...ok])
+    if (fileRef.current) fileRef.current.value = "" // 같은 파일 재선택 허용(클릭 경로)
+  }, [])
   const removeStagedFile = (idx: number) => setStagedFiles((prev) => prev.filter((_, i) => i !== idx))
+
+  // 드래그&드롭 / 붙여넣기로 첨부 — 클릭 첨부와 동일한 스테이징 파이프라인으로 흘려보낸다(추가만, 기존 경로 무변경).
+  const canAttach = !!conversationId && !uploading
+  const dragHasFiles = (e: React.DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files")
+  // dragover/drop은 항상 preventDefault — 안 하면 브라우저가 파일을 새 탭으로 열어 대화를 이탈한다.
+  const onDragEnter = (e: React.DragEvent) => {
+    if (!dragHasFiles(e)) return
+    e.preventDefault()
+    dragDepth.current += 1
+    setIsDragging(true) // 표시 가부는 렌더에서 canAttach로 게이팅(드래그 중 상태 뒤집힘에도 동기)
+  }
+  const onDragOver = (e: React.DragEvent) => {
+    if (!dragHasFiles(e)) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = canAttach ? "copy" : "none"
+  }
+  const onDragLeave = (e: React.DragEvent) => {
+    if (!dragHasFiles(e)) return
+    dragDepth.current = Math.max(0, dragDepth.current - 1)
+    if (dragDepth.current === 0) setIsDragging(false)
+  }
+  const onDrop = (e: React.DragEvent) => {
+    if (!dragHasFiles(e)) return
+    e.preventDefault()
+    dragDepth.current = 0
+    setIsDragging(false)
+    if (canAttach) addStagedFiles(e.dataTransfer.files)
+  }
+  // 드래그가 컴포저 밖에서 끝나거나 취소(ESC)돼도 오버레이가 남지 않도록 전역에서 강제 해제(깊이 카운터 보조)
+  useEffect(() => {
+    const reset = () => {
+      dragDepth.current = 0
+      setIsDragging(false)
+    }
+    window.addEventListener("drop", reset)
+    window.addEventListener("dragend", reset)
+    return () => {
+      window.removeEventListener("drop", reset)
+      window.removeEventListener("dragend", reset)
+    }
+  }, [])
 
   // 본인 메시지 수정 (텍스트만) — 변경은 Realtime UPDATE 로 양쪽에 반영
   const startEdit = (m: DirectMessage) => {
@@ -600,7 +657,22 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
           </button>
         </div>
       )}
-      <div className={cn("flex flex-col gap-1.5 pt-3", !replyTo && "border-t")}>
+      <div
+        className={cn("relative flex flex-col gap-1.5 pt-3", !replyTo && "border-t")}
+        onDragEnter={onDragEnter}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+      >
+        {/* 드래그 오버 시 드롭존 오버레이 — pointer-events-none이라 아래 래퍼가 드롭 이벤트를 그대로 받는다.
+            canAttach 게이팅: 업로드 중·대화 미준비로 드롭 불가일 땐 '놓으세요' 오해를 주지 않음. */}
+        {isDragging && canAttach && (
+          <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-primary bg-card/85 backdrop-blur-sm motion-safe:animate-[equria-fade-up_0.18s_ease-out]">
+            <Upload className="size-6 text-primary" />
+            <p className="text-sm font-medium text-foreground">여기에 파일을 놓으세요</p>
+            <p className="text-xs text-muted-foreground">모든 형식 · 최대 50MB</p>
+          </div>
+        )}
         <input
           ref={fileRef}
           type="file"
@@ -633,6 +705,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
           onSend={send}
           disabled={!conversationId}
           canSendEmpty={stagedFiles.length > 0}
+          onPasteFiles={addStagedFiles}
           leftSlot={
             <Button
               type="button"

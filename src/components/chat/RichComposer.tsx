@@ -43,14 +43,18 @@ export function RichComposer({
   canSendEmpty = false,
   placeholder = "메시지 입력…",
   leftSlot,
+  onPasteFiles,
 }: {
   onSend: (payload: ComposerPayload) => void | Promise<void>
   disabled?: boolean
   canSendEmpty?: boolean // 첨부 등 본문 외 전송거리가 있으면 빈 텍스트도 전송 허용
   placeholder?: string
   leftSlot?: ReactNode
+  onPasteFiles?: (files: FileList) => void // 클립보드에 파일이 있으면 부모가 첨부 처리(텍스트 붙여넣기는 그대로)
 }) {
   const submitRef = useRef<() => void>(() => {})
+  // handlePaste는 에디터 생성 시 한 번 고정 → 최신 콜백을 ref로 전달(stale 클로저 방지, submitRef와 동일 패턴)
+  const onPasteFilesRef = useRef(onPasteFiles)
   const [showFormat, setShowFormat] = useState(false) // 서식 툴바 기본 숨김(애플식 심플)
   // Tiptap v3 useEditor는 트랜잭션마다 리렌더하지 않음 → editor.isEmpty를 직접 읽으면 stale.
   // 전송 버튼 활성/비활성은 onCreate/onUpdate로 동기화한 state로 판단(번역 적용 등 프로그램적 변경 포함).
@@ -76,6 +80,19 @@ export function RichComposer({
         }
         return false
       },
+      handlePaste: (view, event) => {
+        // 클립보드에 파일(스크린샷·복사한 파일)이 있으면 첨부로 가로챈다.
+        // 파일과 함께 텍스트가 있으면 텍스트는 에디터에 삽입해 보존(유실 방지). 텍스트만이면 기존대로 처리.
+        const files = event.clipboardData?.files
+        if (files && files.length > 0 && onPasteFilesRef.current) {
+          event.preventDefault()
+          const text = event.clipboardData?.getData("text/plain")
+          if (text) view.dispatch(view.state.tr.insertText(text))
+          onPasteFilesRef.current(files)
+          return true
+        }
+        return false
+      },
     },
   })
 
@@ -97,6 +114,11 @@ export function RichComposer({
   useEffect(() => {
     submitRef.current = submit
   }, [submit])
+
+  // handlePaste도 동일 — 최신 onPasteFiles를 ref로 갱신
+  useEffect(() => {
+    onPasteFilesRef.current = onPasteFiles
+  }, [onPasteFiles])
 
   const setLink = useCallback(() => {
     if (!editor) return
