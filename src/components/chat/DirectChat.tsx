@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Paperclip, Upload, NotebookPen, FileText, Loader2, Pencil, Trash2, SmilePlus, CornerUpLeft, X, ThumbsUp, Heart, Laugh, PartyPopper, Eye, Check, type LucideIcon } from "lucide-react"
+import { ArrowLeft, Paperclip, Upload, NotebookPen, FileText, Loader2, Pencil, Trash2, SmilePlus, CornerUpLeft, X, ChevronDown, ThumbsUp, Heart, Laugh, PartyPopper, Eye, Check, type LucideIcon } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { mustOk } from "@/lib/supabase/mustOk"
@@ -59,7 +59,11 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
   const [error, setError] = useState<string | null>(null)
   const [replyTo, setReplyTo] = useState<DirectMessage | null>(null)
   const [highlightId, setHighlightId] = useState<string | null>(null)
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const [atBottom, setAtBottom] = useState(true) // 맨 아래 근처 여부(아래로 버튼 표시·자동 따라가기 판단)
+  const scrollRef = useRef<HTMLDivElement>(null) // 메시지 스크롤 컨테이너
+  const contentRef = useRef<HTMLDivElement>(null) // 메시지 콘텐츠 래퍼(높이 변화 관찰 대상)
+  const atBottomRef = useRef(true) // onScroll 로직에서 최신값을 deps 없이 읽기 위한 미러
+  const didInitialScroll = useRef(false) // 첫 로드 1회 즉시 하단 고정 여부
   const fileRef = useRef<HTMLInputElement>(null)
   const dragDepth = useRef(0) // 드롭존 자식 위를 지날 때 enter/leave 플리커 방지용 깊이 카운터
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({})
@@ -252,14 +256,50 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, conversationId, meId, otherUserId])
 
+  // 스크롤 컨테이너를 맨 아래로
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+    const el = scrollRef.current
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior })
+  }, [])
+
+  // 스크롤 위치 추적 — 맨 아래 근처면 atBottom(버튼 숨김·자동 따라가기). ref도 같이 갱신(로직용).
+  const onScroll = () => {
+    const el = scrollRef.current
+    if (!el) return
+    const near = el.scrollHeight - el.scrollTop - el.clientHeight <= 80
+    atBottomRef.current = near
+    setAtBottom(near)
+  }
+
+  // 메시지 변화: 첫 로드는 즉시(애니 없이) 하단 고정 → 새로고침해도 중앙이 아닌 맨 밑. 이후엔 맨 밑이었을 때만 따라감.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
+    if (messages.length === 0) return
+    if (!didInitialScroll.current) {
+      didInitialScroll.current = true
+      scrollToBottom("auto")
+    } else if (atBottomRef.current) {
+      scrollToBottom("smooth")
+    }
+  }, [messages, scrollToBottom])
+
+  // 첨부 이미지가 늦게 로드되며 높이가 커져도 맨 밑이었으면 다시 핀(새로고침 후 중앙에 머무는 근본 원인 차단)
+  useEffect(() => {
+    const content = contentRef.current
+    const scroller = scrollRef.current
+    if (!content || !scroller) return
+    const ro = new ResizeObserver(() => {
+      if (atBottomRef.current) scroller.scrollTo({ top: scroller.scrollHeight })
+    })
+    ro.observe(content)
+    return () => ro.disconnect()
+  }, [])
 
   // 인용 클릭 → 원본 메시지로 스크롤 + 잠시 하이라이트 (타이머는 ref로 관리: 재클릭 리셋·언마운트 정리)
   const scrollToMessage = useCallback((id: string) => {
     const el = messageRefs.current[id]
     if (!el) return
+    // 위로 점프하는 동안엔 '맨 아래' 아님으로 표시 → 이미지 지연 로드의 RO 재핀이 점프를 가로채지 않게.
+    atBottomRef.current = false
     el.scrollIntoView({ behavior: "smooth", block: "center" })
     setHighlightId(id)
     if (highlightTimer.current) window.clearTimeout(highlightTimer.current)
@@ -469,12 +509,14 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
         {!isSelf && <StatusDot online={online.has(otherUserId)} manual={otherStatus} />}
       </div>
 
-      <div className="flex flex-1 flex-col gap-1 overflow-y-auto py-2">
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <div ref={scrollRef} onScroll={onScroll} className="flex min-h-0 flex-1 flex-col overflow-y-auto py-2">
         {messages.length === 0 && (
           <p className="my-auto text-center text-sm text-muted-foreground">
             {isSelf ? "메모나 링크, 파일을 남겨보세요." : "첫 메시지를 보내보세요."}
           </p>
         )}
+        <div ref={contentRef} className="flex flex-col gap-1">
         {messages.map((m) => {
           const mine = m.sender_id === meId
           const url = m.attachment_url ? fileUrls[m.id] : undefined
@@ -642,7 +684,18 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
             </div>
           )
         })}
-        <div ref={bottomRef} />
+        </div>
+        </div>
+        {!atBottom && (
+          <button
+            type="button"
+            onClick={() => scrollToBottom("smooth")}
+            aria-label="맨 아래로"
+            className="absolute bottom-3 right-3 z-10 grid size-9 place-items-center rounded-full border bg-card/90 text-foreground shadow-[var(--shadow-lg)] backdrop-blur-sm transition-colors hover:bg-muted motion-safe:animate-[equria-fade-up_0.18s_ease-out]"
+          >
+            <ChevronDown className="size-5" />
+          </button>
+        )}
       </div>
 
       {replyTo && (
