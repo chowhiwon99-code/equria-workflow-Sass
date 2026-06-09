@@ -1,6 +1,7 @@
 import { streamText, convertToModelMessages, type UIMessage } from "ai"
 import { anthropic, MODELS } from "@/lib/claude/client"
 import { createClient } from "@/lib/supabase/server"
+import { computeCostUsd } from "@/lib/pricing"
 
 export const maxDuration = 60
 export const runtime = "nodejs"
@@ -54,7 +55,18 @@ export async function POST(req: Request) {
     system: SYSTEM,
     messages: modelMessages,
     maxOutputTokens: 2048,
-    async onFinish({ text }) {
+    async onFinish({ text, usage }) {
+      // 비용 추적: 어시스턴트도 Claude 호출 → agent_usage 기록(agent/conversation 없는 대시보드 호출)
+      const inT = usage.inputTokens ?? 0
+      const outT = usage.outputTokens ?? 0
+      void supabase.from("agent_usage").insert({
+        user_id: user.id,
+        tokens_input: inT,
+        tokens_output: outT,
+        success: true,
+        model: MODELS.default,
+        cost_usd: computeCostUsd(MODELS.default, inT, outT),
+      })
       if (!conversationId) return
       // 이번 턴(마지막 사용자 메시지 + 새 어시스턴트 답변)만 저장
       await supabase.from("assistant_messages").insert([

@@ -3,6 +3,7 @@ import { anthropic } from "@/lib/claude/client"
 import { createClient } from "@/lib/supabase/server"
 import { normalizeGraph, topoOrder } from "@/lib/workflows"
 import { isSafeWebhookUrl, MAX_RUN_NODES } from "@/lib/workflowTools"
+import { computeCostUsd } from "@/lib/pricing"
 import type { Json } from "@/lib/supabase/types"
 
 export const maxDuration = 60
@@ -221,6 +222,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
               tokens_input: usage.inputTokens ?? 0,
               tokens_output: usage.outputTokens ?? 0,
               success: true,
+              model: v.model,
+              cost_usd: computeCostUsd(v.model, usage.inputTokens ?? 0, usage.outputTokens ?? 0),
             })
           } catch (err) {
             const msg = err instanceof Error ? err.message : "에이전트 호출 실패"

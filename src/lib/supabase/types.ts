@@ -18,10 +18,12 @@ export type Database = {
         Row: {
           agent_id: string | null
           conversation_id: string | null
+          cost_usd: number | null
           created_at: string
           duration_ms: number | null
           error_message: string | null
           id: string
+          model: string | null
           success: boolean
           tokens_input: number
           tokens_output: number
@@ -31,10 +33,12 @@ export type Database = {
         Insert: {
           agent_id?: string | null
           conversation_id?: string | null
+          cost_usd?: number | null
           created_at?: string
           duration_ms?: number | null
           error_message?: string | null
           id?: string
+          model?: string | null
           success?: boolean
           tokens_input?: number
           tokens_output?: number
@@ -44,10 +48,12 @@ export type Database = {
         Update: {
           agent_id?: string | null
           conversation_id?: string | null
+          cost_usd?: number | null
           created_at?: string
           duration_ms?: number | null
           error_message?: string | null
           id?: string
+          model?: string | null
           success?: boolean
           tokens_input?: number
           tokens_output?: number

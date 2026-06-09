@@ -2,6 +2,7 @@ import { streamText, convertToModelMessages, stepCountIs, type UIMessage, type T
 import { anthropic } from "@/lib/claude/client"
 import { createClient } from "@/lib/supabase/server"
 import { connectMcp } from "@/lib/mcp/connect"
+import { computeCostUsd } from "@/lib/pricing"
 
 export const maxDuration = 60
 export const runtime = "nodejs"
@@ -131,6 +132,8 @@ export async function POST(
           tokens_output: outputTokens,
           duration_ms: Date.now() - startedAt,
           success: true,
+          model: agentVersion.model,
+          cost_usd: computeCostUsd(agentVersion.model, inputTokens, outputTokens),
         }),
         supabase
           .from("conversations")

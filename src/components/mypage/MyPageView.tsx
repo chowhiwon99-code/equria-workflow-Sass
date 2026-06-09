@@ -6,10 +6,11 @@ import { createClient } from "@/lib/supabase/client"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Loading, ErrorState } from "@/components/shared/States"
 import { renderAgentIcon } from "@/components/agents/AgentIcon"
+import { formatUsd } from "@/lib/pricing"
 
 type Profile = { name: string; department: string | null; role: string }
 type AgentLite = { id: string; name: string; description: string | null; icon: string }
-type Stats = { calls: number; tokensIn: number; tokensOut: number; agentsUsed: number }
+type Stats = { calls: number; tokensIn: number; tokensOut: number; agentsUsed: number; cost: number }
 
 export function MyPageView() {
   const supabase = createClient()
@@ -17,7 +18,7 @@ export function MyPageView() {
   const [error, setError] = useState<string | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [myAgents, setMyAgents] = useState<AgentLite[]>([])
-  const [stats, setStats] = useState<Stats>({ calls: 0, tokensIn: 0, tokensOut: 0, agentsUsed: 0 })
+  const [stats, setStats] = useState<Stats>({ calls: 0, tokensIn: 0, tokensOut: 0, agentsUsed: 0, cost: 0 })
 
   const load = useCallback(async () => {
     setError(null)
@@ -36,7 +37,7 @@ export function MyPageView() {
           .eq("created_by", me)
           .eq("is_active", true)
           .order("created_at", { ascending: false }),
-        supabase.from("agent_usage").select("agent_id, tokens_input, tokens_output").eq("user_id", me),
+        supabase.from("agent_usage").select("agent_id, tokens_input, tokens_output, cost_usd").eq("user_id", me),
       ])
       if (prof) setProfile(prof as Profile)
       setMyAgents((agents as AgentLite[]) ?? [])
@@ -45,6 +46,7 @@ export function MyPageView() {
         calls: rows.length,
         tokensIn: rows.reduce((s, r) => s + (r.tokens_input ?? 0), 0),
         tokensOut: rows.reduce((s, r) => s + (r.tokens_output ?? 0), 0),
+        cost: rows.reduce((s, r) => s + Number(r.cost_usd ?? 0), 0),
         agentsUsed: new Set(rows.map((r) => r.agent_id).filter(Boolean)).size,
       })
     } catch {
@@ -73,6 +75,7 @@ export function MyPageView() {
   const fmt = (n: number) => n.toLocaleString("ko-KR")
   const tiles = [
     { label: "AI 호출", value: fmt(stats.calls) },
+    { label: "추정 비용", value: formatUsd(stats.cost) },
     { label: "입력 토큰", value: fmt(stats.tokensIn) },
     { label: "출력 토큰", value: fmt(stats.tokensOut) },
     { label: "사용한 에이전트", value: fmt(stats.agentsUsed) },
