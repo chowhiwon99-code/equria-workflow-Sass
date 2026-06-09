@@ -83,7 +83,8 @@
 > 목표: 회사별 데이터 완전 격리. **A단계(구조)=완료**, **B단계(격리 활성화)=차후**. 캐주얼하게 깨면 회사 간 데이터 누출 = 치명적이니 B단계는 반드시 검증하며.
 > 📋 **전체 제품화 감사·리스크·B1~B6 로드맵·의사결정은 `PRODUCTIZATION.md`** / **B1 상세 설계는 `B1-DESIGN.md`**(2026-06-09, 설계→레드팀→종합).
 > **확정 결정(대표)**: 격리=단일프로젝트+RLS · 과금=시트 고정요금(+비용추적 병행) · 인증=Supabase Auth+매직링크(SSO는 나중 WorkOS) · 시장=영업주도+수동 셋업.
-> **B1 착수 대기**: 권장 = **B1-a(저위험·고가치)** 먼저 — 마이그 `033`(헬퍼 함수+인덱스, 무위험)→`034~041` 읽기 격리(앱 변경 불필요, 누출 ~90% 차단) + WorkspaceProvider 골격. **B1-b(쓰기 강제: 전 INSERT 배선·DEFAULT 제거·`043~046`)는 2번째 회사 임박 시** 별도 승인 게이트. 미결 1건: MCP 격리(회사별 vs 전사공용) — B1은 임시 admin-only.
+> **B1-a 읽기 격리 = 완료(마이그 033~041 적용·검증, 2026-06-09)**: 헬퍼 3종(033) + 24개 테이블 RLS를 `workspace_id in (auth_user_workspace_ids())`로 재작성(034 profiles 동료한정·035 완전개방7·036 agents/workflows·037 사용자별·038 채팅·039 MCP·040 함수/RPC/트리거·041 search_path 하드닝). **검증(롤백 트랜잭션): 멤버는 회귀 0, 비멤버는 전 테이블 0 + 연락처 PII 0.** 앱 코드 변경 없음(멤버십 함수 기반). MCP=회사별 격리 확정.
+> **남은 것**: ① **B1-b(쓰기 강제)** = WorkspaceProvider 앱 컨텍스트 + 전 INSERT에 workspace_id 배선 + presence 채널 동적화 + service_role 라우트 가드 + sentinel 백필 + DEFAULT 제거 — **2번째 회사 온보딩 임박 시** 별도 승인 게이트(앱-DB 동기 필요). ② 어드바이저 WARN 잔여: SECURITY DEFINER 헬퍼의 anon/authenticated 실행가능(RLS에 필요·호출자 본인정보만 반환 → 무해, 수용) + Auth leaked-password protection(대시보드 토글, 켜기 권장).
 > ⚠️ **B1 완료 전 두 번째 회사 온보딩 동결**(현 RLS는 워크스페이스 무관 → 받으면 즉시 데이터 유출).
 
 - **A단계(완료 · 마이그 030 · 비파괴)**: `workspaces`·`workspace_members`(슬랙형 다대다) 신설 + 데이터 **24개 테이블에 `workspace_id`**(NOT NULL DEFAULT=equria, FK on delete cascade)+인덱스. 기존 전원/데이터는 기본 워크스페이스 **`equria`**(고정 sentinel UUID **`00000000-0000-0000-0000-0000000000e1`**) 귀속. 컬럼 DEFAULT 덕에 현재 RLS·앱 무변경.
