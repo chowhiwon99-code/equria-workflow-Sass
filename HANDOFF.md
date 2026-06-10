@@ -84,6 +84,8 @@
 > 📋 **전체 제품화 감사·리스크·B1~B6 로드맵·의사결정은 `PRODUCTIZATION.md`** / **B1 상세 설계는 `B1-DESIGN.md`**(2026-06-09, 설계→레드팀→종합).
 > **확정 결정(대표)**: 격리=단일프로젝트+RLS · 과금=시트 고정요금(+비용추적 병행) · 인증=Supabase Auth+매직링크(SSO는 나중 WorkOS) · 시장=영업주도+수동 셋업.
 > **B1-a 읽기 격리 = 완료(마이그 033~041 적용·검증, 2026-06-09)**: 헬퍼 3종(033) + 24개 테이블 RLS를 `workspace_id in (auth_user_workspace_ids())`로 재작성(034 profiles 동료한정·035 완전개방7·036 agents/workflows·037 사용자별·038 채팅·039 MCP·040 함수/RPC/트리거·041 search_path 하드닝). **검증(롤백 트랜잭션): 멤버는 회귀 0, 비멤버는 전 테이블 0 + 연락처 PII 0.** 앱 코드 변경 없음(멤버십 함수 기반). MCP=회사별 격리 확정.
+> **마이그 043(2026-06-10, 재검증 후 회귀 수정)**: B1 INSERT 정책(is_workspace_member)이 신규 가입자를 막던 '시한폭탄' 해결 — `handle_new_user()`가 신규 가입자를 equria 멤버로 자동 등록(+agents_insert created_by 검증). DB 라이브=프로덕션 즉시 적용. 가짜 가입 시뮬로 검증(프로필+멤버십 생성·write-gate 통과). **이걸로 단일 테넌트에서 신규 직원 가입도 안전.**
+> ⚠️ **B1-b 전 알려진 한계**: ① 앱이 INSERT 시 workspace_id를 명시 안 하고 sentinel DEFAULT 의존 → B1-b에서 DEFAULT 제거 전 `useWorkspace()` 훅+전 INSERT 배선 선행 필수. ② presence 채널 전역(비차단). ③ 비용추적은 성공 호출 기준 추정(워크플로 실패 호출 미기록·Haiku 단가 043에서 정정).
 > **남은 것**: ① **B1-b(쓰기 강제)** = WorkspaceProvider 앱 컨텍스트 + 전 INSERT에 workspace_id 배선 + presence 채널 동적화 + service_role 라우트 가드 + sentinel 백필 + DEFAULT 제거 — **2번째 회사 온보딩 임박 시** 별도 승인 게이트(앱-DB 동기 필요). ② 어드바이저 WARN 잔여: SECURITY DEFINER 헬퍼의 anon/authenticated 실행가능(RLS에 필요·호출자 본인정보만 반환 → 무해, 수용) + Auth leaked-password protection(대시보드 토글, 켜기 권장).
 > ⚠️ **B1 완료 전 두 번째 회사 온보딩 동결**(현 RLS는 워크스페이스 무관 → 받으면 즉시 데이터 유출).
 
