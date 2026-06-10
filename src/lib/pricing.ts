@@ -7,7 +7,7 @@
 const PRICE_PER_MTOK: Record<"opus" | "sonnet" | "haiku", { input: number; output: number }> = {
   opus: { input: 15, output: 75 },
   sonnet: { input: 3, output: 15 },
-  haiku: { input: 1, output: 5 },
+  haiku: { input: 0.8, output: 4 },
 }
 
 /** 모델 id(claude-opus-4-7 / claude-sonnet-4-6 / claude-haiku-4-5 …)를 단가 티어로 매핑. 알 수 없으면 sonnet. */
