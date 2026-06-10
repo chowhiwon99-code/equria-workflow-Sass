@@ -30,12 +30,13 @@ export function NotificationBell({ userId }: { userId: string }) {
 
   useEffect(() => {
     load()
-    // 실시간 구독: 본인에게 새 알림이 INSERT 되면 목록 갱신
+    // 실시간 구독: 본인 알림의 INSERT(새 알림)·UPDATE(읽음처리)·DELETE 모두 반영
+    //  → 채팅방 입장 시 mark_dm_read가 알림을 읽음처리하면 종(배지)이 즉시 갱신됨
     const channel = supabase
       .channel(`notif-${userId}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` },
+        { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` },
         () => load()
       )
       .subscribe()

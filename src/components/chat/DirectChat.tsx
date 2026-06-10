@@ -510,7 +510,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
       </div>
 
       <div className="relative flex min-h-0 flex-1 flex-col">
-        <div ref={scrollRef} onScroll={onScroll} className="flex min-h-0 flex-1 flex-col overflow-y-auto py-2">
+        <div ref={scrollRef} onScroll={onScroll} className="flex min-h-0 flex-1 flex-col overflow-y-auto py-2 pr-2">
         {messages.length === 0 && (
           <p className="my-auto text-center text-sm text-muted-foreground">
             {isSelf ? "메모나 링크, 파일을 남겨보세요." : "첫 메시지를 보내보세요."}

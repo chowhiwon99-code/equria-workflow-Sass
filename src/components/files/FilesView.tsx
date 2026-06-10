@@ -65,20 +65,25 @@ export function FilesView() {
   }, [load])
 
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
+    const picked = Array.from(e.target.files ?? [])
     e.target.value = ""
-    if (!file) return
-    if (file.size > MAX_BYTES) {
-      toast.error("20MB 이하 파일만 업로드할 수 있어요.")
-      return
+    if (picked.length === 0) return
+    // 20MB 초과만 제외하고 나머지는 한 번에 업로드
+    const tooBig = picked.filter((f) => f.size > MAX_BYTES)
+    const ok = picked.filter((f) => f.size <= MAX_BYTES)
+    if (tooBig.length > 0) {
+      toast.error(`20MB를 넘는 파일은 제외했어요: ${tooBig.map((f) => f.name).join(", ")}`)
     }
+    if (ok.length === 0) return
     setUploading(true)
     try {
       const { data: auth } = await supabase.auth.getUser()
       if (!auth.user) throw new Error("로그인이 필요합니다.")
-      const up = await uploadFile(FILES_BUCKET, file)
-      await mustOk(
-        supabase.from("files").insert({
+      // 순차 업로드(스토리지) → 메타데이터는 한 번에 insert
+      const rows = []
+      for (const file of ok) {
+        const up = await uploadFile(FILES_BUCKET, file)
+        rows.push({
           source: "local",
           name: up.name,
           mime_type: up.mimeType,
@@ -86,8 +91,9 @@ export function FilesView() {
           owner_id: auth.user.id,
           metadata: { storage_path: up.path },
         })
-      )
-      toast.success("업로드했어요.")
+      }
+      await mustOk(supabase.from("files").insert(rows))
+      toast.success(`${rows.length}개 업로드했어요.`)
       load()
     } catch {
       toast.error("업로드에 실패했어요.")
@@ -137,7 +143,7 @@ export function FilesView() {
         <Button size="sm" onClick={() => inputRef.current?.click()} disabled={uploading}>
           <Upload /> {uploading ? "업로드 중…" : "파일 업로드"}
         </Button>
-        <input ref={inputRef} type="file" className="hidden" onChange={onFile} />
+        <input ref={inputRef} type="file" multiple className="hidden" onChange={onFile} />
       </div>
 
       {/* Google Drive 연동 게이트 */}
