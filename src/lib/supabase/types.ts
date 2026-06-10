@@ -1137,6 +1137,59 @@ export type Database = {
           },
         ]
       }
+      meeting_notes: {
+        Row: {
+          attachment_name: string | null
+          attachment_path: string | null
+          attachment_size: number | null
+          attendees: string | null
+          content: string
+          created_at: string
+          id: string
+          meeting_date: string | null
+          title: string
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          attachment_name?: string | null
+          attachment_path?: string | null
+          attachment_size?: number | null
+          attendees?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          meeting_date?: string | null
+          title?: string
+          updated_at?: string
+          user_id: string
+          workspace_id?: string
+        }
+        Update: {
+          attachment_name?: string | null
+          attachment_path?: string | null
+          attachment_size?: number | null
+          attendees?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          meeting_date?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_notes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       message_attachments: {
         Row: {
           created_at: string

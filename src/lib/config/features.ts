@@ -20,6 +20,7 @@ import {
   Mail,
   UserCircle,
   ClipboardList,
+  NotebookPen,
   type LucideIcon,
 } from "lucide-react"
 
@@ -132,6 +133,15 @@ export const FEATURES: Feature[] = [
     label: "근태·결재",
     description: "근태(출퇴근)·지출결의서·휴가를 한 곳에서",
     icon: ClipboardList,
+    status: "ready",
+    phase: 6,
+    group: "work",
+  },
+  {
+    href: "/meetings",
+    label: "회의 노트",
+    description: "회의록 작성·공유 + AI 요약/액션아이템",
+    icon: NotebookPen,
     status: "ready",
     phase: 6,
     group: "work",

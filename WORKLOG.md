@@ -16,8 +16,38 @@
 
 **추가 기능(순차):**
 - [x] 3단계 — 업무 통합: 근태관리 · 지출결의서 · 휴가제출 (한 곳에 배치)
-- [ ] 4단계 — 팀 회의 노트: 회의록 작성/수정/업로드/공유 + 옆에 AI 보조 버튼 상시
+- [x] 4단계 — 팀 회의 노트: 회의록 작성/수정/업로드/공유 + 옆에 AI 보조 버튼 상시
 - [ ] 5단계 — 노션식 새 페이지: 블록 에디터 + `/` 슬래시 명령(전 기능) + AI 상시 (가장 큼·단독)
+
+---
+
+## 2026-06-10 · 4단계 — 팀 회의 노트 `/meetings` (+ AI 보조)
+
+**무엇(쪼갠 내용):**
+1. **사전 패턴 정독(워크플로우 6에이전트)** — AI 라우트·Claude 클라이언트·업로드·RLS·디자인 토큰·기존 인라인 AI(ComposerAiAssist) 패턴을 병렬 정독해 구현을 기존 컨벤션에 정렬.
+2. **마이그 046** — `meeting_notes`(공유 회의록). 컬럼: title·content·meeting_date·attendees·attachment_path/name/size·workspace_id(sentinel)·created_at·updated_at. ★ 045(비공개)와 핵심 차이 = **SELECT 공유**(워크스페이스 멤버 전원 열람), 수정=작성자/관리자, 삭제=작성자. UPDATE에 with check로 변조 방어.
+3. **AI 보조 라우트** `POST /api/meeting-notes/assist` — streamText+toTextStreamResponse, 액션 3종(요약/액션아이템/정리), MODELS.default·temp 0.3·maxOutputTokens 2000, 입력 12000자 가드. 저장 안 함(미리보기).
+4. **첨부 다운로드 라우트** `POST /api/meeting-notes/attachment` — files 스토리지가 본인폴더만 읽기라, user 클라이언트로 noteId RLS 인가 후 admin 클라이언트로 60초 서명 URL 발급(BFF).
+5. **types.ts** — meeting_notes Row/Insert/Update 동기화(MCP 추출 삽입).
+6. **features.ts** — 네비 `/meetings`("회의 노트", NotebookPen, work 그룹).
+7. **UI** — `MeetingsView`(목록↔에디터 마스터/디테일) · `MeetingEditor`(제목/날짜/참석자/본문 textarea + 첨부 + 작성자/관리자만 편집·그외 읽기전용) · `MeetingAiAssist`(본문 옆 **상시** 요약/액션아이템/정리 버튼 → 스트리밍 미리보기 → [본문에 추가]/[전체 교체]).
+
+**왜:** "회의록 작성/수정/업로드/공유 + 작성되는 곳 옆에 AI 버튼 상시". 팀 회의 기록을 공유하고, 거친 메모를 AI로 요약·정리·액션아이템화.
+
+**적대적 리뷰(워크플로우 20에이전트, 4차원·반증검증) → 16건 중 5건 확정·전부 수정:**
+- 🔴 **[보안 high] 첨부 경로 위조(IDOR)** — 공격자가 자기 노트에 타인 폴더 경로를 심어 admin 서명으로 타인 비공개 파일 탈취 가능. **수정**: 마이그 047 CHECK(`attachment_path is null or starts_with(path, user_id||'/')`) + 라우트 서명 전 prefix 재검증(이중). 롤백 검증: 위조 차단·정상/null 통과.
+- 🟠 **[UX medium] 전체 교체 파괴적** — 본문 있으면 confirm 가드 추가.
+- 🟡 **[버그 low] 스트리밍 언마운트 누수** — `useEffect(()=>()=>abort,[])` cleanup.
+- 🟡 **[UX low] 미저장 이탈 유실** — dirty 감지 + 목록 이탈 confirm + beforeunload.
+- 🟡 **[위생 low] 첨부 고아** — 삭제 시 본인 첨부 storage.remove(best-effort).
+
+**예상이슈 체크(잔여):**
+- **workspace_id 미주입**: 046도 DB DEFAULT(sentinel) 의존 — B1-b에서 앱 주입 필요(045와 동일 추적).
+- **첨부 고아 잔여**: '파일 변경'(교체) 시 이전 파일·관리자가 타인 노트 삭제 시 파일은 미정리(저장 전 제거하면 미저장 노트가 깨질 위험이 더 커서 보수적으로 둠). 비용/위생 이슈·비차단.
+- **AI 비용 추적 미연동**: assist 라우트는 chat/assist처럼 agent_usage 미기록(미리보기성). 추후 onFinish 연동 검토.
+- tsc 0 · lint 30/0(신규 effect는 setState 없어 규칙 비해당) · 기존 디자인 톤 유지.
+
+**마이그/커밋:** 046·047 적용(원격50=디스크50). 커밋 ↓.
 
 ---
 
