@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Modal, fieldClass } from "@/components/shared/Modal"
 import { Loading } from "@/components/shared/States"
 import { useUndo } from "@/components/undo/UndoProvider"
-import { categoriesFor, computeAmounts, won, EXPENSE_CATEGORIES, REVENUE_CATEGORIES } from "@/lib/finance"
+import { categoriesFor, computeAmounts, won, money, CURRENCIES, EXPENSE_CATEGORIES, REVENUE_CATEGORIES } from "@/lib/finance"
 import { downloadCsv, todayStamp } from "@/lib/csv"
 import type { FinanceEntry, TaxInvoice } from "@/types"
 
@@ -39,12 +39,11 @@ export function FinanceView() {
   const [categoryFilter, setCategoryFilter] = useState<string>("")
   const [pageCount, setPageCount] = useState(1) // 누적 표시 페이지 수
   const [totalCount, setTotalCount] = useState(0)
-  // 합계는 필터된 전체 기준(페이지 무관)
-  const [totals, setTotals] = useState<{ revenue: number; expense: number; byCat: Record<string, number> }>({
-    revenue: 0,
-    expense: 0,
-    byCat: {},
-  })
+  // 합계는 필터된 전체 기준(페이지 무관). 통화별로 분리(서로 다른 통화는 합산하지 않음).
+  const [totals, setTotals] = useState<{
+    byCat: Record<string, number>
+    byCurrency: Record<string, { revenue: number; expense: number }>
+  }>({ byCat: {}, byCurrency: {} })
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -57,7 +56,7 @@ export function FinanceView() {
     const rowsP = rowsQ.order("entry_date", { ascending: false }).range(0, pageCount * PAGE_SIZE - 1)
 
     // 2) 합계 (필터된 전체, 휴지통 제외)
-    let sumQ = supabase.from("finance_entries").select("kind, category, total_amount").is("deleted_at", null)
+    let sumQ = supabase.from("finance_entries").select("kind, category, total_amount, currency").is("deleted_at", null)
     if (kindFilter !== "all") sumQ = sumQ.eq("kind", kindFilter)
     if (categoryFilter) sumQ = sumQ.eq("category", categoryFilter)
     if (searchText.trim()) sumQ = sumQ.or(`vendor.ilike.${s},description.ilike.${s}`)
@@ -70,13 +69,22 @@ export function FinanceView() {
     setTotalCount(rowsRes.count ?? 0)
     setInvoices(invRes.data ?? [])
 
-    const t = { revenue: 0, expense: 0, byCat: {} as Record<string, number> }
-    for (const e of (sumRes.data as { kind: string; category: string | null; total_amount: number }[]) ?? []) {
-      if (e.kind === "revenue") t.revenue += Number(e.total_amount)
+    const t = {
+      byCat: {} as Record<string, number>,
+      byCurrency: {} as Record<string, { revenue: number; expense: number }>,
+    }
+    for (const e of (sumRes.data as { kind: string; category: string | null; total_amount: number; currency: string | null }[]) ?? []) {
+      const cur = e.currency || "KRW"
+      const amt = Number(e.total_amount)
+      const bc = (t.byCurrency[cur] ??= { revenue: 0, expense: 0 })
+      if (e.kind === "revenue") bc.revenue += amt
       else {
-        t.expense += Number(e.total_amount)
-        const k = e.category || "기타"
-        t.byCat[k] = (t.byCat[k] ?? 0) + Number(e.total_amount)
+        bc.expense += amt
+        // 분류별 지출 차트는 원화 항목만(통화 혼합 방지)
+        if (cur === "KRW") {
+          const k = e.category || "기타"
+          t.byCat[k] = (t.byCat[k] ?? 0) + amt
+        }
       }
     }
     setTotals(t)
@@ -131,11 +139,12 @@ export function FinanceView() {
       q = q.or(`vendor.ilike.${s},description.ilike.${s}`)
     }
     const { data } = await q.order("entry_date", { ascending: false })
-    const headers = ["날짜", "구분", "분류", "거래처/항목", "갯수", "단가", "공급가", "부가세", "수수료", "합계", "상태"]
+    const headers = ["날짜", "구분", "분류", "통화", "거래처/항목", "갯수", "단가", "공급가", "부가세", "수수료", "합계", "상태"]
     const rows = (data ?? []).map((e) => [
       e.entry_date,
       e.kind === "revenue" ? "매출" : "비용",
       e.category ?? "",
+      e.currency ?? "KRW",
       e.vendor ?? e.description ?? "",
       e.quantity ?? "",
       e.unit_price ?? "",
@@ -198,11 +207,14 @@ export function FinanceView() {
       return next
     })
 
-  // 요약 집계 (필터된 전체 기준 — 별도 쿼리에서 계산됨)
-  const totalRevenue = totals.revenue
-  const totalExpense = totals.expense
-  const net = totalRevenue - totalExpense
+  // 요약 집계 (필터된 전체 기준 — 별도 쿼리에서 계산됨). 통화별로 분리.
   const expenseByCat = totals.byCat
+  // 통화 순서: KRW 먼저, 그다음 금액 큰 순
+  const currencyRows = Object.entries(totals.byCurrency).sort(([a, av], [b, bv]) => {
+    if (a === "KRW") return -1
+    if (b === "KRW") return 1
+    return bv.revenue + bv.expense - (av.revenue + av.expense)
+  })
   const hasMore = entries.length < totalCount
   // 비용·매출 분류에 "기타" 등 중복 항목이 있어 Set 으로 중복 제거 (select key 충돌 방지)
   const allCategories = [...new Set([...EXPENSE_CATEGORIES, ...REVENUE_CATEGORIES])]
@@ -241,11 +253,33 @@ export function FinanceView() {
         </div>
       </div>
 
-      {/* 순수익 요약 */}
-      <div className="grid grid-cols-3 gap-3">
-        <SummaryCard label="총 매출" value={won(totalRevenue)} className="text-success" />
-        <SummaryCard label="총 지출" value={won(totalExpense)} className="text-destructive" />
-        <SummaryCard label="순수익" value={won(net)} className={net >= 0 ? "text-foreground" : "text-destructive"} />
+      {/* 순수익 요약 — 통화별 */}
+      <div className="flex flex-col gap-3">
+        {currencyRows.length === 0 ? (
+          <div className="grid grid-cols-3 gap-3">
+            <SummaryCard label="총 매출" value={won(0)} className="text-success" />
+            <SummaryCard label="총 지출" value={won(0)} className="text-destructive" />
+            <SummaryCard label="순수익" value={won(0)} />
+          </div>
+        ) : (
+          currencyRows.map(([cur, v]) => {
+            const net = v.revenue - v.expense
+            return (
+              <div key={cur} className="flex flex-col gap-1.5">
+                {currencyRows.length > 1 && (
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {CURRENCIES.find((c) => c.code === cur)?.label ?? cur}
+                  </span>
+                )}
+                <div className="grid grid-cols-3 gap-3">
+                  <SummaryCard label="총 매출" value={money(v.revenue, cur)} className="text-success" />
+                  <SummaryCard label="총 지출" value={money(v.expense, cur)} className="text-destructive" />
+                  <SummaryCard label="순수익" value={money(net, cur)} className={net >= 0 ? "text-foreground" : "text-destructive"} />
+                </div>
+              </div>
+            )
+          })
+        )}
       </div>
 
       {Object.keys(expenseByCat).length > 0 && (
@@ -352,10 +386,10 @@ export function FinanceView() {
                   <td className="px-3 py-2 text-muted-foreground">{e.category ?? "—"}</td>
                   <td className="px-3 py-2 font-medium">{e.vendor ?? e.description ?? "—"}</td>
                   <td className="px-3 py-2 text-right text-muted-foreground">{e.quantity ?? "—"}</td>
-                  <td className="px-3 py-2 text-right text-muted-foreground">{e.unit_price != null ? won(e.unit_price) : "—"}</td>
-                  <td className="px-3 py-2 text-right">{won(e.amount)}</td>
-                  <td className="px-3 py-2 text-right text-muted-foreground">{won(e.kind === "revenue" ? e.fee_amount : e.tax_amount)}</td>
-                  <td className="px-3 py-2 text-right font-medium">{won(e.total_amount)}</td>
+                  <td className="px-3 py-2 text-right text-muted-foreground">{e.unit_price != null ? money(e.unit_price, e.currency) : "—"}</td>
+                  <td className="px-3 py-2 text-right">{money(e.amount, e.currency)}</td>
+                  <td className="px-3 py-2 text-right text-muted-foreground">{money(e.kind === "revenue" ? e.fee_amount : e.tax_amount, e.currency)}</td>
+                  <td className="px-3 py-2 text-right font-medium">{money(e.total_amount, e.currency)}</td>
                   <td className="px-3 py-2">
                     {e.status === "draft" ? (
                       <button
@@ -389,7 +423,7 @@ export function FinanceView() {
                       </button>
                       <button
                         onClick={async () => {
-                          if (!confirm(`이 항목을 삭제할까요?\n(${e.vendor ?? e.description ?? ""} · ${won(e.total_amount)})`)) return
+                          if (!confirm(`이 항목을 삭제할까요?\n(${e.vendor ?? e.description ?? ""} · ${money(e.total_amount, e.currency)})`)) return
                           // soft-delete: deleted_at 마킹 (행·영수증 보존 → Undo 복구)
                           const { error: err } = await supabase
                             .from("finance_entries")
@@ -564,6 +598,7 @@ function FinanceEntryModal({
   const [amount, setAmount] = useState<string>(entry ? String(entry.amount) : "")
   const [tax, setTax] = useState<string>(entry ? String(entry.tax_amount) : "")
   const [fee, setFee] = useState<string>(entry ? String(entry.fee_amount) : "")
+  const [currency, setCurrency] = useState<string>(entry?.currency ?? "KRW")
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -597,6 +632,7 @@ function FinanceEntryModal({
       tax_amount: kind === "expense" ? Number(tax || 0) : 0,
       fee_amount: kind === "revenue" ? Number(fee || 0) : 0,
       total_amount: computed.total,
+      currency,
       source: "manual" as const,
       status: "confirmed" as const,
     }
@@ -613,6 +649,7 @@ function FinanceEntryModal({
         tax_amount: entry.tax_amount,
         fee_amount: entry.fee_amount,
         total_amount: entry.total_amount,
+        currency: entry.currency,
       }
       const { error: err } = await supabase.from("finance_entries").update(payload).eq("id", entry.id)
       setSaving(false)
@@ -684,6 +721,14 @@ function FinanceEntryModal({
               <option value="">선택…</option>
               {cats.map((c) => (
                 <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </label>
+          <label className="flex-1 text-xs text-muted-foreground">
+            통화
+            <select className={fieldClass} value={currency} onChange={(e) => setCurrency(e.target.value)}>
+              {CURRENCIES.map((c) => (
+                <option key={c.code} value={c.code}>{c.label}</option>
               ))}
             </select>
           </label>

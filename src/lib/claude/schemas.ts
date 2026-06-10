@@ -7,6 +7,7 @@ export const receiptSchema = z.object({
   amount: z.number().describe("공급가액(부가세 제외). 불명확하면 합계와 동일하게"),
   tax_amount: z.number().describe("부가세. 없으면 0"),
   total_amount: z.number().describe("총 결제 합계"),
+  currency: z.string().describe("통화 코드: ₩/원→KRW, $/USD→USD, €→EUR, ¥/엔→JPY, 元/위안→CNY, ₿/BTC→BTC. 불명확하면 KRW"),
   category: z.string().describe("분류 추정: 식비/교통/숙박/소프트웨어/사무용품/기타"),
   items: z
     .array(z.object({ name: z.string(), price: z.number() }))

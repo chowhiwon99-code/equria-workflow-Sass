@@ -119,12 +119,28 @@ export function ExpensePanel() {
 
   return (
     <div className="flex flex-col gap-5">
+      {/* 상태별 요약 — 한눈에 대기/승인/반려 건수·금액 */}
+      {rows.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {(["대기", "승인", "반려"] as const).map((s) => {
+            const items = rows.filter((r) => r.status === s)
+            if (items.length === 0) return null
+            const sum = items.reduce((a, r) => a + Number(r.amount), 0)
+            return (
+              <span key={s} className={cn("inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium", STATUS_BADGE[s])}>
+                {s} {items.length}건 · ₩{sum.toLocaleString()}
+              </span>
+            )
+          })}
+        </div>
+      )}
+
       {/* 제출 폼 */}
       <div className="rounded-2xl border bg-card p-5 shadow-[var(--shadow-sm)]">
         <h2 className="mb-3 text-sm font-semibold">새 지출결의서</h2>
         <div className="flex flex-col gap-2">
           <input className={fieldClass} placeholder="제목 (예: 거래처 점심)" value={title} onChange={(e) => setTitle(e.target.value)} />
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <input
               type="number"
               className={cn(fieldClass, "w-36")}
@@ -132,6 +148,9 @@ export function ExpensePanel() {
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
             />
+            {amount && !isNaN(Number(amount)) && Number(amount) > 0 && (
+              <span className="text-sm font-semibold tabular-nums text-primary">₩{Number(amount).toLocaleString()}</span>
+            )}
             <Select value={category} onChange={setCategory} options={CATEGORIES.map((c) => ({ value: c, label: c }))} className="h-9" />
             <input type="date" className={cn(fieldClass, "w-auto")} value={spentOn} onChange={(e) => setSpentOn(e.target.value)} />
           </div>

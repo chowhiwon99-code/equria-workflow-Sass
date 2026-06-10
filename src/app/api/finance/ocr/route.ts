@@ -46,7 +46,7 @@ export async function POST(req: Request) {
           content: [
             {
               type: "text",
-              text: "이 영수증/세금계산서에서 거래처, 날짜, 공급가액, 부가세, 합계, 분류, 품목을 정확히 추출해줘. 금액은 숫자만(콤마 제거).",
+              text: "이 영수증/세금계산서에서 거래처, 날짜, 공급가액, 부가세, 합계, 통화, 분류, 품목을 정확히 추출해줘. 금액은 숫자만(콤마 제거). 통화 기호(₩·$·€·¥·₿)로 통화 코드를 판별해줘.",
             },
             filePart,
           ],
@@ -70,6 +70,7 @@ export async function POST(req: Request) {
       amount: object.amount,
       tax_amount: object.tax_amount,
       total_amount: object.total_amount,
+      currency: object.currency || "KRW",
       category: object.category || null,
       receipt_url: path,
       source: "ocr",

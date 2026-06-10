@@ -218,6 +218,47 @@ export type Database = {
           },
         ]
       }
+      announcements: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          pinned: boolean
+          title: string
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          content?: string
+          created_at?: string
+          id?: string
+          pinned?: boolean
+          title?: string
+          updated_at?: string
+          user_id: string
+          workspace_id?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          pinned?: boolean
+          title?: string
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcements_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assistant_conversations: {
         Row: {
           created_at: string
@@ -829,6 +870,7 @@ export type Database = {
           category: string | null
           created_at: string
           created_by: string | null
+          currency: string
           deleted_at: string | null
           description: string | null
           entry_date: string
@@ -853,6 +895,7 @@ export type Database = {
           category?: string | null
           created_at?: string
           created_by?: string | null
+          currency?: string
           deleted_at?: string | null
           description?: string | null
           entry_date: string
@@ -877,6 +920,7 @@ export type Database = {
           category?: string | null
           created_at?: string
           created_by?: string | null
+          currency?: string
           deleted_at?: string | null
           description?: string | null
           entry_date?: string

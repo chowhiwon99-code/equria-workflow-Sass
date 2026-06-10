@@ -56,3 +56,34 @@ export function computeAmounts(input: {
     kind === "expense" ? base + Number(tax ?? 0) : base - Number(fee ?? 0)
   return { amount: base, total }
 }
+
+/** 지원 통화 — 비용/매출을 KRW 외 달러·유로·엔·위안·비트코인으로 기록·정리. */
+export const CURRENCIES = [
+  { code: "KRW", symbol: "₩", label: "원 (KRW)" },
+  { code: "USD", symbol: "$", label: "달러 (USD)" },
+  { code: "EUR", symbol: "€", label: "유로 (EUR)" },
+  { code: "JPY", symbol: "¥", label: "엔 (JPY)" },
+  { code: "CNY", symbol: "CN¥", label: "위안 (CNY)" },
+  { code: "BTC", symbol: "₿", label: "비트코인 (BTC)" },
+] as const
+
+export type CurrencyCode = (typeof CURRENCIES)[number]["code"]
+
+const CUR_SYMBOL: Record<string, string> = Object.fromEntries(CURRENCIES.map((c) => [c.code, c.symbol]))
+const CUR_DECIMALS: Record<string, number> = { KRW: 0, USD: 2, EUR: 2, JPY: 0, CNY: 2, BTC: 8 }
+
+/**
+ * 금액을 통화에 맞춰 포맷. 법정화폐는 자릿수 규칙, BTC는 최대 8자리(뒤 0 제거).
+ * 미지원 코드는 코드 접미로 표기.
+ */
+export function money(amount: number | string | null | undefined, currency: string | null | undefined): string {
+  const code = currency || "KRW"
+  const n = Number(amount ?? 0)
+  const sym = CUR_SYMBOL[code]
+  if (code === "BTC") {
+    return `₿${n.toFixed(8).replace(/\.?0+$/, "") || "0"}`
+  }
+  const dec = CUR_DECIMALS[code] ?? 2
+  const s = n.toLocaleString("ko-KR", { minimumFractionDigits: 0, maximumFractionDigits: dec })
+  return sym ? `${sym}${s}` : `${s} ${code}`
+}

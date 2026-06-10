@@ -38,6 +38,15 @@ function fmtTime(iso: string | null): string {
 function fmtDate(d: string): string {
   return d.slice(5).replace("-", ".") // MM.DD
 }
+/** 근무시간(출근~퇴근, 퇴근 전이면 현재까지) — "8시간 30분". */
+function workDuration(checkIn: string | null, checkOut: string | null): string {
+  if (!checkIn) return ""
+  const ms = (checkOut ? new Date(checkOut) : new Date()).getTime() - new Date(checkIn).getTime()
+  if (ms <= 0) return ""
+  const h = Math.floor(ms / 3600000)
+  const m = Math.floor((ms % 3600000) / 60000)
+  return h > 0 ? `${h}시간 ${m}분` : `${m}분`
+}
 
 export function AttendancePanel() {
   const supabase = createClient()
@@ -146,6 +155,12 @@ export function AttendancePanel() {
             <p className="mt-0.5 text-lg font-semibold tabular-nums">{fmtTime(today?.check_out ?? null)}</p>
           </div>
         </div>
+        {today?.check_in && (
+          <p className="mt-2.5 text-xs text-muted-foreground">
+            근무시간 <span className="font-semibold text-foreground">{workDuration(today.check_in, today.check_out)}</span>
+            {!today.check_out && <span className="ml-1 text-primary">· 근무 중</span>}
+          </p>
+        )}
         <div className="mt-4 flex gap-2">
           <Button size="sm" onClick={clockIn} disabled={busy || !!today?.check_in} className="flex-1">
             출근
@@ -183,6 +198,11 @@ export function AttendancePanel() {
                 <span className="ml-auto text-muted-foreground tabular-nums">
                   {fmtTime(r.check_in)} ~ {fmtTime(r.check_out)}
                 </span>
+                {r.check_in && r.check_out && (
+                  <span className="w-20 shrink-0 text-right text-xs text-muted-foreground/80 tabular-nums">
+                    {workDuration(r.check_in, r.check_out)}
+                  </span>
+                )}
               </div>
             ))}
           </div>

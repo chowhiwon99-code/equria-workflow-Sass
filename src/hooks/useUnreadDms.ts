@@ -16,7 +16,12 @@ export function useUnreadDms(): number {
   const load = useCallback(async () => {
     const { data: auth } = await supabase.auth.getUser()
     const me = auth.user?.id
-    if (!me) return
+    if (!me) {
+      // 세션 상실 시 배지/구독 정리(방어적 — 현 라우팅상 보통 언마운트됨)
+      setMeId(null)
+      setCount(0)
+      return
+    }
     setMeId(me)
     const { count } = await supabase
       .from("direct_messages")
