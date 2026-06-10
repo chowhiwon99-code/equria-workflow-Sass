@@ -647,6 +647,7 @@ export type Database = {
         Row: {
           created_at: string
           deleted_at: string | null
+          department: string | null
           external_id: string | null
           id: string
           metadata: Json
@@ -656,12 +657,14 @@ export type Database = {
           project_id: string | null
           size_bytes: number | null
           source: string
+          visibility: string
           web_view_link: string | null
           workspace_id: string
         }
         Insert: {
           created_at?: string
           deleted_at?: string | null
+          department?: string | null
           external_id?: string | null
           id?: string
           metadata?: Json
@@ -671,12 +674,14 @@ export type Database = {
           project_id?: string | null
           size_bytes?: number | null
           source?: string
+          visibility?: string
           web_view_link?: string | null
           workspace_id?: string
         }
         Update: {
           created_at?: string
           deleted_at?: string | null
+          department?: string | null
           external_id?: string | null
           id?: string
           metadata?: Json
@@ -686,6 +691,7 @@ export type Database = {
           project_id?: string | null
           size_bytes?: number | null
           source?: string
+          visibility?: string
           web_view_link?: string | null
           workspace_id?: string
         }

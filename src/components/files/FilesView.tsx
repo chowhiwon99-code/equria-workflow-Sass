@@ -5,29 +5,49 @@ import { Upload, FileText, Download, Trash2, CloudUpload } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { mustOk } from "@/lib/supabase/mustOk"
+import { cn } from "@/lib/utils"
 import { useUndo } from "@/components/undo/UndoProvider"
 import { Button } from "@/components/ui/button"
+import { Select } from "@/components/shared/Select"
 import { Loading, EmptyState, ErrorState } from "@/components/shared/States"
 import { uploadFile } from "@/lib/upload"
 import { FILES_BUCKET, fileSourceLabel, formatBytes } from "@/lib/files"
 
+type Visibility = "personal" | "department" | "public"
 type FileRow = {
   id: string
   name: string
   mime_type: string | null
   size_bytes: number | null
   source: string
+  visibility: string
   metadata: { storage_path?: string } | null
   created_at: string
 }
 
 const MAX_BYTES = 20 * 1024 * 1024 // 20MB
 
+// 공개범위 표시(라벨·배지). 가시성 자체는 RLS(마이그 044)가 강제 — 여기선 표시·필터만.
+const VIS: Record<Visibility, { label: string; badge: string }> = {
+  personal: { label: "개인", badge: "bg-muted text-muted-foreground" },
+  department: { label: "부서", badge: "bg-blue-100 text-blue-700" },
+  public: { label: "공개", badge: "bg-emerald-100 text-emerald-700" },
+}
+const TABS: { key: "all" | Visibility; label: string }[] = [
+  { key: "all", label: "전체" },
+  { key: "public", label: "공개" },
+  { key: "department", label: "부서" },
+  { key: "personal", label: "개인" },
+]
+
 export function FilesView() {
   const supabase = createClient()
   const { push } = useUndo()
   const inputRef = useRef<HTMLInputElement>(null)
   const [rows, setRows] = useState<FileRow[]>([])
+  const [myDept, setMyDept] = useState<string | null>(null)
+  const [tab, setTab] = useState<"all" | Visibility>("all")
+  const [uploadVis, setUploadVis] = useState<Visibility>("public")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -39,13 +59,18 @@ export function FilesView() {
         setLoading(false)
         return
       }
-      const { data, error: queryError } = await supabase
-        .from("files")
-        .select("id, name, mime_type, size_bytes, source, metadata, created_at")
-        .eq("owner_id", auth.user.id)
-        .is("deleted_at", null)
-        .order("created_at", { ascending: false })
+      // 일반 파일(프로젝트 미연결)만 — RLS가 본인 개인 + 공개 + 같은 부서만 돌려준다.
+      const [{ data: prof }, { data, error: queryError }] = await Promise.all([
+        supabase.from("profiles").select("department").eq("id", auth.user.id).single(),
+        supabase
+          .from("files")
+          .select("id, name, mime_type, size_bytes, source, visibility, metadata, created_at")
+          .is("project_id", null)
+          .is("deleted_at", null)
+          .order("created_at", { ascending: false }),
+      ])
       if (queryError) throw queryError
+      setMyDept(prof?.department ?? null)
       setRows((data as FileRow[]) ?? [])
       setError(null)
     } catch {
@@ -68,7 +93,6 @@ export function FilesView() {
     const picked = Array.from(e.target.files ?? [])
     e.target.value = ""
     if (picked.length === 0) return
-    // 20MB 초과만 제외하고 나머지는 한 번에 업로드
     const tooBig = picked.filter((f) => f.size > MAX_BYTES)
     const ok = picked.filter((f) => f.size <= MAX_BYTES)
     if (tooBig.length > 0) {
@@ -79,21 +103,23 @@ export function FilesView() {
     try {
       const { data: auth } = await supabase.auth.getUser()
       if (!auth.user) throw new Error("로그인이 필요합니다.")
-      // 순차 업로드(스토리지) → 메타데이터는 한 번에 insert
-      const rows = []
+      // 순차 업로드(스토리지) → 메타데이터는 한 번에 insert. 선택한 공개범위·내 부서 기록.
+      const newRows = []
       for (const file of ok) {
         const up = await uploadFile(FILES_BUCKET, file)
-        rows.push({
+        newRows.push({
           source: "local",
           name: up.name,
           mime_type: up.mimeType,
           size_bytes: up.size,
           owner_id: auth.user.id,
+          visibility: uploadVis,
+          department: myDept,
           metadata: { storage_path: up.path },
         })
       }
-      await mustOk(supabase.from("files").insert(rows))
-      toast.success(`${rows.length}개 업로드했어요.`)
+      await mustOk(supabase.from("files").insert(newRows))
+      toast.success(`${newRows.length}개 업로드했어요.`)
       load()
     } catch {
       toast.error("업로드에 실패했어요.")
@@ -133,17 +159,44 @@ export function FilesView() {
     window.dispatchEvent(new Event("equria:reload"))
   }
 
+  const visible = tab === "all" ? rows : rows.filter((f) => f.visibility === tab)
+  // 업로드 공개범위 옵션 — '부서'는 내 부서가 있을 때만
+  const visOptions = [
+    { value: "public", label: "공개(전체)" },
+    ...(myDept ? [{ value: "department", label: `부서(${myDept})` }] : []),
+    { value: "personal", label: "개인" },
+  ]
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-lg font-semibold">파일 관리</h1>
-          <p className="text-sm text-muted-foreground">파일을 업로드해 보관·공유하세요.</p>
+          <p className="text-sm text-muted-foreground">공개범위를 골라 업로드하고, 분류별로 모아 보세요.</p>
         </div>
-        <Button size="sm" onClick={() => inputRef.current?.click()} disabled={uploading}>
-          <Upload /> {uploading ? "업로드 중…" : "파일 업로드"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Select value={uploadVis} onChange={(v) => setUploadVis(v as Visibility)} options={visOptions} align="end" />
+          <Button size="sm" onClick={() => inputRef.current?.click()} disabled={uploading}>
+            <Upload /> {uploading ? "업로드 중…" : "파일 업로드"}
+          </Button>
+        </div>
         <input ref={inputRef} type="file" multiple className="hidden" onChange={onFile} />
+      </div>
+
+      {/* 분류 탭 */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={cn(
+              "rounded-full px-3 py-1 text-sm transition-colors",
+              tab === t.key ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
       {/* Google Drive 연동 게이트 */}
@@ -169,37 +222,46 @@ export function FilesView() {
             load()
           }}
         />
-      ) : rows.length === 0 ? (
-        <EmptyState icon={FileText} title="아직 업로드한 파일이 없어요." />
+      ) : visible.length === 0 ? (
+        <EmptyState
+          icon={FileText}
+          title={rows.length === 0 ? "아직 업로드한 파일이 없어요." : "이 분류에 파일이 없어요."}
+        />
       ) : (
         <div className="flex flex-col divide-y rounded-xl border">
-          {rows.map((f) => (
-            <div key={f.id} className="flex items-center gap-3 px-4 py-3">
-              <FileText className="size-4 shrink-0 text-muted-foreground" />
-              <div className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-sm font-medium">{f.name}</span>
-                <span className="text-[11px] text-muted-foreground">
-                  {fileSourceLabel(f.source)} · {formatBytes(f.size_bytes)}
+          {visible.map((f) => {
+            const vis = VIS[f.visibility as Visibility]
+            return (
+              <div key={f.id} className="flex items-center gap-3 px-4 py-3">
+                <FileText className="size-4 shrink-0 text-muted-foreground" />
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-sm font-medium">{f.name}</span>
+                  <span className="text-[11px] text-muted-foreground">
+                    {fileSourceLabel(f.source)} · {formatBytes(f.size_bytes)}
+                  </span>
+                </div>
+                <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium", vis?.badge ?? "bg-muted text-muted-foreground")}>
+                  {vis?.label ?? f.visibility}
                 </span>
+                <button
+                  onClick={() => download(f)}
+                  className="text-muted-foreground hover:text-foreground"
+                  aria-label="다운로드"
+                  title="다운로드"
+                >
+                  <Download className="size-4" />
+                </button>
+                <button
+                  onClick={() => remove(f)}
+                  className="text-muted-foreground hover:text-destructive"
+                  aria-label="삭제"
+                  title="삭제"
+                >
+                  <Trash2 className="size-4" />
+                </button>
               </div>
-              <button
-                onClick={() => download(f)}
-                className="text-muted-foreground hover:text-foreground"
-                aria-label="다운로드"
-                title="다운로드"
-              >
-                <Download className="size-4" />
-              </button>
-              <button
-                onClick={() => remove(f)}
-                className="text-muted-foreground hover:text-destructive"
-                aria-label="삭제"
-                title="삭제"
-              >
-                <Trash2 className="size-4" />
-              </button>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
