@@ -19,6 +19,7 @@ import {
   FolderOpen,
   Mail,
   UserCircle,
+  ClipboardList,
   type LucideIcon,
 } from "lucide-react"
 
@@ -123,6 +124,15 @@ export const FEATURES: Feature[] = [
     description: "파일 업로드·정리 (Google Drive 연동 예정)",
     icon: FolderOpen,
     status: "wip",
+    phase: 6,
+    group: "work",
+  },
+  {
+    href: "/work",
+    label: "근태·결재",
+    description: "근태(출퇴근)·지출결의서·휴가를 한 곳에서",
+    icon: ClipboardList,
+    status: "ready",
     phase: 6,
     group: "work",
   },

@@ -15,9 +15,35 @@
 - [x] 파일 분류: 공개/개인/부서 (2단계)
 
 **추가 기능(순차):**
-- [ ] 3단계 — 업무 통합: 근태관리 · 지출결의서 · 휴가제출 (한 곳에 배치)
+- [x] 3단계 — 업무 통합: 근태관리 · 지출결의서 · 휴가제출 (한 곳에 배치)
 - [ ] 4단계 — 팀 회의 노트: 회의록 작성/수정/업로드/공유 + 옆에 AI 보조 버튼 상시
 - [ ] 5단계 — 노션식 새 페이지: 블록 에디터 + `/` 슬래시 명령(전 기능) + AI 상시 (가장 큼·단독)
+
+---
+
+## 2026-06-10 · 3단계 — 업무 통합(근태·지출결의서·휴가) `/work`
+
+**무엇(쪼갠 내용):**
+1. **마이그 045** — 3테이블 신설(전부 B1 멀티테넌트 RLS·`workspace_id` 기본=equria 센티넬):
+   - `attendance_records`(근태): user_id·work_date·check_in·check_out·status(정상/지각/재택/외근/출장/연차/반차/결근)·note, `unique(user_id, work_date)`.
+   - `expense_reports`(지출결의서): title·amount·category(식비/교통/접대/사무용품/출장/기타)·spent_on·description·status(대기/승인/반려)·reviewed_by·reviewed_at.
+   - `leave_requests`(휴가): leave_type(연차/반차/병가/경조사/공가/기타)·start_date·end_date·reason·status·reviewed_by·reviewed_at.
+   - 헬퍼 `auth_is_admin()`(security definer stable). RLS: **SELECT=워크스페이스∩(본인 OR 관리자)**, INSERT=본인+워크스페이스 멤버, UPDATE=워크스페이스∩(본인 OR 관리자), DELETE=본인+워크스페이스.
+2. **types.ts** — 3테이블 Row/Insert/Update를 MCP로 재생성·tsc 검증.
+3. **features.ts** — 네비 항목 `/work`("근태·결재", `ClipboardList`, group=work) 추가.
+4. **UI** — `app/(app)/work/page.tsx` + `components/work/`: `WorkView`(알약 탭 근태/지출/휴가) · `AttendancePanel`(출근/퇴근·상태 Select·오늘카드·최근14건) · `ExpensePanel`(제출폼·목록·관리자 승인/반려·본인 대기 취소) · `LeavePanel`(신청폼·기간·목록·승인/반려/취소) · `status.ts`(결재 배지 공용).
+
+**왜:** "근태관리·지출결의서·휴가제출을 한 곳에 통합 배치". 흩어진 사내 행정 업무를 단일 섹션에서 처리.
+
+**예상이슈 체크:**
+- **격리 검증(롤백 트랜잭션)**: 조휘원 본인 insert 성공, 박유나(비관리자·타인)는 3테이블 모두 0건 → 본인/관리자 외 비가시 확인.
+- **workspace_id 미설정(앱)**: 앱 insert는 컬럼을 안 보내고 **DB DEFAULT=equria 센티넬**에 의존. 단일 워크스페이스 단계(B1-a)에선 정상. **B1-b(DEFAULT 제거·다중 워크스페이스)** 때 앱이 명시 주입하도록 반드시 수정 — HANDOFF에 기록.
+- **결재 자가승인 가능성(RLS)**: UPDATE USING이 '본인 OR 관리자'라, 본인이 자기 건 status를 이론상 바꿀 수 있음. UI는 승인/반려 버튼을 관리자에게만 노출(앱 차원 방어). 엄격화는 추후(상태전이를 컬럼 권한/트리거로 제한) — 비차단.
+- **관리자 판별**: `profiles.role='admin'`. 현재 운영자 외 전원 일반 → 승인 UI 비노출(정상). admin 지정은 DB/추후 관리화면.
+- **다중 클릭/경합**: `busy` 가드 + 작업 후 `load()` 재조회로 일관성 유지.
+- tsc 0 · lint 30/0(새 패널 3개 load effect는 기존과 동일 `set-state-in-effect` 패턴 → `eslint-disable-next-line`으로 베이스라인 유지·신규 범주 0) · 기존 디자인(알약 탭·상태칩·카드) 톤 유지.
+
+**마이그/커밋:** 045 적용(원격48=디스크48 예정). 커밋 ↓.
 
 ---
 

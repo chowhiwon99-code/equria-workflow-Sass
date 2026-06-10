@@ -302,6 +302,50 @@ export type Database = {
           },
         ]
       }
+      attendance_records: {
+        Row: {
+          check_in: string | null
+          check_out: string | null
+          created_at: string
+          id: string
+          note: string | null
+          status: string
+          user_id: string
+          work_date: string
+          workspace_id: string
+        }
+        Insert: {
+          check_in?: string | null
+          check_out?: string | null
+          created_at?: string
+          id?: string
+          note?: string | null
+          status?: string
+          user_id: string
+          work_date?: string
+          workspace_id?: string
+        }
+        Update: {
+          check_in?: string | null
+          check_out?: string | null
+          created_at?: string
+          id?: string
+          note?: string | null
+          status?: string
+          user_id?: string
+          work_date?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_records_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       business_cards: {
         Row: {
           address: string | null
@@ -643,6 +687,66 @@ export type Database = {
           },
         ]
       }
+      expense_reports: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          spent_on: string
+          status: string
+          title: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          amount?: number
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          spent_on?: string
+          status?: string
+          title: string
+          user_id: string
+          workspace_id?: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          spent_on?: string
+          status?: string
+          title?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_reports_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_reports_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       files: {
         Row: {
           created_at: string
@@ -864,6 +968,63 @@ export type Database = {
             foreignKeyName: "google_connections_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leave_requests: {
+        Row: {
+          created_at: string
+          end_date: string
+          id: string
+          leave_type: string
+          reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          start_date: string
+          status: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          end_date?: string
+          id?: string
+          leave_type?: string
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          start_date?: string
+          status?: string
+          user_id: string
+          workspace_id?: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string
+          id?: string
+          leave_type?: string
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          start_date?: string
+          status?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -1664,6 +1825,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      auth_is_admin: { Args: never; Returns: boolean }
+      auth_user_department: { Args: never; Returns: string }
+      auth_user_workspace_ids: { Args: never; Returns: string[] }
+      current_workspace_id: { Args: never; Returns: string }
       directory_contact: {
         Args: { target: string }
         Returns: {
@@ -1676,7 +1841,9 @@ export type Database = {
         Args: { other_user: string }
         Returns: string
       }
+      is_workspace_member: { Args: { ws_id: string }; Returns: boolean }
       mark_dm_read: { Args: { conv_id: string }; Returns: number }
+      shares_workspace_with: { Args: { other_user: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
