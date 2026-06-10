@@ -45,3 +45,27 @@ export async function uploadFile(
   if (error) throw error
   return { path, name: file.name, size: file.size, mimeType }
 }
+
+// 공개 버킷에 활성 콘텐츠(SVG/HTML)가 올라가면 그 URL이 스크립트를 실행할 수 있어 차단한다.
+const BLOCKED_MEDIA_MIME = /^(image\/svg|text\/html|application\/xhtml)/i
+const BLOCKED_MEDIA_EXT = /\.(svg|html?|xhtml|mhtml|shtml)$/i
+
+/**
+ * 회의록 인라인 미디어(이미지/파일)를 공개 meeting-media 버킷에 올리고 공개 URL을 반환.
+ * 공개 버킷이라 안정적인 URL을 본문(리치 HTML)에 그대로 임베드할 수 있다.
+ * opts.download=true면 첨부 다운로드 disposition을 붙인다(파일 블록용 — 교차출처 download 속성 무시 보완).
+ */
+export async function uploadMeetingMedia(
+  file: File,
+  opts?: { download?: boolean }
+): Promise<{ url: string; name: string; size: number; mimeType: string }> {
+  if (BLOCKED_MEDIA_MIME.test(file.type) || BLOCKED_MEDIA_EXT.test(file.name)) {
+    throw new Error("SVG·HTML 형식은 보안상 올릴 수 없어요.")
+  }
+  const supabase = createClient()
+  const up = await uploadFile("meeting-media", file)
+  const { data } = supabase.storage
+    .from("meeting-media")
+    .getPublicUrl(up.path, opts?.download ? { download: up.name } : undefined)
+  return { url: data.publicUrl, name: up.name, size: up.size, mimeType: up.mimeType }
+}

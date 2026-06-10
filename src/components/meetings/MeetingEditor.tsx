@@ -2,25 +2,25 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
-import { ArrowLeft, Paperclip, Download, Trash2, X, Loader2 } from "lucide-react"
+import { ArrowLeft, Trash2, Loader2, Calendar, Users, Sparkles, Plus, RefreshCw, X } from "lucide-react"
+import type { Editor } from "@tiptap/react"
+import type { JSONContent } from "@tiptap/core"
 import { createClient } from "@/lib/supabase/client"
 import { mustOk } from "@/lib/supabase/mustOk"
-import { uploadFile } from "@/lib/upload"
-import { FILES_BUCKET } from "@/lib/files"
-import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { fieldClass } from "@/components/shared/Modal"
-import { MeetingAiAssist } from "./MeetingAiAssist"
+import { MeetingDocEditor } from "./editor/MeetingDocEditor"
+import { useMeetingAi, AI_ACTION_LABEL, type AiAction } from "./useMeetingAi"
 import type { Tables } from "@/lib/supabase/types"
 
 type Note = Tables<"meeting_notes">
-const MAX_BYTES = 20 * 1024 * 1024 // 20MB
+const AI_ACTIONS: AiAction[] = ["summarize", "actions", "polish"]
 
-function fmtBytes(n: number | null): string {
-  if (!n) return ""
-  if (n < 1024) return `${n}B`
-  if (n < 1024 * 1024) return `${Math.round(n / 1024)}KB`
-  return `${(n / 1024 / 1024).toFixed(1)}MB`
+/** AI 평문 결과를 문단 노드로 — 본문(Tiptap)에 삽입/교체용. */
+function linesToContent(text: string): JSONContent[] {
+  return text
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((l) => (l.trim() ? { type: "paragraph", content: [{ type: "text", text: l }] } : { type: "paragraph" }))
 }
 
 export function MeetingEditor({
@@ -43,14 +43,12 @@ export function MeetingEditor({
   const supabase = createClient()
   const canEdit = !note || note.user_id === me || isAdmin
 
-  // 에디터 진입 시점의 초기값(변경 감지 기준) — 첫 마운트에 한 번 고정.
   const init = useMemo(
     () => ({
       title: note?.title ?? "",
       meetingDate: note?.meeting_date ?? new Date().toLocaleDateString("en-CA"),
       attendees: note?.attendees ?? "",
       content: note?.content ?? "",
-      path: note?.attachment_path ?? null,
     }),
     [note]
   )
@@ -58,29 +56,25 @@ export function MeetingEditor({
   const [title, setTitle] = useState(init.title)
   const [meetingDate, setMeetingDate] = useState(init.meetingDate)
   const [attendees, setAttendees] = useState(init.attendees)
-  const [content, setContent] = useState(init.content)
-  const [att, setAtt] = useState<{ path: string | null; name: string | null; size: number | null }>({
-    path: note?.attachment_path ?? null,
-    name: note?.attachment_name ?? null,
-    size: note?.attachment_size ?? null,
-  })
+  const [content, setContent] = useState(init.content) // 본문 HTML
   const [busy, setBusy] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
+  const titleRef = useRef<HTMLTextAreaElement>(null)
+  const editorRef = useRef<Editor | null>(null)
 
-  // 저장된 첨부(서버 라우트로 열람 가능)인지 — 새로 올린 미저장 첨부는 저장 후 열람
-  const savedAttachment = !!note?.id && att.path === note.attachment_path && !!att.path
+  const ai = useMeetingAi(() => editorRef.current?.getText() ?? "")
 
-  // 저장하지 않은 변경 여부 — 이탈 경고에 사용.
+  useEffect(() => {
+    const t = titleRef.current
+    if (t) {
+      t.style.height = "auto"
+      t.style.height = `${t.scrollHeight}px`
+    }
+  }, [])
+
   const dirty =
     canEdit &&
-    (title !== init.title ||
-      meetingDate !== init.meetingDate ||
-      attendees !== init.attendees ||
-      content !== init.content ||
-      att.path !== init.path)
+    (title !== init.title || meetingDate !== init.meetingDate || attendees !== init.attendees || content !== init.content)
 
-  // 변경이 있을 때 브라우저 새로고침/닫기 경고(앱 내 이탈은 handleBack이 막는다).
   useEffect(() => {
     if (!dirty) return
     const h = (e: BeforeUnloadEvent) => e.preventDefault()
@@ -93,40 +87,26 @@ export function MeetingEditor({
     onBack()
   }
 
-  const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    e.target.value = ""
-    if (!file) return
-    if (file.size > MAX_BYTES) {
-      toast.error("20MB 이하 파일만 첨부할 수 있어요.")
-      return
-    }
-    setUploading(true)
-    try {
-      const up = await uploadFile(FILES_BUCKET, file)
-      setAtt({ path: up.path, name: up.name, size: up.size })
-      toast.success("파일을 첨부했어요. 저장하면 공유됩니다.")
-    } catch {
-      toast.error("업로드에 실패했어요.")
-    } finally {
-      setUploading(false)
-    }
+  const sizeTitle = (e: React.FormEvent<HTMLTextAreaElement>) => {
+    const t = e.currentTarget
+    t.style.height = "auto"
+    t.style.height = `${t.scrollHeight}px`
   }
 
-  const openAttachment = async () => {
-    if (!note?.id) return
-    try {
-      const res = await fetch("/api/meeting-notes/attachment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ noteId: note.id }),
-      })
-      if (!res.ok) throw new Error()
-      const { url } = (await res.json()) as { url: string }
-      window.open(url, "_blank")
-    } catch {
-      toast.error("첨부를 열 수 없어요.")
+  const aiAppend = () => {
+    const r = ai.result?.trim()
+    if (r) editorRef.current?.chain().focus("end").insertContent(linesToContent(r)).run()
+    ai.close()
+  }
+  const aiReplace = () => {
+    const r = ai.result?.trim()
+    if (!r) {
+      ai.close()
+      return
     }
+    if (editorRef.current && editorRef.current.getText().trim() && !confirm("현재 본문을 AI 결과로 덮어쓸까요? 기존 내용은 사라집니다.")) return
+    editorRef.current?.commands.setContent({ type: "doc", content: linesToContent(r) })
+    ai.close()
   }
 
   const save = async () => {
@@ -141,9 +121,6 @@ export function MeetingEditor({
         content,
         meeting_date: meetingDate || null,
         attendees: attendees.trim() || null,
-        attachment_path: att.path,
-        attachment_name: att.name,
-        attachment_size: att.size,
       }
       if (note?.id) {
         await mustOk(
@@ -171,10 +148,6 @@ export function MeetingEditor({
     setBusy(true)
     try {
       await mustOk(supabase.from("meeting_notes").delete().eq("id", note.id))
-      // 첨부 정리(본인 폴더 한정·best-effort) — 노트 삭제 시 스토리지 고아 방지.
-      if (note.attachment_path && note.attachment_path.startsWith(`${me}/`)) {
-        await supabase.storage.from(FILES_BUCKET).remove([note.attachment_path])
-      }
       toast.success("삭제했어요.")
       onDeleted()
     } catch {
@@ -185,9 +158,9 @@ export function MeetingEditor({
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="mx-auto w-full max-w-3xl">
       {/* 상단 바 */}
-      <div className="flex items-center justify-between gap-2">
+      <div className="mb-6 flex items-center justify-between gap-2">
         <button onClick={handleBack} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" /> 목록
         </button>
@@ -207,84 +180,117 @@ export function MeetingEditor({
         )}
       </div>
 
+      {/* 제목 — 보더 없는 큰 텍스트 */}
       {canEdit ? (
-        <>
-          {/* 메타 */}
-          <input
-            className={cn(fieldClass, "h-10 text-base font-semibold")}
-            placeholder="회의 제목"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-          <div className="flex flex-wrap gap-2">
-            <input type="date" className={cn(fieldClass, "w-auto")} value={meetingDate} onChange={(e) => setMeetingDate(e.target.value)} />
-            <input
-              className={cn(fieldClass, "min-w-48 flex-1")}
-              placeholder="참석자 (예: 김대표, 박과장)"
-              value={attendees}
-              onChange={(e) => setAttendees(e.target.value)}
-            />
-          </div>
+        <textarea
+          ref={titleRef}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onInput={sizeTitle}
+          rows={1}
+          placeholder="제목 없음"
+          className="w-full resize-none border-0 bg-transparent p-0 text-3xl font-bold leading-tight outline-none placeholder:text-muted-foreground/40 focus-visible:ring-0"
+        />
+      ) : (
+        <h1 className="text-3xl font-bold leading-tight">{note?.title || "제목 없음"}</h1>
+      )}
 
-          {/* AI 보조 — 작성하는 곳 바로 위에 상시 */}
-          <MeetingAiAssist
-            getText={() => content}
-            onAppend={(t) => setContent((c) => (c.trim() ? `${c}\n\n${t}` : t))}
-            onReplace={(t) => setContent(t)}
-            disabled={busy}
-          />
-
-          <textarea
-            className={cn(fieldClass, "h-auto min-h-[280px] resize-y py-2 leading-relaxed")}
-            placeholder="회의 내용을 적어 주세요. 거친 메모도 좋아요 — AI 보조로 정리·요약·액션아이템을 뽑을 수 있어요."
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-          />
-
-          {/* 첨부 */}
-          <div className="flex flex-wrap items-center gap-2">
-            <input ref={fileRef} type="file" className="hidden" onChange={onPickFile} />
-            <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
-              {uploading ? <Loader2 className="size-3.5 animate-spin" /> : <Paperclip className="size-3.5" />}
-              {att.path ? "파일 변경" : "파일 첨부"}
-            </Button>
-            {att.path && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs">
-                <span className="max-w-48 truncate">{att.name}</span>
-                {att.size ? <span className="text-muted-foreground">{fmtBytes(att.size)}</span> : null}
-                {savedAttachment && (
-                  <button onClick={openAttachment} className="text-muted-foreground hover:text-foreground" aria-label="열기">
-                    <Download className="size-3.5" />
-                  </button>
-                )}
-                <button onClick={() => setAtt({ path: null, name: null, size: null })} className="text-muted-foreground hover:text-destructive" aria-label="첨부 제거">
-                  <X className="size-3.5" />
-                </button>
+      {/* 메타 */}
+      <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-muted-foreground">
+        {canEdit ? (
+          <>
+            <label className="inline-flex items-center gap-1.5">
+              <Calendar className="size-3.5" />
+              <input
+                type="date"
+                value={meetingDate}
+                onChange={(e) => setMeetingDate(e.target.value)}
+                className="border-0 bg-transparent p-0 text-xs text-foreground outline-none focus-visible:ring-0"
+              />
+            </label>
+            <label className="inline-flex min-w-0 flex-1 items-center gap-1.5">
+              <Users className="size-3.5 shrink-0" />
+              <input
+                value={attendees}
+                onChange={(e) => setAttendees(e.target.value)}
+                placeholder="참석자 추가"
+                className="w-full border-0 bg-transparent p-0 text-xs text-foreground outline-none placeholder:text-muted-foreground/60 focus-visible:ring-0"
+              />
+            </label>
+          </>
+        ) : (
+          <>
+            {note?.meeting_date && (
+              <span className="inline-flex items-center gap-1.5">
+                <Calendar className="size-3.5" /> {note.meeting_date}
               </span>
             )}
-            {att.path && !savedAttachment && <span className="text-[11px] text-muted-foreground">저장하면 팀이 열람할 수 있어요</span>}
+            {note?.attendees && (
+              <span className="inline-flex items-center gap-1.5">
+                <Users className="size-3.5" /> {note.attendees}
+              </span>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* AI 보조 — 작성하는 곳 옆에 상시 */}
+      {canEdit && (
+        <>
+          <div className="mt-5 flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+              <Sparkles className="size-3" /> AI
+            </span>
+            {AI_ACTIONS.map((a) => (
+              <button
+                key={a}
+                type="button"
+                onClick={() => ai.run(a)}
+                disabled={busy || ai.busy}
+                className="inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+              >
+                {ai.busy && ai.active === a && <Loader2 className="size-3 animate-spin" />}
+                {AI_ACTION_LABEL[a]}
+              </button>
+            ))}
+            <span className="text-[11px] text-muted-foreground/70">· 본문에서 <kbd className="rounded bg-muted px-1">/</kbd> 입력</span>
           </div>
-        </>
-      ) : (
-        /* 읽기 전용 */
-        <div className="flex flex-col gap-3">
-          <h1 className="text-xl font-semibold">{note?.title || "(제목 없음)"}</h1>
-          <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-            {note?.meeting_date && <span>📅 {note.meeting_date}</span>}
-            {note?.attendees && <span>👥 {note.attendees}</span>}
-          </div>
-          <div className="whitespace-pre-wrap break-words rounded-xl border bg-card p-4 text-sm leading-relaxed">
-            {note?.content || <span className="text-muted-foreground">내용이 없습니다.</span>}
-          </div>
-          {att.path && (
-            <div>
-              <Button variant="outline" size="sm" onClick={openAttachment}>
-                <Download className="size-3.5" /> {att.name ?? "첨부 파일"}
-              </Button>
+
+          {ai.result !== null && (
+            <div className="mt-2 rounded-lg border bg-muted/40 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-[11px] font-medium text-muted-foreground">
+                  {ai.active ? AI_ACTION_LABEL[ai.active] : ""} 결과 (미리보기)
+                </span>
+                <button onClick={ai.close} className="text-muted-foreground hover:text-foreground" aria-label="닫기">
+                  <X className="size-3.5" />
+                </button>
+              </div>
+              <div className="max-h-56 overflow-y-auto whitespace-pre-wrap break-words text-sm">
+                {ai.result || <span className="text-muted-foreground">생성 중…</span>}
+              </div>
+              <div className="mt-2.5 flex justify-end gap-1.5">
+                <Button type="button" variant="outline" size="sm" onClick={aiAppend} disabled={ai.busy || !ai.result.trim()}>
+                  <Plus className="size-3.5" /> 본문에 추가
+                </Button>
+                <Button type="button" size="sm" onClick={aiReplace} disabled={ai.busy || !ai.result.trim()}>
+                  <RefreshCw className="size-3.5" /> 전체 교체
+                </Button>
+              </div>
             </div>
           )}
-        </div>
+        </>
       )}
+
+      {/* 본문 — Tiptap 블록 에디터 */}
+      <div className="mt-5 min-h-[45vh]">
+        <MeetingDocEditor
+          value={init.content}
+          editable={canEdit}
+          onChange={setContent}
+          editorRef={editorRef}
+        />
+      </div>
     </div>
   )
 }

@@ -1,6 +1,8 @@
 // 파일관리 SSOT — 버킷 id, 소스 라벨, 바이트 포맷.
 
 export const FILES_BUCKET = "files"
+// 회의록 블록 에디터의 인라인 이미지/파일용 공개 버킷(마이그 048).
+export const MEETING_MEDIA_BUCKET = "meeting-media"
 
 export const FILE_SOURCE_LABEL: Record<string, string> = {
   local: "내 업로드",

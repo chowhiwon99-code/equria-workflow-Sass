@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Plus, Paperclip, NotebookPen } from "lucide-react"
+import { Plus, NotebookPen } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Loading, EmptyState } from "@/components/shared/States"
@@ -10,8 +10,16 @@ import type { Tables } from "@/lib/supabase/types"
 
 type Note = Tables<"meeting_notes">
 
-function snippet(s: string): string {
-  const t = s.replace(/\s+/g, " ").trim()
+/** 본문 HTML에서 미리보기용 평문 추출. */
+function snippet(html: string): string {
+  const t = html
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\s+/g, " ")
+    .trim()
   return t.length > 100 ? `${t.slice(0, 100)}…` : t
 }
 
@@ -104,12 +112,11 @@ export function MeetingsView() {
             >
               <div className="flex items-center gap-2">
                 <span className="min-w-0 flex-1 truncate text-sm font-medium">{n.title || "(제목 없음)"}</span>
-                {n.attachment_path && <Paperclip className="size-3.5 shrink-0 text-muted-foreground" />}
                 <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
                   {(n.meeting_date ?? n.created_at.slice(0, 10)).slice(5).replace("-", ".")}
                 </span>
               </div>
-              {n.content.trim() && <p className="line-clamp-1 text-xs text-muted-foreground">{snippet(n.content)}</p>}
+              {snippet(n.content) && <p className="line-clamp-1 text-xs text-muted-foreground">{snippet(n.content)}</p>}
               <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                 <span>{names[n.user_id] ?? "직원"}</span>
                 {n.attendees && <span className="truncate">· {n.attendees}</span>}

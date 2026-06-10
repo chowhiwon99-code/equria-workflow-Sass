@@ -21,6 +21,35 @@
 
 ---
 
+## 2026-06-10 · 4단계+ — 회의록을 노션식 Tiptap 블록 에디터로 전환
+
+**무엇(쪼갠 내용):**
+1. **노션 슬래시 UX 웹리서치(워크플로우 6에이전트)** — 트리거/필터/키보드/블록전환/위치 5개 facet 조사 → 구현 스펙으로 합성. 그 스펙대로 슬래시 구현.
+2. **Tiptap v3.26 전환** — 코어/확장 전부 3.26 정렬(채팅 회귀 0). 확장 추가: task-list/task-item·image·table(4종)·suggestion.
+3. **블록 에디터(`editor/`)** — `extensions.ts`(StarterKit h1-4 + 체크박스 + 표 + 커스텀 FileBlock/Callout + SlashCommand + Placeholder, **SafeImage**로 src http(s)만), `slashItems.ts`(블록/AI 항목, 아이콘 **lucide 통일**, 모든 command가 deleteRange로 '/쿼리' 소비), `SlashMenu.tsx`(섹션헤더·키보드 순환·scrollIntoView·IME가드), `FileBlock`/`Callout`(ReactNodeView, data-* 직렬화), `MeetingDocEditor`(useEditor, content=HTML, 이미지/파일 인라인 업로드).
+4. **이미지/파일 업로드(모든 형식)** — 공개 `meeting-media` 버킷(마이그 048) + `uploadMeetingMedia`. 이미지=인라인, 파일(pdf·zip·xlsx·ppt 등)=다운로드 disposition.
+5. **구분선=얇은 가로줄·빈줄 플레이스홀더 "'/'를 입력해 명령어 사용"** (요청 화면 반영) + 표/체크박스/코드 등 `.meeting-doc` CSS.
+6. **정리** — 구 SlashTextarea/noteMarkdown/MeetingAiAssist/attachment 라우트 제거. AI는 `useMeetingAi` 훅으로 본문(editor.getText()) 처리, 슬래시에서도 호출.
+
+**왜:** "회의록을 노션처럼(작성 UI) — 이미지/파일 인라인·슬래시 블록". 보내준 노션 슬래시 메뉴 캡처 기준.
+
+**적대적 리뷰(워크플로우 20에이전트, 4차원·반증검증) → 16건 중 7건 확정·핵심 수정:**
+- 🔴 **[보안 high] 저장형 XSS** — FileBlock의 `data-src`에 `javascript:`를 심으면 읽기전용에서 앵커 클릭 시 실행(공유 노트라 멤버→멤버). **수정**: FileBlock src parseHTML+렌더 http(s)만 + SafeImage 동일 가드.
+- 🟠 **[보안 med] 공개버킷 SVG/HTML 실행** — `uploadMeetingMedia`에서 svg/html/xhtml MIME·확장자 차단.
+- 🟡 **[보안 low] 50MB 우회** — 버킷 file_size_limit 서버강제(마이그 049).
+- 🟡 **[버그 low] 교차출처 download 무시** — getPublicUrl download 옵션으로 disposition.
+- 🟡 **[스펙 low] 짧은 뷰포트 메뉴 잘림** — 위치 top 클램프.
+
+**예상이슈 체크(잔여·비차단):**
+- **공개버킷 트레이드오프**: URL 알면 워크스페이스 밖 접근 가능(추측불가 uuid). 더 엄격히는 비공개+서명 후속(HANDOFF).
+- **인라인 미디어 고아**: 노트 삭제 시 meeting-media 객체 미정리(스토리지 GC 후속).
+- **로컬 build 미실행**(폰트) → Vercel이 실제 런타임 게이트. 슬래시/노드 런타임은 브라우저 확인 필요.
+- tsc 0 · lint 30/0 · 기존 디자인 톤 유지.
+
+**마이그/커밋:** 048·049 적용(원격52=디스크52). 커밋 ↓.
+
+---
+
 ## 2026-06-10 · 4단계 — 팀 회의 노트 `/meetings` (+ AI 보조)
 
 **무엇(쪼갠 내용):**
