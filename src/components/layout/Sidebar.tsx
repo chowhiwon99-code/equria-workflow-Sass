@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation"
 import { Check, SlidersHorizontal } from "lucide-react"
 import { FEATURES, FEATURE_GROUPS } from "@/lib/config/features"
 import { cn } from "@/lib/utils"
+import { useUnreadDms } from "@/hooks/useUnreadDms"
 
 // 사이드바에서 숨긴 메뉴(href 목록) — 기기별 저장. (B2B 전환 시 프로필 DB로 승격 가능)
 const LS_KEY = "equria:sidebar-hidden"
@@ -50,6 +51,7 @@ export function Sidebar() {
   const [editing, setEditing] = useState(false)
   // 첫 페인트에선 transition을 끄고(정확한 초기 상태) 이후 토글만 애니메이션 — 하이드레이션 깜빡임 방지
   const [mounted, setMounted] = useState(false)
+  const unreadDms = useUnreadDms() // "직원 채팅" 빨간 배지
 
   // localStorage는 클라이언트에서만 — 마운트 후 로드(하이드레이션 불일치 방지)
   useEffect(() => {
@@ -132,6 +134,11 @@ export function Sidebar() {
                         >
                           <Icon className="size-4 shrink-0" />
                           <span className="flex-1">{feature.label}</span>
+                          {feature.href === "/chat" && unreadDms > 0 && (
+                            <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold leading-none text-white">
+                              {unreadDms > 99 ? "99+" : unreadDms}
+                            </span>
+                          )}
                           {feature.status === "planned" && (
                             <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">예정</span>
                           )}
