@@ -1,7 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Upload, FileText, Loader2, Plus, Pencil, Download, Trash2 } from "lucide-react"
+import { toast } from "sonner"
+import { Upload, FileText, Loader2, Plus, Pencil, Download, Trash2, Receipt } from "lucide-react"
 import { Select } from "@/components/shared/Select"
 import { createClient } from "@/lib/supabase/client"
 import { mustOk } from "@/lib/supabase/mustOk"
@@ -118,6 +119,22 @@ export function FinanceView() {
     } finally {
       setUploading(false)
       if (fileRef.current) fileRef.current.value = ""
+    }
+  }
+
+  // 첨부 영수증(이미지/PDF) 열람 — 서버에서 가시성 인가 후 60초 서명 URL.
+  const viewReceipt = async (id: string) => {
+    try {
+      const res = await fetch("/api/finance/receipt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entryId: id }),
+      })
+      if (!res.ok) throw new Error()
+      const { url } = (await res.json()) as { url: string }
+      window.open(url, "_blank")
+    } catch {
+      toast.error("영수증을 열 수 없어요.")
     }
   }
 
@@ -384,7 +401,20 @@ export function FinanceView() {
                     </span>
                   </td>
                   <td className="px-3 py-2 text-muted-foreground">{e.category ?? "—"}</td>
-                  <td className="px-3 py-2 font-medium">{e.vendor ?? e.description ?? "—"}</td>
+                  <td className="px-3 py-2 font-medium">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="truncate">{e.vendor ?? e.description ?? "—"}</span>
+                      {e.receipt_url && (
+                        <button
+                          onClick={() => viewReceipt(e.id)}
+                          title="첨부 영수증 보기"
+                          className="shrink-0 text-muted-foreground transition-colors hover:text-primary"
+                        >
+                          <Receipt className="size-3.5" />
+                        </button>
+                      )}
+                    </span>
+                  </td>
                   <td className="px-3 py-2 text-right text-muted-foreground">{e.quantity ?? "—"}</td>
                   <td className="px-3 py-2 text-right text-muted-foreground">{e.unit_price != null ? money(e.unit_price, e.currency) : "—"}</td>
                   <td className="px-3 py-2 text-right">{money(e.amount, e.currency)}</td>
