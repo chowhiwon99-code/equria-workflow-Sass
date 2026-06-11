@@ -10,6 +10,7 @@ import { useUndo } from "@/components/undo/UndoProvider"
 import { Button } from "@/components/ui/button"
 import { Select } from "@/components/shared/Select"
 import { FilePreview } from "@/components/shared/FilePreview"
+import { HoverPreview } from "@/components/shared/HoverPreview"
 import { Loading, EmptyState, ErrorState } from "@/components/shared/States"
 import { uploadFile } from "@/lib/upload"
 import { FILES_BUCKET, fileSourceLabel, formatBytes } from "@/lib/files"
@@ -130,19 +131,25 @@ export function FilesView() {
     }
   }
 
+  // 서명 URL(60초) — 호버/클릭 미리보기 공용.
+  const signedUrlFor = useCallback(
+    async (f: FileRow): Promise<string | null> => {
+      const path = f.metadata?.storage_path
+      if (!path) return null
+      const { data } = await supabase.storage.from(FILES_BUCKET).createSignedUrl(path, 60)
+      return data?.signedUrl ?? null
+    },
+    [supabase]
+  )
+
   // 파일 클릭 → 새 탭 대신 인라인 미리보기 칸으로.
   const openPreview = async (f: FileRow) => {
-    const path = f.metadata?.storage_path
-    if (!path) {
-      toast.error("파일 경로를 찾을 수 없어요.")
-      return
-    }
-    const { data, error } = await supabase.storage.from(FILES_BUCKET).createSignedUrl(path, 60)
-    if (error || !data) {
+    const url = await signedUrlFor(f)
+    if (!url) {
       toast.error("미리보기 링크 생성에 실패했어요.")
       return
     }
-    setPreview({ url: data.signedUrl, name: f.name, mime: f.mime_type })
+    setPreview({ url, name: f.name, mime: f.mime_type })
   }
 
   const remove = async (f: FileRow) => {
@@ -236,15 +243,17 @@ export function FilesView() {
             const vis = VIS[f.visibility as Visibility]
             return (
               <div key={f.id} className="flex items-center gap-3 px-4 py-3">
-                <button onClick={() => openPreview(f)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-                  <FileText className="size-4 shrink-0 text-muted-foreground" />
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate text-sm font-medium hover:underline">{f.name}</span>
-                    <span className="text-[11px] text-muted-foreground">
-                      {fileSourceLabel(f.source)} · {formatBytes(f.size_bytes)}
-                    </span>
-                  </div>
-                </button>
+                <HoverPreview getUrl={() => signedUrlFor(f)} name={f.name} mime={f.mime_type} className="flex min-w-0 flex-1">
+                  <button onClick={() => openPreview(f)} className="flex w-full min-w-0 items-center gap-3 text-left">
+                    <FileText className="size-4 shrink-0 text-muted-foreground" />
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate text-sm font-medium hover:underline">{f.name}</span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {fileSourceLabel(f.source)} · {formatBytes(f.size_bytes)}
+                      </span>
+                    </div>
+                  </button>
+                </HoverPreview>
                 <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium", vis?.badge ?? "bg-muted text-muted-foreground")}>
                   {vis?.label ?? f.visibility}
                 </span>

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { Sidebar } from "@/components/layout/Sidebar"
 import { Header } from "@/components/layout/Header"
+import { AnnouncementBanner } from "@/components/layout/AnnouncementBanner"
 import { AgentChatProvider } from "@/components/agent-chat/AgentChatContext"
 import { FloatingAgentChat } from "@/components/agent-chat/FloatingAgentChat"
 import { UndoProvider } from "@/components/undo/UndoProvider"
@@ -33,6 +34,7 @@ export default async function AppLayout({
           <Sidebar />
           <div className="flex flex-1 flex-col overflow-hidden">
             <Header userName={profile?.name ?? "직원"} userId={user.id} />
+            <AnnouncementBanner />
             <main className="flex-1 overflow-y-auto p-[var(--app-pad)]">{children}</main>
           </div>
         </div>

@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Modal, fieldClass } from "@/components/shared/Modal"
 import { FilePreview } from "@/components/shared/FilePreview"
+import { HoverPreview } from "@/components/shared/HoverPreview"
 import { Loading } from "@/components/shared/States"
 import { useUndo } from "@/components/undo/UndoProvider"
 import { categoriesFor, computeAmounts, won, money, CURRENCIES, EXPENSE_CATEGORIES, REVENUE_CATEGORIES } from "@/lib/finance"
@@ -124,27 +125,37 @@ export function FinanceView() {
     }
   }
 
-  // 첨부 영수증(이미지/PDF) 열람 — 서버에서 가시성 인가 후 60초 서명 URL → 인라인 미리보기 칸.
-  const viewReceipt = async (e: FinanceEntry) => {
+  // 영수증 서명 URL(서버 인가 후) — 호버/클릭 공용.
+  const receiptUrlFor = async (e: FinanceEntry): Promise<string | null> => {
     try {
       const res = await fetch("/api/finance/receipt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ entryId: e.id }),
       })
-      if (!res.ok) throw new Error()
+      if (!res.ok) return null
       const { url } = (await res.json()) as { url: string }
-      const ext = (e.receipt_url ?? "").split(".").pop()?.toLowerCase() ?? ""
-      const mime =
-        ext === "pdf"
-          ? "application/pdf"
-          : /^(png|jpe?g|gif|webp|bmp)$/.test(ext)
-            ? `image/${ext === "jpg" ? "jpeg" : ext}`
-            : null
-      setReceiptPreview({ url, name: `${e.vendor ?? "영수증"} (${e.entry_date})`, mime })
+      return url
     } catch {
-      toast.error("영수증을 열 수 없어요.")
+      return null
     }
+  }
+
+  // 첨부 영수증(이미지/PDF) 열람 — 인라인 미리보기 칸.
+  const viewReceipt = async (e: FinanceEntry) => {
+    const url = await receiptUrlFor(e)
+    if (!url) {
+      toast.error("영수증을 열 수 없어요.")
+      return
+    }
+    const ext = (e.receipt_url ?? "").split(".").pop()?.toLowerCase() ?? ""
+    const mime =
+      ext === "pdf"
+        ? "application/pdf"
+        : /^(png|jpe?g|gif|webp|bmp)$/.test(ext)
+          ? `image/${ext === "jpg" ? "jpeg" : ext}`
+          : null
+    setReceiptPreview({ url, name: `${e.vendor ?? "영수증"} (${e.entry_date})`, mime })
   }
 
   const toggle = (id: string) =>
@@ -414,13 +425,15 @@ export function FinanceView() {
                     <span className="inline-flex items-center gap-1.5">
                       <span className="truncate">{e.vendor ?? e.description ?? "—"}</span>
                       {e.receipt_url && (
-                        <button
-                          onClick={() => viewReceipt(e)}
-                          title="첨부 영수증 보기"
-                          className="shrink-0 text-muted-foreground transition-colors hover:text-primary"
-                        >
-                          <Receipt className="size-3.5" />
-                        </button>
+                        <HoverPreview getUrl={() => receiptUrlFor(e)} name={e.receipt_url} className="shrink-0">
+                          <button
+                            onClick={() => viewReceipt(e)}
+                            title="첨부 영수증 보기 (호버로 미리보기)"
+                            className="text-muted-foreground transition-colors hover:text-primary"
+                          >
+                            <Receipt className="size-3.5" />
+                          </button>
+                        </HoverPreview>
                       )}
                     </span>
                   </td>
