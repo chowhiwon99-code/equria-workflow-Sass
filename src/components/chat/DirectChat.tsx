@@ -16,6 +16,7 @@ import { MessageBody } from "@/components/chat/MessageBody"
 import { RichComposer, type ComposerPayload } from "@/components/chat/RichComposer"
 import { AttachmentList, type AttachmentItem } from "@/components/chat/AttachmentList"
 import { useOnlineUsers } from "@/hooks/usePresence"
+import { emitChat, onChat } from "@/lib/chatBus"
 import type { DirectMessage } from "@/types"
 
 const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|bmp|svg|avif|heic|heif)$/i
@@ -136,6 +137,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
         await supabase.from("message_reactions").insert({ message_id: messageId, user_id: meId, emoji })
       }
       void loadReactions(conversationId)
+      emitChat(conversationId)
     },
     [supabase, meId, conversationId, reactions, loadReactions]
   )
@@ -228,33 +230,46 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, conversationId, meId])
 
-  // 탭 복귀/포커스 시 읽음상태·새 메시지 재동기화 (Realtime 누락 대비 — 카톡식 즉시성 보강)
-  useEffect(() => {
-    if (!conversationId || !meId) return
-    const sync = async () => {
-      if (document.visibilityState !== "visible") return
-      const { data: msgs } = await supabase
-        .from("direct_messages")
-        .select("*")
-        .eq("conversation_id", conversationId)
-        .order("created_at", { ascending: true })
-      const list = msgs ?? []
-      setMessages(list)
-      void resolveAttachments(list)
-      void loadReactions(conversationId)
-      void loadAttachments(conversationId)
-      if (meId !== otherUserId) {
-        void supabase.rpc("mark_dm_read", { conv_id: conversationId }).then(() => {})
-      }
-    }
-    window.addEventListener("focus", sync)
-    document.addEventListener("visibilitychange", sync)
-    return () => {
-      window.removeEventListener("focus", sync)
-      document.removeEventListener("visibilitychange", sync)
+  // 메시지·반응·읽음 재동기화 — 포커스 복귀 + 다른 창 신호 공용. 메시지는 항상 갱신, 읽음은 보일 때만.
+  const resync = useCallback(async () => {
+    if (!conversationId) return
+    const { data: msgs } = await supabase
+      .from("direct_messages")
+      .select("*")
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: true })
+    const list = msgs ?? []
+    setMessages(list)
+    void resolveAttachments(list)
+    void loadReactions(conversationId)
+    void loadAttachments(conversationId)
+    if (meId && meId !== otherUserId && document.visibilityState === "visible") {
+      void supabase.rpc("mark_dm_read", { conv_id: conversationId }).then(() => {})
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, conversationId, meId, otherUserId])
+
+  // 탭 복귀/포커스 시 재동기화 (Realtime 누락 대비 — 카톡식 즉시성 보강)
+  useEffect(() => {
+    if (!conversationId || !meId) return
+    const onVis = () => {
+      if (document.visibilityState === "visible") void resync()
+    }
+    window.addEventListener("focus", onVis)
+    document.addEventListener("visibilitychange", onVis)
+    return () => {
+      window.removeEventListener("focus", onVis)
+      document.removeEventListener("visibilitychange", onVis)
+    }
+  }, [conversationId, meId, resync])
+
+  // 다른 창/탭에서 채팅이 바뀌면(BroadcastChannel) 이 대화방이면 즉시 재동기화
+  useEffect(() => {
+    if (!conversationId) return
+    return onChat((cid) => {
+      if (!cid || cid === conversationId) void resync()
+    })
+  }, [conversationId, resync])
 
   // 스크롤 컨테이너를 맨 아래로
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
@@ -340,6 +355,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
         if (insErr || !msg) throw insErr ?? new Error("전송에 실패했어요.")
         // 낙관적 반영 — Realtime 왕복을 기다리지 않고 내 메시지를 즉시 표시(에코 INSERT는 id 중복으로 무시됨)
         setMessages((prev) => (prev.some((mm) => mm.id === msg.id) ? prev : [...prev, msg]))
+        emitChat(conversationId) // 다른 창/탭 즉시 동기화
         if (uploaded.length) {
           const { error: attErr } = await supabase.from("message_attachments").insert(
             uploaded.map((u) => ({
@@ -440,44 +456,54 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
     const prevContent = m.content
     const prevEdited = m.edited_at
     const prevBody = m.body_json
+    const now = new Date().toISOString()
     // 편집은 plain 텍스트이므로 body_json을 비워 리치 잔류를 막는다(편집본은 plain 렌더)
     const { error: e } = await supabase
       .from("direct_messages")
-      .update({ content: text, body_json: null, edited_at: new Date().toISOString() })
+      .update({ content: text, body_json: null, edited_at: now })
       .eq("id", m.id)
     if (e) {
       toast.error(e.message)
       return
     }
     cancelEdit()
+    setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, content: text, body_json: null, edited_at: now } : x)))
+    emitChat(conversationId)
     push({
       label: "메시지 수정",
       undo: async () => {
         await mustOk(supabase.from("direct_messages").update({ content: prevContent, body_json: prevBody, edited_at: prevEdited }).eq("id", m.id))
+        emitChat(conversationId)
       },
       redo: async () => {
-        await mustOk(supabase.from("direct_messages").update({ content: text, body_json: null, edited_at: new Date().toISOString() }).eq("id", m.id))
+        await mustOk(supabase.from("direct_messages").update({ content: text, body_json: null, edited_at: now }).eq("id", m.id))
+        emitChat(conversationId)
       },
     })
   }
   // 본인 메시지 삭제 = soft-delete (deleted_at 마킹 → "삭제된 메시지" placeholder, Undo 복구)
   const deleteMessage = async (m: DirectMessage) => {
     if (!confirm("이 메시지를 삭제할까요?")) return
+    const now = new Date().toISOString()
     const { error: e } = await supabase
       .from("direct_messages")
-      .update({ deleted_at: new Date().toISOString() })
+      .update({ deleted_at: now })
       .eq("id", m.id)
     if (e) {
       toast.error(e.message)
       return
     }
+    setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, deleted_at: now } : x)))
+    emitChat(conversationId)
     push({
       label: "메시지 삭제",
       undo: async () => {
         await mustOk(supabase.from("direct_messages").update({ deleted_at: null }).eq("id", m.id))
+        emitChat(conversationId)
       },
       redo: async () => {
-        await mustOk(supabase.from("direct_messages").update({ deleted_at: new Date().toISOString() }).eq("id", m.id))
+        await mustOk(supabase.from("direct_messages").update({ deleted_at: now }).eq("id", m.id))
+        emitChat(conversationId)
       },
     })
   }

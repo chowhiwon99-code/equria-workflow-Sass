@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { onChat } from "@/lib/chatBus"
 
 /**
  * 내 미읽음 DM 총개수 — 사이드바 "직원 채팅" 빨간 배지용.
@@ -48,6 +49,9 @@ export function useUnreadDms(): number {
       supabase.removeChannel(channel)
     }
   }, [supabase, meId, load])
+
+  // 다른 창/탭의 채팅 변경 즉시 반영(BroadcastChannel)
+  useEffect(() => onChat(() => load()), [load])
 
   return count
 }

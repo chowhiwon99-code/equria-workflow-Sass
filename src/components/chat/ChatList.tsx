@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { StatusDot } from "@/components/chat/StatusDot"
 import { Loading, ErrorState } from "@/components/shared/States"
 import { useOnlineUsers } from "@/hooks/usePresence"
+import { onChat } from "@/lib/chatBus"
 import type { Profile } from "@/types"
 
 type Colleague = Pick<Profile, "id" | "name" | "department" | "status_manual">
@@ -115,6 +116,9 @@ export function ChatList() {
       supabase.removeChannel(channel)
     }
   }, [supabase, meId, load])
+
+  // 다른 창/탭에서 채팅이 바뀌면 목록 즉시 갱신(BroadcastChannel)
+  useEffect(() => onChat(() => load()), [load])
 
   const startedIds = new Set(rooms.map((r) => r.otherId))
   const newContacts = colleagues.filter((c) => !startedIds.has(c.id))

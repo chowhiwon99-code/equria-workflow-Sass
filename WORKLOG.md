@@ -21,6 +21,22 @@
 
 ---
 
+## 2026-06-11 · 채팅 창 간 즉시 동기화(BroadcastChannel) + realtime 보강
+
+**무엇:** 한 창에서 보낸/수정/삭제/반응한 채팅이 **다른 창/탭에 즉시** 반영되게.
+- **`lib/chatBus.ts`** — BroadcastChannel("equria-chat") `emitChat()/onChat()`. 같은 브라우저 창 간 즉시 동기화(같은 창엔 echo 안 됨 → 보낸 창은 낙관적/Realtime).
+- **DirectChat** — 포커스 `sync`를 `resync`(메시지·반응·읽음 재조회)로 추출, **다른 창 신호 시 같은 대화방이면 즉시 resync**. 전송/편집/삭제/반응에 `emitChat`(편집·삭제는 작성 창 낙관적 갱신도 추가). undo/redo도 emit.
+- **ChatList·useUnreadDms** — `onChat`→목록/배지 즉시 reload.
+- **마이그 057** — `direct_conversations`를 realtime publication에 추가(원격/타기기 방 순서·새 대화 반영). direct_messages 등은 이미 등록.
+
+**왜:** "채팅 보내면 다른 창에서도 바로 적용". 기존 realtime+포커스resync에 BroadcastChannel을 더해 같은 브라우저 창 간 즉시성·신뢰성 보강.
+
+**예상이슈 체크:** BroadcastChannel은 같은 출처·브라우저 한정(타기기는 realtime). 미지원 환경은 no-op(폴백=realtime/포커스). 변경 시마다 다른 창 1회 reload(가벼움). 보낸 창엔 echo 없음(낙관/Realtime). tsc 0·lint 30/0·빌드.
+
+**마이그/커밋:** 057 적용. 커밋 ↓.
+
+---
+
 ## 2026-06-11 · 전자결재(카카오워크식) Phase A — 기안·결재선·승인/반려
 
 **무엇(쪼갠 내용):**
