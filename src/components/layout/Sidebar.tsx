@@ -1,27 +1,33 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Check, SlidersHorizontal } from "lucide-react"
+import { Check, SlidersHorizontal, ChevronDown } from "lucide-react"
 import { FEATURES, FEATURE_GROUPS } from "@/lib/config/features"
 import { cn } from "@/lib/utils"
 import { useUnreadDms } from "@/hooks/useUnreadDms"
 
 // 사이드바에서 숨긴 메뉴(href 목록) — 기기별 저장. (B2B 전환 시 프로필 DB로 승격 가능)
 const LS_KEY = "equria:sidebar-hidden"
+// 접은 폴더(그룹 id 목록) — 기기별 저장.
+const CL_KEY = "equria:sidebar-collapsed"
 
-// 애플/토스 결의 부드러운 이징 (Segmented 슬라이딩 썸과 동일)
-const EASE = "ease-[cubic-bezier(0.32,0.72,0,1)]"
-
-function loadHidden(): string[] {
+function loadList(key: string): string[] {
   try {
-    const raw = localStorage.getItem(LS_KEY)
+    const raw = localStorage.getItem(key)
     const arr = raw ? JSON.parse(raw) : []
     return Array.isArray(arr) ? arr.filter((x): x is string => typeof x === "string") : []
   } catch {
     return []
   }
+}
+
+// 애플/토스 결의 부드러운 이징 (Segmented 슬라이딩 썸과 동일)
+const EASE = "ease-[cubic-bezier(0.32,0.72,0,1)]"
+
+function loadHidden(): string[] {
+  return loadList(LS_KEY)
 }
 
 // iOS식 스위치 — 켜기/끄기 상태를 슬라이딩 썸으로 표현 (components/ui 무수정, 인라인)
@@ -48,6 +54,7 @@ function Switch({ on }: { on: boolean }) {
 export function Sidebar() {
   const pathname = usePathname()
   const [hidden, setHidden] = useState<string[]>([])
+  const [collapsed, setCollapsed] = useState<string[]>([]) // 접은 폴더(그룹 id)
   const [editing, setEditing] = useState(false)
   // 첫 페인트에선 transition을 끄고(정확한 초기 상태) 이후 토글만 애니메이션 — 하이드레이션 깜빡임 방지
   const [mounted, setMounted] = useState(false)
@@ -56,6 +63,7 @@ export function Sidebar() {
   // localStorage는 클라이언트에서만 — 마운트 후 로드(하이드레이션 불일치 방지)
   useEffect(() => {
     setHidden(loadHidden())
+    setCollapsed(loadList(CL_KEY))
     setMounted(true)
   }, [])
 
@@ -69,6 +77,40 @@ export function Sidebar() {
       }
       return next
     })
+  }, [])
+
+  // 폴더(그룹) 접기/펴기 — 헤더 클릭. 편집 중엔 항상 펼침.
+  const toggleCollapse = useCallback((id: string) => {
+    setCollapsed((prev) => {
+      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      try {
+        localStorage.setItem(CL_KEY, JSON.stringify(next))
+      } catch {
+        /* 무시 */
+      }
+      return next
+    })
+  }, [])
+
+  // 방향키 내비게이션 — ↑/↓로 메뉴 이동, Home/End로 처음/끝. 접힌 폴더(inert)·숨김 항목은 자동 제외.
+  const navRef = useRef<HTMLElement>(null)
+  const onNavKeyDown = useCallback((e: React.KeyboardEvent<HTMLElement>) => {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp" && e.key !== "Home" && e.key !== "End") return
+    const nav = navRef.current
+    if (!nav) return
+    // 실제로 포커스 가능한(보이고·inert 밖·tabindex≠-1) 링크/헤더 버튼만 수집
+    const items = Array.from(nav.querySelectorAll<HTMLElement>("a[href], button")).filter(
+      (el) => el.tabIndex !== -1 && !el.closest("[inert]") && el.getClientRects().length > 0
+    )
+    if (items.length === 0) return
+    e.preventDefault()
+    const idx = items.indexOf(document.activeElement as HTMLElement)
+    let next: number
+    if (e.key === "Home") next = 0
+    else if (e.key === "End") next = items.length - 1
+    else if (e.key === "ArrowDown") next = idx < 0 ? 0 : (idx + 1) % items.length
+    else next = idx < 0 ? items.length - 1 : (idx - 1 + items.length) % items.length
+    items[next]?.focus()
   }, [])
 
   // grid-rows 0fr↔1fr 높이 트랜지션 래퍼 — JS 측정 없이 부드러운 접힘/펼침
@@ -88,27 +130,47 @@ export function Sidebar() {
         </span>
       </Link>
 
-      <nav className="flex-1 space-y-3 overflow-y-auto p-2">
+      <nav ref={navRef} onKeyDown={onNavKeyDown} className="flex-1 space-y-3 overflow-y-auto p-2">
         {FEATURE_GROUPS.map((group) => {
           const all = FEATURES.filter((f) => f.group === group.id)
           if (all.length === 0) return null
           const visibleCount = all.filter((f) => !hidden.includes(f.href)).length
           // 평소엔 가시 항목이 0이면 그룹 헤더까지 접고, 편집 중엔 항상 펼침
           const groupHeaderOpen = editing || visibleCount > 0
+          // 현재 경로가 이 그룹 항목이면 접혀 있어도 펼쳐 보여준다(저장값은 안 건드림 — '여기 있음' 표시 유지)
+          const hasActive = all.some((f) => pathname === f.href || pathname.startsWith(`${f.href}/`))
+          // 폴더 접힘: collapsed면 항목을 접음(편집 중·활성 경로 포함 시 항상 펼침)
+          const folderOpen = editing || hasActive || !collapsed.includes(group.id)
 
           return (
             <div key={group.id}>
               {group.label && (
-                <div className={collapseRow(groupHeaderOpen)}>
+                <div className={collapseRow(groupHeaderOpen)} inert={!groupHeaderOpen}>
                   <div className="overflow-hidden">
-                    <p className="px-3 pb-1 pt-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
-                      {group.label}
-                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!editing) toggleCollapse(group.id)
+                      }}
+                      className="flex w-full items-center justify-between px-3 pb-1 pt-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70 transition-colors hover:text-muted-foreground"
+                    >
+                      <span>{group.label}</span>
+                      {!editing && (
+                        <ChevronDown
+                          className={cn(
+                            "size-3 shrink-0 transition-transform duration-200 motion-reduce:transition-none",
+                            collapsed.includes(group.id) && "-rotate-90"
+                          )}
+                        />
+                      )}
+                    </button>
                   </div>
                 </div>
               )}
 
-              {all.map((feature) => {
+              <div className={collapseRow(folderOpen)} inert={!folderOpen}>
+                <div className="overflow-hidden">
+                  {all.map((feature) => {
                 const Icon = feature.icon
                 const isHidden = hidden.includes(feature.href)
                 // 편집 중엔 항상 펼침. 평소엔 숨긴 항목만 접음 → 편집 진입/종료 시 부드럽게 펼침/접힘.
@@ -116,7 +178,7 @@ export function Sidebar() {
                 const active = pathname === feature.href || pathname.startsWith(`${feature.href}/`)
 
                 return (
-                  <div key={feature.href} className={collapseRow(rowOpen)}>
+                  <div key={feature.href} className={collapseRow(rowOpen)} inert={!rowOpen}>
                     <div className="overflow-hidden">
                       <div className="relative pb-0.5">
                         {/* ── 일반 모드: 네비게이션 링크 (높이 기준·active 하이라이트) ── */}
@@ -178,6 +240,8 @@ export function Sidebar() {
                   </div>
                 )
               })}
+                </div>
+              </div>
             </div>
           )
         })}
