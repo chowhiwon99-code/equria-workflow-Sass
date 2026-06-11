@@ -13,7 +13,7 @@ import { useOnlineUsers } from "@/hooks/usePresence"
 import { Loading, EmptyState, ErrorState } from "@/components/shared/States"
 import type { Profile } from "@/types"
 
-type Member = Pick<Profile, "id" | "name" | "department" | "position" | "status_manual">
+type Member = Pick<Profile, "id" | "name" | "department" | "position" | "status_manual"> & { role: string }
 type Contact = { email: string | null; work_phone: string | null; mobile: string | null }
 
 const UNDEPT = "부서 미지정"
@@ -27,11 +27,13 @@ export function MembersView() {
   const router = useRouter()
   const [members, setMembers] = useState<Member[]>([])
   const [meId, setMeId] = useState<string | null>(null)
+  const [ownerId, setOwnerId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
   const [contacts, setContacts] = useState<Record<string, Contact>>({})
   const [query, setQuery] = useState("")
+  const [busyId, setBusyId] = useState<string | null>(null)
   const online = useOnlineUsers(meId)
 
   const load = useCallback(async () => {
@@ -39,12 +41,13 @@ export function MembersView() {
       const { data: auth } = await supabase.auth.getUser()
       setMeId(auth.user?.id ?? null)
       // 목록은 비민감 필드만. 연락처(email/전화)는 펼칠 때 directory_contact RPC로 공개 항목만 가져온다.
-      const { data, error: queryError } = await supabase
-        .from("profiles")
-        .select("id, name, department, position, status_manual")
-        .order("name")
+      const [{ data, error: queryError }, { data: ws }] = await Promise.all([
+        supabase.from("profiles").select("id, name, department, position, status_manual, role").order("name"),
+        supabase.from("workspaces").select("owner_id").limit(1).maybeSingle(),
+      ])
       if (queryError) throw queryError
-      setMembers(data ?? [])
+      setMembers((data as Member[]) ?? [])
+      setOwnerId(ws?.owner_id ?? null)
       setError(null)
     } catch {
       setError("구성원 목록을 불러오지 못했어요.")
@@ -84,6 +87,26 @@ export function MembersView() {
     },
     [supabase]
   )
+
+  const isOwner = !!ownerId && ownerId === meId
+
+  // 대표(오너)가 구성원 권한(admin/member) 토글 — set_member_role RPC.
+  const toggleRole = async (m: Member) => {
+    setBusyId(m.id)
+    try {
+      const { error } = await supabase.rpc("set_member_role", {
+        target: m.id,
+        new_role: m.role === "admin" ? "member" : "admin",
+      })
+      if (error) throw new Error(error.message)
+      toast.success(m.role === "admin" ? "관리자 권한을 해제했어요." : "관리자로 지정했어요.")
+      await load()
+    } catch {
+      toast.error("권한 변경에 실패했어요.")
+    } finally {
+      setBusyId(null)
+    }
+  }
 
   const q = query.trim().toLowerCase()
   const filtered = members.filter(
@@ -148,9 +171,14 @@ export function MembersView() {
                         <StatusDot online={isOnline} manual={m.status_manual} className="absolute -bottom-0.5 -right-0.5" />
                       </div>
                       <div className="flex min-w-0 flex-1 flex-col">
-                        <span className="text-sm font-medium">
+                        <span className="inline-flex items-center gap-1 text-sm font-medium">
                           {m.name}
-                          {isMe && <span className="ml-1 text-xs text-muted-foreground">(나)</span>}
+                          {isMe && <span className="text-xs text-muted-foreground">(나)</span>}
+                          {m.id === ownerId ? (
+                            <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">대표</span>
+                          ) : m.role === "admin" ? (
+                            <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">관리자</span>
+                          ) : null}
                         </span>
                         <span className="truncate text-xs text-muted-foreground">
                           {m.position || "직급 미지정"} · {statusLabel(isOnline, m.status_manual)}
@@ -164,14 +192,26 @@ export function MembersView() {
                         <ContactRow icon={Mail} label="이메일" value={c?.email} href={c?.email ? mailHref(c.email) : undefined} />
                         <ContactRow icon={Phone} label="사내 전화" value={c?.work_phone} href={c?.work_phone ? telHref(c.work_phone) : undefined} />
                         <ContactRow icon={Smartphone} label="휴대폰" value={c?.mobile} href={c?.mobile ? telHref(c.mobile) : undefined} />
-                        {!isMe && (
-                          <button
-                            onClick={() => router.push(`/chat/${m.id}`)}
-                            className="mt-1 inline-flex w-fit items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90"
-                          >
-                            <MessageSquare className="size-3.5" /> 메시지 보내기
-                          </button>
-                        )}
+                        <div className="mt-1 flex flex-wrap gap-1.5">
+                          {!isMe && (
+                            <button
+                              onClick={() => router.push(`/chat/${m.id}`)}
+                              className="inline-flex w-fit items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90"
+                            >
+                              <MessageSquare className="size-3.5" /> 메시지 보내기
+                            </button>
+                          )}
+                          {/* 대표만: 구성원 권한 지정 */}
+                          {isOwner && !isMe && m.id !== ownerId && (
+                            <button
+                              onClick={() => toggleRole(m)}
+                              disabled={busyId === m.id}
+                              className="inline-flex w-fit items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted disabled:opacity-50"
+                            >
+                              {m.role === "admin" ? "관리자 권한 해제" : "관리자로 지정"}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>

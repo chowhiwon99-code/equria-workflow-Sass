@@ -2104,6 +2104,7 @@ export type Database = {
       is_workspace_member: { Args: { ws_id: string }; Returns: boolean }
       mark_dm_read: { Args: { conv_id: string }; Returns: number }
       recall_document: { Args: { doc_id: string }; Returns: undefined }
+      set_member_role: { Args: { new_role: string; target: string }; Returns: undefined }
       shares_workspace_with: { Args: { other_user: string }; Returns: boolean }
       submit_document: { Args: { doc_id: string }; Returns: string }
     }
