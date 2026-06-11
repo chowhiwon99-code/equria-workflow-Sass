@@ -10,6 +10,7 @@ import { uploadImage } from "@/lib/upload"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Modal, fieldClass } from "@/components/shared/Modal"
+import { FilePreview } from "@/components/shared/FilePreview"
 import { Loading } from "@/components/shared/States"
 import { useUndo } from "@/components/undo/UndoProvider"
 import { categoriesFor, computeAmounts, won, money, CURRENCIES, EXPENSE_CATEGORIES, REVENUE_CATEGORIES } from "@/lib/finance"
@@ -32,6 +33,7 @@ export function FinanceView() {
   const [editingTax, setEditingTax] = useState<TaxInvoice | null>(null)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [receiptPreview, setReceiptPreview] = useState<{ url: string; name: string; mime: string | null } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   // 필터·페이지네이션
@@ -122,17 +124,24 @@ export function FinanceView() {
     }
   }
 
-  // 첨부 영수증(이미지/PDF) 열람 — 서버에서 가시성 인가 후 60초 서명 URL.
-  const viewReceipt = async (id: string) => {
+  // 첨부 영수증(이미지/PDF) 열람 — 서버에서 가시성 인가 후 60초 서명 URL → 인라인 미리보기 칸.
+  const viewReceipt = async (e: FinanceEntry) => {
     try {
       const res = await fetch("/api/finance/receipt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ entryId: id }),
+        body: JSON.stringify({ entryId: e.id }),
       })
       if (!res.ok) throw new Error()
       const { url } = (await res.json()) as { url: string }
-      window.open(url, "_blank")
+      const ext = (e.receipt_url ?? "").split(".").pop()?.toLowerCase() ?? ""
+      const mime =
+        ext === "pdf"
+          ? "application/pdf"
+          : /^(png|jpe?g|gif|webp|bmp)$/.test(ext)
+            ? `image/${ext === "jpg" ? "jpeg" : ext}`
+            : null
+      setReceiptPreview({ url, name: `${e.vendor ?? "영수증"} (${e.entry_date})`, mime })
     } catch {
       toast.error("영수증을 열 수 없어요.")
     }
@@ -406,7 +415,7 @@ export function FinanceView() {
                       <span className="truncate">{e.vendor ?? e.description ?? "—"}</span>
                       {e.receipt_url && (
                         <button
-                          onClick={() => viewReceipt(e.id)}
+                          onClick={() => viewReceipt(e)}
                           title="첨부 영수증 보기"
                           className="shrink-0 text-muted-foreground transition-colors hover:text-primary"
                         >
@@ -591,6 +600,15 @@ export function FinanceView() {
             setEditingTax(null)
             load()
           }}
+        />
+      )}
+
+      {receiptPreview && (
+        <FilePreview
+          url={receiptPreview.url}
+          name={receiptPreview.name}
+          mime={receiptPreview.mime}
+          onClose={() => setReceiptPreview(null)}
         />
       )}
     </div>

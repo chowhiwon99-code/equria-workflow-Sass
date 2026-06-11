@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Upload, FileText, Download, Trash2, CloudUpload } from "lucide-react"
+import { Upload, FileText, Eye, Trash2, CloudUpload } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { mustOk } from "@/lib/supabase/mustOk"
@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils"
 import { useUndo } from "@/components/undo/UndoProvider"
 import { Button } from "@/components/ui/button"
 import { Select } from "@/components/shared/Select"
+import { FilePreview } from "@/components/shared/FilePreview"
 import { Loading, EmptyState, ErrorState } from "@/components/shared/States"
 import { uploadFile } from "@/lib/upload"
 import { FILES_BUCKET, fileSourceLabel, formatBytes } from "@/lib/files"
@@ -51,6 +52,7 @@ export function FilesView() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [preview, setPreview] = useState<{ url: string; name: string; mime: string | null } | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -128,7 +130,8 @@ export function FilesView() {
     }
   }
 
-  const download = async (f: FileRow) => {
+  // 파일 클릭 → 새 탭 대신 인라인 미리보기 칸으로.
+  const openPreview = async (f: FileRow) => {
     const path = f.metadata?.storage_path
     if (!path) {
       toast.error("파일 경로를 찾을 수 없어요.")
@@ -136,10 +139,10 @@ export function FilesView() {
     }
     const { data, error } = await supabase.storage.from(FILES_BUCKET).createSignedUrl(path, 60)
     if (error || !data) {
-      toast.error("다운로드 링크 생성에 실패했어요.")
+      toast.error("미리보기 링크 생성에 실패했어요.")
       return
     }
-    window.open(data.signedUrl, "_blank")
+    setPreview({ url: data.signedUrl, name: f.name, mime: f.mime_type })
   }
 
   const remove = async (f: FileRow) => {
@@ -233,23 +236,25 @@ export function FilesView() {
             const vis = VIS[f.visibility as Visibility]
             return (
               <div key={f.id} className="flex items-center gap-3 px-4 py-3">
-                <FileText className="size-4 shrink-0 text-muted-foreground" />
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-sm font-medium">{f.name}</span>
-                  <span className="text-[11px] text-muted-foreground">
-                    {fileSourceLabel(f.source)} · {formatBytes(f.size_bytes)}
-                  </span>
-                </div>
+                <button onClick={() => openPreview(f)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                  <FileText className="size-4 shrink-0 text-muted-foreground" />
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-sm font-medium hover:underline">{f.name}</span>
+                    <span className="text-[11px] text-muted-foreground">
+                      {fileSourceLabel(f.source)} · {formatBytes(f.size_bytes)}
+                    </span>
+                  </div>
+                </button>
                 <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium", vis?.badge ?? "bg-muted text-muted-foreground")}>
                   {vis?.label ?? f.visibility}
                 </span>
                 <button
-                  onClick={() => download(f)}
+                  onClick={() => openPreview(f)}
                   className="text-muted-foreground hover:text-foreground"
-                  aria-label="다운로드"
-                  title="다운로드"
+                  aria-label="미리보기"
+                  title="미리보기"
                 >
-                  <Download className="size-4" />
+                  <Eye className="size-4" />
                 </button>
                 <button
                   onClick={() => remove(f)}
@@ -264,6 +269,8 @@ export function FilesView() {
           })}
         </div>
       )}
+
+      {preview && <FilePreview url={preview.url} name={preview.name} mime={preview.mime} onClose={() => setPreview(null)} />}
     </div>
   )
 }

@@ -21,6 +21,23 @@
 
 ---
 
+## 2026-06-11 · 파일 인라인 미리보기(새 탭 대신 우측 칸)
+
+**무엇:** 파일·영수증 클릭 시 새 브라우저 탭이 아니라 **앱 안 우측 미리보기 칸**으로 띄움.
+- **`components/shared/FilePreview.tsx`** — 재사용 드로어. 이미지=`<img>`, PDF=`<iframe>` 인라인, 그 외=다운로드 안내. ESC·바깥클릭 닫힘, 상단에 다운로드 버튼.
+- **FilesView** — 파일 행 클릭·아이콘(Eye)→`window.open` 제거하고 `FilePreview` 칸으로(mime로 형식 판별).
+- **FinanceView** — 영수증 아이콘→`window.open` 제거하고 `FilePreview` 칸으로(receipt_url 확장자로 mime 추론).
+
+**왜:** "파일 클릭할 때 창 안 뜨고 작게 칸으로 미리보기". 컨텍스트 유지·새 탭 난립 방지.
+
+**예상이슈 체크:** 서명 URL 60초는 로드엔 충분(로드 후 만료 무관). zip/xlsx/ppt 등 브라우저 미지원 형식은 다운로드 안내. img는 동적 서명 URL이라 next/image 대신 `<img>`(eslint-disable 1줄). 데이터 변경 없음(표시 방식만). tsc 0·lint 30/0·기존 디자인 유지.
+
+**부수 데이터 수정:** Google Asia Pacific OCR 2건이 구버전 OCR(통화 미인식)로 KRW 저장돼 7.56이 ₩8로 표시되던 것 → **USD로 정정**(amount는 원래 정확). 통화 OCR 인식은 052에서 반영됨(배포 시 신규분 자동).
+
+**커밋:** ↓
+
+---
+
 ## 2026-06-11 · 비용/매출 첨부 영수증(이미지·PDF) 열람
 
 **무엇:** finance 표에서 첨부된 영수증(OCR 업로드)을 다시 열어볼 수 있게. receipts 버킷은 비공개·본인폴더라, finance_entries(워크스페이스 공유) 가시성으로 인가 후 admin 서명 URL을 발급.
