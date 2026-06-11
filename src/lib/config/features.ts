@@ -21,6 +21,7 @@ import {
   UserCircle,
   ClipboardList,
   NotebookPen,
+  Stamp,
   type LucideIcon,
 } from "lucide-react"
 
@@ -129,9 +130,18 @@ export const FEATURES: Feature[] = [
     group: "work",
   },
   {
+    href: "/approval",
+    label: "전자결재",
+    description: "기안·결재선·승인/반려",
+    icon: Stamp,
+    status: "ready",
+    phase: 6,
+    group: "work",
+  },
+  {
     href: "/work",
-    label: "근태·결재",
-    description: "근태(출퇴근)·지출결의서·휴가를 한 곳에서",
+    label: "근태",
+    description: "출퇴근·근태 기록",
     icon: ClipboardList,
     status: "ready",
     phase: 6,

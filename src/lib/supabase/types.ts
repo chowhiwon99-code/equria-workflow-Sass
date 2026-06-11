@@ -259,6 +259,167 @@ export type Database = {
           },
         ]
       }
+      approval_comments: {
+        Row: {
+          body: string
+          created_at: string
+          document_id: string
+          id: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          document_id: string
+          id?: string
+          user_id: string
+          workspace_id?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          document_id?: string
+          id?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_comments_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "approval_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_comments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      approval_documents: {
+        Row: {
+          attachment_name: string | null
+          attachment_path: string | null
+          attachment_size: number | null
+          body: Json
+          completed_at: string | null
+          created_at: string
+          current_step: number
+          doc_no: string | null
+          doc_type: string
+          drafter_id: string
+          id: string
+          status: string
+          submitted_at: string | null
+          title: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          attachment_name?: string | null
+          attachment_path?: string | null
+          attachment_size?: number | null
+          body?: Json
+          completed_at?: string | null
+          created_at?: string
+          current_step?: number
+          doc_no?: string | null
+          doc_type?: string
+          drafter_id: string
+          id?: string
+          status?: string
+          submitted_at?: string | null
+          title?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Update: {
+          attachment_name?: string | null
+          attachment_path?: string | null
+          attachment_size?: number | null
+          body?: Json
+          completed_at?: string | null
+          created_at?: string
+          current_step?: number
+          doc_no?: string | null
+          doc_type?: string
+          drafter_id?: string
+          id?: string
+          status?: string
+          submitted_at?: string | null
+          title?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_documents_drafter_id_fkey"
+            columns: ["drafter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      approval_steps: {
+        Row: {
+          acted_at: string | null
+          approver_id: string
+          comment: string | null
+          created_at: string
+          document_id: string
+          id: string
+          role: string
+          status: string
+          step_order: number
+          workspace_id: string
+        }
+        Insert: {
+          acted_at?: string | null
+          approver_id: string
+          comment?: string | null
+          created_at?: string
+          document_id: string
+          id?: string
+          role?: string
+          status?: string
+          step_order: number
+          workspace_id?: string
+        }
+        Update: {
+          acted_at?: string | null
+          approver_id?: string
+          comment?: string | null
+          created_at?: string
+          document_id?: string
+          id?: string
+          role?: string
+          status?: string
+          step_order?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_steps_approver_id_fkey"
+            columns: ["approver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_steps_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "approval_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assistant_conversations: {
         Row: {
           created_at: string
@@ -1922,6 +2083,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      act_on_approval: { Args: { p_action: string; p_comment?: string; p_document_id: string }; Returns: undefined }
       auth_is_admin: { Args: never; Returns: boolean }
       auth_user_department: { Args: never; Returns: string }
       auth_user_workspace_ids: { Args: never; Returns: string[] }
@@ -1938,9 +2100,12 @@ export type Database = {
         Args: { other_user: string }
         Returns: string
       }
+      is_approval_participant: { Args: { doc_id: string }; Returns: boolean }
       is_workspace_member: { Args: { ws_id: string }; Returns: boolean }
       mark_dm_read: { Args: { conv_id: string }; Returns: number }
+      recall_document: { Args: { doc_id: string }; Returns: undefined }
       shares_workspace_with: { Args: { other_user: string }; Returns: boolean }
+      submit_document: { Args: { doc_id: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never

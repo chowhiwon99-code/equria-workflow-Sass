@@ -21,6 +21,32 @@
 
 ---
 
+## 2026-06-11 · 전자결재(카카오워크식) Phase A — 기안·결재선·승인/반려
+
+**무엇(쪼갠 내용):**
+1. **사전 기획(plan mode)** — 카카오워크 전자결재/근태 웹조사(Explore 3) + Plan 에이전트 설계 → 사용자 확정(진짜 결재선·전자결재 코어 먼저·메뉴 분리·기존데이터 깔끔전환). 계획 승인.
+2. **마이그 054·055** — `approval_documents`(doc_no·doc_type 5종·body jsonb·status 5종·current_step)·`approval_steps`(결재선: step_order·approver·role 결재/참조·status)·`approval_comments`. B1 RLS + `is_approval_participant`. **상신 후 변경은 RPC 전용**(클라는 임시저장만 직접 수정). RPC `submit_document`/`act_on_approval`(순차·반려 의견필수·완료/다음단계)/`recall_document`. notif type 'approval'.
+3. **타입 재생성** — 3테이블 + 4함수(rpc) 동기화.
+4. **UI(`src/components/approval/`)** — `/approval` 문서함(결재할문서[배지]·기안함·참조함) · `NewDocumentModal`(양식+결재선 picker, 기본 대표) · `DocumentDetail`(결재선 진행 **도장**·승인/반려[의견필수]·회수·의견 thread·초안 상신/삭제) · `DocumentList` · `templates.ts`/`status.ts`/`lib.ts`. 알림 딥링크 `/approval/<id>`.
+5. **메뉴 분리** — `/work` "근태·결재" → **전자결재(/approval)** + **근태(/work)**. WorkView 근태 단독화(구 지출/휴가 단일승인 패널 dereference, 테이블 보존).
+
+**왜:** "카카오워크 결재 시스템 카피해서 근태·결재 재작업". 단일 admin 승인 → 진짜 결재선(순차 N명).
+
+**적대 리뷰(워크플로우 16에이전트·4차원) → 13건 중 10건 확정·핵심 수정(마이그 056):**
+- 🔴 **[보안 high] self-approval** — 기안자가 자기를 결재자로 넣어 자가승인 가능(UI만 막음). **DB 3중 차단**(as_insert with check·submit·act RPC). 롤백검증: submit·act 모두 차단.
+- 🟠 **[med] doc_no 중복** — 워크스페이스 유니크 인덱스(fail-fast). **[med] realtime 미등록** — publication 추가(구독 동작). **[low] 초안 프라이버시** — 임시저장은 기안자/admin만(상신 전 결재자 비공개).
+- 🟡 **[low] 참조 완료알림** 추가 · **회수→임시저장**(편집·재상신) · **초안 상신/삭제 UI** · 상신실패 시 초안 이동.
+
+**예상이슈 체크(잔여·비차단):**
+- **반려 문서 재상신**: v1은 '복제 후 재기안' 미구현(회수는 임시저장 복귀로 가능). 추후 NewDocumentModal 편집모드.
+- **임시저장 본문/결재선 편집**: 상세에서 상신/삭제만(필드 수정은 추후 편집모드).
+- doc_no 동시 채번은 유니크로 fail-fast(재시도). workspace_id sentinel 의존(B1-b).
+- tsc 0 · lint 30/0 · 빌드 성공 · 기존 디자인 톤 유지. **Phase B 근태개편·C 연차/관리자**는 로드맵.
+
+**마이그/커밋:** 054·055·056 적용. 커밋 ↓.
+
+---
+
 ## 2026-06-11 · 공지 전파(전체 알림+상단 배너) · 파일/영수증 호버 미리보기
 
 **무엇(쪼갠 내용):**
