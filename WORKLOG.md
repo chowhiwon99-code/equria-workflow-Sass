@@ -21,6 +21,27 @@
 
 ---
 
+## 2026-06-11 · 알림 모두읽음 · 사이드바 폴더 접기 · 대표 권한부여 + 싹 리뷰
+
+**무엇(쪼갠 내용):**
+1. **알림 모두 확인** — `NotificationBell.tsx`: 벨(드롭다운) 열면 `onOpenChange`에서 `markAllRead()` 호출 → 안 읽음 배지 즉시 클리어. (리뷰 반영: 쓰기 `{ error }` 캡처 후 **성공 시에만** 낙관적 클리어 — supabase-js는 실패해도 throw 안 함, 배지 거짓 해제 방지.)
+2. **사이드바 폴더 접기/펴기** — `Sidebar.tsx`: 그룹 헤더를 클릭 가능 버튼으로(ChevronDown 회전), `collapsed`(그룹 id 목록) localStorage 저장(`equria:sidebar-collapsed`), grid-rows 0fr↔1fr 트랜지션. (리뷰 반영: ① 닫힘 래퍼에 `inert` — 접힌 항목이 키보드 탭/스크린리더에 안 잡히게(a11y) ② `hasActive` — 현재 경로가 접힌 폴더 안이면 자동 펼침.)
+3. **대표→구성원 관리자 권한 부여** — 마이그 **058**(`guard_profile_role` 트리거 + `set_member_role` RPC, 오너 게이트·자가상승 차단) + `MembersView.tsx`(대표만 보이는 "관리자로 지정/해제" 버튼, 대표/관리자 배지). types.ts에 `set_member_role` 추가.
+4. **마이그 059(리뷰 반영·권한 범위 축소)** — `owner_can_set_role(target)` 헬퍼 신설: 전역 `profiles.role` 변경을 **"대상의 모든 소속 워크스페이스를 호출자가 소유"할 때만** 허용. 058은 "어떤 워크스페이스든 소유"라 멀티테넌트(B2 초대) 도입 시 교차테넌트 권한상승 잠재 → 좁힘. trigger·RPC 모두 헬퍼 사용.
+
+**왜:** 사용자 요청("알림 버튼 누르면 모두 확인 / 사이드바 폴더별 정리 / 대표가 지정한 사람한테 권한"). 리뷰는 "리뷰 한번 싹 하고 배포".
+
+**싹 리뷰(적대 워크플로우, 4차원→적대검증):** 확정 4건 전부 수정 — ① [med] 058 교차테넌트 상승(잠재)→059 ② [med] 접힌 폴더 포커스 노출→inert ③ [low] 모두읽음 실패 시 배지 거짓해제→error 캡처 ④ [low] 활성경로 접힘→hasActive. 채팅 동기화 0건(깨끗).
+
+**예상이슈 체크:**
+- 059는 `create or replace`만(테이블/컬럼 무변)→types 재생성 불필요. 단일테넌트 동작 동일(롤백 트랜잭션 검증: `same_tenant=t cross_tenant=f`).
+- `inert`는 React 19 boolean prop(정상 컴파일). 닫힘 시에만 적용→펼침 애니메이션 무영향.
+- 회귀: tsc 0 · lint 30/0(신규 0) · `pnpm build` exit 0. 보안 어드바이저 신규 0(SECURITY DEFINER WARN은 기존 베이스라인).
+
+**마이그:** 058·059 적용(원격=디스크). **커밋·배포 ↓.**
+
+---
+
 ## 2026-06-11 · 채팅 창 간 즉시 동기화(BroadcastChannel) + realtime 보강
 
 **무엇:** 한 창에서 보낸/수정/삭제/반응한 채팅이 **다른 창/탭에 즉시** 반영되게.
