@@ -58,12 +58,24 @@ export function NotificationBell({ userId }: { userId: string }) {
   }
 
   const markAllRead = async () => {
-    await supabase.from("notifications").update({ is_read: true }).eq("user_id", userId).eq("is_read", false)
-    setItems((prev) => prev.map((x) => ({ ...x, is_read: true })))
+    const { error } = await supabase
+      .from("notifications")
+      .update({ is_read: true })
+      .eq("user_id", userId)
+      .eq("is_read", false)
+    // 쓰기 성공 시에만 낙관적 클리어 — supabase-js는 실패해도 throw 안 하므로 배지가 거짓 해제되지 않도록
+    if (!error) setItems((prev) => prev.map((x) => ({ ...x, is_read: true })))
   }
 
   return (
-    <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+    <DropdownMenu
+      open={menuOpen}
+      onOpenChange={(o) => {
+        setMenuOpen(o)
+        // 알림을 열면(벨 누르면) 모두 확인(읽음) 처리 — 배지 즉시 클리어
+        if (o && unread > 0) void markAllRead()
+      }}
+    >
       <DropdownMenuTrigger className="relative flex size-8 items-center justify-center rounded-md transition-colors hover:bg-accent">
         <Bell className="size-4" />
         {unread > 0 && (
