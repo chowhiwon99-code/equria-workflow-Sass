@@ -14,26 +14,32 @@ import { DOC_TYPES, DOC_FIELDS, type DocType } from "./templates"
 import type { Person } from "./lib"
 
 type LineEntry = { approver_id: string; role: "결재" | "참조" }
+// 편집 대상(임시저장/회수/반려 후 임시저장 문서) — 있으면 생성 대신 수정 모드.
+export type EditDoc = { id: string; docType: DocType; title: string; fields: Record<string, string>; line: LineEntry[] }
 
 export function NewDocumentModal({
   me,
   ownerId,
   people,
+  editDoc,
   onClose,
   onDone,
 }: {
   me: string
   ownerId: string | null
   people: Person[]
+  editDoc?: EditDoc | null
   onClose: () => void
   onDone: (newId?: string) => void
 }) {
   const supabase = createClient()
-  const [docType, setDocType] = useState<DocType>("일반기안")
-  const [title, setTitle] = useState("")
-  const [fields, setFields] = useState<Record<string, string>>({})
-  // 기본 결재선: 대표(owner)가 본인이 아니면 1명 자동
-  const [line, setLine] = useState<LineEntry[]>(ownerId && ownerId !== me ? [{ approver_id: ownerId, role: "결재" }] : [])
+  const [docType, setDocType] = useState<DocType>(editDoc?.docType ?? "일반기안")
+  const [title, setTitle] = useState(editDoc?.title ?? "")
+  const [fields, setFields] = useState<Record<string, string>>(editDoc?.fields ?? {})
+  // 편집이면 기존 결재선, 아니면 기본(대표가 본인이 아니면 1명 자동)
+  const [line, setLine] = useState<LineEntry[]>(
+    editDoc?.line ?? (ownerId && ownerId !== me ? [{ approver_id: ownerId, role: "결재" }] : [])
+  )
   const [pick, setPick] = useState("")
   const [busy, setBusy] = useState(false)
 
@@ -69,6 +75,41 @@ export function NewDocumentModal({
       return
     }
     setBusy(true)
+
+    // ── 편집 모드: 기존 임시저장 문서 UPDATE + 결재선 통째 교체(RLS상 임시저장 소유자 허용) ──
+    if (editDoc) {
+      try {
+        await mustOk(
+          supabase
+            .from("approval_documents")
+            .update({ doc_type: docType, title: title.trim(), body: fields, updated_at: new Date().toISOString() })
+            .eq("id", editDoc.id)
+        )
+        await mustOk(supabase.from("approval_steps").delete().eq("document_id", editDoc.id))
+        if (line.length > 0) {
+          await mustOk(
+            supabase.from("approval_steps").insert(
+              line.map((l, i) => ({ document_id: editDoc.id, step_order: i + 1, approver_id: l.approver_id, role: l.role }))
+            )
+          )
+        }
+        if (submit) {
+          const { error } = await supabase.rpc("submit_document", { doc_id: editDoc.id })
+          if (error) throw new Error(error.message)
+          toast.success("상신했어요.")
+        } else {
+          toast.success("저장했어요.")
+        }
+        onDone(editDoc.id)
+      } catch {
+        toast.error("저장에 실패했어요.")
+      } finally {
+        setBusy(false)
+      }
+      return
+    }
+
+    // ── 생성 모드 ──
     let docId: string | null = null
     try {
       const { data: doc } = await mustOk(
@@ -109,7 +150,7 @@ export function NewDocumentModal({
   }
 
   return (
-    <Modal title="새 기안" onClose={onClose} className="max-w-lg">
+    <Modal title={editDoc ? "기안 수정" : "새 기안"} onClose={onClose} className="max-w-lg">
       <div className="flex flex-col gap-3">
         {/* 양식 + 제목 */}
         <div className="flex gap-2">

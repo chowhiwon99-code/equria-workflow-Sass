@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { ArrowLeft, Check, X, Undo2, Loader2, Send } from "lucide-react"
+import { ArrowLeft, Check, X, Undo2, Loader2, Send, Pencil, RotateCcw } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
@@ -13,6 +13,7 @@ import { Loading } from "@/components/shared/States"
 import { DOC_STATUS_BADGE, STEP_STAMP } from "./status"
 import { DOC_FIELDS, type DocType } from "./templates"
 import { approvalSteps, currentStep, isMyTurn, type Doc, type Person } from "./lib"
+import { NewDocumentModal, type EditDoc } from "./NewDocumentModal"
 
 type Comment = { id: string; user_id: string; body: string; created_at: string }
 
@@ -28,6 +29,7 @@ export function DocumentDetail({ docId }: { docId: string }) {
   const [rejecting, setRejecting] = useState(false)
   const [rejectText, setRejectText] = useState("")
   const [newComment, setNewComment] = useState("")
+  const [editing, setEditing] = useState(false)
 
   const load = useCallback(async () => {
     const { data: auth } = await supabase.auth.getUser()
@@ -114,6 +116,33 @@ export function DocumentDetail({ docId }: { docId: string }) {
   }
 
   const isDraftOwner = doc.status === "임시저장" && doc.drafter_id === me
+  const canRevise = doc.status === "반려" && doc.drafter_id === me
+  // 편집 모달에 넘길 현재 문서 스냅샷(임시저장 소유자만 실제 수정 가능 — RLS가 강제)
+  const editDoc: EditDoc = {
+    id: doc.id,
+    docType: doc.doc_type as DocType,
+    title: doc.title ?? "",
+    fields: Object.fromEntries(Object.entries(body).map(([k, v]) => [k, v == null ? "" : String(v)])),
+    line: [...(doc.approval_steps ?? [])]
+      .sort((a, b) => a.step_order - b.step_order)
+      .map((s) => ({ approver_id: s.approver_id, role: s.role as "결재" | "참조" })),
+  }
+
+  // 반려 문서 재작성: 임시저장으로 되돌리고(RPC) 바로 편집 모달 열기
+  const revise = async () => {
+    setBusy(true)
+    try {
+      const { error } = await supabase.rpc("revise_document", { doc_id: doc.id })
+      if (error) throw new Error(error.message)
+      await load()
+      setEditing(true)
+      toast.success("임시저장으로 되돌렸어요. 수정 후 다시 상신하세요.")
+    } catch {
+      toast.error("처리에 실패했어요.")
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const addComment = () => {
     if (!newComment.trim()) return
@@ -200,16 +229,26 @@ export function DocumentDetail({ docId }: { docId: string }) {
         </div>
       </div>
 
-      {/* 초안 액션(임시저장·회수 후) */}
+      {/* 초안 액션(임시저장·회수·반려 재작성 후) */}
       {isDraftOwner && (
         <div className="flex gap-2">
           <Button size="sm" onClick={submitDraft} disabled={busy} className="flex-1">
             {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />} 상신
           </Button>
+          <Button size="sm" variant="outline" onClick={() => setEditing(true)} disabled={busy}>
+            <Pencil className="size-3.5" /> 편집
+          </Button>
           <Button size="sm" variant="ghost" onClick={deleteDraft} disabled={busy} className="text-destructive">
             <X className="size-3.5" /> 삭제
           </Button>
         </div>
+      )}
+
+      {/* 반려 문서: 기안자가 재작성(→임시저장으로 되돌려 수정·재상신) */}
+      {canRevise && (
+        <Button size="sm" variant="outline" onClick={revise} disabled={busy} className="w-fit">
+          <RotateCcw className="size-3.5" /> 재작성
+        </Button>
       )}
 
       {/* 액션 */}
@@ -283,6 +322,20 @@ export function DocumentDetail({ docId }: { docId: string }) {
           </Button>
         </div>
       </div>
+
+      {editing && (
+        <NewDocumentModal
+          me={me}
+          ownerId={null}
+          people={people}
+          editDoc={editDoc}
+          onClose={() => setEditing(false)}
+          onDone={() => {
+            setEditing(false)
+            load()
+          }}
+        />
+      )}
     </div>
   )
 }
