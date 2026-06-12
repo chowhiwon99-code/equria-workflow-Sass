@@ -679,9 +679,9 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
                 </div>
               )}
               {mine && ((!isSelf && m.read_at === null) || showTime) && (
-                <div className="flex shrink-0 flex-col items-end justify-end self-end mb-1.5 text-[10px] text-muted-foreground">
-                  {!isSelf && m.read_at === null && <span className="leading-none text-warning">1</span>}
-                  {showTime && <span className="leading-5">{fmtTime(m.created_at)}</span>}
+                <div className="flex shrink-0 flex-col items-end justify-end gap-0.5 self-end mb-0.5 -mr-0.5 text-[10px] leading-none text-muted-foreground">
+                  {!isSelf && m.read_at === null && <span className="text-warning">1</span>}
+                  {showTime && <span>{fmtTime(m.created_at)}</span>}
                 </div>
               )}
               {m.attachment_url && isImageAttachment(m.attachment_name) ? (
@@ -735,7 +735,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
                 </div>
               )}
               {!mine && showTime && (
-                <span className="shrink-0 self-end mb-1.5 text-[10px] leading-5 text-muted-foreground">{fmtTime(m.created_at)}</span>
+                <span className="shrink-0 self-end mb-0.5 -ml-0.5 text-[10px] leading-none text-muted-foreground">{fmtTime(m.created_at)}</span>
               )}
               {!mine && (
                 <div className="flex items-center gap-0.5 self-center opacity-0 transition-opacity group-hover:opacity-100 has-[[data-emoji-open]]:opacity-100">
