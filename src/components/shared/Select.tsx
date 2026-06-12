@@ -47,7 +47,7 @@ export function Select({
         className="max-h-72 min-w-[var(--radix-dropdown-menu-trigger-width)] overflow-y-auto"
       >
         {options.map((o) => (
-          <DropdownMenuItem key={o.value} onSelect={() => onChange(o.value)} className="gap-2">
+          <DropdownMenuItem key={o.value} onClick={() => onChange(o.value)} className="gap-2">
             <Check className={cn("size-3.5 shrink-0", o.value === value ? "opacity-100" : "opacity-0")} />
             <span className="truncate">{o.label}</span>
           </DropdownMenuItem>
