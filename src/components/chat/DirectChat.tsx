@@ -679,7 +679,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
                 </div>
               )}
               {mine && ((!isSelf && m.read_at === null) || showTime) && (
-                <div className="flex shrink-0 flex-col items-end justify-end gap-0.5 self-end -mr-1 pb-0.5 text-[10px] leading-none text-muted-foreground">
+                <div className="flex shrink-0 flex-col items-end justify-end gap-0.5 self-end mr-1 pb-0.5 text-[10px] leading-none text-muted-foreground">
                   {!isSelf && m.read_at === null && <span className="text-warning">1</span>}
                   {showTime && <span>{fmtTime(m.created_at)}</span>}
                 </div>
@@ -735,7 +735,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
                 </div>
               )}
               {!mine && showTime && (
-                <span className="shrink-0 self-end -ml-1 pb-0.5 text-[10px] leading-none text-muted-foreground">{fmtTime(m.created_at)}</span>
+                <span className="shrink-0 self-end ml-1 pb-0.5 text-[10px] leading-none text-muted-foreground">{fmtTime(m.created_at)}</span>
               )}
               {!mine && (
                 <div className="flex items-center gap-0.5 self-center opacity-0 transition-opacity group-hover:opacity-100 has-[[data-emoji-open]]:opacity-100">
