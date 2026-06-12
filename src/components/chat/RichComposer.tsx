@@ -44,6 +44,7 @@ export function RichComposer({
   placeholder = "메시지 입력…",
   leftSlot,
   onPasteFiles,
+  onTyping,
 }: {
   onSend: (payload: ComposerPayload) => void | Promise<void>
   disabled?: boolean
@@ -51,10 +52,12 @@ export function RichComposer({
   placeholder?: string
   leftSlot?: ReactNode
   onPasteFiles?: (files: FileList) => void // 클립보드에 파일이 있으면 부모가 첨부 처리(텍스트 붙여넣기는 그대로)
+  onTyping?: () => void // 입력이 바뀔 때마다 호출(부모가 throttle해 '작성 중' 브로드캐스트)
 }) {
   const submitRef = useRef<() => void>(() => {})
-  // handlePaste는 에디터 생성 시 한 번 고정 → 최신 콜백을 ref로 전달(stale 클로저 방지, submitRef와 동일 패턴)
+  // handlePaste·onUpdate는 에디터 생성 시 한 번 고정 → 최신 콜백을 ref로 전달(stale 클로저 방지)
   const onPasteFilesRef = useRef(onPasteFiles)
+  const onTypingRef = useRef(onTyping)
   const [showFormat, setShowFormat] = useState(false) // 서식 툴바 기본 숨김(애플식 심플)
   // Tiptap v3 useEditor는 트랜잭션마다 리렌더하지 않음 → editor.isEmpty를 직접 읽으면 stale.
   // 전송 버튼 활성/비활성은 onCreate/onUpdate로 동기화한 state로 판단(번역 적용 등 프로그램적 변경 포함).
@@ -64,7 +67,10 @@ export function RichComposer({
     immediatelyRender: false, // Next App Router SSR 하이드레이션 방지
     extensions: [...CHAT_EXTENSIONS, Placeholder.configure({ placeholder })],
     onCreate: ({ editor }) => setIsEmpty(editor.isEmpty),
-    onUpdate: ({ editor }) => setIsEmpty(editor.isEmpty),
+    onUpdate: ({ editor }) => {
+      setIsEmpty(editor.isEmpty)
+      onTypingRef.current?.() // '작성 중' 신호(부모가 throttle)
+    },
     editorProps: {
       attributes: {
         spellcheck: "true", // 네이티브 맞춤법 빨간 밑줄
@@ -119,6 +125,11 @@ export function RichComposer({
   useEffect(() => {
     onPasteFilesRef.current = onPasteFiles
   }, [onPasteFiles])
+
+  // onUpdate에서 호출하는 onTyping도 ref로 갱신(stale 방지)
+  useEffect(() => {
+    onTypingRef.current = onTyping
+  }, [onTyping])
 
   // 첨부가 처음 스테이징되면(드롭·붙여넣기·클릭) 에디터에 포커스 → 곧바로 Enter로 전송 가능.
   // false→true 전환에서만 포커스(타이핑 중 커서 점프 방지).

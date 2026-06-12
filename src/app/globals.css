@@ -283,6 +283,18 @@ body {
   }
 }
 
+/* 채팅 '작성 중…' 점 — 카톡식으로 점이 살짝 떠오르며 밝아졌다 가라앉음. 점마다 delay로 물결. */
+@keyframes equria-typing {
+  0%, 60%, 100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
 /* 위젯 FAB 스택 — 아래(런처)에서 스프링으로 촤르륵 튀어오르는 등장. 항목별 delay로 스태거 */
 @keyframes equria-pop {
   0% {

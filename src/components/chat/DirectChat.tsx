@@ -41,6 +41,11 @@ function quoteSnippet(m: DirectMessage): string {
   return m.content
 }
 
+/** 메시지 시각 — "오후 2:30" (카톡식 짧은 시각). */
+function fmtTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit" })
+}
+
 export function DirectChat({ otherUserId }: { otherUserId: string }) {
   const supabase = createClient()
   const { push } = useUndo()
@@ -61,6 +66,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
   const [replyTo, setReplyTo] = useState<DirectMessage | null>(null)
   const [highlightId, setHighlightId] = useState<string | null>(null)
   const [atBottom, setAtBottom] = useState(true) // 맨 아래 근처 여부(아래로 버튼 표시·자동 따라가기 판단)
+  const [otherTyping, setOtherTyping] = useState(false) // 상대가 작성 중(브로드캐스트로 수신)
   const scrollRef = useRef<HTMLDivElement>(null) // 메시지 스크롤 컨테이너
   const contentRef = useRef<HTMLDivElement>(null) // 메시지 콘텐츠 래퍼(높이 변화 관찰 대상)
   const atBottomRef = useRef(true) // onScroll 로직에서 최신값을 deps 없이 읽기 위한 미러
@@ -69,6 +75,9 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
   const dragDepth = useRef(0) // 드롭존 자식 위를 지날 때 enter/leave 플리커 방지용 깊이 카운터
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const highlightTimer = useRef<number | null>(null)
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null) // '작성 중' 브로드캐스트 발신용
+  const typingClearTimer = useRef<number | null>(null) // 상대 타이핑 표시 자동 해제 타이머
+  const lastTypingSent = useRef(0) // 내 타이핑 브로드캐스트 throttle 기준 시각(ms)
 
   const isSelf = meId != null && otherUserId === meId
   const online = useOnlineUsers(meId)
@@ -191,7 +200,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
   useEffect(() => {
     if (!conversationId || !meId) return
     const channel = supabase
-      .channel(`dm-${conversationId}`)
+      .channel(`dm-${conversationId}`, { config: { broadcast: { self: false } } })
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "direct_messages", filter: `conversation_id=eq.${conversationId}` },
@@ -199,8 +208,9 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
           const next = payload.new as DirectMessage
           setMessages((prev) => (prev.some((m) => m.id === next.id) ? prev : [...prev, next]))
           void resolveAttachments([next])
-          // 상대 메시지면 즉시 읽음 처리 (RPC — .then 으로 실제 요청 전송)
+          // 상대 메시지면: '작성 중' 표시 해제 + 즉시 읽음 처리 (RPC)
           if (next.sender_id !== meId) {
+            setOtherTyping(false)
             void supabase.rpc("mark_dm_read", { conv_id: conversationId }).then(() => {})
           }
         }
@@ -223,12 +233,34 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
         { event: "*", schema: "public", table: "message_attachments" },
         () => void loadAttachments(conversationId)
       )
+      .on("broadcast", { event: "typing" }, (msg) => {
+        // 상대가 입력 중 — 표시 켜고, 일정 시간 신호 없으면 자동 해제(self:false라 내 신호는 안 옴)
+        const uid = (msg.payload as { user_id?: string } | undefined)?.user_id
+        if (!uid || uid === meId) return
+        setOtherTyping(true)
+        if (typingClearTimer.current) window.clearTimeout(typingClearTimer.current)
+        typingClearTimer.current = window.setTimeout(() => setOtherTyping(false), 3500)
+      })
       .subscribe()
+    channelRef.current = channel
     return () => {
+      if (typingClearTimer.current) window.clearTimeout(typingClearTimer.current)
+      channelRef.current = null
       supabase.removeChannel(channel)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, conversationId, meId])
+
+  // 입력 중 '작성 중' 브로드캐스트(throttle 1.5s). 나와의 채팅·채널 미준비 시엔 보내지 않음.
+  const notifyTyping = useCallback(() => {
+    if (isSelf || !meId) return
+    const ch = channelRef.current
+    if (!ch) return
+    const now = Date.now()
+    if (now - lastTypingSent.current < 1500) return
+    lastTypingSent.current = now
+    void ch.send({ type: "broadcast", event: "typing", payload: { user_id: meId } })
+  }, [isSelf, meId])
 
   // 메시지·반응·읽음 재동기화 — 포커스 복귀 + 다른 창 신호 공용. 메시지는 항상 갱신, 읽음은 보일 때만.
   const resync = useCallback(async () => {
@@ -543,11 +575,18 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
           </p>
         )}
         <div ref={contentRef} className="flex flex-col gap-1">
-        {messages.map((m) => {
+        {messages.map((m, i) => {
           const mine = m.sender_id === meId
           const url = m.attachment_url ? fileUrls[m.id] : undefined
           const parent = m.parent_id ? messagesById.get(m.parent_id) : undefined
           const parentClickable = !!parent && !parent.deleted_at // 삭제·미발견 부모는 스크롤 불가
+          // 카톡식 시간: 같은 사람·같은 분(分) 연속이면 마지막 메시지에만 시각을 보인다(노이즈 압축).
+          const nextMsg = messages[i + 1]
+          const showTime =
+            !nextMsg ||
+            nextMsg.sender_id !== m.sender_id ||
+            nextMsg.deleted_at != null ||
+            fmtTime(nextMsg.created_at) !== fmtTime(m.created_at)
 
           // 삭제된 메시지 → placeholder (양쪽 모두)
           if (m.deleted_at) {
@@ -639,7 +678,12 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
                   </button>
                 </div>
               )}
-              {mine && !isSelf && m.read_at === null && <span className="mb-0.5 shrink-0 text-[10px] text-warning">1</span>}
+              {mine && ((!isSelf && m.read_at === null) || showTime) && (
+                <div className="flex shrink-0 flex-col items-end justify-end self-end mb-1.5 text-[10px] text-muted-foreground">
+                  {!isSelf && m.read_at === null && <span className="leading-none text-warning">1</span>}
+                  {showTime && <span className="leading-5">{fmtTime(m.created_at)}</span>}
+                </div>
+              )}
               {m.attachment_url && isImageAttachment(m.attachment_name) ? (
                 // 이미지 첨부 — 파일명 대신 썸네일을 바로 렌더 (클릭 시 원본 새 탭)
                 <a
@@ -690,6 +734,9 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
                   )}
                 </div>
               )}
+              {!mine && showTime && (
+                <span className="shrink-0 self-end mb-1.5 text-[10px] leading-5 text-muted-foreground">{fmtTime(m.created_at)}</span>
+              )}
               {!mine && (
                 <div className="flex items-center gap-0.5 self-center opacity-0 transition-opacity group-hover:opacity-100 has-[[data-emoji-open]]:opacity-100">
                   <button onClick={() => setReplyTo(m)} className="text-muted-foreground hover:text-foreground" aria-label="답장">
@@ -710,6 +757,20 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
             </div>
           )
         })}
+        {/* 상대 '작성 중…' — 카톡식 점 3개 물결 애니메이션 */}
+        {otherTyping && !isSelf && (
+          <div className="flex justify-start">
+            <div className="flex items-center gap-1 rounded-2xl bg-muted px-3.5 py-2.5">
+              {[0, 150, 300].map((d) => (
+                <span
+                  key={d}
+                  className="size-1.5 rounded-full bg-muted-foreground/60 motion-safe:animate-[equria-typing_1.2s_ease-in-out_infinite]"
+                  style={{ animationDelay: `${d}ms` }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
         </div>
         </div>
         {!atBottom && (
@@ -785,6 +846,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
           disabled={!conversationId}
           canSendEmpty={stagedFiles.length > 0}
           onPasteFiles={addStagedFiles}
+          onTyping={notifyTyping}
           leftSlot={
             <Button
               type="button"
