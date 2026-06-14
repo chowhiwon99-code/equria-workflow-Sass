@@ -11,6 +11,8 @@
 
 ## 1. 프로젝트 정체성
 
+> ⚠️ **브랜드 규칙은 `HANDOFF.md` §합의된 정책이 최신(이 절을 대체).** 제품 **브랜드명 미정** · `EQURIA`/`이큐리아`/`K-뷰티`는 **첫 사내 고객 흔적**(제품명·도메인 아님) · 철학 = **회사별 커스터마이징**(도메인/브랜드는 고정값 아닌 슬롯/설정으로). 아래 서술은 *첫 고객(우리 회사)* 맥락의 원본 기록.
+
 **무엇을 만드는가:** 이큐리아(EQURIA) K-뷰티 브랜드 내부 직원 전용 워크스페이스 플랫폼 (사내 SaaS)
 **왜 만드는가:** 외부 SaaS 구독 대신 직접 구축 — 월 수백만 원 절감 + 100% 커스터마이징
 **누가 사용하는가:** 이큐리아 내부 직원 (판매/외부 공개 아님)
@@ -94,7 +96,7 @@ equria-workspace/
 ├── next.config.ts  tsconfig.json  package.json
 ├── .claude/skills/                     ← safe-changes · latest-stack · known-issues
 ├── supabase/
-│   ├── migrations/                     ← 001_initial_schema … 022b (24개 파일, DB SSOT)
+│   ├── migrations/                     ← 001_initial_schema … 061 (64개 파일, DB SSOT)
 │   └── seed.sql                        ← 기본 에이전트 8개 시드
 │
 └── src/
@@ -136,7 +138,7 @@ equria-workspace/
 
 ---
 
-## 6. DB 스키마 요약 (26개 테이블 · 마이그 001~022b)
+## 6. DB 스키마 요약 (약 36개 테이블 · 마이그 001~061)
 
 | 영역 | 테이블 |
 |------|--------|

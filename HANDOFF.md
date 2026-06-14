@@ -2,7 +2,7 @@
 
 > **새 세션 읽기 순서:** 이 파일 → 아래 **📂 문서 지도** → `CLAUDE.md` → `.claude/skills/{safe-changes,latest-stack,known-issues}.md`
 > 이 파일은 **"현재 상태 · 다음 할 일 · 합의된 정책"만** 담는다. 깊은 내용은 전용 문서(지도 참조), 과거 상세는 git 커밋 메시지에.
-> 최종 업데이트: **2026-06-11 (세션 9 — 사내 행정 일습 프로덕션 배포)**
+> 최종 업데이트: **2026-06-14 (세션 9 연장 — 전자결재 마무리·드롭다운 복구·채팅 타이핑/시간·문서 정리)**
 
 ---
 
@@ -19,21 +19,24 @@
 | `.claude/skills/safe-changes.md` | 변경 안전 원칙 (모든 코드/DB 변경 전 — 최우선) |
 | `.claude/skills/latest-stack.md` | AI SDK v6·Supabase 최신 패턴 |
 | `.claude/skills/known-issues.md` | 비차단 기술부채·보류분 |
+| `STUDY.md` | (대표용) 비개발자 학습 코스 — 시스템 이해. 온보딩 필수는 아님 |
+
+> 옛 설계 문서(`PLAN`·`CHAT-HUB`·`GOOGLE-MCP` 아키텍처)는 구현 완료/대체되어 `docs/archive/`로 이동. **현재 상태=이 파일, 구현 진실=코드/마이그레이션.**
 
 ---
 
-## 🎯 지금 상태 (2026-06-10)
+## 🎯 지금 상태 (2026-06-14)
 
 - **제품**: 사내 직원용 AI 워크스페이스 → **B2B 멀티테넌트(회사별 판매) SaaS로 전환 중**.
   - ⚠️ **브랜드명 미정.** 코드에 박힌 `EQURIA`·`이큐리아`·`K-뷰티`는 판매 제품명/도메인이 아니라 **첫 번째 사내 고객(우리 회사)의 맥락이 하드코딩된 흔적**. 철학 = **"회사별 커스터마이징"**(각 회사 업무에 AI가 진짜 작동하게).
-- **배포**: 프로덕션 `main` = **`23833fe`** READY · https://equria-workflow-sass.vercel.app
-  - **세션9(2026-06-12) 추가 배포**: 전자결재 재상신/편집(060)·채번버그(061)·**드롭다운 선택 복구**(Select onClick — 라이브 블로커였음)·채팅 작성중/시간. 직전 프로덕션 **`1a7dec2`가 1클릭 롤백 후보**(세션9 핵심), 더 이전 `16daca9`도 후보. 마이그 043~061 프로덕션 적용 완료(프론트=DB 일치).
+- **배포**: 프로덕션 `main` = **`d6f6c55`** READY · https://equria-workflow-sass.vercel.app
+  - **세션9(2026-06-12~14) 배포분**: 전자결재 재상신/편집(060)·채번버그(061)·**드롭다운 선택 복구**(Select `onClick`=Base UI 메뉴 API — 라이브 블로커였음)·채팅 **작성중 인디케이터 + 메시지 시간**(`self-center` 정렬). 마이그 043~061 프로덕션 적용 완료(프론트=DB 일치). 롤백 후보 **`1a7dec2`**(채팅 시간정렬 전), 더 이전 `16daca9`.
   - ⚠️ **배포 팁**: `main`·`feat`를 같은 SHA로 동시 push하면 Vercel이 중복제거해 프로덕션 승격을 건너뛸 때가 있음 → **`main`을 먼저 push해 프로덕션 빌드 확인 후 `feat` push**.
   - 작업 흐름: `feat`에서 작업 → 브랜치 push마다 **프리뷰 자동배포**(라이브 무영향) → `main` push만 프로덕션 배포.
 - **라이브 기능**: 에이전트 허브(우하단 위젯)·에이전트 빌더(위저드)·워크플로우(n8n 캔버스+순차실행)·캘린더·프로젝트·재무·명함·파일·**메일(Gmail)**·**MCP**·구성원 디렉터리 + **직원 채팅**(상태표시·이모지반응·답장/스레드·리치텍스트·다중첨부·**드래그앤드롭/붙여넣기**·AI보조/맞춤법) · 전역 ⌘Z Undo/휴지통.
 - **🔐 멀티테넌시 B1-a (읽기 격리) = 완료** (마이그 033~043, DB 라이브·검증). 회사 간 데이터 격리 활성 → 아래 §멀티테넌시.
 - **💰 비용 추적 = 켜짐** (마이그 042): Claude 호출별 모델·달러비용 기록 + 마이페이지 "추정 비용".
-- **🆕 2026-06-10~11 추가 — 사내 행정 일습(✅ 프로덕션 배포 완료 `fbca15b`)**:
+- **🆕 사내 행정 일습(✅ 라이브)**:
   - **근태·결재 `/work`**(마이그 045): 근태(출퇴근)·지출결의서·휴가 통합. 본인/관리자 비공개 RLS, 관리자 승인/반려.
   - **회의 노트 `/meetings`**(마이그 046~049): 워크스페이스 **공유** 회의록. **노션식 Tiptap 블록 에디터** — `/` 슬래시 메뉴(텍스트·제목1~4·목록3종·인용·콜아웃·코드·구분선·표 + **이미지/파일(pdf·zip·xlsx·ppt 등 모든 형식) 인라인 업로드**, lucide 아이콘 통일), 빈줄 "'/'를 입력해 명령어 사용". 본문=HTML 저장, 읽기전용은 동일 확장 렌더(=sanitize). 상시 AI 보조(요약/액션아이템/정리, `/api/meeting-notes/assist`, 슬래시에서도). 인라인 미디어=공개 `meeting-media` 버킷(048, svg/html 차단·50MB 049). 적대 리뷰 2라운드(IDOR·저장형 XSS 등) 수정 완료.
   - **🆕 전자결재 `/approval`**(카카오워크식, 마이그 054~056): 양식→폼→**결재선(순차 N명, 결재/참조)**→상신→순차 승인/반려(의견)→**문서함**(결재할문서·기안함·참조함)→문서상세(**결재선 도장** 진행·회수·의견). RPC `submit/act/recall`(상신 후 변경 RPC 전용). **self-approval DB 3중 차단**·realtime·초안 프라이버시. 메뉴 `/work`를 **전자결재+근태**로 분리(구 지출/휴가 단일승인 패널 제거). Phase B 근태개편·C 연차/관리자는 로드맵.
@@ -42,7 +45,7 @@
   - **사이드바 "직원 채팅" 미읽음 빨간 배지**(`useUnreadDms`) · 근태/지출 UI 개선(근무시간·상태요약).
   - 작은 수정(1·2단계): 채팅 알림 자동삭제·스크롤바 간격·파일 다중업로드·파일 공개범위(공개/부서/개인, 044).
   - **다음(5단계 예정)**: 노션식 새 페이지(블록 에디터 + `/`슬래시 + AI 상시) — 가장 큼·단독.
-- **안정도**: `tsc` 0 · `pnpm lint` **30 errors/0 warnings**(전부 기존 `set-state-in-effect`·refs 부채, 신규 0이 베이스라인) · `any` 0 · 마이그 **원격59↔디스크59 drift 없음**(044~056 추가) · **`next build` 성공**(폰트 이슈 해소) · 로컬 `next build`는 폰트 이슈로 미실행 → **Vercel 빌드가 실제 게이트**.
+- **안정도**: `tsc` 0 · `pnpm lint` **30 errors/0 warnings**(전부 기존 `set-state-in-effect`·refs 부채, 신규 0이 베이스라인) · `any` 0 · 마이그 **001~061(64파일) 적용·drift 없음** · **`next build` 성공** → **Vercel 빌드가 실제 게이트**.
 
 > 최근 작업 상세(세션7·8: UI 리프레시·채팅 단계0~6·에이전트/위젯 재설계·캘린더·삭제RLS버그·B1격리·비용추적 등)는 **git 커밋 메시지**에 충실히 기록됨. 여기 중복 안 함.
 
@@ -66,7 +69,7 @@
 - **service_role 키 rotation**(레거시 노출분) · **Supabase Auth leaked-password protection 켜기**(대시보드 토글, 무료 보안강화).
 
 ### D. 나중
-- 채팅 단계7(초대·권한, B2와 합류) · 과금 자동화(Stripe) · SSO/SCIM·SOC2(엔터프라이즈) · Electron/모바일(B6).
+- 채팅 단계7(초대·권한, B2와 합류) · 과금 자동화(Stripe) · SSO/SCIM·SOC2(엔터프라이즈) · Electron/모바일(B6) · **Google Drive 탭**(`FilesView` 미구현 — 설계 `docs/archive/GOOGLE-MCP-ARCHITECTURE.md` §4).
 > 비차단 기술부채는 `known-issues.md`.
 
 ---
@@ -105,7 +108,7 @@
 
 - **GitHub**: `chowhiwon99-code/equria-workflow-Sass` (main=프로덕션, 작업브랜치 `feat/toss-ui-refresh`).
 - **Vercel**: team `team_wcW0NMU7oiIxNndyV1afigbp` · project `prj_CcCTUr8eIYpaStaj6RNq7VoLPZG6` (`equria-workflow-sass`) · 배포보호 off.
-- **Supabase**: project `dutovtfdckhayyvhtuxu` (ap-northeast-2 서울) · 마이그 001~043(**원격46↔디스크46**).
+- **Supabase**: project `dutovtfdckhayyvhtuxu` (ap-northeast-2 서울) · 마이그 **001~061(64파일)**.
 - **.env.local**: ANTHROPIC · Supabase(URL·anon·service_role) · Google 4종 · `WORKSPACE_PASSWORD` 채워짐. ⚠️ **시크릿 값은 문서/채팅에 적지 말 것**(HANDOFF는 git 추적).
 - **테스트 계정**: 조휘원(`c6817c63-943f-4257-8500-f9840ad39bde`)·이동규·김건 (워크스페이스 비번 로그인). 모델: 기본 `claude-sonnet-4-6` / 복잡 `claude-opus-4-7`.
 - 링크: [GitHub](https://github.com/chowhiwon99-code/equria-workflow-Sass) · [Vercel](https://vercel.com/chowhiwon99-2151s-projects/equria-workflow-sass) · [Supabase](https://supabase.com/dashboard/project/dutovtfdckhayyvhtuxu) · 메모리 `~/.claude/projects/-Users-johwiwon-equria-workspace/memory/`
