@@ -2,7 +2,7 @@
 
 > **새 세션 읽기 순서:** 이 파일 → 아래 **📂 문서 지도** → `CLAUDE.md` → `.claude/skills/{safe-changes,latest-stack,known-issues}.md`
 > 이 파일은 **"현재 상태 · 다음 할 일 · 합의된 정책"만** 담는다. 깊은 내용은 전용 문서(지도 참조), 과거 상세는 git 커밋 메시지에.
-> 최종 업데이트: **2026-06-14 (세션 9 연장 — 전자결재 마무리·드롭다운 복구·채팅 타이핑/시간·문서 정리)**
+> 최종 업데이트: **2026-06-22 (세션 10 — 멀티에이전트 전체 코드리뷰 + 채팅 영속성·MCP 격리·캘린더 팀수정 배포)**
 
 ---
 
@@ -25,11 +25,12 @@
 
 ---
 
-## 🎯 지금 상태 (2026-06-14)
+## 🎯 지금 상태 (2026-06-22)
 
 - **제품**: 사내 직원용 AI 워크스페이스 → **B2B 멀티테넌트(회사별 판매) SaaS로 전환 중**.
   - ⚠️ **브랜드명 미정.** 코드에 박힌 `EQURIA`·`이큐리아`·`K-뷰티`는 판매 제품명/도메인이 아니라 **첫 번째 사내 고객(우리 회사)의 맥락이 하드코딩된 흔적**. 철학 = **"회사별 커스터마이징"**(각 회사 업무에 AI가 진짜 작동하게).
-- **배포**: 프로덕션 `main` = **`d6f6c55`** READY · https://equria-workflow-sass.vercel.app
+- **배포**: 프로덕션 `main` = **`46070b5`** READY · https://equria-workflow-sass.vercel.app
+  - **세션10(2026-06-22) 배포분 [`46070b5`]**: 멀티에이전트 전체 코드리뷰(12렌즈·확정 21건) 후 고가치 5건 수정 — ① 채팅 영속성(스트림 중단/에러에도 메시지·비용 유실 방지: 유저 메시지 **스트리밍 전 선저장** + `result.consumeStream()` + `onError` 실패 usage 기록) ② MCP 서버 수정/삭제 **워크스페이스 격리**(service_role→유저 스코프 클라이언트, RLS 0행→404) ③ 어시스턴트 비용 insert `void`→`await`(미전송 버그) ④ 대화생성 실패 500. **🆕 캘린더 팀수정**(마이그 062): `cal_update/cal_delete`를 작성자 본인→**워크스페이스 멤버 전체**로 확대(남이 만든 일정도 수정/삭제 가능, 테넌트 격리 유지) + 프론트 0행 무음실패→에러 노출. 롤백 후보 **`d6f6c55`**.
   - **세션9(2026-06-12~14) 배포분**: 전자결재 재상신/편집(060)·채번버그(061)·**드롭다운 선택 복구**(Select `onClick`=Base UI 메뉴 API — 라이브 블로커였음)·채팅 **작성중 인디케이터 + 메시지 시간**(`self-center` 정렬). 마이그 043~061 프로덕션 적용 완료(프론트=DB 일치). 롤백 후보 **`1a7dec2`**(채팅 시간정렬 전), 더 이전 `16daca9`.
   - ⚠️ **배포 팁**: `main`·`feat`를 같은 SHA로 동시 push하면 Vercel이 중복제거해 프로덕션 승격을 건너뛸 때가 있음 → **`main`을 먼저 push해 프로덕션 빌드 확인 후 `feat` push**.
   - 작업 흐름: `feat`에서 작업 → 브랜치 push마다 **프리뷰 자동배포**(라이브 무영향) → `main` push만 프로덕션 배포.
@@ -45,7 +46,7 @@
   - **사이드바 "직원 채팅" 미읽음 빨간 배지**(`useUnreadDms`) · 근태/지출 UI 개선(근무시간·상태요약).
   - 작은 수정(1·2단계): 채팅 알림 자동삭제·스크롤바 간격·파일 다중업로드·파일 공개범위(공개/부서/개인, 044).
   - **다음(5단계 예정)**: 노션식 새 페이지(블록 에디터 + `/`슬래시 + AI 상시) — 가장 큼·단독.
-- **안정도**: `tsc` 0 · `pnpm lint` **30 errors/0 warnings**(전부 기존 `set-state-in-effect`·refs 부채, 신규 0이 베이스라인) · `any` 0 · 마이그 **001~061(64파일) 적용·drift 없음** · **`next build` 성공** → **Vercel 빌드가 실제 게이트**.
+- **안정도**: `tsc` 0 · `pnpm lint` **30 errors/0 warnings**(전부 기존 `set-state-in-effect`·refs 부채, 신규 0이 베이스라인) · `any` 0 · 마이그 **001~062(65파일) 적용·drift 없음** · **`next build` 성공** → **Vercel 빌드가 실제 게이트**.
 
 > 최근 작업 상세(세션7·8: UI 리프레시·채팅 단계0~6·에이전트/위젯 재설계·캘린더·삭제RLS버그·B1격리·비용추적 등)는 **git 커밋 메시지**에 충실히 기록됨. 여기 중복 안 함.
 
@@ -108,7 +109,7 @@
 
 - **GitHub**: `chowhiwon99-code/equria-workflow-Sass` (main=프로덕션, 작업브랜치 `feat/toss-ui-refresh`).
 - **Vercel**: team `team_wcW0NMU7oiIxNndyV1afigbp` · project `prj_CcCTUr8eIYpaStaj6RNq7VoLPZG6` (`equria-workflow-sass`) · 배포보호 off.
-- **Supabase**: project `dutovtfdckhayyvhtuxu` (ap-northeast-2 서울) · 마이그 **001~061(64파일)**.
+- **Supabase**: project `dutovtfdckhayyvhtuxu` (ap-northeast-2 서울) · 마이그 **001~062(65파일)**.
 - **.env.local**: ANTHROPIC · Supabase(URL·anon·service_role) · Google 4종 · `WORKSPACE_PASSWORD` 채워짐. ⚠️ **시크릿 값은 문서/채팅에 적지 말 것**(HANDOFF는 git 추적).
 - **테스트 계정**: 조휘원(`c6817c63-943f-4257-8500-f9840ad39bde`)·이동규·김건 (워크스페이스 비번 로그인). 모델: 기본 `claude-sonnet-4-6` / 복잡 `claude-opus-4-7`.
 - 링크: [GitHub](https://github.com/chowhiwon99-code/equria-workflow-Sass) · [Vercel](https://vercel.com/chowhiwon99-2151s-projects/equria-workflow-sass) · [Supabase](https://supabase.com/dashboard/project/dutovtfdckhayyvhtuxu) · 메모리 `~/.claude/projects/-Users-johwiwon-equria-workspace/memory/`
