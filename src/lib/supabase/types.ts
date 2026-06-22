@@ -548,6 +548,35 @@ export type Database = {
           },
         ]
       }
+      attendance_viewers: {
+        Row: {
+          created_at: string
+          granted_by: string | null
+          viewer_user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          granted_by?: string | null
+          viewer_user_id: string
+          workspace_id?: string
+        }
+        Update: {
+          created_at?: string
+          granted_by?: string | null
+          viewer_user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_viewers_viewer_user_id_fkey"
+            columns: ["viewer_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       business_cards: {
         Row: {
           address: string | null
@@ -2087,6 +2116,9 @@ export type Database = {
       auth_is_admin: { Args: never; Returns: boolean }
       auth_user_department: { Args: never; Returns: string }
       auth_user_workspace_ids: { Args: never; Returns: string[] }
+      can_view_attendance: { Args: { ws: string }; Returns: boolean }
+      grant_attendance_viewer: { Args: { target: string }; Returns: undefined }
+      revoke_attendance_viewer: { Args: { target: string }; Returns: undefined }
       current_workspace_id: { Args: never; Returns: string }
       directory_contact: {
         Args: { target: string }

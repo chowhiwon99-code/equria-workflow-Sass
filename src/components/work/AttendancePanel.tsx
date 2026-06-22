@@ -18,7 +18,7 @@ type Rec = {
 }
 
 const STATUS = ["정상", "지각", "재택", "외근", "출장", "반차", "연차", "결근"] as const
-const STATUS_BADGE: Record<string, string> = {
+export const STATUS_BADGE: Record<string, string> = {
   정상: "bg-emerald-100 text-emerald-700",
   지각: "bg-amber-100 text-amber-700",
   재택: "bg-blue-100 text-blue-700",
@@ -29,13 +29,13 @@ const STATUS_BADGE: Record<string, string> = {
   결근: "bg-red-100 text-red-700",
 }
 
-function todayStr(): string {
+export function todayStr(): string {
   return new Date().toLocaleDateString("en-CA") // YYYY-MM-DD (로컬 날짜)
 }
-function fmtTime(iso: string | null): string {
+export function fmtTime(iso: string | null): string {
   return iso ? new Date(iso).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) : "—"
 }
-function fmtDate(d: string): string {
+export function fmtDate(d: string): string {
   return d.slice(5).replace("-", ".") // MM.DD
 }
 /** 근무시간(출근~퇴근, 퇴근 전이면 현재까지) — "8시간 30분". */
