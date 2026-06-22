@@ -552,10 +552,19 @@ function CreateEventModal({
         color: event.color,
         attachments: event.attachments,
       }
-      const { error: uErr } = await supabase.from("calendar_events").update(payload).eq("id", event.id)
+      const { data: updated, error: uErr } = await supabase
+        .from("calendar_events")
+        .update(payload)
+        .eq("id", event.id)
+        .select("id")
       setSaving(false)
       if (uErr) {
         setError(uErr.message)
+        return
+      }
+      // RLS 등으로 0행이면 에러 없이 안 바뀐다 → 과거 '조용한 실패'의 원인. 명확히 알린다.
+      if (!updated || updated.length === 0) {
+        setError("수정에 실패했어요. 권한이 없거나 일정이 삭제된 것 같아요.")
         return
       }
       push({
@@ -722,6 +731,7 @@ function EventDetailModal({
   const supabase = createClient()
   const { push } = useUndo()
   const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
   const start = new Date(event.start_time)
   const end = event.end_time ? new Date(event.end_time) : null
   const multiDay = end ? !isSameDay(start, end) : false
@@ -736,8 +746,17 @@ function EventDetailModal({
     const prev = event.status
     const next = event.status === "done" ? "scheduled" : "done"
     setBusy(true)
-    await supabase.from("calendar_events").update({ status: next }).eq("id", event.id)
+    setErr(null)
+    const { data, error } = await supabase
+      .from("calendar_events")
+      .update({ status: next })
+      .eq("id", event.id)
+      .select("id")
     setBusy(false)
+    if (error || !data || data.length === 0) {
+      setErr("처리에 실패했어요. 잠시 후 다시 시도해 주세요.")
+      return
+    }
     push({
       label: next === "done" ? "일정 완료" : "완료 취소",
       undo: async () => {
@@ -754,8 +773,17 @@ function EventDetailModal({
 
   const remove = async () => {
     setBusy(true)
-    await supabase.from("calendar_events").delete().eq("id", event.id)
+    setErr(null)
+    const { data, error } = await supabase
+      .from("calendar_events")
+      .delete()
+      .eq("id", event.id)
+      .select("id")
     setBusy(false)
+    if (error || !data || data.length === 0) {
+      setErr("삭제에 실패했어요. 잠시 후 다시 시도해 주세요.")
+      return
+    }
     push({
       label: "일정 삭제",
       undo: async () => {
@@ -805,6 +833,7 @@ function EventDetailModal({
           </ul>
         )}
         {event.status === "done" && <p className="text-sm font-medium text-success">✓ 완료된 일정</p>}
+        {err && <p className="text-sm text-destructive">{err}</p>}
         <div className="flex items-center justify-between gap-2">
           <Button variant="destructive" size="sm" onClick={remove} disabled={busy}>
             <Trash2 /> 삭제
