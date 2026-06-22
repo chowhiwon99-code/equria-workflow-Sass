@@ -61,6 +61,20 @@ export async function POST(
     conversationId = conv.id
   }
 
+  // 이번 턴의 사용자 메시지를 스트리밍 전에 먼저 저장한다(H2).
+  // onFinish는 클라이언트가 스트림을 끝까지 소비해야 실행되므로, 중단/에러 시 유실되지 않게 선저장.
+  const lastUser = [...messages].reverse().find((m) => m.role === "user")
+  const lastUserText =
+    lastUser?.parts
+      .map((p) => (p.type === "text" ? p.text : ""))
+      .join("\n")
+      .trim() ?? ""
+  await supabase.from("messages").insert({
+    conversation_id: conversationId,
+    role: "user",
+    content: lastUserText,
+  })
+
   const startedAt = Date.now()
   const windowed = messages.slice(-HISTORY_WINDOW)
   const modelMessages = await convertToModelMessages(windowed)
@@ -95,35 +109,33 @@ export async function POST(
     temperature: Number(agentVersion.temperature),
     // MCP 도구가 있으면 다단계 도구호출 허용(없으면 단일 응답)
     ...(hasTools ? { tools, stopWhen: stepCountIs(5) } : {}),
-    onError() {
-      void closeMcp()
+    async onError({ error }) {
+      // 사용자 메시지는 이미 선저장됨(위). 실패 사용량을 기록해 관측성 확보 + MCP 정리(M3).
+      await Promise.all([
+        supabase.from("agent_usage").insert({
+          agent_id: agentId,
+          user_id: user.id,
+          conversation_id: conversationId,
+          duration_ms: Date.now() - startedAt,
+          success: false,
+          error_message: error instanceof Error ? error.message : String(error),
+          model: agentVersion.model,
+        }),
+        closeMcp(),
+      ])
     },
     async onFinish({ text, usage }) {
-      const lastUser = [...messages].reverse().find((m) => m.role === "user")
-      const lastUserText =
-        lastUser?.parts
-          .map((p) => (p.type === "text" ? p.text : ""))
-          .join("\n")
-          .trim() ?? ""
-
       const inputTokens = usage.inputTokens ?? 0
       const outputTokens = usage.outputTokens ?? 0
 
       await Promise.all([
-        supabase.from("messages").insert([
-          {
-            conversation_id: conversationId!,
-            role: "user",
-            content: lastUserText,
-          },
-          {
-            conversation_id: conversationId!,
-            role: "assistant",
-            content: text,
-            tokens_used: outputTokens,
-            model: agentVersion.model,
-          },
-        ]),
+        supabase.from("messages").insert({
+          conversation_id: conversationId!,
+          role: "assistant",
+          content: text,
+          tokens_used: outputTokens,
+          model: agentVersion.model,
+        }),
         supabase.from("agent_usage").insert({
           agent_id: agentId,
           user_id: user.id,
@@ -143,6 +155,10 @@ export async function POST(
       await closeMcp()
     },
   })
+
+  // 클라이언트가 스트리밍 중 끊겨도 서버가 끝까지 소비해 onFinish가 실행되도록 한다(H2).
+  // 소비 중 에러는 위 streamText onError가 이미 처리하므로 여기선 unhandled rejection만 무음 처리.
+  void result.consumeStream({ onError: () => {} })
 
   return result.toUIMessageStreamResponse({
     headers: { "X-Conversation-Id": conversationId ?? "" },

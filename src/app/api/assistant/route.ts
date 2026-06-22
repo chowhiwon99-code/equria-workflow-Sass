@@ -37,17 +37,31 @@ export async function POST(req: Request) {
   const messages = body.messages ?? []
   let conversationId = body.conversationId ?? null
 
-  // 새 대화면 생성(제목 = 첫 사용자 메시지 일부)
+  // 새 대화면 생성(제목 = 첫 사용자 메시지 일부). 생성 실패 시 500으로 막아 턴이 조용히 유실되지 않게(M2).
   if (!conversationId) {
     const title = lastUserText(messages).slice(0, 40) || null
-    const { data: conv } = await supabase
+    const { data: conv, error: convErr } = await supabase
       .from("assistant_conversations")
       .insert({ user_id: user.id, title })
       .select("id")
       .single()
-    conversationId = conv?.id ?? null
+    if (convErr || !conv) {
+      return new Response(convErr?.message ?? "Failed to create conversation", {
+        status: 500,
+      })
+    }
+    conversationId = conv.id
   }
+  const convId = conversationId
 
+  // 이번 턴의 사용자 메시지를 스트리밍 전에 먼저 저장(중단/에러로 onFinish가 안 돌아도 유실 방지·H2).
+  await supabase.from("assistant_messages").insert({
+    conversation_id: convId,
+    role: "user",
+    content: lastUserText(messages),
+  })
+
+  const startedAt = Date.now()
   const modelMessages = await convertToModelMessages(messages.slice(-HISTORY_WINDOW))
 
   const result = streamText({
@@ -56,31 +70,48 @@ export async function POST(req: Request) {
     messages: modelMessages,
     maxOutputTokens: 2048,
     async onFinish({ text, usage }) {
-      // 비용 추적: 어시스턴트도 Claude 호출 → agent_usage 기록(agent/conversation 없는 대시보드 호출)
+      // 비용 추적: 어시스턴트도 Claude 호출 → agent_usage 기록. await로 묶어 전송 보장(M1: 기존 void는 전송 안 됨).
       const inT = usage.inputTokens ?? 0
       const outT = usage.outputTokens ?? 0
-      void supabase.from("agent_usage").insert({
-        user_id: user.id,
-        tokens_input: inT,
-        tokens_output: outT,
-        success: true,
-        model: MODELS.default,
-        cost_usd: computeCostUsd(MODELS.default, inT, outT),
-      })
-      if (!conversationId) return
-      // 이번 턴(마지막 사용자 메시지 + 새 어시스턴트 답변)만 저장
-      await supabase.from("assistant_messages").insert([
-        { conversation_id: conversationId, role: "user", content: lastUserText(messages) },
-        { conversation_id: conversationId, role: "assistant", content: text },
+      await Promise.all([
+        supabase.from("agent_usage").insert({
+          user_id: user.id,
+          tokens_input: inT,
+          tokens_output: outT,
+          duration_ms: Date.now() - startedAt,
+          success: true,
+          model: MODELS.default,
+          cost_usd: computeCostUsd(MODELS.default, inT, outT),
+        }),
+        // 이번 턴의 어시스턴트 답변만 저장(사용자 메시지는 위에서 선저장)
+        supabase.from("assistant_messages").insert({
+          conversation_id: convId,
+          role: "assistant",
+          content: text,
+        }),
+        supabase
+          .from("assistant_conversations")
+          .update({ updated_at: new Date().toISOString() })
+          .eq("id", convId),
       ])
-      await supabase
-        .from("assistant_conversations")
-        .update({ updated_at: new Date().toISOString() })
-        .eq("id", conversationId)
+    },
+    async onError({ error }) {
+      // 사용자 메시지는 이미 선저장됨. 실패 사용량 기록(관측성).
+      await supabase.from("agent_usage").insert({
+        user_id: user.id,
+        duration_ms: Date.now() - startedAt,
+        success: false,
+        error_message: error instanceof Error ? error.message : String(error),
+        model: MODELS.default,
+      })
     },
   })
 
+  // 클라이언트가 끊겨도 서버가 끝까지 소비해 onFinish가 실행되도록 한다(H2).
+  // 소비 중 에러는 위 streamText onError가 이미 처리하므로 여기선 unhandled rejection만 무음 처리.
+  void result.consumeStream({ onError: () => {} })
+
   return result.toUIMessageStreamResponse({
-    headers: conversationId ? { "X-Conversation-Id": conversationId } : undefined,
+    headers: { "X-Conversation-Id": convId },
   })
 }
