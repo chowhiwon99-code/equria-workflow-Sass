@@ -1,12 +1,12 @@
 "use client"
 
-import { useCallback, useEffect, useState, type ReactNode } from "react"
-import { Plus, NotebookPen, Folder, FolderPlus, Trash2 } from "lucide-react"
+import { useCallback, useEffect, useState } from "react"
+import { Plus, NotebookPen, Folder, FolderPlus } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
-import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Select } from "@/components/shared/Select"
+import { FolderSidebarItem } from "@/components/shared/FolderSidebarItem"
 import { Loading, EmptyState } from "@/components/shared/States"
 import { MeetingEditor } from "./MeetingEditor"
 import type { Tables } from "@/lib/supabase/types"
@@ -142,10 +142,16 @@ export function MeetingsView() {
       <div className="flex flex-col gap-5 sm:flex-row">
         {/* 폴더 사이드바 */}
         <aside className="flex shrink-0 flex-col gap-1 sm:w-48">
-          <FolderItem label="전체" count={notes.length} active={selected === "all"} onClick={() => setSelected("all")} />
-          <FolderItem label="미분류" count={noneCount} active={selected === "none"} onClick={() => setSelected("none")} />
+          <FolderSidebarItem label="전체" count={notes.length} active={selected === "all"} onClick={() => setSelected("all")} />
+          <FolderSidebarItem
+            label="미분류"
+            count={noneCount}
+            active={selected === "none"}
+            onClick={() => setSelected("none")}
+            onDropItem={(id) => moveNote(id, null)}
+          />
           {folders.map((f) => (
-            <FolderItem
+            <FolderSidebarItem
               key={f.id}
               label={f.name}
               count={countOf(f.id)}
@@ -153,6 +159,7 @@ export function MeetingsView() {
               icon={<Folder className="size-3.5 shrink-0 text-muted-foreground" />}
               onClick={() => setSelected(f.id)}
               onDelete={() => deleteFolder(f)}
+              onDropItem={(id) => moveNote(id, f.id)}
             />
           ))}
           <form
@@ -197,10 +204,18 @@ export function MeetingsView() {
           ) : (
             <div className="flex flex-col gap-2">
               {visible.map((n) => (
-                <div key={n.id} className="flex items-stretch gap-2">
+                <div
+                  key={n.id}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData("text/plain", n.id)
+                    e.dataTransfer.effectAllowed = "move"
+                  }}
+                  className="flex items-stretch gap-2"
+                >
                   <button
                     onClick={() => openNote(n)}
-                    className="flex min-w-0 flex-1 flex-col gap-1 rounded-xl border bg-card p-4 text-left transition-colors hover:bg-muted/40"
+                    className="flex min-w-0 flex-1 cursor-grab flex-col gap-1 rounded-xl border bg-card p-4 text-left transition-colors hover:bg-muted/40 active:cursor-grabbing"
                   >
                     <div className="flex items-center gap-2">
                       <span className="min-w-0 flex-1 truncate text-sm font-medium">{n.title || "(제목 없음)"}</span>
@@ -231,47 +246,6 @@ export function MeetingsView() {
           )}
         </div>
       </div>
-    </div>
-  )
-}
-
-/** 폴더 사이드바 항목 — 클릭=선택, (폴더만) hover 시 삭제 버튼. */
-function FolderItem({
-  label,
-  count,
-  active,
-  icon,
-  onClick,
-  onDelete,
-}: {
-  label: string
-  count: number
-  active: boolean
-  icon?: ReactNode
-  onClick: () => void
-  onDelete?: () => void
-}) {
-  return (
-    <div
-      className={cn(
-        "group flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm transition-colors",
-        active ? "bg-primary/10 text-primary" : "hover:bg-muted/50"
-      )}
-    >
-      <button onClick={onClick} className="flex min-w-0 flex-1 items-center gap-1.5 text-left">
-        {icon}
-        <span className="min-w-0 flex-1 truncate font-medium">{label}</span>
-        <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{count}</span>
-      </button>
-      {onDelete && (
-        <button
-          onClick={onDelete}
-          className="shrink-0 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
-          aria-label={`${label} 폴더 삭제`}
-        >
-          <Trash2 className="size-3.5" />
-        </button>
-      )}
     </div>
   )
 }

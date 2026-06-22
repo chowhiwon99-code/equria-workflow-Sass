@@ -978,12 +978,40 @@ export type Database = {
           },
         ]
       }
+      file_folders: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          sort: number
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          sort?: number
+          workspace_id?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          sort?: number
+          workspace_id?: string
+        }
+        Relationships: []
+      }
       files: {
         Row: {
           created_at: string
           deleted_at: string | null
           department: string | null
           external_id: string | null
+          folder_id: string | null
           id: string
           metadata: Json
           mime_type: string | null
@@ -1001,6 +1029,7 @@ export type Database = {
           deleted_at?: string | null
           department?: string | null
           external_id?: string | null
+          folder_id?: string | null
           id?: string
           metadata?: Json
           mime_type?: string | null
@@ -1018,6 +1047,7 @@ export type Database = {
           deleted_at?: string | null
           department?: string | null
           external_id?: string | null
+          folder_id?: string | null
           id?: string
           metadata?: Json
           mime_type?: string | null
@@ -1050,6 +1080,13 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "files_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "file_folders"
             referencedColumns: ["id"]
           },
         ]
@@ -2174,6 +2211,7 @@ export type Database = {
       mark_dm_read: { Args: { conv_id: string }; Returns: number }
       recall_document: { Args: { doc_id: string }; Returns: undefined }
       revise_document: { Args: { doc_id: string }; Returns: undefined }
+      set_file_folder: { Args: { p_file: string; p_folder: string | null }; Returns: undefined }
       set_meeting_note_folder: { Args: { new_folder: string | null; note_id: string }; Returns: undefined }
       set_member_position: { Args: { new_position: string; target: string }; Returns: undefined }
       set_member_role: { Args: { new_role: string; target: string }; Returns: undefined }
