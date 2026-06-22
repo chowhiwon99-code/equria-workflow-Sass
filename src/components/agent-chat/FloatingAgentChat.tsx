@@ -216,7 +216,9 @@ function EmptyAgentWidget() {
         aria-label="에이전트 위젯 열기 (⌘K)"
         title="핀한 에이전트가 없습니다 (⌘K)"
       >
-        <Sparkles className="pointer-events-none size-6" />
+        <span className="pointer-events-none flex items-center justify-center motion-safe:animate-float">
+          <Sparkles className="size-6" />
+        </span>
       </button>
     )
   }
@@ -299,11 +301,16 @@ function FabLauncher({ unread, onOpen }: { unread: boolean; onOpen: () => void }
       aria-label="에이전트 위젯 열기 (⌘K)"
       title={unreadAgent ? `${unreadAgent.name} · 새 메시지` : "에이전트 (⌘K)"}
     >
-      {unreadAgent ? (
-        <span className="pointer-events-none">{renderAgentIcon(unreadAgent.icon, "size-6")}</span>
-      ) : (
-        <Sparkles className="pointer-events-none size-6" />
-      )}
+      {/* 아이콘만 둥둥(float) — 버튼 자체는 left/top(드래그)·hover:scale 담당이라
+          transform 충돌을 피하려 안쪽 span에만 애니. 드래그 중엔 정지. */}
+      <span
+        className={cn(
+          "pointer-events-none flex items-center justify-center",
+          !dragging && "motion-safe:animate-float"
+        )}
+      >
+        {unreadAgent ? renderAgentIcon(unreadAgent.icon, "size-6") : <Sparkles className="size-6" />}
+      </span>
       {unread && (
         <span className="pointer-events-none absolute right-0 top-0 size-3 rounded-full bg-destructive ring-2 ring-background" />
       )}
