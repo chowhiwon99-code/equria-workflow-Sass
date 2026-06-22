@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { createAdminClient } from "@/lib/supabase/admin"
 import type { Database } from "@/lib/supabase/types"
 
 export const runtime = "nodejs"
@@ -17,7 +16,8 @@ async function requireAdmin() {
   if (prof?.role !== "admin") {
     return { error: NextResponse.json({ error: "관리자만 가능해요." }, { status: 403 }) }
   }
-  return { admin: createAdminClient() }
+  // 유저 스코프(RLS) 클라이언트로 반환 — mcp_admin 정책이 "관리자 AND 내 워크스페이스"를 강제(타 회사 MCP 변경 차단·H1).
+  return { db: supabase }
 }
 
 /** MCP 서버 수정 (관리자). */
@@ -40,8 +40,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (body.auth_type === "none" || body.auth_type === "bearer") patch.auth_type = body.auth_type
   if (typeof body.is_active === "boolean") patch.is_active = body.is_active
 
-  const { error } = await gate.admin.from("mcp_servers").update(patch).eq("id", id)
+  const { data, error } = await gate.db
+    .from("mcp_servers")
+    .update(patch)
+    .eq("id", id)
+    .select("id")
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  // RLS로 막힌 타 워크스페이스 대상은 0행 갱신(에러 없음) → 404로 명확히 처리.
+  if (!data || data.length === 0) {
+    return NextResponse.json({ error: "MCP 서버를 찾을 수 없거나 권한이 없어요." }, { status: 404 })
+  }
   return NextResponse.json({ ok: true })
 }
 
@@ -51,7 +59,14 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const gate = await requireAdmin()
   if (gate.error) return gate.error
 
-  const { error } = await gate.admin.from("mcp_servers").delete().eq("id", id)
+  const { data, error } = await gate.db
+    .from("mcp_servers")
+    .delete()
+    .eq("id", id)
+    .select("id")
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (!data || data.length === 0) {
+    return NextResponse.json({ error: "MCP 서버를 찾을 수 없거나 권한이 없어요." }, { status: 404 })
+  }
   return NextResponse.json({ ok: true })
 }
