@@ -108,6 +108,21 @@ export function MembersView() {
     }
   }
 
+  // 대표(오너)가 구성원 직급(자유 입력) 설정 — set_member_position RPC.
+  const savePosition = async (m: Member, value: string) => {
+    setBusyId(m.id)
+    try {
+      const { error } = await supabase.rpc("set_member_position", { target: m.id, new_position: value })
+      if (error) throw new Error(error.message)
+      toast.success("직급을 저장했어요.")
+      await load()
+    } catch {
+      toast.error("직급 변경에 실패했어요.")
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   const q = query.trim().toLowerCase()
   const filtered = members.filter(
     (m) =>
@@ -211,6 +226,14 @@ export function MembersView() {
                               {m.role === "admin" ? "관리자 권한 해제" : "관리자로 지정"}
                             </button>
                           )}
+                          {/* 대표만: 직급 설정(자유 입력). 직원 본인/타인은 변경 불가(트리거+RPC 가드). */}
+                          {isOwner && (
+                            <PositionEditor
+                              current={m.position}
+                              busy={busyId === m.id}
+                              onSave={(v) => savePosition(m, v)}
+                            />
+                          )}
                         </div>
                       </div>
                     )}
@@ -253,5 +276,41 @@ function ContactRow({
         <span className="text-xs text-muted-foreground/60">비공개 또는 미등록</span>
       )}
     </div>
+  )
+}
+
+/** 대표용 직급 인라인 편집기 — 자유 입력 + 저장(set_member_position RPC). */
+function PositionEditor({
+  current,
+  busy,
+  onSave,
+}: {
+  current: string | null
+  busy: boolean
+  onSave: (value: string) => void
+}) {
+  const [val, setVal] = useState(current ?? "")
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        onSave(val)
+      }}
+      className="flex w-full items-center gap-1.5"
+    >
+      <input
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        placeholder="직급 설정 (예: 팀장 / 매니저 / 사원)"
+        className="h-8 flex-1 rounded-lg border bg-background px-2.5 text-xs outline-none focus:ring-2 focus:ring-ring"
+      />
+      <button
+        type="submit"
+        disabled={busy}
+        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted disabled:opacity-50"
+      >
+        직급 저장
+      </button>
+    </form>
   )
 }

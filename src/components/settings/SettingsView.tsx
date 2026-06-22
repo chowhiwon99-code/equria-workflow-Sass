@@ -205,7 +205,6 @@ export function SettingsView() {
           .update({
             name: name.trim(),
             department: department.trim() || null,
-            position: position.trim() || null,
             work_phone: workPhone.trim() || null,
             mobile: mobile.trim() || null,
             contact_privacy: privacy,
@@ -261,7 +260,10 @@ export function SettingsView() {
             <input className={fieldClass} value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="예: 마케팅팀" />
           </Field>
           <Field label="직급">
-            <input className={fieldClass} value={position} onChange={(e) => setPosition(e.target.value)} placeholder="예: 팀장 / 매니저 / 사원" />
+            <div className="flex items-center justify-between rounded-xl bg-muted/40 px-3.5 py-2.5 text-sm">
+              <span className={position ? "font-medium" : "text-muted-foreground"}>{position || "미지정"}</span>
+              <span className="text-xs text-muted-foreground">대표가 설정해요</span>
+            </div>
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="사내 전화">

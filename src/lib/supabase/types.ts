@@ -2105,6 +2105,7 @@ export type Database = {
       mark_dm_read: { Args: { conv_id: string }; Returns: number }
       recall_document: { Args: { doc_id: string }; Returns: undefined }
       revise_document: { Args: { doc_id: string }; Returns: undefined }
+      set_member_position: { Args: { new_position: string; target: string }; Returns: undefined }
       set_member_role: { Args: { new_role: string; target: string }; Returns: undefined }
       shares_workspace_with: { Args: { other_user: string }; Returns: boolean }
       submit_document: { Args: { doc_id: string }; Returns: string }
