@@ -1371,6 +1371,33 @@ export type Database = {
           },
         ]
       }
+      meeting_note_folders: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          sort: number
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          sort?: number
+          workspace_id?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          sort?: number
+          workspace_id?: string
+        }
+        Relationships: []
+      }
       meeting_notes: {
         Row: {
           attachment_name: string | null
@@ -1379,6 +1406,7 @@ export type Database = {
           attendees: string | null
           content: string
           created_at: string
+          folder_id: string | null
           id: string
           meeting_date: string | null
           title: string
@@ -1393,6 +1421,7 @@ export type Database = {
           attendees?: string | null
           content?: string
           created_at?: string
+          folder_id?: string | null
           id?: string
           meeting_date?: string | null
           title?: string
@@ -1407,6 +1436,7 @@ export type Database = {
           attendees?: string | null
           content?: string
           created_at?: string
+          folder_id?: string | null
           id?: string
           meeting_date?: string | null
           title?: string
@@ -1420,6 +1450,13 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_notes_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "meeting_note_folders"
             referencedColumns: ["id"]
           },
         ]
@@ -2137,6 +2174,7 @@ export type Database = {
       mark_dm_read: { Args: { conv_id: string }; Returns: number }
       recall_document: { Args: { doc_id: string }; Returns: undefined }
       revise_document: { Args: { doc_id: string }; Returns: undefined }
+      set_meeting_note_folder: { Args: { new_folder: string | null; note_id: string }; Returns: undefined }
       set_member_position: { Args: { new_position: string; target: string }; Returns: undefined }
       set_member_role: { Args: { new_role: string; target: string }; Returns: undefined }
       shares_workspace_with: { Args: { other_user: string }; Returns: boolean }
