@@ -15,7 +15,7 @@ description: EQURIA Workspace의 모든 코드/DB 변경에서 "꼬임 방지(ma
 
 ## 1. DB는 항상 SSOT (Single Source of Truth)
 - **모든 DDL은 ① MCP `apply_migration`로 원격 적용 + ② 동일 SQL을 `supabase/migrations/NNN_*.sql`로 파일화**. 둘 중 하나만 하면 "꼬임"의 시작. DB-only 변경 금지.
-- 마이그레이션 번호는 **순차**(현재 061까지·64파일). 새 변경 = 다음 번호.
+- 마이그레이션 번호는 **순차**(최신 범위·파일 수는 HANDOFF / `ls supabase/migrations`로 확인 — 여기에 숫자 박지 말 것). 새 변경 = 다음 번호.
 - 스키마 변경 후 **`types.ts` 재생성**(`generate_typescript_types`) 또는 해당 타입 수동 반영 → 코드/DB 타입 불일치 방지.
 - **마이그레이션은 멱등(idempotent)하게**: `create table if not exists`, `create or replace function`, `drop ... if exists`, `create policy` 전 `drop policy if exists`. 재실행해도 안전하게.
 

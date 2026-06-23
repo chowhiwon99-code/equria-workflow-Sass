@@ -5,7 +5,7 @@ description: EQURIA Workspace의 설치된 최신 스택(AI SDK v6, Next 16, Rea
 
 # Latest Stack Reference (검증된 최신 패턴)
 
-> 이 파일은 **실제 설치된 패키지에서 검증한** API만 담는다. PLAN.md §5의 옛 코드(v3/v4)보다 **이 파일이 우선**한다.
+> 이 파일은 **실제 설치된 패키지에서 검증한** API만 담는다. `docs/archive/PLAN.md` §5의 옛 코드(v3/v4)보다 **이 파일이 우선**한다.
 > 라이브러리 API가 불확실하면: **context7 MCP**(resolve-library-id → get-library-docs) 또는 내장 **claude-api 스킬**을 사용해 최신 문서를 확인할 것.
 
 ## 설치된 버전 (2026-05 기준, package.json 확인)

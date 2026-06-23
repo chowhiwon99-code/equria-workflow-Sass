@@ -91,12 +91,12 @@ NEXT_PUBLIC_APP_NAME=이큐리아 워크스페이스
 
 ```
 equria-workspace/
-├── CLAUDE.md  PLAN.md  HANDOFF.md      ← 매니페스트 · 기획 · 세션 인수인계
+├── CLAUDE.md  HANDOFF.md  WORKLOG.md   ← 매니페스트 · 현재상태 · 작업로그 (옛 PLAN.md는 docs/archive/)
 ├── .env.local  .env.example
 ├── next.config.ts  tsconfig.json  package.json
 ├── .claude/skills/                     ← safe-changes · latest-stack · known-issues
 ├── supabase/
-│   ├── migrations/                     ← 001_initial_schema … 061 (64개 파일, DB SSOT)
+│   ├── migrations/                     ← 001_initial_schema … (DB SSOT — 최신 범위·수는 §6·HANDOFF)
 │   └── seed.sql                        ← 기본 에이전트 8개 시드
 │
 └── src/
@@ -138,7 +138,7 @@ equria-workspace/
 
 ---
 
-## 6. DB 스키마 요약 (약 39개 테이블 · 마이그 001~066)
+## 6. DB 스키마 요약 (약 39개 테이블 · 마이그 001~067)
 
 | 영역 | 테이블 |
 |------|--------|
@@ -156,7 +156,7 @@ equria-workspace/
 | 알림 | `notifications` |
 | 구글 연동 | `google_connections` |
 
-> 전체 SQL: `supabase/migrations/` (001~066, 69파일). 원격 적용·drift 없음. **세부 진행상황·최신 변경은 HANDOFF.md가 SSOT.**
+> 전체 SQL: `supabase/migrations/` (001~067, 70파일). 원격 적용·drift 없음. **세부 진행상황·최신 변경은 HANDOFF.md가 SSOT.**
 > 기본 에이전트 8개 시드: `supabase/seed.sql` 참고
 
 ---
@@ -216,7 +216,7 @@ Phase 5 [MCP 연결] — Google Workspace, Supabase MCP
 Phase 6 [워크플로우] — 에이전트 체이닝, 자동화
 ```
 
-> 각 Phase 상세: `PLAN.md` 참고
+> 각 Phase 상세: `docs/archive/PLAN.md`(아카이브) 참고
 
 ---
 
