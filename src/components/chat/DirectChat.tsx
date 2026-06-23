@@ -54,6 +54,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
   const [editText, setEditText] = useState("")
   const [otherName, setOtherName] = useState("")
   const [otherStatus, setOtherStatus] = useState<string | null>(null)
+  const [otherPosition, setOtherPosition] = useState<string | null>(null)
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [messages, setMessages] = useState<DirectMessage[]>([])
   const [reactions, setReactions] = useState<{ id: string; message_id: string; emoji: string; user_id: string }[]>([])
@@ -160,11 +161,12 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
 
       const { data: other } = await supabase
         .from("profiles")
-        .select("name, status_manual")
+        .select("name, status_manual, position")
         .eq("id", otherUserId)
         .single()
       setOtherName(me === otherUserId ? "나와의 채팅" : other?.name ?? "직원")
       setOtherStatus(other?.status_manual ?? null)
+      setOtherPosition(other?.position ?? null)
 
       const { data: convId, error: rpcErr } = await supabase.rpc("get_or_create_direct_conversation", {
         other_user: otherUserId,
@@ -564,6 +566,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
         </Link>
         {isSelf && <NotebookPen className="size-4 text-primary" />}
         <span className="text-sm font-semibold">{otherName}</span>
+        {!isSelf && otherPosition && <span className="text-xs text-muted-foreground">{otherPosition}</span>}
         {!isSelf && <StatusDot online={online.has(otherUserId)} manual={otherStatus} />}
       </div>
 

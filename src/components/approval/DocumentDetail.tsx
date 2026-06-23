@@ -38,7 +38,7 @@ export function DocumentDetail({ docId }: { docId: string }) {
     const [{ data: d }, { data: cs }, { data: ppl }] = await Promise.all([
       supabase.from("approval_documents").select("*, approval_steps(*)").eq("id", docId).maybeSingle(),
       supabase.from("approval_comments").select("id, user_id, body, created_at").eq("document_id", docId).order("created_at"),
-      supabase.from("profiles").select("id, name, avatar_url"),
+      supabase.from("profiles").select("id, name, avatar_url, position"),
     ])
     setDoc((d as Doc) ?? null)
     setComments((cs as Comment[]) ?? [])
@@ -64,6 +64,8 @@ export function DocumentDetail({ docId }: { docId: string }) {
   }
 
   const nameById = (id: string) => people.find((p) => p.id === id)?.name ?? "직원"
+  const posById = (id: string) => people.find((p) => p.id === id)?.position ?? null
+  const nameWithPos = (id: string) => [nameById(id), posById(id)].filter(Boolean).join(" · ")
 
   if (loading) return <Loading rows={5} />
   if (!doc || !me)
@@ -170,7 +172,7 @@ export function DocumentDetail({ docId }: { docId: string }) {
           <Avatar className="size-5">
             <AvatarFallback className="text-[9px]">{nameById(doc.drafter_id).slice(0, 2)}</AvatarFallback>
           </Avatar>
-          기안 {nameById(doc.drafter_id)}
+          기안 {nameWithPos(doc.drafter_id)}
           {doc.submitted_at && <span>· {doc.submitted_at.slice(0, 10)}</span>}
         </div>
       </div>
@@ -198,6 +200,9 @@ export function DocumentDetail({ docId }: { docId: string }) {
                     </span>
                   </div>
                   <span className="max-w-16 truncate text-[11px]">{nameById(s.approver_id)}</span>
+                  {posById(s.approver_id) && (
+                    <span className="max-w-16 truncate text-[10px] text-muted-foreground">{posById(s.approver_id)}</span>
+                  )}
                   {s.comment && <span className="max-w-24 truncate text-[10px] text-muted-foreground">“{s.comment}”</span>}
                 </div>
               )
@@ -205,7 +210,7 @@ export function DocumentDetail({ docId }: { docId: string }) {
           </div>
           {refs.length > 0 && (
             <div className="mt-3 flex items-center gap-1.5 border-t pt-2.5 text-[11px] text-muted-foreground">
-              참조 {refs.map((r) => nameById(r.approver_id)).join(", ")}
+              참조 {refs.map((r) => nameWithPos(r.approver_id)).join(", ")}
             </div>
           )}
         </div>
@@ -302,7 +307,7 @@ export function DocumentDetail({ docId }: { docId: string }) {
               <AvatarFallback className="text-[10px]">{nameById(c.user_id).slice(0, 2)}</AvatarFallback>
             </Avatar>
             <div className="flex min-w-0 flex-1 flex-col rounded-lg bg-muted/40 px-2.5 py-1.5">
-              <span className="text-[11px] text-muted-foreground">{nameById(c.user_id)}</span>
+              <span className="text-[11px] text-muted-foreground">{nameWithPos(c.user_id)}</span>
               <span className="whitespace-pre-wrap break-words text-sm">{c.body}</span>
             </div>
           </div>

@@ -44,6 +44,7 @@ export function NewDocumentModal({
   const [busy, setBusy] = useState(false)
 
   const nameById = useMemo(() => Object.fromEntries(people.map((p) => [p.id, p.name])), [people])
+  const posById = useMemo(() => Object.fromEntries(people.map((p) => [p.id, p.position])), [people])
   // 결재선에 추가 가능한 사람: 본인(기안자) 제외 + 이미 추가된 사람 제외
   const addable = people.filter((p) => p.id !== me && !line.some((l) => l.approver_id === p.id))
   const setField = (k: string, v: string) => setFields((f) => ({ ...f, [k]: v }))
@@ -211,7 +212,10 @@ export function NewDocumentModal({
                   <Avatar className="size-6">
                     <AvatarFallback className="text-[10px]">{(nameById[e.approver_id] ?? "??").slice(0, 2)}</AvatarFallback>
                   </Avatar>
-                  <span className="flex-1 truncate text-sm">{nameById[e.approver_id] ?? "직원"}</span>
+                  <span className="flex-1 truncate text-sm">
+                    {nameById[e.approver_id] ?? "직원"}
+                    {posById[e.approver_id] && <span className="text-muted-foreground"> · {posById[e.approver_id]}</span>}
+                  </span>
                   <button
                     onClick={() => toggleRole(i)}
                     className={cn(
@@ -239,7 +243,7 @@ export function NewDocumentModal({
               <Select
                 value={pick}
                 onChange={setPick}
-                options={addable.map((p) => ({ value: p.id, label: p.name }))}
+                options={addable.map((p) => ({ value: p.id, label: `${p.name}${p.position ? " · " + p.position : ""}` }))}
                 placeholder="결재자 선택"
                 className="h-8 flex-1"
               />

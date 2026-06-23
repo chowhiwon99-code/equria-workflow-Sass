@@ -12,7 +12,7 @@ import { useOnlineUsers } from "@/hooks/usePresence"
 import { onChat } from "@/lib/chatBus"
 import type { Profile } from "@/types"
 
-type Colleague = Pick<Profile, "id" | "name" | "department" | "status_manual">
+type Colleague = Pick<Profile, "id" | "name" | "department" | "status_manual" | "position">
 
 type RoomSummary = {
   otherId: string
@@ -47,7 +47,7 @@ export function ChatList() {
           .from("direct_conversations")
           .select("*")
           .order("last_message_at", { ascending: false, nullsFirst: false }),
-        supabase.from("profiles").select("id, name, department, status_manual").neq("id", me).order("name"),
+        supabase.from("profiles").select("id, name, department, status_manual, position").neq("id", me).order("name"),
       ])
 
       const nameById = new Map((profs ?? []).map((p) => [p.id, p.name]))
@@ -123,6 +123,7 @@ export function ChatList() {
   const startedIds = new Set(rooms.map((r) => r.otherId))
   const newContacts = colleagues.filter((c) => !startedIds.has(c.id))
   const statusById = new Map(colleagues.map((c) => [c.id, c.status_manual]))
+  const posById = new Map(colleagues.map((c) => [c.id, c.position]))
 
   return (
     <div className="flex flex-col gap-5">
@@ -169,7 +170,12 @@ export function ChatList() {
                       />
                     </div>
                     <div className="flex min-w-0 flex-1 flex-col">
-                      <span className="text-sm font-medium">{r.otherName}</span>
+                      <span className="text-sm font-medium">
+                        {r.otherName}
+                        {posById.get(r.otherId) && (
+                          <span className="ml-1 text-[11px] font-normal text-muted-foreground">{posById.get(r.otherId)}</span>
+                        )}
+                      </span>
                       <span className="truncate text-xs text-muted-foreground">{r.lastMessage}</span>
                     </div>
                     <div className="flex flex-col items-end gap-1">
@@ -219,7 +225,9 @@ export function ChatList() {
                     </div>
                     <div className="flex flex-col">
                       <span className="text-sm font-medium">{c.name}</span>
-                      {c.department && <span className="text-xs text-muted-foreground">{c.department}</span>}
+                      {(c.position || c.department) && (
+                        <span className="text-xs text-muted-foreground">{[c.position, c.department].filter(Boolean).join(" · ")}</span>
+                      )}
                     </div>
                   </button>
                 ))}

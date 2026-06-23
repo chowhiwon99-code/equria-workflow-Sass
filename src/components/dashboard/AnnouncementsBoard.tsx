@@ -25,6 +25,7 @@ export function AnnouncementsBoard() {
   const [me, setMe] = useState<string | null>(null)
   const [isOwner, setIsOwner] = useState(false)
   const [names, setNames] = useState<Record<string, string>>({})
+  const [positions, setPositions] = useState<Record<string, string | null>>({})
   const [list, setList] = useState<Ann[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -45,11 +46,12 @@ export function AnnouncementsBoard() {
         .select("*")
         .order("pinned", { ascending: false })
         .order("created_at", { ascending: false }),
-      supabase.from("profiles").select("id, name"),
+      supabase.from("profiles").select("id, name, position"),
     ])
     setIsOwner(!!ws && ws.owner_id === auth.user.id)
     setList((anns as Ann[]) ?? [])
     setNames(Object.fromEntries((ppl ?? []).map((p) => [p.id, p.name])))
+    setPositions(Object.fromEntries((ppl ?? []).map((p) => [p.id, p.position])))
     setLoading(false)
   }, [supabase])
 
@@ -170,7 +172,7 @@ export function AnnouncementsBoard() {
                 {a.title && <p className="truncate text-sm font-medium">{a.title}</p>}
                 {a.content && <p className={cn("whitespace-pre-wrap break-words text-sm text-muted-foreground", !expanded && "line-clamp-2")}>{a.content}</p>}
                 <p className="mt-0.5 text-[11px] text-muted-foreground/70">
-                  {names[a.user_id] ?? "오너"} · {fmtDate(a.created_at)}
+                  {[names[a.user_id] ?? "오너", positions[a.user_id]].filter(Boolean).join(" · ")} · {fmtDate(a.created_at)}
                 </p>
               </div>
               {isOwner && (

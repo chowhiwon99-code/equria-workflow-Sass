@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Select } from "@/components/shared/Select"
 import { FolderGrid } from "@/components/shared/FolderGrid"
+import { SelectCheck } from "@/components/shared/SelectCheck"
+import { SelectionBar } from "@/components/shared/SelectionBar"
 import { Loading, EmptyState } from "@/components/shared/States"
 import { MeetingEditor } from "./MeetingEditor"
 import type { Tables } from "@/lib/supabase/types"
@@ -23,24 +25,12 @@ const SORT_OPTIONS = [
   { value: "count", label: "회의록 많은순" },
 ]
 
-/** 본문 HTML에서 미리보기용 평문 추출. */
-function snippet(html: string): string {
-  const t = html
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/\s+/g, " ")
-    .trim()
-  return t.length > 100 ? `${t.slice(0, 100)}…` : t
-}
-
 export function MeetingsView() {
   const supabase = createClient()
   const [me, setMe] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [names, setNames] = useState<Record<string, string>>({})
+  const [positions, setPositions] = useState<Record<string, string | null>>({})
   const [notes, setNotes] = useState<Note[]>([])
   const [folders, setFolders] = useState<FolderRow[]>([])
   const [currentFolder, setCurrentFolder] = useState<string | null>(null) // null = 루트(전체)
@@ -58,12 +48,13 @@ export function MeetingsView() {
     const [{ data: prof }, { data: list }, { data: ppl }, { data: fdrs }] = await Promise.all([
       supabase.from("profiles").select("role").eq("id", auth.user.id).single(),
       supabase.from("meeting_notes").select("*").order("created_at", { ascending: false }),
-      supabase.from("profiles").select("id, name"),
+      supabase.from("profiles").select("id, name, position"),
       supabase.from("meeting_note_folders").select("id, name, created_at").order("created_at"),
     ])
     setIsAdmin(prof?.role === "admin")
     setNotes((list as Note[]) ?? [])
     setNames(Object.fromEntries((ppl ?? []).map((p) => [p.id, p.name])))
+    setPositions(Object.fromEntries((ppl ?? []).map((p) => [p.id, p.position])))
     setFolders((fdrs as FolderRow[]) ?? [])
     setLoading(false)
   }, [supabase])
@@ -149,6 +140,7 @@ export function MeetingsView() {
         me={me}
         isAdmin={isAdmin}
         authorName={editing ? names[editing.user_id] : undefined}
+        authorPosition={editing ? positions[editing.user_id] : undefined}
         onBack={backToList}
         onSaved={afterChange}
         onDeleted={afterChange}
@@ -233,24 +225,8 @@ export function MeetingsView() {
         />
       )}
 
-      {/* 다중 선택 이동 바 */}
-      {sel.size > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded-lg bg-muted/50 px-3 py-2 text-sm">
-          <span className="font-medium">{sel.size}개 선택</span>
-          <Select
-            value="__"
-            onChange={(v) => {
-              if (v !== "__") moveNotes([...sel], v === "none" ? null : v)
-            }}
-            options={[{ value: "__", label: "폴더로 이동…" }, ...moveOptions]}
-            align="start"
-            className="h-8"
-          />
-          <button onClick={clearSel} className="text-muted-foreground hover:text-foreground">
-            선택 해제
-          </button>
-        </div>
-      )}
+      {/* 다중 선택 = 화면 안 밀리는 하단 플로팅 바 */}
+      <SelectionBar count={sel.size} moveOptions={moveOptions} onMove={(fid) => moveNotes([...sel], fid)} onClear={clearSel} />
 
       {/* 노트 목록 */}
       {notes.length === 0 ? (
@@ -273,57 +249,28 @@ export function MeetingsView() {
               : "이 폴더에 회의록이 없어요."}
         </p>
       ) : (
-        <div className="flex flex-col gap-2">
+        // 맥북 폴더창식 노트 아이콘 그리드 — 가로 공간 절약. 더블클릭=열기, 드래그·체크박스 이동.
+        <div className="flex flex-wrap gap-3">
           {visible.map((n) => {
             const checked = sel.has(n.id)
+            const date = (n.meeting_date ?? n.created_at.slice(0, 10)).slice(5).replace("-", ".")
             return (
               <div
                 key={n.id}
                 draggable
                 onDragStart={(e) => startDrag(e, n.id)}
-                className="group flex items-center gap-2"
+                className={cn("group relative w-24 cursor-grab rounded-2xl p-1 transition-colors active:cursor-grabbing", checked && "bg-primary/10")}
               >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => toggleSel(n.id)}
-                  onClick={(e) => e.stopPropagation()}
-                  aria-label={`${n.title || "회의록"} 선택`}
-                  className={cn(
-                    "size-4 shrink-0 cursor-pointer accent-primary transition-opacity",
-                    checked ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                  )}
-                />
-                <button
-                  onClick={() => openNote(n)}
-                  className={cn(
-                    "flex min-w-0 flex-1 cursor-grab flex-col gap-1 rounded-xl border bg-card p-4 text-left transition-colors hover:bg-muted/40 active:cursor-grabbing",
-                    checked && "ring-2 ring-primary"
-                  )}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium">{n.title || "(제목 없음)"}</span>
-                    <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
-                      {(n.meeting_date ?? n.created_at.slice(0, 10)).slice(5).replace("-", ".")}
-                    </span>
+                <SelectCheck checked={checked} onToggle={() => toggleSel(n.id)} className="absolute left-1 top-1 z-10" />
+                <button onDoubleClick={() => openNote(n)} title="더블클릭으로 열기" className="flex w-full flex-col items-center">
+                  <div className="flex aspect-square w-full items-center justify-center rounded-2xl bg-muted/50 transition-colors group-hover:bg-muted">
+                    <NotebookPen className="size-9 text-muted-foreground" strokeWidth={1.5} />
                   </div>
-                  {snippet(n.content) && <p className="line-clamp-1 text-xs text-muted-foreground">{snippet(n.content)}</p>}
-                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                    <span>{names[n.user_id] ?? "직원"}</span>
-                    {n.attendees && <span className="truncate">· {n.attendees}</span>}
-                  </div>
+                  <span className="mt-1 w-full truncate px-0.5 text-center text-xs font-medium" title={n.title || "(제목 없음)"}>
+                    {n.title || "(제목 없음)"}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">{date}</span>
                 </button>
-                {folders.length > 0 && (
-                  <div className="flex shrink-0 items-center">
-                    <Select
-                      value={n.folder_id ?? "none"}
-                      onChange={(v) => moveNotes([n.id], v === "none" ? null : v)}
-                      options={moveOptions}
-                      align="end"
-                      className="h-8"
-                    />
-                  </div>
-                )}
               </div>
             )
           })}

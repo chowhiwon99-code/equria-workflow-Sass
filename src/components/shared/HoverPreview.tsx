@@ -101,7 +101,7 @@ export function HoverPreview({
   }
 
   return (
-    <span ref={wrapRef} className={className} onMouseEnter={onEnter} onMouseLeave={onLeave}>
+    <span ref={wrapRef} className={className} onMouseEnter={onEnter} onMouseLeave={onLeave} onMouseDown={onLeave} onDragStart={onLeave}>
       {children}
       {open && pos && url && (
         <div

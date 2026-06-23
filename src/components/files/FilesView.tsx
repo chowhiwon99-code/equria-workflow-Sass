@@ -25,7 +25,8 @@ import { useUndo } from "@/components/undo/UndoProvider"
 import { Button } from "@/components/ui/button"
 import { Select } from "@/components/shared/Select"
 import { FolderGrid } from "@/components/shared/FolderGrid"
-import { PdfThumb } from "./PdfThumb"
+import { SelectCheck } from "@/components/shared/SelectCheck"
+import { SelectionBar } from "@/components/shared/SelectionBar"
 import { FilePreview } from "@/components/shared/FilePreview"
 import { HoverPreview } from "@/components/shared/HoverPreview"
 import { Loading, EmptyState, ErrorState } from "@/components/shared/States"
@@ -74,11 +75,6 @@ function isImageFile(name: string, mime: string | null): boolean {
   return !!mime?.startsWith("image/") || ["png", "jpg", "jpeg", "gif", "webp", "svg", "heic"].includes(ext)
 }
 
-// PDF인지(아이콘뷰에서 1페이지 썸네일 렌더 대상).
-function isPdfFile(name: string, mime: string | null): boolean {
-  return mime === "application/pdf" || name.split(".").pop()?.toLowerCase() === "pdf"
-}
-
 // 파일 종류별 아이콘·색 — 확장자/MIME로 판별(보기 쉽게).
 function fileVisual(name: string, mime: string | null): { Icon: LucideIcon; color: string } {
   const ext = name.split(".").pop()?.toLowerCase() ?? ""
@@ -112,7 +108,6 @@ export function FilesView() {
   const { push } = useUndo()
   const inputRef = useRef<HTMLInputElement>(null)
   const [rows, setRows] = useState<FileRow[]>([])
-  const [thumbs, setThumbs] = useState<Record<string, string>>({}) // 이미지 파일 id → 서명 썸네일 URL
   const [folders, setFolders] = useState<FolderRow[]>([])
   const [currentFolder, setCurrentFolder] = useState<string | null>(null) // null = 루트(전체)
   const [folderSort, setFolderSort] = useState<FolderSort>("name")
@@ -146,25 +141,10 @@ export function FilesView() {
         supabase.from("file_folders").select("id, name, created_at").order("created_at"),
       ])
       if (queryError) throw queryError
-      const fileRows = (data as FileRow[]) ?? []
       setMyDept(prof?.department ?? null)
-      setRows(fileRows)
+      setRows((data as FileRow[]) ?? [])
       setFolders((fdrs as FolderRow[]) ?? [])
       setError(null)
-      // 이미지 파일은 실제 썸네일용 서명 URL을 배치 발급(1시간). PDF/오피스는 종류 아이콘.
-      const imgs = fileRows.filter((f) => isImageFile(f.name, f.mime_type) && f.metadata?.storage_path)
-      if (imgs.length) {
-        const { data: signed } = await supabase.storage
-          .from(FILES_BUCKET)
-          .createSignedUrls(imgs.map((f) => f.metadata!.storage_path as string), 3600)
-        const m: Record<string, string> = {}
-        signed?.forEach((s, i) => {
-          if (s.signedUrl) m[imgs[i].id] = s.signedUrl
-        })
-        setThumbs(m)
-      } else {
-        setThumbs({})
-      }
     } catch {
       setError("파일 목록을 불러오지 못했어요.")
     } finally {
@@ -235,15 +215,19 @@ export function FilesView() {
   }
 
   // 서명 URL(60초) — 호버/클릭 미리보기 공용.
-  const signedUrlFor = useCallback(
-    async (f: FileRow): Promise<string | null> => {
-      const path = f.metadata?.storage_path
-      if (!path) return null
-      const { data } = await supabase.storage.from(FILES_BUCKET).createSignedUrl(path, 60)
-      return data?.signedUrl ?? null
-    },
-    [supabase]
-  )
+  // 서명 URL은 서버 BFF 경유 — files 버킷이 '본인 폴더만'이라(015) 공유된 남의 파일은
+  // 클라가 직접 못 서명. 서버가 RLS로 인가 후 admin으로 서명한다(/api/files/signed-url).
+  const signedUrlFor = useCallback(async (f: FileRow): Promise<string | null> => {
+    if (!f.metadata?.storage_path) return null
+    const res = await fetch("/api/files/signed-url", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fileId: f.id }),
+    })
+    if (!res.ok) return null
+    const json = (await res.json()) as { url?: string }
+    return json.url ?? null
+  }, [])
 
   // 파일 클릭 → 새 탭 대신 인라인 미리보기 칸으로.
   const openPreview = async (f: FileRow) => {
@@ -328,6 +312,12 @@ export function FilesView() {
   })
   const gridItems = sortedFolders.map((f) => ({ id: f.id, name: f.name, count: countOf(f.id) }))
   const currentName = folders.find((f) => f.id === currentFolder)?.name
+  // 폴더 안은 항상 아이콘 그리드(맥북 폴더창), 루트(미분류)에서만 토글 적용.
+  const effectiveView = currentFolder === null ? view : "icon"
+  // 컨트롤은 의미 있을 때만 노출(깔끔). 공개범위 필터=2종 이상일 때(또는 필터 켜진 상태),
+  // 폴더 정렬=폴더 2개 이상, 리스트/아이콘 토글=루트에 낱개 파일 있을 때.
+  const visibilityVaries = new Set(rows.map((r) => r.visibility)).size > 1
+  const hasLoose = rows.some((r) => !r.folder_id)
 
   // 날짜별 그룹(오늘/이전 7일/이전 30일/월별) — visible은 이미 created_at desc 정렬.
   const now = new Date()
@@ -363,42 +353,23 @@ export function FilesView() {
         key={f.id}
         draggable
         onDragStart={(e) => startDrag(e, f.id)}
-        className={cn("group flex cursor-grab items-center gap-3 px-4 py-3 active:cursor-grabbing", checked && "bg-primary/5")}
+        className={cn("group flex cursor-grab items-center gap-3 px-4 py-3 transition-colors active:cursor-grabbing", checked && "bg-primary/5")}
       >
-        <input
-          type="checkbox"
-          checked={checked}
-          onChange={() => toggleSel(f.id)}
-          onClick={(e) => e.stopPropagation()}
-          aria-label={`${f.name} 선택`}
-          className={cn("size-4 shrink-0 cursor-pointer accent-primary transition-opacity", checked ? "opacity-100" : "opacity-0 group-hover:opacity-100")}
-        />
-        <HoverPreview getUrl={() => signedUrlFor(f)} name={f.name} mime={f.mime_type} className="flex min-w-0 flex-1">
-          <button onClick={() => openPreview(f)} className="flex w-full min-w-0 items-center gap-3 text-left">
-            {/* 리스트도 실제 썸네일(이미지/PDF 첫 장) — 안 되면 종류 아이콘. 통일된 크기 슬롯. */}
-            <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted/20">
-              {thumbs[f.id] ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={thumbs[f.id]} alt="" className="size-full object-cover" />
-              ) : isPdfFile(f.name, f.mime_type) && f.metadata?.storage_path ? (
-                <PdfThumb
-                  id={f.id}
-                  path={f.metadata.storage_path}
-                  className="size-full object-cover"
-                  fallback={<Icon className={cn("size-5", color)} strokeWidth={1.75} />}
-                />
-              ) : (
-                <Icon className={cn("size-5", color)} strokeWidth={1.75} />
-              )}
+        <SelectCheck checked={checked} onToggle={() => toggleSel(f.id)} />
+        <button onClick={() => openPreview(f)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+          {/* 호버 미리보기는 썸네일 위에서만(이름/메타에선 안 뜸) */}
+          <HoverPreview getUrl={() => signedUrlFor(f)} name={f.name} mime={f.mime_type} className="block shrink-0">
+            <div className="flex size-9 items-center justify-center rounded-md border bg-muted/20">
+              <Icon className={cn("size-5", color)} strokeWidth={1.75} />
             </div>
-            <div className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-sm font-medium hover:underline">{f.name}</span>
-              <span className="text-[11px] text-muted-foreground">
-                {fileSourceLabel(f.source)} · {formatBytes(f.size_bytes)}
-              </span>
-            </div>
-          </button>
-        </HoverPreview>
+          </HoverPreview>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <span className="truncate text-sm font-medium hover:underline">{f.name}</span>
+            <span className="text-[11px] text-muted-foreground">
+              {fileSourceLabel(f.source)} · {formatBytes(f.size_bytes)}
+            </span>
+          </div>
+        </button>
         <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium", vis?.badge ?? "bg-muted text-muted-foreground")}>
           {vis?.label ?? f.visibility}
         </span>
@@ -424,39 +395,21 @@ export function FilesView() {
         key={f.id}
         draggable
         onDragStart={(e) => startDrag(e, f.id)}
-        className={cn("group relative w-24 cursor-grab active:cursor-grabbing", checked && "rounded-2xl ring-2 ring-primary")}
+        className={cn("group relative w-24 cursor-grab rounded-2xl p-1 transition-colors active:cursor-grabbing", checked && "bg-primary/10")}
       >
-        <input
-          type="checkbox"
-          checked={checked}
-          onChange={() => toggleSel(f.id)}
-          onClick={(e) => e.stopPropagation()}
-          aria-label={`${f.name} 선택`}
-          className={cn("absolute left-1 top-1 z-10 size-4 cursor-pointer accent-primary transition-opacity", checked ? "opacity-100" : "opacity-0 group-hover:opacity-100")}
-        />
-        <HoverPreview getUrl={() => signedUrlFor(f)} name={f.name} mime={f.mime_type} className="flex w-full flex-col items-center gap-1">
-          <button onDoubleClick={() => openPreview(f)} title="더블클릭으로 열기" className="flex w-full flex-col items-center">
-            <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-2xl bg-muted/50 transition-colors group-hover:bg-muted">
-              {thumbs[f.id] ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={thumbs[f.id]} alt="" className="size-full object-cover" />
-              ) : isPdfFile(f.name, f.mime_type) && f.metadata?.storage_path ? (
-                <PdfThumb
-                  id={f.id}
-                  path={f.metadata.storage_path}
-                  className="size-full object-cover"
-                  fallback={<Icon className={cn("size-9", color)} strokeWidth={1.5} />}
-                />
-              ) : (
-                <Icon className={cn("size-9", color)} strokeWidth={1.5} />
-              )}
+        <SelectCheck checked={checked} onToggle={() => toggleSel(f.id)} className="absolute left-1 top-1 z-10" />
+        <button onDoubleClick={() => openPreview(f)} title="더블클릭으로 열기" className="flex w-full flex-col items-center">
+          {/* 호버 미리보기는 아이콘(썸네일) 위에서만 */}
+          <HoverPreview getUrl={() => signedUrlFor(f)} name={f.name} mime={f.mime_type} className="block w-full">
+            <div className="flex aspect-square w-full items-center justify-center rounded-2xl bg-muted/50 transition-colors group-hover:bg-muted">
+              <Icon className={cn("size-9", color)} strokeWidth={1.5} />
             </div>
-            <span className="mt-1 w-full truncate px-0.5 text-center text-xs font-medium" title={f.name}>
-              {f.name}
-            </span>
-            <span className="text-[10px] text-muted-foreground">{formatBytes(f.size_bytes)}</span>
-          </button>
-        </HoverPreview>
+          </HoverPreview>
+          <span className="mt-1 w-full truncate px-0.5 text-center text-xs font-medium" title={f.name}>
+            {f.name}
+          </span>
+          <span className="text-[10px] text-muted-foreground">{formatBytes(f.size_bytes)}</span>
+        </button>
         <button
           onClick={() => remove(f)}
           className="absolute right-1 top-1 rounded bg-background/80 p-0.5 text-muted-foreground opacity-0 backdrop-blur transition-opacity hover:text-destructive group-hover:opacity-100"
@@ -480,7 +433,7 @@ export function FilesView() {
         </div>
         <div className="flex items-center gap-2">
           <Select value={uploadVis} onChange={(v) => setUploadVis(v as Visibility)} options={visOptions} align="end" />
-          <Button size="sm" onClick={() => inputRef.current?.click()} disabled={uploading}>
+          <Button size="sm" className="h-8" onClick={() => inputRef.current?.click()} disabled={uploading}>
             <Upload /> {uploading ? "업로드 중…" : "파일 업로드"}
           </Button>
         </div>
@@ -522,25 +475,42 @@ export function FilesView() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          {currentFolder === null && (
+          {/* 공개범위 필터 — 공개범위가 2종 이상(또는 필터 켜짐)일 때만 의미 있음 */}
+          {(visibilityVaries || tab !== "all") && (
+            <Select
+              value={tab}
+              onChange={(v) => {
+                setTab(v as "all" | Visibility)
+                clearSel()
+              }}
+              options={TABS.map((t) => ({ value: t.key, label: t.label }))}
+              align="end"
+              className="h-8"
+            />
+          )}
+          {/* 폴더 정렬 — 폴더 2개 이상일 때만 */}
+          {currentFolder === null && folders.length > 1 && (
             <Select value={folderSort} onChange={(v) => setFolderSort(v as FolderSort)} options={SORT_OPTIONS} align="end" className="h-8" />
           )}
-          <div className="flex items-center gap-0.5 rounded-lg border p-0.5">
-            {([
-              { k: "list", icon: List, label: "리스트" },
-              { k: "icon", icon: LayoutGrid, label: "아이콘" },
-            ] as const).map(({ k, icon: Icon, label }) => (
-              <button
-                key={k}
-                onClick={() => setView(k)}
-                aria-label={label}
-                title={label}
-                className={cn("rounded-md p-1.5 transition-colors", view === k ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}
-              >
-                <Icon className="size-4" />
-              </button>
-            ))}
-          </div>
+          {/* 리스트/아이콘 토글 — 루트에 낱개 파일이 있을 때만(폴더 안은 항상 아이콘) */}
+          {currentFolder === null && hasLoose && (
+            <div className="flex h-8 items-center gap-0.5 rounded-lg border p-0.5">
+              {([
+                { k: "list", icon: List, label: "리스트" },
+                { k: "icon", icon: LayoutGrid, label: "아이콘" },
+              ] as const).map(({ k, icon: Icon, label }) => (
+                <button
+                  key={k}
+                  onClick={() => setView(k)}
+                  aria-label={label}
+                  title={label}
+                  className={cn("rounded-md p-1.5 transition-colors", view === k ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}
+                >
+                  <Icon className="size-4" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -556,43 +526,8 @@ export function FilesView() {
         />
       )}
 
-      {/* 공개범위 분류 탭 */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => {
-              setTab(t.key)
-              clearSel()
-            }}
-            className={cn(
-              "rounded-full px-3 py-1 text-sm transition-colors",
-              tab === t.key ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {/* 다중 선택 이동 바 */}
-      {sel.size > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded-lg bg-muted/50 px-3 py-2 text-sm">
-          <span className="font-medium">{sel.size}개 선택</span>
-          <Select
-            value="__"
-            onChange={(v) => {
-              if (v !== "__") moveFiles([...sel], v === "none" ? null : v)
-            }}
-            options={[{ value: "__", label: "폴더로 이동…" }, ...moveOptions]}
-            align="start"
-            className="h-8"
-          />
-          <button onClick={clearSel} className="text-muted-foreground hover:text-foreground">
-            선택 해제
-          </button>
-        </div>
-      )}
+      {/* 다중 선택 = 화면 안 밀리는 하단 플로팅 바 */}
+      <SelectionBar count={sel.size} moveOptions={moveOptions} onMove={(fid) => moveFiles([...sel], fid)} onClear={clearSel} />
 
       {/* 파일 영역 — 날짜별 그룹(오늘/이전 7일/이전 30일/월별) */}
       {loading ? (
@@ -625,7 +560,7 @@ export function FilesView() {
           {dateGroups.map((g) => (
             <div key={g.key} className="flex flex-col gap-2">
               <h3 className="px-1 text-xs font-semibold text-muted-foreground">{g.label}</h3>
-              {view === "list" ? (
+              {effectiveView === "list" ? (
                 <div className="flex flex-col divide-y rounded-xl border">{g.items.map(listRow)}</div>
               ) : (
                 <div className="flex flex-wrap gap-3">{g.items.map(iconTile)}</div>

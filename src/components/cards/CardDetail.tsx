@@ -24,7 +24,7 @@ const FIELDS: { key: keyof BusinessCard; label: string }[] = [
   { key: "website", label: "웹사이트" },
 ]
 
-type CardRow = BusinessCard & { owner: { name: string } | null }
+type CardRow = BusinessCard & { owner: { name: string; position: string | null } | null }
 
 export function CardDetail({ cardId }: { cardId: string }) {
   const supabase = createClient()
@@ -40,7 +40,7 @@ export function CardDetail({ cardId }: { cardId: string }) {
     try {
       const { data, error: queryError } = await supabase
         .from("business_cards")
-        .select("*, owner:profiles!business_cards_owner_id_fkey(name)")
+        .select("*, owner:profiles!business_cards_owner_id_fkey(name, position)")
         .eq("id", cardId)
         .is("deleted_at", null)
         .single()
@@ -96,7 +96,7 @@ export function CardDetail({ cardId }: { cardId: string }) {
       <BackLink href="/cards" label="명함 목록" />
 
       <p className="text-sm text-muted-foreground">
-        등록: <span className="font-medium text-foreground">{card.owner?.name ?? "—"}</span>
+        등록: <span className="font-medium text-foreground">{[card.owner?.name ?? "—", card.owner?.position].filter(Boolean).join(" · ")}</span>
         <span className="mx-1.5">·</span>
         {new Date(card.created_at).toLocaleDateString("ko-KR")}
       </p>

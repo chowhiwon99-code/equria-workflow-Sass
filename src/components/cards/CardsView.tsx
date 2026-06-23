@@ -11,7 +11,7 @@ import { downloadCsv, todayStamp } from "@/lib/csv"
 import { Loading, EmptyState, ErrorState } from "@/components/shared/States"
 import type { BusinessCard } from "@/types"
 
-type CardRow = BusinessCard & { owner: { name: string } | null }
+type CardRow = BusinessCard & { owner: { name: string; position: string | null } | null }
 type GroupBy = "owner" | "date" | "company" | "none"
 
 const GROUP_OPTIONS: { value: GroupBy; label: string }[] = [
@@ -74,7 +74,7 @@ export function CardsView() {
     try {
       let q = supabase
         .from("business_cards")
-        .select("*, owner:profiles!business_cards_owner_id_fkey(name)", { count: "exact" })
+        .select("*, owner:profiles!business_cards_owner_id_fkey(name, position)", { count: "exact" })
         .is("deleted_at", null)
       if (searchText.trim()) q = q.or(searchOr(searchText))
       q = q.order("created_at", { ascending: false })
@@ -112,7 +112,7 @@ export function CardsView() {
   const exportCsv = async () => {
     let q = supabase
       .from("business_cards")
-      .select("*, owner:profiles!business_cards_owner_id_fkey(name)")
+      .select("*, owner:profiles!business_cards_owner_id_fkey(name, position)")
       .is("deleted_at", null)
     if (searchText.trim()) q = q.or(searchOr(searchText))
     const { data } = await q.order("created_at", { ascending: false })
@@ -288,7 +288,7 @@ function CardItem({ c }: { c: CardRow }) {
         </span>
       )}
       <span className="mt-1 flex items-center gap-1.5 border-t pt-2 text-xs text-muted-foreground">
-        <UserCircle className="size-3.5 shrink-0" /> 등록: {c.owner?.name ?? "—"}
+        <UserCircle className="size-3.5 shrink-0" /> 등록: {[c.owner?.name ?? "—", c.owner?.position].filter(Boolean).join(" · ")}
       </span>
     </Link>
   )

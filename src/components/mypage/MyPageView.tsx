@@ -8,7 +8,7 @@ import { Loading, ErrorState } from "@/components/shared/States"
 import { renderAgentIcon } from "@/components/agents/AgentIcon"
 import { formatUsd } from "@/lib/pricing"
 
-type Profile = { name: string; department: string | null; role: string }
+type Profile = { name: string; department: string | null; role: string; position: string | null }
 type AgentLite = { id: string; name: string; description: string | null; icon: string }
 type Stats = { calls: number; tokensIn: number; tokensOut: number; agentsUsed: number; cost: number }
 
@@ -30,7 +30,7 @@ export function MyPageView() {
       }
       const me = auth.user.id
       const [{ data: prof }, { data: agents }, { data: usage }] = await Promise.all([
-        supabase.from("profiles").select("name, department, role").eq("id", me).single(),
+        supabase.from("profiles").select("name, department, role, position").eq("id", me).single(),
         supabase
           .from("agents")
           .select("id, name, description, icon")
@@ -95,7 +95,9 @@ export function MyPageView() {
               {profile?.role === "admin" ? "관리자" : "멤버"}
             </span>
           </div>
-          <span className="text-sm text-muted-foreground">{profile?.department || "부서 미설정"}</span>
+          <span className="text-sm text-muted-foreground">
+            {[profile?.position, profile?.department].filter(Boolean).join(" · ") || "부서 미설정"}
+          </span>
         </div>
         <Link href="/settings" className="ml-auto text-xs text-muted-foreground hover:text-foreground">
           프로필 수정 →

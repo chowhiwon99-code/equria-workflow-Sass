@@ -35,7 +35,7 @@ export function ApprovalView() {
     const [{ data: ws }, { data: list }, { data: ppl }] = await Promise.all([
       supabase.from("workspaces").select("owner_id").limit(1).maybeSingle(),
       supabase.from("approval_documents").select("*, approval_steps(*)").order("created_at", { ascending: false }),
-      supabase.from("profiles").select("id, name, avatar_url").order("name"),
+      supabase.from("profiles").select("id, name, avatar_url, position").order("name"),
     ])
     setOwnerId(ws?.owner_id ?? null)
     setDocs((list as Doc[]) ?? [])
@@ -61,6 +61,7 @@ export function ApprovalView() {
   }, [supabase, me, load])
 
   const nameById = useMemo(() => Object.fromEntries(people.map((p) => [p.id, p.name])), [people])
+  const posById = useMemo(() => Object.fromEntries(people.map((p) => [p.id, p.position])), [people])
   const inboxCount = me ? docs.filter((d) => inBox(d, me, "inbox")).length : 0
   const shown = me ? docs.filter((d) => inBox(d, me, box)) : []
 
@@ -104,6 +105,7 @@ export function ApprovalView() {
         docs={shown}
         me={me ?? ""}
         nameById={nameById}
+        posById={posById}
         emptyLabel={BOXES.find((b) => b.key === box)?.empty ?? ""}
         onOpen={(id) => router.push(`/approval/${id}`)}
       />

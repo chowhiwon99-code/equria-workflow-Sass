@@ -136,6 +136,11 @@ export function SettingsView() {
   const [email, setEmail] = useState("")
   const [status, setStatus] = useState<string | null>(null)
   const [position, setPosition] = useState("")
+  // 대표(오너) 전용 — 구성원 직급 일괄 관리
+  const [meId, setMeId] = useState<string | null>(null)
+  const [isOwner, setIsOwner] = useState(false)
+  const [memberList, setMemberList] = useState<{ id: string; name: string; department: string | null; position: string | null }[]>([])
+  const [busyId, setBusyId] = useState<string | null>(null)
   const [workPhone, setWorkPhone] = useState("")
   const [mobile, setMobile] = useState("")
   const [privacy, setPrivacy] = useState<ContactPrivacy>({
@@ -178,6 +183,15 @@ export function SettingsView() {
       setEmail(c?.email ?? "")
       setWorkPhone(c?.work_phone ?? "")
       setMobile(c?.mobile ?? "")
+      // 대표면 구성원 직급 관리용 목록도 로드
+      setMeId(auth.user.id)
+      const { data: ws } = await supabase.from("workspaces").select("owner_id").limit(1).maybeSingle()
+      const owner = !!ws?.owner_id && ws.owner_id === auth.user.id
+      setIsOwner(owner)
+      if (owner) {
+        const { data: mem } = await supabase.from("profiles").select("id, name, department, position").order("name")
+        setMemberList((mem as { id: string; name: string; department: string | null; position: string | null }[]) ?? [])
+      }
       setError(null)
     } catch {
       setError("설정을 불러오지 못했어요. 다시 시도해 주세요.")
@@ -228,6 +242,20 @@ export function SettingsView() {
     toast.success("상태를 변경했어요.")
   }
 
+  const saveMemberPosition = async (id: string, value: string) => {
+    setBusyId(id)
+    try {
+      const { error } = await supabase.rpc("set_member_position", { target: id, new_position: value })
+      if (error) throw new Error(error.message)
+      toast.success("직급을 저장했어요.")
+      await load()
+    } catch {
+      toast.error("직급 변경에 실패했어요.")
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   const logout = async () => {
     await supabase.auth.signOut()
     router.push("/login")
@@ -262,7 +290,7 @@ export function SettingsView() {
           <Field label="직급">
             <div className="flex items-center justify-between rounded-xl bg-muted/40 px-3.5 py-2.5 text-sm">
               <span className={position ? "font-medium" : "text-muted-foreground"}>{position || "미지정"}</span>
-              <span className="text-xs text-muted-foreground">대표가 설정해요</span>
+              <span className="text-xs text-muted-foreground">{isOwner ? "아래 ‘구성원 직급’에서 설정" : "대표가 설정해요"}</span>
             </div>
           </Field>
           <div className="grid grid-cols-2 gap-3">
@@ -335,6 +363,22 @@ export function SettingsView() {
         </div>
       </Card>
 
+      {/* 대표: 구성원 직급 일괄 관리 */}
+      {isOwner && (
+        <Card>
+          <SectionTitle title="구성원 직급" desc="대표가 직원별 직급을 지정해요. 직원 본인은 변경할 수 없어요." />
+          {memberList.length === 0 ? (
+            <p className="text-sm text-muted-foreground">구성원이 없어요.</p>
+          ) : (
+            <div className="flex flex-col divide-y overflow-hidden rounded-xl border">
+              {memberList.map((m) => (
+                <MemberPositionRow key={m.id} member={m} isMe={m.id === meId} busy={busyId === m.id} onSave={(v) => saveMemberPosition(m.id, v)} />
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
       {/* 화면(테마) */}
       <Card>
         <SectionTitle title="화면" desc="밝기 테마를 선택해요." />
@@ -370,6 +414,50 @@ export function SettingsView() {
           </Button>
         </div>
       </Card>
+    </div>
+  )
+}
+
+/** 대표용 구성원 직급 한 줄 — 자유 입력 + 저장(set_member_position RPC). */
+function MemberPositionRow({
+  member,
+  isMe,
+  busy,
+  onSave,
+}: {
+  member: { id: string; name: string; department: string | null; position: string | null }
+  isMe: boolean
+  busy: boolean
+  onSave: (value: string) => void
+}) {
+  const [val, setVal] = useState(member.position ?? "")
+  const dirty = val.trim() !== (member.position ?? "")
+  return (
+    <div className="flex items-center gap-3 px-3.5 py-2.5">
+      <div className="flex min-w-0 flex-col">
+        <span className="text-sm font-medium">
+          {member.name}
+          {isMe && <span className="ml-1 text-xs font-normal text-muted-foreground">(나)</span>}
+        </span>
+        <span className="truncate text-xs text-muted-foreground">{member.department || "부서 미지정"}</span>
+      </div>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          onSave(val.trim())
+        }}
+        className="ml-auto flex items-center gap-1.5"
+      >
+        <input
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          placeholder="직급"
+          className="h-8 w-28 rounded-lg border bg-background px-2.5 text-xs outline-none focus:ring-2 focus:ring-ring"
+        />
+        <Button size="sm" className="h-8" type="submit" disabled={busy || !dirty}>
+          저장
+        </Button>
+      </form>
     </div>
   )
 }

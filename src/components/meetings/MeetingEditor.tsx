@@ -28,6 +28,7 @@ export function MeetingEditor({
   me,
   isAdmin,
   authorName,
+  authorPosition,
   onBack,
   onSaved,
   onDeleted,
@@ -36,6 +37,7 @@ export function MeetingEditor({
   me: string
   isAdmin: boolean
   authorName?: string
+  authorPosition?: string | null
   onBack: () => void
   onSaved: () => void
   onDeleted: () => void
@@ -176,7 +178,9 @@ export function MeetingEditor({
             </Button>
           </div>
         ) : (
-          <span className="text-[11px] text-muted-foreground">읽기 전용{authorName ? ` · ${authorName}` : ""}</span>
+          <span className="text-[11px] text-muted-foreground">
+            읽기 전용{authorName ? ` · ${[authorName, authorPosition].filter(Boolean).join(" · ")}` : ""}
+          </span>
         )}
       </div>
 

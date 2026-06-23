@@ -44,14 +44,22 @@ export function Select({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align={align}
-        className="max-h-72 min-w-[var(--radix-dropdown-menu-trigger-width)] overflow-y-auto"
+        sideOffset={6}
+        className="max-h-72 min-w-[max(11rem,var(--anchor-width))] overflow-y-auto rounded-xl p-1.5 shadow-[var(--shadow-lg)]"
       >
-        {options.map((o) => (
-          <DropdownMenuItem key={o.value} onClick={() => onChange(o.value)} className="gap-2">
-            <Check className={cn("size-3.5 shrink-0", o.value === value ? "opacity-100" : "opacity-0")} />
-            <span className="truncate">{o.label}</span>
-          </DropdownMenuItem>
-        ))}
+        {options.map((o) => {
+          const active = o.value === value
+          return (
+            <DropdownMenuItem
+              key={o.value}
+              onClick={() => onChange(o.value)}
+              className={cn("gap-2 rounded-lg px-2.5 py-2 transition-colors", active && "font-medium")}
+            >
+              <Check className={cn("size-4 shrink-0 text-primary transition-opacity", active ? "opacity-100" : "opacity-0")} />
+              <span className="truncate">{o.label}</span>
+            </DropdownMenuItem>
+          )
+        })}
       </DropdownMenuContent>
     </DropdownMenu>
   )

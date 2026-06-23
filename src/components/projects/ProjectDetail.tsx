@@ -16,14 +16,14 @@ import { PROJECT_STATUS, PROJECT_STATUS_ORDER } from "@/lib/projects"
 import { isFigmaUrl, toFigmaDesktopUrl } from "@/lib/figma"
 import type { Project, ProjectStatus, Profile, DriveFile } from "@/types"
 
-type MemberRow = { id: string; user_id: string; role: string; member: { name: string } | null }
+type MemberRow = { id: string; user_id: string; role: string; member: { name: string; position: string | null } | null }
 
 export function ProjectDetail({ projectId }: { projectId: string }) {
   const supabase = createClient()
   const { push } = useUndo()
-  const [project, setProject] = useState<(Project & { owner: { name: string } | null }) | null>(null)
+  const [project, setProject] = useState<(Project & { owner: { name: string; position: string | null } | null }) | null>(null)
   const [members, setMembers] = useState<MemberRow[]>([])
-  const [profiles, setProfiles] = useState<Pick<Profile, "id" | "name">[]>([])
+  const [profiles, setProfiles] = useState<Pick<Profile, "id" | "name" | "position">[]>([])
   const [eventCount, setEventCount] = useState(0)
   const [financeTotal, setFinanceTotal] = useState<{ expense: number; revenue: number }>({ expense: 0, revenue: 0 })
   const [loading, setLoading] = useState(true)
@@ -33,13 +33,13 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
     setLoading(true)
     try {
       const [{ data: proj }, { data: mem }, { data: prof }, { count: evCount }, { data: fin }] = await Promise.all([
-        supabase.from("projects").select("*, owner:profiles!projects_owner_id_fkey(name)").eq("id", projectId).single(),
-        supabase.from("project_members").select("id, user_id, role, member:profiles!project_members_user_id_fkey(name)").eq("project_id", projectId),
-        supabase.from("profiles").select("id, name").order("name"),
+        supabase.from("projects").select("*, owner:profiles!projects_owner_id_fkey(name, position)").eq("id", projectId).single(),
+        supabase.from("project_members").select("id, user_id, role, member:profiles!project_members_user_id_fkey(name, position)").eq("project_id", projectId),
+        supabase.from("profiles").select("id, name, position").order("name"),
         supabase.from("calendar_events").select("id", { count: "exact", head: true }).eq("project_id", projectId),
         supabase.from("finance_entries").select("kind, total_amount").eq("project_id", projectId).is("deleted_at", null),
       ])
-      setProject((proj as (Project & { owner: { name: string } | null }) | null) ?? null)
+      setProject((proj as (Project & { owner: { name: string; position: string | null } | null }) | null) ?? null)
       setMembers((mem as MemberRow[]) ?? [])
       setProfiles(prof ?? [])
       setEventCount(evCount ?? 0)
@@ -156,7 +156,9 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
               className="h-9 w-full"
             />
           </MetaItem>
-          <MetaItem label="담당자">{project.owner?.name ?? "미지정"}</MetaItem>
+          <MetaItem label="담당자">
+            {project.owner ? [project.owner.name, project.owner.position].filter(Boolean).join(" · ") : "미지정"}
+          </MetaItem>
           <MetaItem label="시작일">{project.start_date ?? "—"}</MetaItem>
           <MetaItem label="종료예정">{project.due_date ?? "—"}</MetaItem>
         </div>
@@ -178,6 +180,7 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
           {members.length === 0 && <span className="text-sm text-muted-foreground">아직 참여 멤버가 없습니다.</span>}
           {members.map((m) => {
             const name = m.member?.name ?? "?"
+            const pos = m.member?.position
             return (
               <span
                 key={m.id}
@@ -186,7 +189,10 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
                 <Avatar size="sm" className="size-5">
                   <AvatarFallback className="text-[9px]">{name.slice(0, 2)}</AvatarFallback>
                 </Avatar>
-                <span className="font-medium">{name}</span>
+                <span className="font-medium">
+                  {name}
+                  {pos && <span className="font-normal text-muted-foreground"> · {pos}</span>}
+                </span>
                 <button onClick={() => removeMember(m.id)} className="text-muted-foreground hover:text-destructive" aria-label="제거">
                   <X className="size-3" />
                 </button>

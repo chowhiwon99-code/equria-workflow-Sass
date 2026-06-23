@@ -11,12 +11,14 @@ export function DocumentList({
   docs,
   me,
   nameById,
+  posById,
   emptyLabel,
   onOpen,
 }: {
   docs: Doc[]
   me: string
   nameById: Record<string, string>
+  posById: Record<string, string | null>
   emptyLabel: string
   onOpen: (id: string) => void
 }) {
@@ -39,7 +41,8 @@ export function DocumentList({
             </div>
             <span className="truncate text-[11px] text-muted-foreground">
               {d.doc_no ? `${d.doc_no} · ` : ""}
-              {nameById[d.drafter_id] ?? "직원"} · {docSummary(d.doc_type, (d.body ?? {}) as Record<string, unknown>)}
+              {[nameById[d.drafter_id] ?? "직원", posById[d.drafter_id]].filter(Boolean).join(" · ")} ·{" "}
+              {docSummary(d.doc_type, (d.body ?? {}) as Record<string, unknown>)}
             </span>
           </div>
           <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">

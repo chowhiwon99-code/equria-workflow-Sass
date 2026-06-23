@@ -29,6 +29,7 @@ export function LeavePanel() {
   const [me, setMe] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [names, setNames] = useState<Record<string, string>>({})
+  const [positions, setPositions] = useState<Record<string, string | null>>({})
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -49,11 +50,12 @@ export function LeavePanel() {
         .from("leave_requests")
         .select("id, leave_type, start_date, end_date, reason, status, user_id, created_at")
         .order("created_at", { ascending: false }),
-      supabase.from("profiles").select("id, name"),
+      supabase.from("profiles").select("id, name, position"),
     ])
     setIsAdmin(prof?.role === "admin")
     setRows((list as Row[]) ?? [])
     setNames(Object.fromEntries((ppl ?? []).map((p) => [p.id, p.name])))
+    setPositions(Object.fromEntries((ppl ?? []).map((p) => [p.id, p.position])))
     setLoading(false)
   }, [supabase])
 
@@ -154,7 +156,7 @@ export function LeavePanel() {
                   </span>
                   <span className="truncate text-[11px] text-muted-foreground">
                     {r.reason || "사유 없음"}
-                    {isAdmin && r.user_id !== me && ` · ${names[r.user_id] ?? "직원"}`}
+                    {isAdmin && r.user_id !== me && ` · ${[names[r.user_id] ?? "직원", positions[r.user_id]].filter(Boolean).join(" · ")}`}
                   </span>
                 </div>
                 <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium", STATUS_BADGE[r.status])}>

@@ -15,7 +15,7 @@ import { PROJECT_STATUS, PROJECT_STATUS_ORDER } from "@/lib/projects"
 import type { Project, ProjectStatus, Profile } from "@/types"
 
 type ProjectRow = Project
-type MemberLite = { id: string; name: string; avatar_url: string | null }
+type MemberLite = { id: string; name: string; avatar_url: string | null; position: string | null }
 
 const PAGE_SIZE = 50
 
@@ -45,7 +45,7 @@ function fmtDate(d: string): string {
 export function ProjectsView() {
   const supabase = createClient()
   const [projects, setProjects] = useState<ProjectRow[]>([])
-  const [profiles, setProfiles] = useState<Pick<Profile, "id" | "name" | "avatar_url">[]>([])
+  const [profiles, setProfiles] = useState<Pick<Profile, "id" | "name" | "avatar_url" | "position">[]>([])
   const [memberMap, setMemberMap] = useState<Record<string, string[]>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -69,7 +69,7 @@ export function ProjectsView() {
       }
       const [projRes, profRes] = await Promise.all([
         q.order("created_at", { ascending: false }).range(0, pageCount * PAGE_SIZE - 1),
-        supabase.from("profiles").select("id, name, avatar_url").order("name"),
+        supabase.from("profiles").select("id, name, avatar_url, position").order("name"),
       ])
       if (projRes.error) throw projRes.error
       if (profRes.error) throw profRes.error
@@ -254,7 +254,7 @@ function AvatarStack({ members }: { members: MemberLite[] }) {
   return (
     <div className="flex items-center -space-x-2">
       {shown.map((m) => (
-        <Avatar key={m.id} size="sm" className="ring-2 ring-card" title={m.name}>
+        <Avatar key={m.id} size="sm" className="ring-2 ring-card" title={m.name + (m.position ? " · " + m.position : "")}>
           {m.avatar_url && <AvatarImage src={m.avatar_url} alt={m.name} />}
           <AvatarFallback className="text-[10px]">{m.name.slice(0, 2)}</AvatarFallback>
         </Avatar>

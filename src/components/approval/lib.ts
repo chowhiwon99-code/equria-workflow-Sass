@@ -2,7 +2,7 @@ import type { Tables } from "@/lib/supabase/types"
 
 export type Step = Tables<"approval_steps">
 export type Doc = Tables<"approval_documents"> & { approval_steps: Step[] }
-export type Person = { id: string; name: string; avatar_url: string | null }
+export type Person = { id: string; name: string; avatar_url: string | null; position: string | null }
 export type Box = "inbox" | "drafts" | "refs"
 
 /** 결재 단계만 step_order 순(참조 제외). */

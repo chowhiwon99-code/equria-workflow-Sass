@@ -7,6 +7,7 @@ import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Select } from "@/components/shared/Select"
+import { MonthStepper, currentYM, monthRange, type YM } from "@/components/shared/MonthStepper"
 import { Loading } from "@/components/shared/States"
 
 type Rec = {
@@ -33,16 +34,17 @@ export function todayStr(): string {
   return new Date().toLocaleDateString("en-CA") // YYYY-MM-DD (로컬 날짜)
 }
 export function fmtTime(iso: string | null): string {
-  return iso ? new Date(iso).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) : "—"
+  // 24시간제(오후 중복 제거 → "16:14") — 알아보기 쉽게.
+  return iso ? new Date(iso).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false }) : "—"
 }
 export function fmtDate(d: string): string {
   return d.slice(5).replace("-", ".") // MM.DD
 }
-/** 근무시간(출근~퇴근, 퇴근 전이면 현재까지) — "8시간 30분". */
-function workDuration(checkIn: string | null, checkOut: string | null): string {
+/** 근무시간(출근~퇴근, 퇴근 전이면 현재까지) — "8시간 30분". 1분 미만은 "". */
+export function workDuration(checkIn: string | null, checkOut: string | null): string {
   if (!checkIn) return ""
   const ms = (checkOut ? new Date(checkOut) : new Date()).getTime() - new Date(checkIn).getTime()
-  if (ms <= 0) return ""
+  if (ms < 60000) return "" // 1분 미만은 표시 안 함("0분" 방지)
   const h = Math.floor(ms / 3600000)
   const m = Math.floor((ms % 3600000) / 60000)
   return h > 0 ? `${h}시간 ${m}분` : `${m}분`
@@ -51,7 +53,9 @@ function workDuration(checkIn: string | null, checkOut: string | null): string {
 export function AttendancePanel() {
   const supabase = createClient()
   const [me, setMe] = useState<string | null>(null)
-  const [recs, setRecs] = useState<Rec[]>([])
+  const [recs, setRecs] = useState<Rec[]>([]) // 선택한 달의 내 근태
+  const [today, setToday] = useState<Rec | null>(null) // 오늘 기록(항상 오늘 — 월 이동과 무관)
+  const [ym, setYm] = useState<YM>(currentYM)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
 
@@ -59,22 +63,27 @@ export function AttendancePanel() {
     const { data: auth } = await supabase.auth.getUser()
     if (!auth.user) return setLoading(false)
     setMe(auth.user.id)
-    const { data } = await supabase
-      .from("attendance_records")
-      .select("id, work_date, check_in, check_out, status")
-      .eq("user_id", auth.user.id)
-      .order("work_date", { ascending: false })
-      .limit(14)
-    setRecs((data as Rec[]) ?? [])
+    const { start, end } = monthRange(ym)
+    const cols = "id, work_date, check_in, check_out, status"
+    const [{ data: month }, { data: td }] = await Promise.all([
+      supabase
+        .from("attendance_records")
+        .select(cols)
+        .eq("user_id", auth.user.id)
+        .gte("work_date", start)
+        .lt("work_date", end)
+        .order("work_date", { ascending: false }),
+      supabase.from("attendance_records").select(cols).eq("user_id", auth.user.id).eq("work_date", todayStr()).maybeSingle(),
+    ])
+    setRecs((month as Rec[]) ?? [])
+    setToday((td as Rec) ?? null)
     setLoading(false)
-  }, [supabase])
+  }, [supabase, ym])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load()
   }, [load])
-
-  const today = recs.find((r) => r.work_date === todayStr()) ?? null
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true)
@@ -137,13 +146,7 @@ export function AttendancePanel() {
               {today?.status ?? "미기록"}
             </span>
           </div>
-          <Select
-            value={today?.status ?? "정상"}
-            onChange={setStatus}
-            options={STATUS.map((s) => ({ value: s, label: s }))}
-            align="end"
-            className="h-8"
-          />
+          <Select value={today?.status ?? "정상"} onChange={setStatus} options={STATUS.map((s) => ({ value: s, label: s }))} align="end" className="h-8" />
         </div>
         <div className="mt-4 grid grid-cols-2 gap-3">
           <div className="rounded-xl border p-3">
@@ -157,54 +160,45 @@ export function AttendancePanel() {
         </div>
         {today?.check_in && (
           <p className="mt-2.5 text-xs text-muted-foreground">
-            근무시간 <span className="font-semibold text-foreground">{workDuration(today.check_in, today.check_out)}</span>
+            근무시간 <span className="font-semibold text-foreground">{workDuration(today.check_in, today.check_out) || "0분"}</span>
             {!today.check_out && <span className="ml-1 text-primary">· 근무 중</span>}
           </p>
         )}
         <div className="mt-4 flex gap-2">
-          <Button size="sm" onClick={clockIn} disabled={busy || !!today?.check_in} className="flex-1">
+          <Button size="sm" onClick={clockIn} disabled={busy || !!today?.check_in} className="h-8 flex-1">
             출근
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={clockOut}
-            disabled={busy || !today?.check_in || !!today?.check_out}
-            className="flex-1"
-          >
+          <Button size="sm" variant="outline" onClick={clockOut} disabled={busy || !today?.check_in || !!today?.check_out} className="h-8 flex-1">
             퇴근
           </Button>
         </div>
       </div>
 
-      {/* 최근 내역 */}
+      {/* 내 근태 — 월별 */}
       <div>
-        <h2 className="mb-2 text-sm font-semibold">최근 근태</h2>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold">내 근태</h2>
+          <MonthStepper value={ym} onChange={setYm} max={currentYM()} />
+        </div>
         {recs.length === 0 ? (
-          <p className="text-sm text-muted-foreground">아직 근태 기록이 없어요.</p>
+          <p className="py-6 text-center text-sm text-muted-foreground">이 달 근태 기록이 없어요.</p>
         ) : (
           <div className="flex flex-col divide-y rounded-xl border">
-            {recs.map((r) => (
-              <div key={r.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
-                <span className="w-14 shrink-0 text-muted-foreground tabular-nums">{fmtDate(r.work_date)}</span>
-                <span
-                  className={cn(
-                    "rounded-full px-2 py-0.5 text-[11px] font-medium",
-                    STATUS_BADGE[r.status] ?? "bg-muted text-muted-foreground"
-                  )}
-                >
-                  {r.status}
-                </span>
-                <span className="ml-auto text-muted-foreground tabular-nums">
-                  {fmtTime(r.check_in)} ~ {fmtTime(r.check_out)}
-                </span>
-                {r.check_in && r.check_out && (
-                  <span className="w-20 shrink-0 text-right text-xs text-muted-foreground/80 tabular-nums">
-                    {workDuration(r.check_in, r.check_out)}
+            {recs.map((r) => {
+              const dur = workDuration(r.check_in, r.check_out)
+              return (
+                <div key={r.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+                  <span className="w-14 shrink-0 text-muted-foreground tabular-nums">{fmtDate(r.work_date)}</span>
+                  <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", STATUS_BADGE[r.status] ?? "bg-muted text-muted-foreground")}>
+                    {r.status}
                   </span>
-                )}
-              </div>
-            ))}
+                  <span className="ml-auto text-muted-foreground tabular-nums">
+                    {fmtTime(r.check_in)} ~ {fmtTime(r.check_out)}
+                  </span>
+                  {dur && <span className="w-20 shrink-0 text-right text-xs text-muted-foreground/80 tabular-nums">{dur}</span>}
+                </div>
+              )
+            })}
           </div>
         )}
       </div>

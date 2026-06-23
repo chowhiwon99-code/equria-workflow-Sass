@@ -30,6 +30,7 @@ export function ExpensePanel() {
   const [me, setMe] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [names, setNames] = useState<Record<string, string>>({})
+  const [positions, setPositions] = useState<Record<string, string | null>>({})
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -51,11 +52,12 @@ export function ExpensePanel() {
         .from("expense_reports")
         .select("id, title, amount, category, spent_on, description, status, user_id, created_at")
         .order("created_at", { ascending: false }),
-      supabase.from("profiles").select("id, name"),
+      supabase.from("profiles").select("id, name, position"),
     ])
     setIsAdmin(prof?.role === "admin")
     setRows((list as Row[]) ?? [])
     setNames(Object.fromEntries((ppl ?? []).map((p) => [p.id, p.name])))
+    setPositions(Object.fromEntries((ppl ?? []).map((p) => [p.id, p.position])))
     setLoading(false)
   }, [supabase])
 
@@ -181,7 +183,7 @@ export function ExpensePanel() {
                   <span className="truncate text-sm font-medium">{r.title}</span>
                   <span className="text-[11px] text-muted-foreground">
                     {r.category} · {r.spent_on.slice(5).replace("-", ".")}
-                    {isAdmin && r.user_id !== me && ` · ${names[r.user_id] ?? "직원"}`}
+                    {isAdmin && r.user_id !== me && ` · ${[names[r.user_id] ?? "직원", positions[r.user_id]].filter(Boolean).join(" · ")}`}
                   </span>
                 </div>
                 <span className="shrink-0 text-sm font-semibold tabular-nums">₩{Number(r.amount).toLocaleString()}</span>
