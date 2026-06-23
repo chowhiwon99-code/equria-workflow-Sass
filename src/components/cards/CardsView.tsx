@@ -15,7 +15,7 @@ type CardRow = BusinessCard & { owner: { name: string } | null }
 type GroupBy = "owner" | "date" | "company" | "none"
 
 const GROUP_OPTIONS: { value: GroupBy; label: string }[] = [
-  { value: "owner", label: "등록자별" },
+  { value: "owner", label: "직원별" },
   { value: "date", label: "날짜별" },
   { value: "company", label: "회사별" },
   { value: "none", label: "전체" },
@@ -40,7 +40,7 @@ function groupCards(cards: CardRow[], by: GroupBy): { label: string; items: Card
   const map = new Map<string, { label: string; items: CardRow[] }>()
   for (const c of cards) {
     let label: string
-    if (by === "owner") label = c.owner?.name ?? "등록자 미상"
+    if (by === "owner") label = c.owner?.name ?? "직원 미상"
     else if (by === "date") label = monthLabel(c.created_at)
     else label = c.company?.trim() || "(회사 미상)"
     const g = map.get(label) ?? { label, items: [] }
@@ -50,7 +50,7 @@ function groupCards(cards: CardRow[], by: GroupBy): { label: string; items: Card
   const arr = [...map.values()]
   // owner/company = 가나다(미상 그룹은 맨 뒤). date = created_at desc 입력순(Map 보존) → 최신 월 먼저.
   if (by === "owner" || by === "company") {
-    const last = by === "company" ? "(회사 미상)" : "등록자 미상"
+    const last = by === "company" ? "(회사 미상)" : "직원 미상"
     arr.sort((a, b) => (a.label === last ? 1 : b.label === last ? -1 : a.label.localeCompare(b.label, "ko")))
   }
   return arr
