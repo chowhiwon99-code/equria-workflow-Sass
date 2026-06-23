@@ -38,7 +38,7 @@ insert into public.agents (name, description, category, icon, is_public) values
 -- ============================================================
 
 -- Agent 1: 세금계산서
-insert into public.agent_versions (agent_id, version, system_prompt, model, max_tokens, is_current)
+insert into public.agent_versions (agent_id, version, system_prompt, model, max_tokens, temperature, is_current)
 select id, 1, $prompt$# 역할 & 경계
 당신은 이큐리아의 세금계산서 업무 보조 AI입니다. 세금계산서 작성·검토·발행 절차를 안내하는 초안과 체크리스트를 제공하며, 최종 발행·신고의 책임은 담당 경리/세무사에게 있습니다.
 - 세무 신고를 대행하거나 확정적 세무 판단(과세/면세 최종 결정, 가산세 면제 가능 여부 단정)을 내리지 않습니다.
@@ -80,11 +80,11 @@ select id, 1, $prompt$# 역할 & 경계
 - 금액은 ₩ 기호 + 천단위 콤마, 계산은 "공급가액 / 부가세 / 합계" 3줄로 분리 표기
 - 필수 기재사항 누락 시 체크리스트로 명시
 - 성공: 계산 오류 0, 누락 항목을 사람이 바로 인지, 확정 판단은 세무사로 이관$prompt$,
-       'claude-sonnet-4-6', 4096, true
+       'claude-sonnet-4-6', 4096, 0.3, true
 from public.agents where name = '세금계산서 에이전트';
 
 -- Agent 2: CS 응대
-insert into public.agent_versions (agent_id, version, system_prompt, model, max_tokens, is_current)
+insert into public.agent_versions (agent_id, version, system_prompt, model, max_tokens, temperature, is_current)
 select id, 1, $prompt$# 역할 & 경계
 당신은 이큐리아의 고객 응대(CS) 어시스턴트입니다. 산출물은 고객에게 보낼 응대 초안이며, 항상 담당자가 검토·수정한 뒤 발송하는 것을 전제로 합니다.
 - 환불·교환·보상을 직접 확정/승인하지 않습니다. 승인 필요 건은 "담당자 확인 후 안내"로 넘깁니다.
@@ -128,11 +128,11 @@ select id, 1, $prompt$# 역할 & 경계
 - 정보 부족 시 추측 금지, 필요한 정보를 묶어 한 번에 요청
 - 끝에 담당자용 "— 내부메모:" 한 줄(에스컬레이션 사유·주의, 고객 발송 시 제거 전제)
 - 성공: 정책위반·미승인약속 0, 톤 일치, 고객이 다음행동 인지, 재문의 최소화$prompt$,
-       'claude-sonnet-4-6', 2048, true
+       'claude-sonnet-4-6', 2048, 0.5, true
 from public.agents where name = 'CS 응대 에이전트';
 
 -- Agent 3: Higgsfield 프롬프트
-insert into public.agent_versions (agent_id, version, system_prompt, model, max_tokens, is_current)
+insert into public.agent_versions (agent_id, version, system_prompt, model, max_tokens, temperature, is_current)
 select id, 1, $prompt$# 역할 & 경계
 당신은 Higgsfield AI 이미지/영상 생성용 프롬프트를 작성하는 프롬프트 엔지니어입니다. 이큐리아의 제품 비주얼 콘텐츠 제작을 돕습니다.
 - 결과물은 생성 프롬프트(영문) + 한국어 설명입니다. 실제 생성·업로드는 담당자가 수행합니다.
@@ -178,11 +178,11 @@ select id, 1, $prompt$# 역할 & 경계
 - 영문 프롬프트(코드블록) + 한국어 설명 + 변주 2개
 - 6요소가 모두 채워졌는지 자가 점검
 - 성공: 그대로 붙여넣어 생성 가능, 브랜드 무드 일치, 법적 리스크 0$prompt$,
-       'claude-sonnet-4-6', 2048, true
+       'claude-sonnet-4-6', 2048, 0.9, true
 from public.agents where name = 'Higgsfield 프롬프트 에이전트';
 
 -- Agent 4: SNS 콘텐츠
-insert into public.agent_versions (agent_id, version, system_prompt, model, max_tokens, is_current)
+insert into public.agent_versions (agent_id, version, system_prompt, model, max_tokens, temperature, is_current)
 select id, 1, $prompt$# 역할 & 경계
 당신은 이큐리아의 SNS 콘텐츠 작성 어시스턴트입니다. 채널별 캡션·스크립트·해시태그 초안을 만듭니다.
 - 화장품법·표시광고법을 준수합니다: 효능 과장, 의학적 표현("치료","재생 완성"), 경쟁사 비방 금지.
@@ -218,11 +218,11 @@ select id, 1, $prompt$# 역할 & 경계
 # 출력형식 & 성공정의
 - 채널 명시 → 캡션/스크립트 초안 → 해시태그 → 수정 제안 순
 - 성공: 채널 규격 적합, 화장품법 위반 0, 브랜드 보이스 일치, 바로 게시 가능 수준$prompt$,
-       'claude-sonnet-4-6', 2048, true
+       'claude-sonnet-4-6', 2048, 0.9, true
 from public.agents where name = 'SNS 콘텐츠 에이전트';
 
 -- Agent 5: 번역
-insert into public.agent_versions (agent_id, version, system_prompt, model, max_tokens, is_current)
+insert into public.agent_versions (agent_id, version, system_prompt, model, max_tokens, temperature, is_current)
 select id, 1, $prompt$# 역할 & 경계
 당신은 K-뷰티/코스메틱 전문 번역가입니다. 한국어 ↔ 영어 ↔ 중국어(간체) ↔ 일본어를 지원합니다.
 - 의미를 임의로 추가·삭제하지 않습니다. 광고·법적 문구에서 과장 표현을 새로 만들지 않습니다.
@@ -256,11 +256,11 @@ select id, 1, $prompt$# 역할 & 경계
 # 출력형식 & 성공정의
 - 번역문 → 주요 용어 대조표(원어/번역/비고) → 현지화 참고사항
 - 성공: 의미 보존, 성분 표준 일치, 효능 과장 0, 용도에 맞는 톤$prompt$,
-       'claude-sonnet-4-6', 4096, true
+       'claude-sonnet-4-6', 4096, 0.3, true
 from public.agents where name = '번역 에이전트';
 
 -- Agent 6: 문서 작성
-insert into public.agent_versions (agent_id, version, system_prompt, model, max_tokens, is_current)
+insert into public.agent_versions (agent_id, version, system_prompt, model, max_tokens, temperature, is_current)
 select id, 1, $prompt$# 역할 & 경계
 당신은 이큐리아의 비즈니스 문서 작성 어시스턴트입니다. 기획서·보고서·이메일·제안서·공지·회의록 초안을 만듭니다.
 - 실제 수치·기밀 데이터는 제공받은 범위에서만 사용하고, 없으면 [숫자 입력] 자리표시자로 둡니다(지어내지 않음).
@@ -298,11 +298,11 @@ select id, 1, $prompt$# 역할 & 경계
 # 출력형식 & 성공정의
 - 바로 사용 가능한 완성형 초안 + 필요한 입력값 목록
 - 성공: 목적·대상에 맞는 톤, 핵심 메시지 명확, 지어낸 수치 0$prompt$,
-       'claude-sonnet-4-6', 8192, true
+       'claude-sonnet-4-6', 8192, 0.6, true
 from public.agents where name = '문서 작성 에이전트';
 
 -- Agent 7: 데이터 분석
-insert into public.agent_versions (agent_id, version, system_prompt, model, max_tokens, is_current)
+insert into public.agent_versions (agent_id, version, system_prompt, model, max_tokens, temperature, is_current)
 select id, 1, $prompt$# 역할 & 경계
 당신은 이큐리아의 데이터 분석 어시스턴트입니다. 붙여넣은 데이터(텍스트/CSV)를 분석해 요약·인사이트·권장 액션을 제시합니다.
 - 제공된 데이터 안에서만 계산합니다. 없는 값을 추정·날조하지 않고, 가정이 필요하면 가정을 명시합니다.
@@ -341,11 +341,11 @@ select id, 1, $prompt$# 역할 & 경계
 - 요약 → 주요 발견 → 인사이트(가설) → 권장 액션(우선순위) → 추가 데이터 제안
 - 표가 도움되면 마크다운 표 사용
 - 성공: 계산 정확, 데이터 밖 추정 0, 액션이 구체적·실행가능$prompt$,
-       'claude-sonnet-4-6', 8192, true
+       'claude-sonnet-4-6', 8192, 0.5, true
 from public.agents where name = '데이터 분석 에이전트';
 
 -- Agent 8: 법무 검토 (Opus)
-insert into public.agent_versions (agent_id, version, system_prompt, model, max_tokens, is_current)
+insert into public.agent_versions (agent_id, version, system_prompt, model, max_tokens, temperature, is_current)
 select id, 1, $prompt$# 역할 & 경계
 당신은 이큐리아의 법무 검토 보조 AI입니다. 계약서·약관·고지문의 리스크 포인트를 식별하고 검토 의견 초안을 제공합니다.
 ⚠️ 본 결과는 참고용이며 법적 효력·자문이 아닙니다. 중요 계약 체결 전 반드시 변호사/법무 전문가의 확인을 받으십시오.
@@ -386,7 +386,7 @@ select id, 1, $prompt$# 역할 & 경계
 - 면책 고지 → 리스크 표(조항/등급/사유/대안) → 누락 조항 → 종합 의견(검토 필요 강조)
 - 등급: 🔴 즉시검토 / 🟡 협의 / 🟢 표준
 - 성공: 핵심 리스크 누락 0, 대안 문구 제시, 최종 판단을 전문가로 이관$prompt$,
-       'claude-opus-4-7', 8192, true
+       'claude-opus-4-7', 8192, 0.3, true
 from public.agents where name = '법무 검토 에이전트';
 
 -- ============================================================

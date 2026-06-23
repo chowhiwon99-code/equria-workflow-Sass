@@ -46,7 +46,7 @@
   - **사이드바 "직원 채팅" 미읽음 빨간 배지**(`useUnreadDms`) · 근태/지출 UI 개선(근무시간·상태요약).
   - 작은 수정(1·2단계): 채팅 알림 자동삭제·스크롤바 간격·파일 다중업로드·파일 공개범위(공개/부서/개인, 044).
   - **다음(5단계 예정)**: 노션식 새 페이지(블록 에디터 + `/`슬래시 + AI 상시) — 가장 큼·단독.
-- **안정도**: `tsc` 0 · `pnpm lint` **30 errors/0 warnings**(전부 기존 `set-state-in-effect`·refs 부채, 신규 0이 베이스라인) · `any` 0 · 마이그 **001~067(70파일) 적용·drift 없음** · **`next build` 성공** → **Vercel 빌드가 실제 게이트**.
+- **안정도**: `tsc` 0 · `pnpm lint` **30 errors/0 warnings**(전부 기존 `set-state-in-effect`·refs 부채, 신규 0이 베이스라인) · `any` 0 · 마이그 **001~068(71파일) 적용·drift 없음** · **`next build` 성공** → **Vercel 빌드가 실제 게이트**.
 
 > 최근 작업 상세(세션7·8: UI 리프레시·채팅 단계0~6·에이전트/위젯 재설계·캘린더·삭제RLS버그·B1격리·비용추적 등)는 **git 커밋 메시지**에 충실히 기록됨. 여기 중복 안 함.
 
@@ -71,7 +71,7 @@
 
 ### A. 지금 안전·고가치 (멀티테넌시 무관 · 리스크 0 · 바로 착수 가능)
 1. ✅ **기본(템플릿) 에이전트 똑똑하게 (2026-06-23·완료·라이브)** — 8개 매뉴얼을 7섹션 백본(역할&경계·회사 컨텍스트(교체 블록)·절차·금지선·예시3·엣지케이스·출력형식&성공정의)으로 재작성. seed.sql 재작성 + **마이그 067**로 라이브 version 2 버전업(296~458자→973~1629자, 3~5배). 모델·온도 무변(A②=온도 별건). 롤백 후보 **`067` 직전**(v1을 is_current로). 상세 = `AGENTS-MCP-STRATEGY.md §5`.
-2. **seed 온도값 채우기** — 현재 8개 전부 0.7(seed 미설정). 정확성=0.3/창의=0.8~1.0 차등. **마이그 불필요**(컬럼·코드 정상, seed.sql만 수정. DB 상한 1.0).
+2. ✅ **seed 온도값 차등 (2026-06-24·완료·라이브, 마이그 068)** — 정확성(번역·세금·법무)=0.3 / 균형(CS·데이터=0.5·문서=0.6) / 창의(SNS·이미지)=0.9. ※067로 라이브 v2가 이미 있어 seed만으론 라이브 반영 안 됨 → 마이그 068로 현재 버전 temperature UPDATE + seed.sql 동기. 롤백=전부 0.7.
 3. **회사 지식 수집** — 차별화 자산(정책·실제 사례·톤)을 슬롯 콘텐츠로.
 
 ### B. 두 번째 회사 받기 "전" 반드시 (멀티테넌시 본작업)
@@ -124,7 +124,7 @@
 
 - **GitHub**: `chowhiwon99-code/equria-workflow-Sass` (main=프로덕션, 작업브랜치 `feat/toss-ui-refresh`).
 - **Vercel**: team `team_wcW0NMU7oiIxNndyV1afigbp` · project `prj_CcCTUr8eIYpaStaj6RNq7VoLPZG6` (`equria-workflow-sass`) · 배포보호 off.
-- **Supabase**: project `dutovtfdckhayyvhtuxu` (ap-northeast-2 서울) · 마이그 **001~067(70파일)**.
+- **Supabase**: project `dutovtfdckhayyvhtuxu` (ap-northeast-2 서울) · 마이그 **001~068(71파일)**.
 - **.env.local**: ANTHROPIC · Supabase(URL·anon·service_role) · Google 4종 · `WORKSPACE_PASSWORD` 채워짐. ⚠️ **시크릿 값은 문서/채팅에 적지 말 것**(HANDOFF는 git 추적).
 - **테스트 계정**: 조휘원(`c6817c63-943f-4257-8500-f9840ad39bde`)·이동규·김건 (워크스페이스 비번 로그인). 모델: 기본 `claude-sonnet-4-6` / 복잡 `claude-opus-4-7`.
 - 링크: [GitHub](https://github.com/chowhiwon99-code/equria-workflow-Sass) · [Vercel](https://vercel.com/chowhiwon99-2151s-projects/equria-workflow-sass) · [Supabase](https://supabase.com/dashboard/project/dutovtfdckhayyvhtuxu) · 메모리 `~/.claude/projects/-Users-johwiwon-equria-workspace/memory/`
