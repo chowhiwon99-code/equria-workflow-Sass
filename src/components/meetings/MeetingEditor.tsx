@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
-import { ArrowLeft, Trash2, Loader2, Calendar, Users, Sparkles, Plus, RefreshCw, X, Search, Image as ImageIcon, Check, ShieldCheck, Network } from "lucide-react"
+import { ArrowLeft, Trash2, Loader2, Calendar, Users, Sparkles, Plus, RefreshCw, X, Search, Image as ImageIcon, Check, ShieldCheck, Network, FileDown } from "lucide-react"
 import type { Editor } from "@tiptap/react"
 import type { JSONContent } from "@tiptap/core"
 import { createClient } from "@/lib/supabase/client"
@@ -59,6 +59,36 @@ function mdToContent(text: string): JSONContent[] {
   flush()
   return out.length ? out : [{ type: "paragraph" }]
 }
+
+const PRINT_CSS = `
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; color: #111; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.doc { max-width: 720px; margin: 0 auto; padding: 40px 32px; }
+.doc-title { font-size: 26px; font-weight: 800; margin: 0 0 6px; }
+.doc-meta { color: #666; font-size: 13px; margin: 0 0 24px; }
+.meeting-doc { font-size: 14px; line-height: 1.7; }
+.meeting-doc h1 { font-size: 22px; font-weight: 700; margin: 22px 0 10px; }
+.meeting-doc h2 { font-size: 18px; font-weight: 700; margin: 20px 0 8px; }
+.meeting-doc h3 { font-size: 15px; font-weight: 700; margin: 16px 0 6px; }
+.meeting-doc p { margin: 8px 0; }
+.meeting-doc ul, .meeting-doc ol { margin: 8px 0; padding-left: 22px; }
+.meeting-doc li { margin: 3px 0; }
+.meeting-doc img { max-width: 100%; height: auto; border-radius: 8px; margin: 8px 0; display: block; }
+.meeting-doc img[data-align="center"] { margin-left: auto; margin-right: auto; }
+.meeting-doc img[data-align="right"] { margin-left: auto; }
+.meeting-doc table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+.meeting-doc th, .meeting-doc td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; font-size: 13px; }
+.meeting-doc th { background: #f5f5f5; font-weight: 600; }
+.meeting-doc pre { background: #f5f5f5; padding: 12px; border-radius: 8px; overflow: auto; font-size: 12px; }
+.meeting-doc code { font-family: ui-monospace, monospace; }
+.meeting-doc blockquote { border-left: 3px solid #ddd; margin: 10px 0; padding: 2px 14px; color: #555; }
+.meeting-doc a { color: #2563eb; text-decoration: underline; }
+.meeting-doc mark { background: #fff3a3; padding: 0 2px; }
+.meeting-doc hr { border: none; border-top: 1px solid #e5e5e5; margin: 18px 0; }
+@page { margin: 16mm; }
+`
+
+const escapeHtml = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] ?? c)
 
 export function MeetingEditor({
   note,
@@ -202,7 +232,7 @@ export function MeetingEditor({
       editorRef.current
         ?.chain()
         .focus("end")
-        .insertContent(urls.map((src) => ({ type: "image", attrs: { src } })))
+        .insertContent(urls.map((src) => ({ type: "image", attrs: { src, width: "60%" } })))
         .run()
       toast.success(`이미지 ${urls.length}개를 본문에 넣었어요.`)
       setImgCandidates(null)
@@ -397,6 +427,23 @@ export function MeetingEditor({
     }
   }
 
+  // PDF 저장 — 새 창에 정리본만 렌더 → 브라우저 인쇄(PDF로 저장). 의존성 0, 한글 폰트 안전.
+  const exportPdf = () => {
+    const html = editorRef.current?.getHTML() ?? content
+    const win = window.open("", "_blank", "width=860,height=1000")
+    if (!win) {
+      toast.error("팝업이 차단됐어요. 팝업 허용 후 다시 시도해 주세요.")
+      return
+    }
+    const meta = [meetingDate, attendees].filter(Boolean).map(escapeHtml).join(" · ")
+    win.document.write(
+      `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>${escapeHtml(title || "회의록")}</title><style>${PRINT_CSS}</style></head><body><main class="doc"><h1 class="doc-title">${escapeHtml(title || "제목 없음")}</h1>${meta ? `<p class="doc-meta">${meta}</p>` : ""}<div class="meeting-doc">${html}</div></main><scr` +
+        `ipt>window.onload=function(){setTimeout(function(){window.focus();window.print()},300)}</scr` +
+        `ipt></body></html>`
+    )
+    win.document.close()
+  }
+
   return (
     <div className="mx-auto w-full max-w-3xl">
       {/* 상단 바 */}
@@ -404,22 +451,27 @@ export function MeetingEditor({
         <button onClick={handleBack} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" /> 목록
         </button>
-        {canEdit ? (
-          <div className="flex items-center gap-1.5">
-            {note?.id && (
-              <Button variant="ghost" size="sm" onClick={remove} disabled={busy} className="text-destructive hover:text-destructive">
-                <Trash2 className="size-3.5" /> 삭제
+        <div className="flex items-center gap-1.5">
+          <Button variant="ghost" size="sm" onClick={exportPdf} title="PDF로 저장 (인쇄 → 대상을 'PDF로 저장')">
+            <FileDown className="size-3.5" /> PDF
+          </Button>
+          {canEdit ? (
+            <>
+              {note?.id && (
+                <Button variant="ghost" size="sm" onClick={remove} disabled={busy} className="text-destructive hover:text-destructive">
+                  <Trash2 className="size-3.5" /> 삭제
+                </Button>
+              )}
+              <Button size="sm" onClick={save} disabled={busy}>
+                {busy && <Loader2 className="size-3.5 animate-spin" />} 저장
               </Button>
-            )}
-            <Button size="sm" onClick={save} disabled={busy}>
-              {busy && <Loader2 className="size-3.5 animate-spin" />} 저장
-            </Button>
-          </div>
-        ) : (
-          <span className="text-[11px] text-muted-foreground">
-            읽기 전용{authorName ? ` · ${[authorName, authorPosition].filter(Boolean).join(" · ")}` : ""}
-          </span>
-        )}
+            </>
+          ) : (
+            <span className="text-[11px] text-muted-foreground">
+              읽기 전용{authorName ? ` · ${[authorName, authorPosition].filter(Boolean).join(" · ")}` : ""}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* 제목 — 보더 없는 큰 텍스트 */}

@@ -141,6 +141,14 @@ const SafeImage = Image.extend({
           return a === "left" || a === "center" || a === "right" ? { "data-align": a } : {}
         },
       },
+      width: {
+        default: null,
+        parseHTML: (el: HTMLElement) => el.style.width || el.getAttribute("data-width") || null,
+        renderHTML: (attrs: Record<string, unknown>) => {
+          const wv = attrs.width
+          return typeof wv === "string" && wv ? { style: `width: ${wv}`, "data-width": wv } : {}
+        },
+      },
     }
   },
 })

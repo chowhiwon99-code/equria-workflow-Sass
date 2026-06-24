@@ -159,10 +159,19 @@ export function TextMenu({ editor }: { editor: Editor }) {
 }
 
 /** 이미지 선택 시 — 정렬(좌/중/우) + 설명(alt) 편집. */
+const IMG_SIZES: { label: string; value: string | null; title: string }[] = [
+  { label: "S", value: "35%", title: "작게" },
+  { label: "M", value: "60%", title: "보통" },
+  { label: "L", value: "85%", title: "크게" },
+  { label: "원본", value: null, title: "원본 크기" },
+]
+
 export function ImageMenu({ editor }: { editor: Editor }) {
   const isAlign = (a: string) => editor.getAttributes("image").align === a
   const setAlign = (align: "left" | "center" | "right") =>
     editor.chain().focus().updateAttributes("image", { align }).run()
+  const isWidth = (w: string | null) => ((editor.getAttributes("image").width as string | null) ?? null) === w
+  const setWidth = (width: string | null) => editor.chain().focus().updateAttributes("image", { width }).run()
   const editAlt = () => {
     const prev = (editor.getAttributes("image").alt as string | undefined) ?? ""
     const alt = window.prompt("이미지 설명(alt)", prev)
@@ -171,6 +180,12 @@ export function ImageMenu({ editor }: { editor: Editor }) {
   return (
     <BubbleMenu editor={editor} pluginKey="imageMenu" shouldShow={({ editor }) => editor.isActive("image")}>
       <div className={bar}>
+        {IMG_SIZES.map((s) => (
+          <button key={s.label} className={cn(mbtn, isWidth(s.value) && "bg-muted text-foreground")} title={s.title} onClick={() => setWidth(s.value)}>
+            {s.label}
+          </button>
+        ))}
+        <div className={sep} />
         <button className={cn(mbtn, isAlign("left") && "bg-muted text-foreground")} title="왼쪽 정렬" onClick={() => setAlign("left")}>
           <AlignLeft className="size-3.5" />
         </button>
