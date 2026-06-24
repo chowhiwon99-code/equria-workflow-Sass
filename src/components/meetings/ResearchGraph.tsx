@@ -14,14 +14,14 @@ import {
 import { swatch } from "@/lib/meetingMeta"
 
 type GNode = SimulationNodeDatum & { id: string; label: string; group: string; deg?: number }
-type GLink = SimulationLinkDatum<GNode> & { rel?: string; off?: number }
+type GLink = SimulationLinkDatum<GNode> & { rel?: string }
 
 const PALETTE = ["blue", "green", "orange", "purple", "red", "yellow", "gray"]
 
 /**
- * 리서치 지식 그래프 — d3-force 물리 + 캔버스 2.5D 렌더(보기 전용 오버레이).
- * 입체감: 구체 그라데이션·그림자·연속 미세 모션·곡선 링크 + 흐르는 입자·허브 크기·호버 글로우.
- * 조작: 노드 드래그 / 휠 줌 / 배경 드래그 팬 / 호버 강조.
+ * 리서치 지식 그래프 — d3-force 물리 + 캔버스(보기 전용).
+ * 미니멀 조형: 매트 구체 + 소프트 드롭섀도 + 얇은 직선 + 크기 변화. 색으로만 그룹 구분.
+ * 라벨은 허브/호버만(클린 유지). 조작: 노드 드래그 / ⌘+휠 줌 / 배경 드래그 팬 / 호버 강조.
  */
 export function ResearchGraph({
   nodes,
@@ -51,15 +51,14 @@ export function ResearchGraph({
 
     const r0 = wrap.getBoundingClientRect()
     let w = r0.width || 600
-    let h = r0.height || 400
+    let h = r0.height || 420
 
     const gNodes: GNode[] = nodes.map((n, i) => {
       const a = (i / Math.max(nodes.length, 1)) * Math.PI * 2
       return { ...n, x: w / 2 + Math.cos(a) * 90, y: h / 2 + Math.sin(a) * 90 }
     })
     const byId = new Map(gNodes.map((n) => [n.id, n]))
-    const gLinks: GLink[] = links.map((l, i) => ({ source: l.source, target: l.target, rel: l.rel, off: i * 0.137 }))
-    // 차수(degree) — 허브일수록 크게
+    const gLinks: GLink[] = links.map((l) => ({ source: l.source, target: l.target, rel: l.rel }))
     for (const n of gNodes) n.deg = 0
     for (const l of gLinks) {
       const s = byId.get(l.source as string)
@@ -67,55 +66,8 @@ export function ResearchGraph({
       if (s) s.deg = (s.deg ?? 0) + 1
       if (t) t.deg = (t.deg ?? 0) + 1
     }
-    const radOf = (n: GNode) => 5 + Math.min(n.deg ?? 0, 8) * 1.3
-
-    const sim = forceSimulation<GNode>(gNodes)
-      .force("charge", forceManyBody().strength(-260))
-      .force(
-        "link",
-        forceLink<GNode, GLink>(gLinks)
-          .id((d) => d.id)
-          .distance(90)
-          .strength(0.5)
-      )
-      .force("collide", forceCollide((n) => radOf(n as GNode) + 16))
-      .force("center", forceCenter(w / 2, h / 2))
-      .alphaTarget(0.012) // 연속 미세 모션(살아있는 망)
-      .restart()
-
-    // 뷰 변환(줌/팬)
-    let scale = 1
-    let tx = 0
-    let ty = 0
-    let frame = 0
-
-    const sphere = (n: GNode) => {
-      const r = radOf(n)
-      const base = colorOf(n.group)
-      const focused = hover != null && (n.id === hover.id || neighbors.has(n.id))
-      const dim = hover != null && !focused
-      ctx.globalAlpha = dim ? 0.28 : 1
-      // 그림자/글로우
-      ctx.save()
-      ctx.shadowColor = hover != null && n.id === hover.id ? base : "rgba(0,0,0,0.25)"
-      ctx.shadowBlur = hover != null && n.id === hover.id ? 18 : 6
-      ctx.shadowOffsetY = 2
-      const g = ctx.createRadialGradient(n.x! - r * 0.35, n.y! - r * 0.4, r * 0.2, n.x!, n.y!, r)
-      g.addColorStop(0, `color-mix(in oklch, ${base} 45%, white)`)
-      g.addColorStop(0.55, base)
-      g.addColorStop(1, `color-mix(in oklch, ${base} 78%, black)`)
-      ctx.beginPath()
-      ctx.arc(n.x!, n.y!, r, 0, Math.PI * 2)
-      ctx.fillStyle = g
-      ctx.fill()
-      ctx.restore()
-      ctx.globalAlpha = dim ? 0.28 : 1
-      // 라벨
-      ctx.fillStyle = labelColor
-      ctx.font = `${hover != null && n.id === hover.id ? "600 " : ""}11px sans-serif`
-      ctx.textAlign = "center"
-      ctx.fillText(n.label, n.x!, n.y! - r - 4)
-    }
+    // 크기 변화(허브 큼·잎 작음)
+    const radOf = (n: GNode) => 4 + Math.sqrt(n.deg ?? 0) * 3.6
 
     let hover: GNode | null = null
     const neighbors = new Set<string>()
@@ -130,53 +82,84 @@ export function ResearchGraph({
       }
     }
 
+    let scale = 1
+    let tx = 0
+    let ty = 0
+    let dpr = 1
+
+    const sim = forceSimulation<GNode>(gNodes)
+      .force("charge", forceManyBody().strength(-300))
+      .force(
+        "link",
+        forceLink<GNode, GLink>(gLinks)
+          .id((d) => d.id)
+          .distance(95)
+          .strength(0.45)
+      )
+      .force("collide", forceCollide((n) => radOf(n as GNode) + 14))
+      .force("center", forceCenter(w / 2, h / 2))
+      .alphaTarget(0.008) // 아주 은은한 연속 모션
+      .restart()
+
     const draw = () => {
-      frame++
       ctx.setTransform(1, 0, 0, 1, 0, 0)
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       ctx.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * tx, dpr * ty)
 
-      // 링크(곡선) + 흐르는 입자
+      // 링크 — 얇은 직선
       for (const l of gLinks) {
         const s = l.source as GNode
         const t = l.target as GNode
         if (s.x == null || t.x == null) continue
         const active = hover != null && (s.id === hover.id || t.id === hover.id)
-        const mx = (s.x + t.x!) / 2
-        const my = (s.y! + t.y!) / 2
-        const dx = t.x! - s.x
-        const dy = t.y! - s.y!
-        const len = Math.hypot(dx, dy) || 1
-        const cx = mx - (dy / len) * len * 0.12 // 수직 오프셋 → 살짝 곡선
-        const cy = my + (dx / len) * len * 0.12
-        ctx.strokeStyle = active ? "rgba(110,110,210,0.65)" : "rgba(140,140,160,0.16)"
-        ctx.lineWidth = active ? 1.6 / scale : 1 / scale
+        ctx.strokeStyle = active ? "rgba(80,80,95,0.5)" : "rgba(120,120,140,0.22)"
+        ctx.lineWidth = (active ? 1 : 0.7) / scale
         ctx.beginPath()
         ctx.moveTo(s.x, s.y!)
-        ctx.quadraticCurveTo(cx, cy, t.x!, t.y!)
+        ctx.lineTo(t.x!, t.y!)
         ctx.stroke()
-        // 흐르는 입자(이차베지어 위)
-        const p = ((frame * 0.004 + (l.off ?? 0)) % 1)
-        const u = 1 - p
-        const px = u * u * s.x + 2 * u * p * cx + p * p * t.x!
-        const py = u * u * s.y! + 2 * u * p * cy + p * p * t.y!
-        ctx.globalAlpha = active ? 0.9 : 0.4
-        ctx.beginPath()
-        ctx.arc(px, py, active ? 2.2 / scale : 1.5 / scale, 0, Math.PI * 2)
-        ctx.fillStyle = active ? "rgb(120,120,220)" : "rgba(150,150,170,0.9)"
-        ctx.fill()
-        ctx.globalAlpha = 1
       }
-      // 노드(구체)
+
+      // 노드 — 매트 구체 + 소프트 드롭섀도
       for (const n of gNodes) {
         if (n.x == null || n.y == null) continue
-        sphere(n)
+        const r = radOf(n)
+        const base = colorOf(n.group)
+        const dim = hover != null && n.id !== hover.id && !neighbors.has(n.id)
+        ctx.globalAlpha = dim ? 0.3 : 1
+        ctx.save()
+        ctx.shadowColor = "rgba(0,0,0,0.22)"
+        ctx.shadowBlur = r * 0.85
+        ctx.shadowOffsetY = r * 0.5
+        const g = ctx.createRadialGradient(n.x - r * 0.4, n.y - r * 0.45, r * 0.1, n.x, n.y, r)
+        g.addColorStop(0, `color-mix(in oklch, ${base} 68%, white)`)
+        g.addColorStop(0.65, base)
+        g.addColorStop(1, `color-mix(in oklch, ${base} 88%, black)`)
+        ctx.fillStyle = g
+        ctx.beginPath()
+        ctx.arc(n.x, n.y, r, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.restore()
+      }
+
+      // 라벨 — 허브(연결 많음) 항상 + 호버 시 해당+이웃
+      ctx.globalAlpha = 1
+      ctx.fillStyle = labelColor
+      ctx.textAlign = "center"
+      for (const n of gNodes) {
+        if (n.x == null || n.y == null) continue
+        const isHub = (n.deg ?? 0) >= 3
+        const onHover = hover != null && (n.id === hover.id || neighbors.has(n.id))
+        if (!isHub && !onHover) continue
+        if (hover != null && !onHover) continue // 호버 중엔 관련 노드만
+        ctx.globalAlpha = onHover ? 1 : 0.75
+        ctx.font = `${onHover ? "600 " : ""}11px sans-serif`
+        ctx.fillText(n.label, n.x, n.y - radOf(n) - 5)
       }
       ctx.globalAlpha = 1
     }
     sim.on("tick", draw)
 
-    let dpr = 1
     const resize = () => {
       const r = wrap.getBoundingClientRect()
       w = r.width
@@ -191,7 +174,6 @@ export function ResearchGraph({
       sim.alpha(0.4).restart()
     }
 
-    // 화면→월드 좌표
     const toWorld = (e: MouseEvent | WheelEvent) => {
       const r = canvas.getBoundingClientRect()
       return [(e.clientX - r.left - tx) / scale, (e.clientY - r.top - ty) / scale] as const
@@ -253,7 +235,7 @@ export function ResearchGraph({
         dragging.fx = null
         dragging.fy = null
         dragging = null
-        sim.alphaTarget(0.012)
+        sim.alphaTarget(0.008)
       }
       panning = null
       canvas.style.cursor = "grab"
@@ -262,8 +244,7 @@ export function ResearchGraph({
       if (!(e.ctrlKey || e.metaKey)) return // 페이지 스크롤 보존 — ⌘/Ctrl+휠로만 줌
       e.preventDefault()
       const [wx, wy] = toWorld(e)
-      const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12
-      const next = Math.max(0.3, Math.min(3, scale * factor))
+      const next = Math.max(0.3, Math.min(3, scale * (e.deltaY < 0 ? 1.12 : 1 / 1.12)))
       const r = canvas.getBoundingClientRect()
       tx = e.clientX - r.left - wx * next
       ty = e.clientY - r.top - wy * next
@@ -293,7 +274,7 @@ export function ResearchGraph({
       className={
         fullscreen
           ? "fixed inset-0 z-50 flex flex-col bg-background/95 backdrop-blur-sm"
-          : "mt-2 flex flex-col overflow-hidden rounded-xl border bg-muted/20"
+          : "mt-2 flex flex-col overflow-hidden rounded-xl border bg-background"
       }
     >
       <div className="flex items-center justify-between border-b px-3 py-1.5">
