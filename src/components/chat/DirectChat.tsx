@@ -394,6 +394,31 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
       const replyParent = replyTo
       setStagedFiles([])
       setReplyTo(null)
+      // 클라 생성 id — 낙관적 말풍선과 실제 행이 같은 id를 공유(에코 INSERT 중복·레이스 방지).
+      const id = crypto.randomUUID()
+      const content = trimmed || attachmentSummary(files) // plain SSOT(첨부만이면 요약)
+      const bodyJ = trimmed ? (bodyJson as unknown as DirectMessage["body_json"]) : null
+      const parentId = replyParent?.id ?? null
+      const rootId = replyParent ? replyParent.root_id ?? replyParent.id : null
+      // 낙관적 반영 — 누르는 즉시 말풍선 표시(서버 왕복·업로드 안 기다림). 실패 시 catch에서 제거.
+      const optimistic: DirectMessage = {
+        id,
+        conversation_id: conversationId,
+        sender_id: meId,
+        content,
+        body_json: bodyJ,
+        parent_id: parentId,
+        root_id: rootId,
+        created_at: new Date().toISOString(),
+        edited_at: null,
+        deleted_at: null,
+        read_at: null,
+        attachment_url: null,
+        attachment_name: null,
+        workspace_id: "",
+      }
+      setMessages((prev) => [...prev, optimistic])
+      emitChat(conversationId) // 다른 창/탭 즉시 동기화
       if (files.length) setUploading(true)
       try {
         const uploaded = await Promise.all(
@@ -401,20 +426,12 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
         )
         const { data: msg, error: insErr } = await supabase
           .from("direct_messages")
-          .insert({
-            conversation_id: conversationId,
-            sender_id: meId,
-            content: trimmed || attachmentSummary(files), // plain SSOT(첨부만이면 요약)
-            body_json: trimmed ? (bodyJson as unknown as DirectMessage["body_json"]) : null,
-            parent_id: replyParent?.id ?? null,
-            root_id: replyParent ? replyParent.root_id ?? replyParent.id : null,
-          })
+          .insert({ id, conversation_id: conversationId, sender_id: meId, content, body_json: bodyJ, parent_id: parentId, root_id: rootId })
           .select("*")
           .single()
         if (insErr || !msg) throw insErr ?? new Error("전송에 실패했어요.")
-        // 낙관적 반영 — Realtime 왕복을 기다리지 않고 내 메시지를 즉시 표시(에코 INSERT는 id 중복으로 무시됨)
-        setMessages((prev) => (prev.some((mm) => mm.id === msg.id) ? prev : [...prev, msg]))
-        emitChat(conversationId) // 다른 창/탭 즉시 동기화
+        // 실제 행으로 교체(서버 타임스탬프·workspace_id 반영). 에코 INSERT는 같은 id라 무시됨.
+        setMessages((prev) => prev.map((mm) => (mm.id === id ? (msg as DirectMessage) : mm)))
         if (uploaded.length) {
           const { error: attErr } = await supabase.from("message_attachments").insert(
             uploaded.map((u) => ({
@@ -429,6 +446,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
           void loadAttachments(conversationId)
         }
       } catch (e) {
+        setMessages((prev) => prev.filter((mm) => mm.id !== id)) // 낙관적 메시지 제거
         toast.error(e instanceof Error ? e.message : "전송 실패")
         setStagedFiles(files) // 첨부 복원
         setReplyTo(replyParent)

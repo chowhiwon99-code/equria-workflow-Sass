@@ -106,13 +106,16 @@ export function RichComposer({
     if (!editor || disabled) return
     const text = editor.getText().trim()
     if (!text && !canSendEmpty) return // 텍스트도 첨부도 없으면 무시
+    const json = editor.getJSON()
+    // 낙관적 — 서버 왕복을 기다리지 않고 즉시 비워 입력이 멈춰 보이지 않게(실패 시 복원).
+    editor.commands.clearContent()
+    setIsEmpty(true)
+    editor.commands.focus()
     try {
-      await onSend({ text, bodyJson: editor.getJSON() })
-      editor.commands.clearContent() // 성공 시에만 비움 — 실패하면 입력 보존(재시도 가능)
-      setIsEmpty(true)
-      editor.commands.focus()
+      await onSend({ text, bodyJson: json })
     } catch {
-      /* onSend가 throw하면 입력을 남겨 둔다 */
+      editor.commands.setContent(json) // 실패 시 입력 복원(재시도 가능)
+      setIsEmpty(editor.isEmpty)
     }
   }, [editor, disabled, canSendEmpty, onSend])
 
