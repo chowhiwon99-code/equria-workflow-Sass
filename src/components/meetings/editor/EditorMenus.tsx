@@ -2,7 +2,7 @@
 
 import { BubbleMenu } from "@tiptap/react/menus"
 import type { Editor } from "@tiptap/react"
-import { Plus, Minus, Trash2, Bold, Italic, Strikethrough, Code, Highlighter, Link as LinkIcon, AlignLeft, AlignCenter, AlignRight } from "lucide-react"
+import { Minus, Trash2, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Bold, Italic, Strikethrough, Code, Highlighter, Link as LinkIcon, AlignLeft, AlignCenter, AlignRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const bar = "flex items-center gap-0.5 rounded-lg border bg-popover p-1 text-xs shadow-[var(--shadow-lg)]"
@@ -14,22 +14,31 @@ export function TableMenu({ editor }: { editor: Editor }) {
   return (
     <BubbleMenu editor={editor} pluginKey="tableMenu" shouldShow={({ editor }) => editor.isActive("table")}>
       <div className={bar}>
-        <button className={btn} title="아래에 행 추가" onClick={() => editor.chain().focus().addRowAfter().run()}>
-          행<Plus className="size-3" />
+        <button className={btn} title="위에 행 삽입" onClick={() => editor.chain().focus().addRowBefore().run()}>
+          행<ArrowUp className="size-3" />
+        </button>
+        <button className={btn} title="아래에 행 삽입" onClick={() => editor.chain().focus().addRowAfter().run()}>
+          행<ArrowDown className="size-3" />
         </button>
         <button className={btn} title="행 삭제" onClick={() => editor.chain().focus().deleteRow().run()}>
           행<Minus className="size-3" />
         </button>
         <div className={sep} />
-        <button className={btn} title="오른쪽에 열 추가" onClick={() => editor.chain().focus().addColumnAfter().run()}>
-          열<Plus className="size-3" />
+        <button className={btn} title="왼쪽에 열 삽입" onClick={() => editor.chain().focus().addColumnBefore().run()}>
+          열<ArrowLeft className="size-3" />
+        </button>
+        <button className={btn} title="오른쪽에 열 삽입" onClick={() => editor.chain().focus().addColumnAfter().run()}>
+          열<ArrowRight className="size-3" />
         </button>
         <button className={btn} title="열 삭제" onClick={() => editor.chain().focus().deleteColumn().run()}>
           열<Minus className="size-3" />
         </button>
         <div className={sep} />
         <button className={btn} title="헤더 행 토글" onClick={() => editor.chain().focus().toggleHeaderRow().run()}>
-          헤더
+          헤더행
+        </button>
+        <button className={btn} title="헤더 열 토글" onClick={() => editor.chain().focus().toggleHeaderColumn().run()}>
+          헤더열
         </button>
         <button className={btn} title="셀 병합 / 분할" onClick={() => editor.chain().focus().mergeOrSplit().run()}>
           병합

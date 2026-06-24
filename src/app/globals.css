@@ -570,10 +570,11 @@ body {
 }
 .meeting-doc th,
 .meeting-doc td {
-  border: 1px solid var(--border);
+  border: 1px solid color-mix(in oklch, var(--foreground) 22%, transparent);
   padding: 0.4rem 0.6rem;
   vertical-align: top;
   position: relative;
+  min-width: 3rem;
 }
 .meeting-doc th {
   background: var(--muted);
@@ -584,8 +585,9 @@ body {
   content: "";
   position: absolute;
   inset: 0;
-  background: color-mix(in oklch, var(--primary) 12%, transparent);
+  background: color-mix(in oklch, var(--primary) 20%, transparent);
   pointer-events: none;
+  z-index: 2;
 }
 /* 표 — 열 리사이즈 그립(resizable:true 가시화) */
 .meeting-doc .tableWrapper {
