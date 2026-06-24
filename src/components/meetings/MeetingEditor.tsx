@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
-import { ArrowLeft, Trash2, Loader2, Calendar, Users, Sparkles, Plus, RefreshCw, X, Search } from "lucide-react"
+import { ArrowLeft, Trash2, Loader2, Calendar, Users, Sparkles, Plus, RefreshCw, X, Search, Image as ImageIcon, Check } from "lucide-react"
 import type { Editor } from "@tiptap/react"
 import type { JSONContent } from "@tiptap/core"
 import { createClient } from "@/lib/supabase/client"
 import { mustOk } from "@/lib/supabase/mustOk"
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/shared/Modal"
 import { MeetingDocEditor } from "./editor/MeetingDocEditor"
@@ -128,6 +129,78 @@ export function MeetingEditor({
     editorRef.current?.chain().focus("end").insertContent(mdToContent(t)).run()
     setResearchOpen(false)
     setResearchResult(null)
+  }
+
+  // 2b 이미지 — 리서치 출처에서 대표 이미지 후보 추출 → 선택 → meeting-media로 가져와 삽입.
+  const [imgBusy, setImgBusy] = useState(false)
+  const [imgCandidates, setImgCandidates] = useState<{ image: string; source: string; title?: string }[] | null>(null)
+  const [imgSelected, setImgSelected] = useState<Set<string>>(new Set())
+  const [imgInserting, setImgInserting] = useState(false)
+
+  const findImages = async () => {
+    const urls = researchResult?.sources.map((s) => s.url) ?? []
+    if (urls.length === 0) {
+      toast.error("출처가 없어 이미지를 찾을 수 없어요.")
+      return
+    }
+    setImgBusy(true)
+    setImgCandidates(null)
+    setImgSelected(new Set())
+    try {
+      const res = await fetch("/api/meeting-notes/research/images", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ urls }),
+      })
+      if (!res.ok) throw new Error("이미지 검색에 실패했어요.")
+      setImgCandidates(((await res.json()) as { images: { image: string; source: string; title?: string }[] }).images)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "이미지 검색에 실패했어요.")
+    } finally {
+      setImgBusy(false)
+    }
+  }
+  const toggleImg = (url: string) =>
+    setImgSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(url)) next.delete(url)
+      else next.add(url)
+      return next
+    })
+  const insertImages = async () => {
+    if (imgSelected.size === 0) return
+    setImgInserting(true)
+    try {
+      const imported = await Promise.all(
+        [...imgSelected].map(async (src) => {
+          try {
+            const res = await fetch("/api/meeting-notes/research/image-import", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ url: src }),
+            })
+            return res.ok ? ((await res.json()) as { url: string }).url : null
+          } catch {
+            return null
+          }
+        })
+      )
+      const urls = imported.filter((u): u is string => !!u)
+      if (urls.length === 0) {
+        toast.error("이미지를 가져오지 못했어요.")
+        return
+      }
+      editorRef.current
+        ?.chain()
+        .focus("end")
+        .insertContent(urls.map((src) => ({ type: "image", attrs: { src } })))
+        .run()
+      toast.success(`이미지 ${urls.length}개를 본문에 넣었어요.`)
+      setImgCandidates(null)
+      setImgSelected(new Set())
+    } finally {
+      setImgInserting(false)
+    }
   }
 
   useEffect(() => {
@@ -395,11 +468,59 @@ export function MeetingEditor({
                       ))}
                     </div>
                   )}
-                  <div className="mt-2.5 flex justify-end">
+                  <div className="mt-2.5 flex flex-wrap items-center justify-end gap-1.5">
+                    {researchResult.sources.length > 0 && (
+                      <Button type="button" variant="outline" size="sm" onClick={findImages} disabled={imgBusy}>
+                        {imgBusy ? <Loader2 className="size-3.5 animate-spin" /> : <ImageIcon className="size-3.5" />} 이미지 찾기
+                      </Button>
+                    )}
                     <Button type="button" size="sm" onClick={insertResearch} disabled={!researchResult.text.trim()}>
                       <Plus className="size-3.5" /> 본문에 삽입
                     </Button>
                   </div>
+                  {imgCandidates && (
+                    <div className="mt-2 border-t pt-2">
+                      {imgCandidates.length === 0 ? (
+                        <p className="text-[11px] text-muted-foreground">출처에서 이미지를 찾지 못했어요.</p>
+                      ) : (
+                        <>
+                          <div className="mb-1.5 flex items-center justify-between">
+                            <span className="text-[11px] font-medium text-muted-foreground">
+                              이미지 선택 {imgSelected.size}/{imgCandidates.length}
+                            </span>
+                            <Button type="button" size="sm" onClick={insertImages} disabled={imgInserting || imgSelected.size === 0}>
+                              {imgInserting && <Loader2 className="size-3.5 animate-spin" />} 선택 삽입
+                            </Button>
+                          </div>
+                          <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
+                            {imgCandidates.map((c) => {
+                              const on = imgSelected.has(c.image)
+                              return (
+                                <button
+                                  key={c.image}
+                                  type="button"
+                                  onClick={() => toggleImg(c.image)}
+                                  title={c.title || c.source}
+                                  className={cn(
+                                    "relative aspect-video overflow-hidden rounded-md border-2 bg-muted/40 transition-colors",
+                                    on ? "border-primary" : "border-transparent hover:border-border"
+                                  )}
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={c.image} alt="" loading="lazy" className="size-full object-cover" />
+                                  {on && (
+                                    <span className="absolute right-1 top-1 rounded-full bg-primary p-0.5 text-primary-foreground">
+                                      <Check className="size-3" />
+                                    </span>
+                                  )}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
             </div>
