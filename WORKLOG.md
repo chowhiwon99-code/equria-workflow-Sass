@@ -39,6 +39,12 @@
 7. **표 강화** — 선 가시화(foreground 22%)·노션식 메뉴(행/열 전방위 삽입·헤더행/열·병합)·**셀 배경색 8종**(TableCell backgroundColor + setCellAttribute, data-bg color-mix)·**열 균등분할**(colwidth 제거 커스텀 command).
 8. **회의 DB 뷰(메타데이터)** — 마이그 070: `meeting_categories`(사용자정의 분류·색·RLS 워크스페이스) + meeting_notes `category_id·importance·meeting_time` + `set_meeting_meta` RPC(멤버 누구나, 폴더 패턴). `/meetings` **표(DB) 토글** — 분류 색태그·중요도·일시 인라인 편집, 분류 관리(추가/색7/삭제), 정렬(날짜·중요도)·필터(분류). `MeetingTable.tsx`·`lib/meetingMeta`(프로젝트 재사용). 기본분류 5종 시드. 스코프=단일분류·고정중요도(사용자 확정). **타입 수동 추가**(regen 드리프트 방지). **결정 보류:** 파일컬럼·프로젝트 중요도 연동=다음.
 
+**추가 — AI 리서치 Part 2 (`ac77c71`~`8bc6bf2`):** 회의 에디터 `리서치` 버튼 →
+9. **2a 검색·신뢰도** — `/api/meeting-notes/research`: Claude + `anthropic.tools.webSearch_20250305`(maxUses5·KR) → 신뢰도 1차(관련성)·2차(권위·최신성·교차검증) 카테고리 정리 + 출처. 웹서치 실패 시 Claude 지식 폴백(최신성 한계 명시). 비용 `agent_usage`.
+10. **2b 이미지** — `/research/images`(출처 og:image/twitter:image 추출·SSRF가드·HTML만) + `/research/image-import`(외부→meeting-media 다운로드·재업로드·이미지만·SVG차단·15MB) + `lib/safeFetch`. 후보 그리드 다중선택→삽입.
+11. **2c 초안·검증** — `/research/draft`(보고서/기획서·자료범위 밖 날조 금지) + `/research/verify`(generateObject+Zod 적대적 팩트체크, 주장별 supported/weak/unsupported). UI: 타입토글·초안표시·검증 색배지. `mdToContent`로 마크다운→Tiptap 삽입.
+**⚠️ 전제:** Anthropic 콘솔 web search 활성+결제(대표 액션) — 미활성이면 2a 폴백·2b 출처 없음. **검증:** 매 단계 tsc 0·lint 30/0·build 0. context7로 web_search API 확인.
+
 ---
 
 ## 2026-06-24 · 세션12 — A② 온도차등 + 작업 하네스(루프/하네스 엔지니어링) + 재무 UI 재구성(워크플로우)
