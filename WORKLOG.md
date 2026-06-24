@@ -27,6 +27,7 @@
 1. **A② 에이전트 온도 차등(마이그 068·라이브)** — 8개 기본 에이전트 성격별: 정확성(번역·세금·법무)=0.3 / 균형(CS·데이터=0.5·문서=0.6) / 창의(SNS·이미지)=0.9. 067로 라이브 v2가 이미 0.7이라 마이그 068(데이터 UPDATE)로 현재버전 temperature 변경 + seed.sql 동기. A①(매뉴얼)+A②(온도)로 "똑똑한 에이전트" 완결.
 2. **작업 하네스 구축(`cacf4f4`)** — 대화 중 "루프/하네스 엔지니어링" 논의 → 우리 작업방식을 점검(훅 0·하네스 문서뿐)하고 코드화. ① `.claude/settings.json` 훅: **pre-push 게이트**(`if:Bash(git push*)`로 push 때만 tsc 강제+lint 회귀차단) · **Stop 검증**(src 변경 턴 tsc 자동, 보고전용) — 스크립트 `.claude/hooks/`. ② 명령 `/deploy`(tsc→lint→build→main먼저push→feat→Vercel확인→문서)·`/verify`(tsc+lint). ③ `work-harness` 스킬(작업 SOP·멀티에이전트 기준·**진행상황 가시성 1순위**). 균형(편집마다 X)·검증게이트만(자동수정 X) = 적극+안정.
 3. **재무 UI 재구성(`e1789f3`·배포)** — 962줄 단일 `FinanceView`를 **탭(요약/내역/세금계산서) + 월 기간필터 + 경량 차트**로. **멀티에이전트 워크플로우 2종**으로 진행: ⓐ 설계 판정단(3안 병렬→점수·합성, 안1 베이스+안2·3 graft) ⓑ 적대 검증(통화분리·RLS/undo·회귀·React건전성 4차원, **4/4 pass·이슈 0**). 신규 `usePeriodFilter`(기간 훅)·`financeAgg`(순수 집계, **통화분리 내장**)·`financeCharts`(TrendBadge 증감%·TrendBars 인라인SVG·BreakdownBars CSS — **npm 패키지 0**)·`FinanceEntryModal`·`TaxInvoiceModal` 분리.
+4. **원화 환산 합계(`12a1453`·배포, 마이그 069)** — 요약 탭에 '원화 환산 합계' 카드(전 통화→KRW). 통화별 분리는 유지하고 환산만 별도(기준환율·날짜 명시 = 투명, 몰래합산 원칙 유지). `fx_rates` 테이블(전역 참조데이터, 쓰기=service_role) + `/api/finance/fx-rates` BFF(일별 캐시 외부≤1회/일, **ECB/Frankfurter 무키**, base=EUR 풀정밀도, 실패 시 DB 폴백). 방식A(오늘환율)·**BTC 제외**(자기 통화로 따로). 사용자 요청 "실시간 말고 일별".
 
 **왜:** A는 로드맵 "지금 안전·고가치"(에이전트 차별화 완결). 하네스는 작업을 더 적극·안정·가시적으로(사용자 요구). 재무는 로드맵 3차 大작업 — 첫 워크플로우 실전 적용(loop/harness 엔지니어링 시연).
 

@@ -138,7 +138,7 @@ equria-workspace/
 
 ---
 
-## 6. DB 스키마 요약 (약 39개 테이블 · 마이그 001~068)
+## 6. DB 스키마 요약 (약 40개 테이블 · 마이그 001~069)
 
 | 영역 | 테이블 |
 |------|--------|
@@ -151,12 +151,12 @@ equria-workspace/
 | 캘린더 | `calendar_events` |
 | MCP | `mcp_servers` · `mcp_tools` |
 | 파일/문서 | `files` · `business_cards` · `tax_invoices` |
-| 재무 | `finance_entries` |
+| 재무 | `finance_entries` · `fx_rates`(환율) |
 | 프로젝트 | `projects` · `project_members` |
 | 알림 | `notifications` |
 | 구글 연동 | `google_connections` |
 
-> 전체 SQL: `supabase/migrations/` (001~068, 71파일). 원격 적용·drift 없음. **세부 진행상황·최신 변경은 HANDOFF.md가 SSOT.**
+> 전체 SQL: `supabase/migrations/` (001~069, 72파일). 원격 적용·drift 없음. **세부 진행상황·최신 변경은 HANDOFF.md가 SSOT.**
 > 기본 에이전트 8개 시드: `supabase/seed.sql` 참고
 
 ---
