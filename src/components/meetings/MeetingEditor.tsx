@@ -113,17 +113,22 @@ export function MeetingEditor({
     if (!q || researchBusy) return
     setResearchBusy(true)
     setResearchResult(null)
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 75000)
     try {
       const res = await fetch("/api/meeting-notes/research", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: q, context: editorRef.current?.getText().slice(0, 4000) ?? "" }),
+        signal: ctrl.signal,
       })
       if (!res.ok) throw new Error("리서치에 실패했어요.")
       setResearchResult((await res.json()) as { text: string; sources: { url: string; title?: string }[]; searched: boolean })
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "리서치에 실패했어요.")
+      const aborted = (e as { name?: string } | null)?.name === "AbortError"
+      toast.error(aborted ? "리서치가 너무 오래 걸려요. 주제를 좁혀 다시 시도해 주세요." : e instanceof Error ? e.message : "리서치에 실패했어요.")
     } finally {
+      clearTimeout(timer)
       setResearchBusy(false)
     }
   }

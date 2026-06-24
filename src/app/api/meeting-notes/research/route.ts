@@ -66,30 +66,36 @@ export async function POST(req: Request) {
       prompt,
       tools: {
         web_search: anthropic.tools.webSearch_20250305({
-          maxUses: 5,
+          maxUses: 3,
           userLocation: { type: "approximate", country: "KR", timezone: "Asia/Seoul" },
         }),
       },
-      maxOutputTokens: 2500,
+      maxOutputTokens: 1800,
       temperature: 0.4,
     })
     text = result.text
     sources = collectSources(result.sources)
     inputTokens = result.usage.inputTokens ?? 0
     outputTokens = result.usage.outputTokens ?? 0
-  } catch {
-    // 웹서치 미활성/실패 → Claude 지식 폴백
+  } catch (e) {
+    // 웹서치 미활성/실패/시간초과 → Claude 지식 폴백
+    console.error("[research] web_search 실패, 폴백:", e instanceof Error ? e.message : e)
     searched = false
-    const result = await generateText({
-      model: anthropic(MODELS.default),
-      system: `${SYSTEM}\n\n⚠️ 웹 검색을 쓸 수 없다. 학습된 지식으로 정리하되, 최신성·정확성에 한계가 있음을 맨 위에 1줄로 명시하라.`,
-      prompt,
-      maxOutputTokens: 2500,
-      temperature: 0.4,
-    })
-    text = result.text
-    inputTokens = result.usage.inputTokens ?? 0
-    outputTokens = result.usage.outputTokens ?? 0
+    try {
+      const result = await generateText({
+        model: anthropic(MODELS.default),
+        system: `${SYSTEM}\n\n⚠️ 웹 검색을 쓸 수 없다. 학습된 지식으로 정리하되, 최신성·정확성에 한계가 있음을 맨 위에 1줄로 명시하라.`,
+        prompt,
+        maxOutputTokens: 1800,
+        temperature: 0.4,
+      })
+      text = result.text
+      inputTokens = result.usage.inputTokens ?? 0
+      outputTokens = result.usage.outputTokens ?? 0
+    } catch (e2) {
+      console.error("[research] 폴백도 실패:", e2 instanceof Error ? e2.message : e2)
+      return Response.json({ error: "리서치 생성에 실패했어요." }, { status: 500 })
+    }
   }
 
   // 비용 기록 (best-effort — 실패해도 결과는 반환)
