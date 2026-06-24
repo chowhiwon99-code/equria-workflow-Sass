@@ -478,6 +478,51 @@ body {
   border-radius: 0.3rem;
   font-size: 0.85em;
 }
+/* 코드 문법 하이라이트(highlight.js) — 라이트/다크 모두 읽히는 미드톤 */
+.meeting-doc pre code.hljs {
+  color: var(--foreground);
+  background: transparent;
+  padding: 0;
+}
+.meeting-doc .hljs-comment,
+.meeting-doc .hljs-quote {
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+.meeting-doc .hljs-keyword,
+.meeting-doc .hljs-selector-tag,
+.meeting-doc .hljs-built_in,
+.meeting-doc .hljs-name {
+  color: oklch(0.56 0.18 295);
+}
+.meeting-doc .hljs-string,
+.meeting-doc .hljs-attr,
+.meeting-doc .hljs-regexp {
+  color: oklch(0.52 0.13 150);
+}
+.meeting-doc .hljs-number,
+.meeting-doc .hljs-literal {
+  color: oklch(0.58 0.15 50);
+}
+.meeting-doc .hljs-title,
+.meeting-doc .hljs-section {
+  color: oklch(0.54 0.15 255);
+}
+.meeting-doc .hljs-attribute,
+.meeting-doc .hljs-property,
+.meeting-doc .hljs-variable,
+.meeting-doc .hljs-type {
+  color: oklch(0.55 0.12 215);
+}
+.meeting-doc .hljs-meta {
+  color: oklch(0.6 0.1 50);
+}
+.meeting-doc .hljs-emphasis {
+  font-style: italic;
+}
+.meeting-doc .hljs-strong {
+  font-weight: 600;
+}
 .meeting-doc a {
   color: var(--primary);
   text-decoration: underline;
@@ -541,6 +586,35 @@ body {
   inset: 0;
   background: color-mix(in oklch, var(--primary) 12%, transparent);
   pointer-events: none;
+}
+/* 표 — 열 리사이즈 그립(resizable:true 가시화) */
+.meeting-doc .tableWrapper {
+  overflow-x: auto;
+  margin: 0.75rem 0;
+}
+.meeting-doc .tableWrapper table {
+  margin: 0;
+}
+.meeting-doc .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: -2px;
+  width: 4px;
+  background: var(--primary);
+  opacity: 0.55;
+  pointer-events: none;
+  z-index: 5;
+}
+.meeting-doc.resize-cursor {
+  cursor: col-resize;
+}
+/* 형광펜(highlight mark) */
+.meeting-doc mark {
+  background: color-mix(in oklch, var(--warning) 38%, transparent);
+  border-radius: 0.2rem;
+  padding: 0 0.12rem;
+  color: inherit;
 }
 /* 빈 블록 플레이스홀더 — "'/'를 입력해 명령어 사용" */
 .meeting-doc .is-empty::before {

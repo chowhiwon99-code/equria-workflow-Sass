@@ -3,17 +3,38 @@ import Placeholder from "@tiptap/extension-placeholder"
 import Image from "@tiptap/extension-image"
 import TaskList from "@tiptap/extension-task-list"
 import TaskItem from "@tiptap/extension-task-item"
+import Highlight from "@tiptap/extension-highlight"
 import { Table } from "@tiptap/extension-table"
 import TableRow from "@tiptap/extension-table-row"
 import TableHeader from "@tiptap/extension-table-header"
 import TableCell from "@tiptap/extension-table-cell"
 import { Extension, type Editor, type Range } from "@tiptap/core"
 import Suggestion, { type SuggestionProps, type SuggestionKeyDownProps } from "@tiptap/suggestion"
-import { ReactRenderer, type Extensions } from "@tiptap/react"
+import { ReactRenderer, ReactNodeViewRenderer, type Extensions } from "@tiptap/react"
+import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight"
+import { createLowlight } from "lowlight"
+import javascript from "highlight.js/lib/languages/javascript"
+import typescript from "highlight.js/lib/languages/typescript"
+import python from "highlight.js/lib/languages/python"
+import json from "highlight.js/lib/languages/json"
+import bash from "highlight.js/lib/languages/bash"
+import sql from "highlight.js/lib/languages/sql"
+import xml from "highlight.js/lib/languages/xml"
+import css from "highlight.js/lib/languages/css"
 import { FileBlock } from "./FileBlock"
 import { Callout } from "./Callout"
+import { CodeBlockView } from "./CodeBlockView"
 import { SlashMenu, type SlashMenuRef } from "./SlashMenu"
 import { buildSlashItems, filterSlashItems, type SlashHandlers, type SlashItem } from "./slashItems"
+
+// 코드 하이라이트 — 필요 언어만 등록(번들 최소). html=xml.
+const lowlight = createLowlight()
+lowlight.register({ javascript, typescript, python, json, bash, sql, xml, css })
+const CodeBlock = CodeBlockLowlight.extend({
+  addNodeView() {
+    return ReactNodeViewRenderer(CodeBlockView)
+  },
+}).configure({ lowlight })
 
 type SlashCmd = (p: { editor: Editor; range: Range }) => void
 
@@ -119,6 +140,7 @@ const SlashCommand = Extension.create<{ handlers: SlashHandlers }>({
 export function buildMeetingExtensions(opts: { placeholder: string; handlers: SlashHandlers }): Extensions {
   return [
     StarterKit.configure({
+      codeBlock: false, // CodeBlockLowlight(문법 하이라이트)로 대체
       heading: { levels: [1, 2, 3, 4] },
       link: {
         openOnClick: false,
@@ -128,6 +150,7 @@ export function buildMeetingExtensions(opts: { placeholder: string; handlers: Sl
     }),
     TaskList,
     TaskItem.configure({ nested: true }),
+    Highlight,
     SafeImage.configure({ inline: false, allowBase64: false }),
     Table.configure({ resizable: true }),
     TableRow,
@@ -135,6 +158,7 @@ export function buildMeetingExtensions(opts: { placeholder: string; handlers: Sl
     TableCell,
     FileBlock,
     Callout,
+    CodeBlock,
     SlashCommand.configure({ handlers: opts.handlers }),
     Placeholder.configure({
       includeChildren: false,
