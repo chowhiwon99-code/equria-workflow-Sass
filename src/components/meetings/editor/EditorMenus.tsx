@@ -9,11 +9,45 @@ const bar = "flex items-center gap-0.5 rounded-lg border bg-popover p-1 text-xs 
 const btn = "inline-flex items-center gap-0.5 rounded px-1.5 py-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 const sep = "mx-0.5 h-4 w-px bg-border"
 
-/** 표 안에 커서가 있을 때 뜨는 플로팅 컨트롤 — 행/열 추가·삭제·헤더·병합·표삭제. */
+const CELL_COLORS: { name: string | null; label: string; swatch: string }[] = [
+  { name: null, label: "색 없음", swatch: "transparent" },
+  { name: "gray", label: "회색", swatch: "oklch(0.84 0.01 264)" },
+  { name: "red", label: "빨강", swatch: "oklch(0.83 0.09 25)" },
+  { name: "orange", label: "주황", swatch: "oklch(0.86 0.09 65)" },
+  { name: "yellow", label: "노랑", swatch: "oklch(0.92 0.1 100)" },
+  { name: "green", label: "초록", swatch: "oklch(0.87 0.09 150)" },
+  { name: "blue", label: "파랑", swatch: "oklch(0.85 0.07 240)" },
+  { name: "purple", label: "보라", swatch: "oklch(0.85 0.08 300)" },
+]
+
+/** 표 안에 커서가 있을 때 뜨는 플로팅 컨트롤 — 행/열 삽입·삭제·헤더·병합·균등분할·칸 색·표삭제. */
 export function TableMenu({ editor }: { editor: Editor }) {
+  // 열 균등 분할 — 현재 표의 모든 셀 colwidth 제거(table-layout:fixed라 자동 균등 배분).
+  const distribute = () =>
+    editor.commands.command(({ tr, state, dispatch }) => {
+      const { $from } = state.selection
+      for (let d = $from.depth; d > 0; d--) {
+        const node = $from.node(d)
+        if (node.type.name === "table") {
+          const start = $from.start(d)
+          let changed = false
+          node.descendants((child, pos) => {
+            if ((child.type.name === "tableCell" || child.type.name === "tableHeader") && child.attrs.colwidth) {
+              tr.setNodeMarkup(start + pos, undefined, { ...child.attrs, colwidth: null })
+              changed = true
+            }
+            return true
+          })
+          if (changed && dispatch) dispatch(tr)
+          return true
+        }
+      }
+      return false
+    })
+
   return (
     <BubbleMenu editor={editor} pluginKey="tableMenu" shouldShow={({ editor }) => editor.isActive("table")}>
-      <div className={bar}>
+      <div className="flex max-w-[min(94vw,40rem)] flex-wrap items-center gap-0.5 rounded-lg border bg-popover p-1 text-xs shadow-[var(--shadow-lg)]">
         <button className={btn} title="위에 행 삽입" onClick={() => editor.chain().focus().addRowBefore().run()}>
           행<ArrowUp className="size-3" />
         </button>
@@ -43,6 +77,22 @@ export function TableMenu({ editor }: { editor: Editor }) {
         <button className={btn} title="셀 병합 / 분할" onClick={() => editor.chain().focus().mergeOrSplit().run()}>
           병합
         </button>
+        <button className={btn} title="열 너비 균등 분할" onClick={distribute}>
+          균등
+        </button>
+        <div className={sep} />
+        {CELL_COLORS.map((c) => (
+          <button
+            key={c.name ?? "none"}
+            type="button"
+            title={`칸 색: ${c.label}`}
+            onClick={() => editor.chain().focus().setCellAttribute("backgroundColor", c.name).run()}
+            className="flex size-4 items-center justify-center rounded-full border border-border transition-transform hover:scale-110"
+            style={{ backgroundColor: c.swatch }}
+          >
+            {c.name === null && <span className="text-[8px] leading-none text-muted-foreground">✕</span>}
+          </button>
+        ))}
         <div className={sep} />
         <button
           className="inline-flex items-center rounded p-1 text-muted-foreground transition-colors hover:bg-destructive-bg hover:text-destructive"

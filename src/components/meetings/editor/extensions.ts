@@ -36,6 +36,28 @@ const CodeBlock = CodeBlockLowlight.extend({
   },
 }).configure({ lowlight })
 
+// 표 셀 배경색(노션식 칸 색) — backgroundColor 속성. setCellAttribute로 설정, data-bg를 CSS로 색 매핑.
+const cellBgAttr = {
+  backgroundColor: {
+    default: null,
+    parseHTML: (el: HTMLElement) => el.getAttribute("data-bg"),
+    renderHTML: (attrs: Record<string, unknown>) => {
+      const c = attrs.backgroundColor
+      return typeof c === "string" && c ? { "data-bg": c } : {}
+    },
+  },
+}
+const TableCellBg = TableCell.extend({
+  addAttributes() {
+    return { ...(this.parent?.() ?? {}), ...cellBgAttr }
+  },
+})
+const TableHeaderBg = TableHeader.extend({
+  addAttributes() {
+    return { ...(this.parent?.() ?? {}), ...cellBgAttr }
+  },
+})
+
 type SlashCmd = (p: { editor: Editor; range: Range }) => void
 
 /** suggestion 렌더 — 캐럿 아래에 메뉴를 띄우고, 화면 하단에 가까우면 위로 뒤집는다. */
@@ -162,8 +184,8 @@ export function buildMeetingExtensions(opts: { placeholder: string; handlers: Sl
     SafeImage.configure({ inline: false, allowBase64: false }),
     Table.configure({ resizable: true }),
     TableRow,
-    TableHeader,
-    TableCell,
+    TableHeaderBg,
+    TableCellBg,
     FileBlock,
     Callout,
     CodeBlock,

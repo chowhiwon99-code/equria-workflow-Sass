@@ -589,6 +589,28 @@ body {
   pointer-events: none;
   z-index: 2;
 }
+/* 표 셀 배경색(노션식 칸 색) — data-bg, color-mix로 라이트/다크 자동 적응 */
+.meeting-doc [data-bg="gray"] {
+  background-color: color-mix(in oklch, var(--muted-foreground) 16%, transparent);
+}
+.meeting-doc [data-bg="red"] {
+  background-color: color-mix(in oklch, oklch(0.62 0.2 25) 20%, transparent);
+}
+.meeting-doc [data-bg="orange"] {
+  background-color: color-mix(in oklch, oklch(0.7 0.16 60) 22%, transparent);
+}
+.meeting-doc [data-bg="yellow"] {
+  background-color: color-mix(in oklch, oklch(0.85 0.16 95) 26%, transparent);
+}
+.meeting-doc [data-bg="green"] {
+  background-color: color-mix(in oklch, oklch(0.65 0.16 150) 20%, transparent);
+}
+.meeting-doc [data-bg="blue"] {
+  background-color: color-mix(in oklch, oklch(0.6 0.13 240) 20%, transparent);
+}
+.meeting-doc [data-bg="purple"] {
+  background-color: color-mix(in oklch, oklch(0.55 0.16 300) 20%, transparent);
+}
 /* 표 — 열 리사이즈 그립(resizable:true 가시화) */
 .meeting-doc .tableWrapper {
   overflow-x: auto;
