@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
-import { ArrowLeft, Trash2, Loader2, Calendar, Users, Sparkles, Plus, RefreshCw, X, Search, Image as ImageIcon, Check } from "lucide-react"
+import { ArrowLeft, Trash2, Loader2, Calendar, Users, Sparkles, Plus, RefreshCw, X, Search, Image as ImageIcon, Check, ShieldCheck } from "lucide-react"
 import type { Editor } from "@tiptap/react"
 import type { JSONContent } from "@tiptap/core"
 import { createClient } from "@/lib/supabase/client"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
+import { tagBg } from "@/lib/meetingMeta"
 import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/shared/Modal"
 import { MeetingDocEditor } from "./editor/MeetingDocEditor"
@@ -16,6 +17,8 @@ import type { Tables } from "@/lib/supabase/types"
 
 type Note = Tables<"meeting_notes">
 const AI_ACTIONS: AiAction[] = ["summarize", "actions", "polish"]
+const VERDICT_LABEL: Record<string, string> = { supported: "검증", weak: "주의", unsupported: "미검증" }
+const VERDICT_COLOR: Record<string, string> = { supported: "green", weak: "yellow", unsupported: "red" }
 
 /** AI 평문 결과를 문단 노드로 — 본문(Tiptap)에 삽입/교체용. */
 function linesToContent(text: string): JSONContent[] {
@@ -201,6 +204,63 @@ export function MeetingEditor({
     } finally {
       setImgInserting(false)
     }
+  }
+
+  // 2c 초안 + 검증 — 리서치 자료로 보고서/기획서 초안 → 적대적 팩트체크.
+  const [draftType, setDraftType] = useState<"report" | "proposal">("report")
+  const [draftBusy, setDraftBusy] = useState(false)
+  const [draft, setDraft] = useState<string | null>(null)
+  const [verifyBusy, setVerifyBusy] = useState(false)
+  const [verifyResult, setVerifyResult] = useState<{
+    overall: string
+    items: { claim: string; verdict: "supported" | "weak" | "unsupported"; note: string }[]
+  } | null>(null)
+
+  const runDraft = async () => {
+    const material = researchResult?.text.trim()
+    if (!material || draftBusy) return
+    setDraftBusy(true)
+    setDraft(null)
+    setVerifyResult(null)
+    try {
+      const res = await fetch("/api/meeting-notes/research/draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic: researchQuery, material, type: draftType }),
+      })
+      if (!res.ok) throw new Error("초안 작성에 실패했어요.")
+      setDraft(((await res.json()) as { draft: string }).draft)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "초안 작성에 실패했어요.")
+    } finally {
+      setDraftBusy(false)
+    }
+  }
+  const runVerify = async () => {
+    const material = researchResult?.text.trim()
+    if (!draft || !material || verifyBusy) return
+    setVerifyBusy(true)
+    setVerifyResult(null)
+    try {
+      const res = await fetch("/api/meeting-notes/research/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ draft, material }),
+      })
+      if (!res.ok) throw new Error("검증에 실패했어요.")
+      setVerifyResult(
+        (await res.json()) as { overall: string; items: { claim: string; verdict: "supported" | "weak" | "unsupported"; note: string }[] }
+      )
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "검증에 실패했어요.")
+    } finally {
+      setVerifyBusy(false)
+    }
+  }
+  const insertDraft = () => {
+    if (!draft?.trim()) return
+    editorRef.current?.chain().focus("end").insertContent(mdToContent(draft)).run()
+    toast.success("초안을 본문에 넣었어요.")
   }
 
   useEffect(() => {
@@ -521,6 +581,65 @@ export function MeetingEditor({
                       )}
                     </div>
                   )}
+
+                  {/* 2c 초안 + 검증 */}
+                  <div className="mt-2 border-t pt-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[11px] font-medium text-muted-foreground">초안</span>
+                      <div className="flex rounded-lg border p-0.5 text-[11px]">
+                        <button
+                          type="button"
+                          onClick={() => setDraftType("report")}
+                          className={cn("rounded px-2 py-0.5 transition-colors", draftType === "report" ? "bg-muted font-medium text-foreground" : "text-muted-foreground")}
+                        >
+                          보고서
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDraftType("proposal")}
+                          className={cn("rounded px-2 py-0.5 transition-colors", draftType === "proposal" ? "bg-muted font-medium text-foreground" : "text-muted-foreground")}
+                        >
+                          기획서
+                        </button>
+                      </div>
+                      <Button type="button" variant="outline" size="sm" onClick={runDraft} disabled={draftBusy}>
+                        {draftBusy && <Loader2 className="size-3.5 animate-spin" />} 초안 작성
+                      </Button>
+                    </div>
+                    {draft && (
+                      <>
+                        <div className="mt-2 max-h-72 overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-background/60 p-2 text-sm">{draft}</div>
+                        <div className="mt-2 flex flex-wrap items-center justify-end gap-1.5">
+                          <Button type="button" variant="outline" size="sm" onClick={runVerify} disabled={verifyBusy}>
+                            {verifyBusy ? <Loader2 className="size-3.5 animate-spin" /> : <ShieldCheck className="size-3.5" />} 검증
+                          </Button>
+                          <Button type="button" size="sm" onClick={insertDraft}>
+                            <Plus className="size-3.5" /> 초안 삽입
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                    {verifyResult && (
+                      <div className="mt-2 rounded-md border bg-background/60 p-2">
+                        <p className="mb-1.5 text-[11px] text-muted-foreground">{verifyResult.overall}</p>
+                        <ul className="flex flex-col gap-1">
+                          {verifyResult.items.map((it, i) => (
+                            <li key={i} className="flex items-start gap-1.5 text-xs">
+                              <span
+                                className="mt-0.5 shrink-0 rounded px-1 text-[10px] font-medium"
+                                style={{ backgroundColor: tagBg(VERDICT_COLOR[it.verdict] ?? "gray") }}
+                              >
+                                {VERDICT_LABEL[it.verdict] ?? "?"}
+                              </span>
+                              <span>
+                                <span className="font-medium">{it.claim}</span> <span className="text-muted-foreground">— {it.note}</span>
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
                 </>
               )}
             </div>
