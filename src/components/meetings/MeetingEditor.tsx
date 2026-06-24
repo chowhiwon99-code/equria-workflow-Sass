@@ -737,7 +737,14 @@ export function MeetingEditor({
                   </div>
 
                   {graphData && (
-                    <ResearchGraph nodes={graphData.nodes} links={graphData.links} topic={researchQuery} onClose={() => setGraphData(null)} />
+                    <ResearchGraph
+                      nodes={graphData.nodes}
+                      links={graphData.links}
+                      topic={researchQuery}
+                      material={researchResult.text}
+                      onInsert={(text) => editorRef.current?.chain().focus("end").insertContent(mdToContent(text)).run()}
+                      onClose={() => setGraphData(null)}
+                    />
                   )}
                 </>
               )}
