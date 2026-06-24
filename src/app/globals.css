@@ -616,6 +616,20 @@ body {
   padding: 0 0.12rem;
   color: inherit;
 }
+/* 이미지 정렬(data-align) */
+.meeting-doc img[data-align="left"] {
+  display: block;
+  margin-right: auto;
+}
+.meeting-doc img[data-align="center"] {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+.meeting-doc img[data-align="right"] {
+  display: block;
+  margin-left: auto;
+}
 /* 빈 블록 플레이스홀더 — "'/'를 입력해 명령어 사용" */
 .meeting-doc .is-empty::before {
   content: attr(data-placeholder);

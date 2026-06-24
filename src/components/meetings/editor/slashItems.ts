@@ -15,6 +15,7 @@ import {
   Table as TableIcon,
   Image as ImageIcon,
   Paperclip,
+  Calendar,
   type LucideIcon,
 } from "lucide-react"
 
@@ -144,6 +145,23 @@ export function buildSlashItems(handlers: SlashHandlers): SlashItem[] {
       icon: Minus,
       keywords: ["divider", "hr", "구분선", "선"],
       command: ({ editor, range }) => editor.chain().focus().deleteRange(range).setHorizontalRule().run(),
+    },
+    {
+      key: "date",
+      title: "날짜",
+      hint: "오늘",
+      section: "기본 블록",
+      icon: Calendar,
+      keywords: ["date", "날짜", "오늘", "today", "time"],
+      command: ({ editor, range }) => {
+        const today = new Date().toLocaleDateString("ko-KR", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+          weekday: "short",
+        })
+        editor.chain().focus().deleteRange(range).insertContent(`${today} `).run()
+      },
     },
     {
       key: "table",

@@ -5,7 +5,7 @@ import { useEditor, EditorContent, type Editor } from "@tiptap/react"
 import { toast } from "sonner"
 import { uploadMeetingMedia } from "@/lib/upload"
 import { buildMeetingExtensions } from "./extensions"
-import { TableMenu, TextMenu } from "./EditorMenus"
+import { TableMenu, TextMenu, ImageMenu } from "./EditorMenus"
 import type { SlashHandlers } from "./slashItems"
 
 const MAX_BYTES = 50 * 1024 * 1024 // 50MB
@@ -96,6 +96,7 @@ export function MeetingDocEditor({
       <EditorContent editor={editor} />
       {editor && editable && <TextMenu editor={editor} />}
       {editor && editable && <TableMenu editor={editor} />}
+      {editor && editable && <ImageMenu editor={editor} />}
     </>
   )
 }

@@ -2,7 +2,7 @@
 
 import { BubbleMenu } from "@tiptap/react/menus"
 import type { Editor } from "@tiptap/react"
-import { Plus, Minus, Trash2, Bold, Italic, Strikethrough, Code, Highlighter, Link as LinkIcon } from "lucide-react"
+import { Plus, Minus, Trash2, Bold, Italic, Strikethrough, Code, Highlighter, Link as LinkIcon, AlignLeft, AlignCenter, AlignRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const bar = "flex items-center gap-0.5 rounded-lg border bg-popover p-1 text-xs shadow-[var(--shadow-lg)]"
@@ -93,6 +93,37 @@ export function TextMenu({ editor }: { editor: Editor }) {
         <div className={sep} />
         <button className={item(editor.isActive("link"))} title="링크" onClick={toggleLink}>
           <LinkIcon className="size-3.5" />
+        </button>
+      </div>
+    </BubbleMenu>
+  )
+}
+
+/** 이미지 선택 시 — 정렬(좌/중/우) + 설명(alt) 편집. */
+export function ImageMenu({ editor }: { editor: Editor }) {
+  const isAlign = (a: string) => editor.getAttributes("image").align === a
+  const setAlign = (align: "left" | "center" | "right") =>
+    editor.chain().focus().updateAttributes("image", { align }).run()
+  const editAlt = () => {
+    const prev = (editor.getAttributes("image").alt as string | undefined) ?? ""
+    const alt = window.prompt("이미지 설명(alt)", prev)
+    if (alt !== null) editor.chain().focus().updateAttributes("image", { alt }).run()
+  }
+  return (
+    <BubbleMenu editor={editor} pluginKey="imageMenu" shouldShow={({ editor }) => editor.isActive("image")}>
+      <div className={bar}>
+        <button className={cn(mbtn, isAlign("left") && "bg-muted text-foreground")} title="왼쪽 정렬" onClick={() => setAlign("left")}>
+          <AlignLeft className="size-3.5" />
+        </button>
+        <button className={cn(mbtn, isAlign("center") && "bg-muted text-foreground")} title="가운데 정렬" onClick={() => setAlign("center")}>
+          <AlignCenter className="size-3.5" />
+        </button>
+        <button className={cn(mbtn, isAlign("right") && "bg-muted text-foreground")} title="오른쪽 정렬" onClick={() => setAlign("right")}>
+          <AlignRight className="size-3.5" />
+        </button>
+        <div className={sep} />
+        <button className={mbtn} title="이미지 설명(alt)" onClick={editAlt}>
+          alt
         </button>
       </div>
     </BubbleMenu>
