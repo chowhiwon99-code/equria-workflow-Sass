@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
-import { ArrowLeft, Trash2, Loader2, Calendar, Users, Sparkles, Plus, RefreshCw, X, Search, Image as ImageIcon, Check, ShieldCheck } from "lucide-react"
+import { ArrowLeft, Trash2, Loader2, Calendar, Users, Sparkles, Plus, RefreshCw, X, Search, Image as ImageIcon, Check, ShieldCheck, Network } from "lucide-react"
 import type { Editor } from "@tiptap/react"
 import type { JSONContent } from "@tiptap/core"
 import { createClient } from "@/lib/supabase/client"
@@ -12,6 +12,7 @@ import { tagBg } from "@/lib/meetingMeta"
 import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/shared/Modal"
 import { MeetingDocEditor } from "./editor/MeetingDocEditor"
+import { ResearchGraph } from "./ResearchGraph"
 import { useMeetingAi, AI_ACTION_LABEL, type AiAction } from "./useMeetingAi"
 import type { Tables } from "@/lib/supabase/types"
 
@@ -261,6 +262,40 @@ export function MeetingEditor({
     if (!draft?.trim()) return
     editorRef.current?.chain().focus("end").insertContent(mdToContent(draft)).run()
     toast.success("초안을 본문에 넣었어요.")
+  }
+
+  // 지식 그래프 — 리서치 자료에서 개체·관계 추출 → 움직이는 망(보기 전용 오버레이).
+  const [graphBusy, setGraphBusy] = useState(false)
+  const [graphData, setGraphData] = useState<{
+    nodes: { id: string; label: string; group: string }[]
+    links: { source: string; target: string; rel?: string }[]
+  } | null>(null)
+
+  const runGraph = async () => {
+    const material = researchResult?.text.trim()
+    if (!material || graphBusy) return
+    setGraphBusy(true)
+    try {
+      const res = await fetch("/api/meeting-notes/research/graph", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic: researchQuery, material }),
+      })
+      if (!res.ok) throw new Error("그래프 생성에 실패했어요.")
+      const data = (await res.json()) as {
+        nodes: { id: string; label: string; group: string }[]
+        links: { source: string; target: string; rel?: string }[]
+      }
+      if (data.nodes.length === 0) {
+        toast.error("그래프로 만들 내용을 찾지 못했어요.")
+        return
+      }
+      setGraphData(data)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "그래프 생성에 실패했어요.")
+    } finally {
+      setGraphBusy(false)
+    }
   }
 
   useEffect(() => {
@@ -529,6 +564,9 @@ export function MeetingEditor({
                     </div>
                   )}
                   <div className="mt-2.5 flex flex-wrap items-center justify-end gap-1.5">
+                    <Button type="button" variant="outline" size="sm" onClick={runGraph} disabled={graphBusy}>
+                      {graphBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Network className="size-3.5" />} 그래프
+                    </Button>
                     {researchResult.sources.length > 0 && (
                       <Button type="button" variant="outline" size="sm" onClick={findImages} disabled={imgBusy}>
                         {imgBusy ? <Loader2 className="size-3.5 animate-spin" /> : <ImageIcon className="size-3.5" />} 이미지 찾기
@@ -656,6 +694,10 @@ export function MeetingEditor({
           editorRef={editorRef}
         />
       </div>
+
+      {graphData && (
+        <ResearchGraph nodes={graphData.nodes} links={graphData.links} topic={researchQuery} onClose={() => setGraphData(null)} />
+      )}
     </div>
   )
 }
