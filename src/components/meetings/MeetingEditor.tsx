@@ -683,6 +683,10 @@ export function MeetingEditor({
                       </div>
                     )}
                   </div>
+
+                  {graphData && (
+                    <ResearchGraph nodes={graphData.nodes} links={graphData.links} topic={researchQuery} onClose={() => setGraphData(null)} />
+                  )}
                 </>
               )}
             </div>
@@ -699,10 +703,6 @@ export function MeetingEditor({
           editorRef={editorRef}
         />
       </div>
-
-      {graphData && (
-        <ResearchGraph nodes={graphData.nodes} links={graphData.links} topic={researchQuery} onClose={() => setGraphData(null)} />
-      )}
     </div>
   )
 }

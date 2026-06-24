@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useRef } from "react"
-import { X } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { X, Maximize2, Minimize2 } from "lucide-react"
 import {
   forceSimulation,
   forceManyBody,
@@ -36,6 +36,7 @@ export function ResearchGraph({
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const [fullscreen, setFullscreen] = useState(false)
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -258,6 +259,7 @@ export function ResearchGraph({
       canvas.style.cursor = "grab"
     }
     const onWheel = (e: WheelEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return // 페이지 스크롤 보존 — ⌘/Ctrl+휠로만 줌
       e.preventDefault()
       const [wx, wy] = toWorld(e)
       const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12
@@ -287,19 +289,32 @@ export function ResearchGraph({
   }, [nodes, links])
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-background/95 backdrop-blur-sm">
-      <div className="flex items-center justify-between border-b px-4 py-2">
-        <span className="truncate text-sm font-medium">지식 그래프 · {topic}</span>
-        <button onClick={onClose} className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="닫기">
-          <X className="size-4" />
-        </button>
+    <div
+      className={
+        fullscreen
+          ? "fixed inset-0 z-50 flex flex-col bg-background/95 backdrop-blur-sm"
+          : "mt-2 flex flex-col overflow-hidden rounded-xl border bg-muted/20"
+      }
+    >
+      <div className="flex items-center justify-between border-b px-3 py-1.5">
+        <span className="truncate text-xs font-medium">지식 그래프 · {topic}</span>
+        <div className="flex items-center gap-0.5">
+          <button
+            onClick={() => setFullscreen((f) => !f)}
+            className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            aria-label={fullscreen ? "축소" : "전체화면"}
+          >
+            {fullscreen ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
+          </button>
+          <button onClick={onClose} className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="닫기">
+            <X className="size-3.5" />
+          </button>
+        </div>
       </div>
-      <div ref={wrapRef} className="relative flex-1 text-foreground">
+      <div ref={wrapRef} className={fullscreen ? "relative flex-1 text-foreground" : "relative h-[420px] text-foreground"}>
         <canvas ref={canvasRef} className="block size-full cursor-grab" />
       </div>
-      <div className="border-t px-4 py-1.5 text-center text-[11px] text-muted-foreground">
-        노드 드래그 · 휠 줌 · 배경 드래그로 이동 · 호버하면 연결 강조
-      </div>
+      <div className="border-t px-3 py-1 text-center text-[10px] text-muted-foreground">노드 드래그 · ⌘/Ctrl+휠 줌 · 배경 드래그 이동 · 호버 강조</div>
     </div>
   )
 }
