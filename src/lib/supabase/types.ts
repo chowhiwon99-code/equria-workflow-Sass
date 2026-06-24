@@ -1191,6 +1191,33 @@ export type Database = {
           },
         ]
       }
+      fx_rates: {
+        Row: {
+          as_of: string
+          currency: string
+          fetched_at: string
+          id: string
+          krw_per_unit: number
+          source: string
+        }
+        Insert: {
+          as_of: string
+          currency: string
+          fetched_at?: string
+          id?: string
+          krw_per_unit: number
+          source?: string
+        }
+        Update: {
+          as_of?: string
+          currency?: string
+          fetched_at?: string
+          id?: string
+          krw_per_unit?: number
+          source?: string
+        }
+        Relationships: []
+      }
       google_connections: {
         Row: {
           access_token: string | null

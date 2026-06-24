@@ -59,6 +59,8 @@ export function FinanceView() {
   const [sumRows, setSumRows] = useState<SumRow[]>([])
   const [trendRaw, setTrendRaw] = useState<SumRow[]>([])
   const [trendCur, setTrendCur] = useState("KRW")
+  // 원화 환산용 일별 환율(krw_per_unit). 통화별 분리는 유지하고 '환산 합계'에만 사용.
+  const [fx, setFx] = useState<{ base: string; as_of: string | null; rates: Record<string, number> } | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -114,6 +116,20 @@ export function FinanceView() {
   useEffect(() => {
     setPageCount(1)
   }, [searchText, kindFilter, categoryFilter, range])
+
+  // 환율 1회 로드(서버가 일별 캐시). 외부 데이터라 비동기 콜백에서만 setState.
+  useEffect(() => {
+    let alive = true
+    fetch("/api/finance/fx-rates")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (alive && d && d.rates) setFx(d as { base: string; as_of: string | null; rates: Record<string, number> })
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
 
   const onUpload = async (file: File) => {
     setUploading(true)
@@ -274,6 +290,27 @@ export function FinanceView() {
   const expenseBreakdown = useMemo(() => toBreakdown(aggregateByCategory(sumRows, "expense")), [sumRows])
   const revenueBreakdown = useMemo(() => toBreakdown(aggregateByCategory(sumRows, "revenue")), [sumRows])
 
+  // 원화 환산 합계 — fiat만 환율 적용(BTC 제외). usedFx=환산할 비-KRW 금액이 있을 때만 표시.
+  const fxConverted = useMemo(() => {
+    if (!fx) return null
+    let revenue = 0
+    let expense = 0
+    let usedFx = false
+    let skippedBtc = false
+    for (const [cur, v] of Object.entries(byCurrency)) {
+      if (cur === "BTC") {
+        skippedBtc = true
+        continue
+      }
+      const rate = cur === "KRW" ? 1 : fx.rates[cur]
+      if (!rate || rate <= 0) continue
+      if (cur !== "KRW") usedFx = true
+      revenue += v.revenue * rate
+      expense += v.expense * rate
+    }
+    return { revenue, expense, net: revenue - expense, usedFx, skippedBtc, asOf: fx.as_of }
+  }, [fx, byCurrency])
+
   const trendCurrencies = useMemo(() => {
     const set = new Set<string>()
     for (const r of trendRaw) set.add(r.currency || "KRW")
@@ -385,6 +422,25 @@ export function FinanceView() {
           />
         ) : (
           <div className="flex flex-col gap-6">
+            {/* 원화 환산 합계 (전 통화→KRW, fiat만) */}
+            {fxConverted?.usedFx && (
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-1">
+                  <span className="text-xs font-medium text-foreground">
+                    원화 환산 합계 <span className="font-normal text-muted-foreground">(전 통화 → KRW)</span>
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    기준환율 {fxConverted.asOf ?? "—"} · 참고{fxConverted.skippedBtc ? " · BTC 제외" : ""}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <SummaryCard label="총 매출" value={won(Math.round(fxConverted.revenue))} className="text-success" />
+                  <SummaryCard label="총 지출" value={won(Math.round(fxConverted.expense))} className="text-destructive" />
+                  <SummaryCard label="순수익" value={won(Math.round(fxConverted.net))} className={fxConverted.net >= 0 ? "text-foreground" : "text-destructive"} />
+                </div>
+              </div>
+            )}
+
             {/* 통화별 KPI 카드 */}
             <div className="flex flex-col gap-3">
               {currencyRows.map(([cur, v]) => {
