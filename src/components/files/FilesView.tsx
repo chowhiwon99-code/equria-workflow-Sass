@@ -570,18 +570,18 @@ export function FilesView() {
         </div>
       )}
 
-      {/* Google Drive 연동 게이트 (루트에만) */}
+      {/* Google Drive 연동 진입 (루트에만) — 컴팩트 한 줄. 연동 후 클릭→Drive 뷰 진입 구조. */}
       {currentFolder === null && (
-        <div className="flex items-center gap-3 rounded-xl border border-dashed p-4">
-          <CloudUpload className="size-5 text-muted-foreground" />
-          <div className="flex-1">
-            <p className="text-sm font-medium">Google Drive 연동</p>
-            <p className="text-xs text-muted-foreground">연결하면 Drive 파일을 함께 볼 수 있어요. (준비 중)</p>
-          </div>
-          <Button size="sm" variant="outline" disabled>
-            연결 (곧)
-          </Button>
-        </div>
+        <button
+          type="button"
+          disabled
+          title="Google Drive 연동 — 준비 중"
+          className="flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left disabled:cursor-default"
+        >
+          <CloudUpload className="size-4 shrink-0 text-muted-foreground" />
+          <span className="flex-1 text-sm font-medium">Google Drive 연동</span>
+          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">곧</span>
+        </button>
       )}
 
       {preview && <FilePreview url={preview.url} name={preview.name} mime={preview.mime} onClose={() => setPreview(null)} />}
