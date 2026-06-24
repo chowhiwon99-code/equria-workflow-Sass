@@ -39,6 +39,10 @@
 
 **롤백:** A②=전부 0.7 / 재무=`fbec1a9`(직전 프로덕션).
 
+**추가 — 성능·버그픽스 (`1745445`·배포):** 사용자 신고 "전환 느림 + 채팅 첨부 안 열림(about:blank)".
+5. **페이지 전환 느림** — 진단: Vercel 함수=iad1(미국) ↔ Supabase=서울 → 매 요청 태평양 왕복(레이아웃 getUser+profiles+페이지 쿼리). **`vercel.json` `regions:["icn1"]`(서울)** co-locate → 왕복 ~200~400ms→~10ms.
+6. **채팅 첨부 about:blank** — 진단(Explore 에이전트): 파일 링크 `target=_blank`+`download`+크로스오리진(Supabase)이라 빈 탭. → **target 제거 + Supabase 서명 `download` 옵션**(Content-Disposition attachment, 그 자리 다운로드). + **서명 폭풍**(매 이벤트 전체 재서명·교체→깜빡임) → **증분 서명**(`attachmentsRef` 캐시 재사용·병합). ※"받은사람 열람불가" 첫 가설은 빗나감(스토리지 정책 024로 이미 해결). 게이트 tsc0·lint30/0·build0.
+
 ---
 
 ## 2026-06-24 · 세션11 2차 — Finder 정교화·미리보기 버그픽스·근태 월별·직급 전면·설정 직급관리 (사용자 반복 피드백)
