@@ -35,6 +35,10 @@
 
 **예상이슈 점검:** 새 deps=Tiptap 공식 소형(pdfjs류 아님, 빌드 통과) · 읽기전용 메뉴 숨김(editable 게이트) · 낙관적 전송은 클라 id 공유로 에코 중복/레이스 없음 · set-state-in-effect 베이스라인 30 불변. **롤백:** 에디터=`651e503`(1d/1e전)/`1745445`(전체전), 메시지=`ade8d08`.
 
+**추가 — 표 노션강화 + 회의 DB (`e603f85`~`a9f19e6`):**
+7. **표 강화** — 선 가시화(foreground 22%)·노션식 메뉴(행/열 전방위 삽입·헤더행/열·병합)·**셀 배경색 8종**(TableCell backgroundColor + setCellAttribute, data-bg color-mix)·**열 균등분할**(colwidth 제거 커스텀 command).
+8. **회의 DB 뷰(메타데이터)** — 마이그 070: `meeting_categories`(사용자정의 분류·색·RLS 워크스페이스) + meeting_notes `category_id·importance·meeting_time` + `set_meeting_meta` RPC(멤버 누구나, 폴더 패턴). `/meetings` **표(DB) 토글** — 분류 색태그·중요도·일시 인라인 편집, 분류 관리(추가/색7/삭제), 정렬(날짜·중요도)·필터(분류). `MeetingTable.tsx`·`lib/meetingMeta`(프로젝트 재사용). 기본분류 5종 시드. 스코프=단일분류·고정중요도(사용자 확정). **타입 수동 추가**(regen 드리프트 방지). **결정 보류:** 파일컬럼·프로젝트 중요도 연동=다음.
+
 ---
 
 ## 2026-06-24 · 세션12 — A② 온도차등 + 작업 하네스(루프/하네스 엔지니어링) + 재무 UI 재구성(워크플로우)
