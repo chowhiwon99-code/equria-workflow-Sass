@@ -1435,6 +1435,44 @@ export type Database = {
           },
         ]
       }
+      meeting_categories: {
+        Row: {
+          color: string
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          sort_order: number
+          workspace_id: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          sort_order?: number
+          workspace_id?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          sort_order?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_categories_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meeting_note_folders: {
         Row: {
           created_at: string
@@ -1468,11 +1506,14 @@ export type Database = {
           attachment_path: string | null
           attachment_size: number | null
           attendees: string | null
+          category_id: string | null
           content: string
           created_at: string
           folder_id: string | null
           id: string
+          importance: number
           meeting_date: string | null
+          meeting_time: string | null
           title: string
           updated_at: string
           user_id: string
@@ -1487,7 +1528,10 @@ export type Database = {
           created_at?: string
           folder_id?: string | null
           id?: string
+          category_id?: string | null
+          importance?: number
           meeting_date?: string | null
+          meeting_time?: string | null
           title?: string
           updated_at?: string
           user_id: string
@@ -1502,7 +1546,10 @@ export type Database = {
           created_at?: string
           folder_id?: string | null
           id?: string
+          category_id?: string | null
+          importance?: number
           meeting_date?: string | null
+          meeting_time?: string | null
           title?: string
           updated_at?: string
           user_id?: string
@@ -2239,6 +2286,7 @@ export type Database = {
       recall_document: { Args: { doc_id: string }; Returns: undefined }
       revise_document: { Args: { doc_id: string }; Returns: undefined }
       set_file_folder: { Args: { p_file: string; p_folder: string | null }; Returns: undefined }
+      set_meeting_meta: { Args: { p_category: string | null; p_date: string | null; p_importance: number; p_note: string; p_time: string | null }; Returns: undefined }
       set_meeting_note_folder: { Args: { new_folder: string | null; note_id: string }; Returns: undefined }
       set_member_position: { Args: { new_position: string; target: string }; Returns: undefined }
       set_member_role: { Args: { new_role: string; target: string }; Returns: undefined }

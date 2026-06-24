@@ -12,9 +12,11 @@ import { SelectCheck } from "@/components/shared/SelectCheck"
 import { SelectionBar } from "@/components/shared/SelectionBar"
 import { Loading, EmptyState } from "@/components/shared/States"
 import { MeetingEditor } from "./MeetingEditor"
+import { MeetingTable } from "./MeetingTable"
 import type { Tables } from "@/lib/supabase/types"
 
 type Note = Tables<"meeting_notes">
+type Category = Tables<"meeting_categories">
 type FolderRow = { id: string; name: string; created_at: string }
 type FolderSort = "name" | "recent" | "old" | "count"
 
@@ -40,22 +42,26 @@ export function MeetingsView() {
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState<"list" | "edit">("list")
   const [editing, setEditing] = useState<Note | null>(null)
+  const [categories, setCategories] = useState<Category[]>([])
+  const [listMode, setListMode] = useState<"grid" | "table">("grid")
 
   const load = useCallback(async () => {
     const { data: auth } = await supabase.auth.getUser()
     if (!auth.user) return setLoading(false)
     setMe(auth.user.id)
-    const [{ data: prof }, { data: list }, { data: ppl }, { data: fdrs }] = await Promise.all([
+    const [{ data: prof }, { data: list }, { data: ppl }, { data: fdrs }, { data: cats }] = await Promise.all([
       supabase.from("profiles").select("role").eq("id", auth.user.id).single(),
       supabase.from("meeting_notes").select("*").order("created_at", { ascending: false }),
       supabase.from("profiles").select("id, name, position"),
       supabase.from("meeting_note_folders").select("id, name, created_at").order("created_at"),
+      supabase.from("meeting_categories").select("*").order("sort_order"),
     ])
     setIsAdmin(prof?.role === "admin")
     setNotes((list as Note[]) ?? [])
     setNames(Object.fromEntries((ppl ?? []).map((p) => [p.id, p.name])))
     setPositions(Object.fromEntries((ppl ?? []).map((p) => [p.id, p.position])))
     setFolders((fdrs as FolderRow[]) ?? [])
+    setCategories((cats as Category[]) ?? [])
     setLoading(false)
   }, [supabase])
 
@@ -208,11 +214,25 @@ export function MeetingsView() {
             </>
           )}
         </div>
-        {currentFolder === null && (
-          <Select value={folderSort} onChange={(v) => setFolderSort(v as FolderSort)} options={SORT_OPTIONS} align="end" className="h-8" />
-        )}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-0.5 rounded-lg border p-0.5 text-xs">
+            <button onClick={() => setListMode("grid")} className={cn("rounded px-2 py-1 transition-colors", listMode === "grid" ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/50")}>
+              그리드
+            </button>
+            <button onClick={() => setListMode("table")} className={cn("rounded px-2 py-1 transition-colors", listMode === "table" ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/50")}>
+              표
+            </button>
+          </div>
+          {currentFolder === null && listMode === "grid" && (
+            <Select value={folderSort} onChange={(v) => setFolderSort(v as FolderSort)} options={SORT_OPTIONS} align="end" className="h-8" />
+          )}
+        </div>
       </div>
 
+      {listMode === "table" ? (
+        <MeetingTable notes={notes} categories={categories} onOpen={openNote} onReload={load} />
+      ) : (
+        <>
       {/* 루트에서만 폴더 그리드 */}
       {currentFolder === null && (
         <FolderGrid
@@ -275,6 +295,8 @@ export function MeetingsView() {
             )
           })}
         </div>
+      )}
+        </>
       )}
     </div>
   )
