@@ -49,9 +49,7 @@ export function AttachmentList({ items, className }: { items: AttachmentItem[]; 
         <a
           key={a.id}
           href={a.url ?? undefined}
-          target="_blank"
-          rel="noopener noreferrer"
-          download
+          download={a.name ?? true}
           className={cn(
             "inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-xs transition-colors hover:bg-muted",
             !a.url && "pointer-events-none opacity-60"

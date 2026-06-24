@@ -29,6 +29,12 @@ function isImageAttachment(name: string | null | undefined): boolean {
   return !!name && IMAGE_EXT_RE.test(name)
 }
 
+const IMAGE_MIME_RE = /^image\//
+/** 다중첨부 이미지 판별(mime 우선·파일명 보조) — 서명 시 이미지=뷰/파일=다운로드 분기. */
+function attIsImage(mime: string | null, name: string | null): boolean {
+  return (!!mime && IMAGE_MIME_RE.test(mime)) || IMAGE_EXT_RE.test(name ?? "")
+}
+
 /** 첨부만 보낼 때 content(plain SSOT) 자동 요약 — ChatList 미리보기·답장 인용에 쓰임 */
 function attachmentSummary(files: File[]): string {
   return files.length === 1 ? files[0].name : `파일 ${files.length}개`
@@ -61,6 +67,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
   const [fileUrls, setFileUrls] = useState<Record<string, string>>({})
   const [stagedFiles, setStagedFiles] = useState<File[]>([])
   const [attachments, setAttachments] = useState<(AttachmentItem & { message_id: string })[]>([])
+  const attachmentsRef = useRef<(AttachmentItem & { message_id: string })[]>([])
   const [uploading, setUploading] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -115,7 +122,8 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
     [supabase]
   )
 
-  // 이 대화의 모든 다중첨부(message_attachments)를 로드 + 서명 URL 일괄 생성(inner join 필터).
+  // 이 대화의 다중첨부 로드 + 서명 URL. 증분(이미 서명된 건 재사용)으로 깜빡임·서명폭풍 방지.
+  // 파일(비이미지)은 download 옵션으로 서명 → 새 탭(target=_blank) 없이 그 자리 다운로드(about:blank 방지).
   const loadAttachments = useCallback(
     async (convId: string) => {
       const { data } = await supabase
@@ -123,16 +131,33 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
         .select("id, message_id, storage_path, name, mime_type, direct_messages!inner(conversation_id)")
         .eq("direct_messages.conversation_id", convId)
       const rows = data ?? []
-      const resolved = await Promise.all(
-        rows.map(async (a) => {
-          const { data: s } = await supabase.storage.from("chat-files").createSignedUrl(a.storage_path, 3600)
-          return { id: a.id, message_id: a.message_id, name: a.name, mime_type: a.mime_type, url: s?.signedUrl ?? null }
+      const cachedUrl = new Map(attachmentsRef.current.map((c) => [c.id, c.url]))
+      const toSign = rows.filter((a) => !cachedUrl.get(a.id))
+      const signed = await Promise.all(
+        toSign.map(async (a) => {
+          const opts = attIsImage(a.mime_type, a.name) ? undefined : { download: a.name ?? true }
+          const { data: s } = await supabase.storage.from("chat-files").createSignedUrl(a.storage_path, 3600, opts)
+          return [a.id, s?.signedUrl ?? null] as const
         })
       )
-      setAttachments(resolved)
+      const signedUrl = new Map(signed)
+      setAttachments(
+        rows.map((a) => ({
+          id: a.id,
+          message_id: a.message_id,
+          name: a.name,
+          mime_type: a.mime_type,
+          url: signedUrl.get(a.id) ?? cachedUrl.get(a.id) ?? null,
+        }))
+      )
     },
     [supabase]
   )
+
+  // attachments 최신값을 ref로 추적(증분 서명 캐시 비교용 — setState 아님이라 베이스라인 무관).
+  useEffect(() => {
+    attachmentsRef.current = attachments
+  }, [attachments])
 
   // 반응 토글 — 내 같은 이모지 있으면 삭제, 없으면 추가. (RLS: 본인만)
   const toggleReaction = useCallback(
