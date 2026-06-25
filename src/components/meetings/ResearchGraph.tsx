@@ -438,7 +438,7 @@ export function ResearchGraph({
       }
     >
       <div className="flex items-center justify-between border-b px-3 py-1.5">
-        <span className="truncate text-xs font-medium">지식 그래프 · {topic}</span>
+        <span className="truncate text-xs font-medium">꼬리물기 · {topic}</span>
         <div className="flex items-center gap-0.5">
           <button
             onClick={() => setFullscreen((f) => !f)}

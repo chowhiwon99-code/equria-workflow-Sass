@@ -336,18 +336,18 @@ export function MeetingEditor({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ topic: topicArg ?? researchQuery, material }),
       })
-      if (!res.ok) throw new Error("그래프 생성에 실패했어요.")
+      if (!res.ok) throw new Error("꼬리물기 생성에 실패했어요.")
       const data = (await res.json()) as {
         nodes: { id: string; label: string; group: string }[]
         links: { source: string; target: string; rel?: string }[]
       }
       if (data.nodes.length === 0) {
-        if (!silent) toast.error("그래프로 만들 내용을 찾지 못했어요.")
+        if (!silent) toast.error("꼬리물기로 만들 내용을 찾지 못했어요.")
         return
       }
       setGraphData(data)
     } catch (e) {
-      if (!silent) toast.error(e instanceof Error ? e.message : "그래프 생성에 실패했어요.")
+      if (!silent) toast.error(e instanceof Error ? e.message : "꼬리물기 생성에 실패했어요.")
     } finally {
       setGraphBusy(false)
     }
@@ -693,7 +693,7 @@ export function MeetingEditor({
                   )}
                   <div className="mt-2.5 flex flex-wrap items-center justify-end gap-1.5">
                     <Button type="button" variant="outline" size="sm" onClick={() => runGraph()} disabled={graphBusy}>
-                      {graphBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Network className="size-3.5" />} 그래프
+                      {graphBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Network className="size-3.5" />} 꼬리물기
                     </Button>
                     {researchResult.sources.length > 0 && (
                       <Button type="button" variant="outline" size="sm" onClick={findImages} disabled={imgBusy}>
