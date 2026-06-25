@@ -43,6 +43,13 @@
 9. **2a 검색·신뢰도** — `/api/meeting-notes/research`: Claude + `anthropic.tools.webSearch_20250305`(maxUses5·KR) → 신뢰도 1차(관련성)·2차(권위·최신성·교차검증) 카테고리 정리 + 출처. 웹서치 실패 시 Claude 지식 폴백(최신성 한계 명시). 비용 `agent_usage`.
 10. **2b 이미지** — `/research/images`(출처 og:image/twitter:image 추출·SSRF가드·HTML만) + `/research/image-import`(외부→meeting-media 다운로드·재업로드·이미지만·SVG차단·15MB) + `lib/safeFetch`. 후보 그리드 다중선택→삽입.
 11. **2c 초안·검증** — `/research/draft`(보고서/기획서·자료범위 밖 날조 금지) + `/research/verify`(generateObject+Zod 적대적 팩트체크, 주장별 supported/weak/unsupported). UI: 타입토글·초안표시·검증 색배지. `mdToContent`로 마크다운→Tiptap 삽입.
+
+**추가 — 지식 그래프 + 대화형 (`e9d14bd`~`0030e9e`):**
+12. **지식 그래프** — `/research/graph`(generateObject로 개체·관계 추출) + `ResearchGraph.tsx`(d3-force 물리 + 캔버스). **플랫 단색 노드**(InfraNodus식·차수 크기·호버 발광)·인라인 패널(전체화면 토글)·⌘+휠 줌·배경 팬·노드 드래그. **리서치 시 자동 생성**(내용+망 동시).
+13. **꼬리물기** — `/research/node`(노드 설명·꼬리질문·연관개념). 노드 클릭 → 옆 팝오버 카드. 칩 클릭 시 **이전 Q&A 누적 스레드**(`Card.steps[]`, 스파이더 웹)·**망 성장**(연관노드 동적 추가·중복 라벨 링크만·시뮬 재가열). 본문삽입=스레드 전체. ref 렌더접근 회피(openRef effect·wrapSize state).
+14. **대화형 리서치** — `/research` prior 누적: 후속 입력창+퀵칩(더깊게·출처더·경쟁사·최신·리스크)으로 정리본 고도화, 그래프도 함께 갱신. `runResearch(followup?)` 멀티턴.
+15. **이미지 크기 + PDF** — SafeImage `width` 속성 + 메뉴 프리셋(S35/M60/L85/원본·연구삽입 기본60%). PDF=새 창 인쇄식(자체 CSS, dep0, 한글 안전).
+**전제:** Anthropic web search 활성(미활성=2a 폴백·2b 출처없음·그래프는 동작). 새 dep `d3-force`. `lib/safeFetch`(SSRF가드). **검증:** 매 배포 tsc0·lint30/0·build0.
 **⚠️ 전제:** Anthropic 콘솔 web search 활성+결제(대표 액션) — 미활성이면 2a 폴백·2b 출처 없음. **검증:** 매 단계 tsc 0·lint 30/0·build 0. context7로 web_search API 확인.
 
 ---
