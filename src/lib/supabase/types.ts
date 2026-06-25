@@ -2018,6 +2018,27 @@ export type Database = {
           },
         ]
       }
+      room_members: {
+        Row: {
+          joined_at: string
+          role: string
+          room_id: string
+          user_id: string
+        }
+        Insert: {
+          joined_at?: string
+          role?: string
+          room_id: string
+          user_id: string
+        }
+        Update: {
+          joined_at?: string
+          role?: string
+          room_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       projects: {
         Row: {
           created_at: string
@@ -2430,6 +2451,9 @@ export type Database = {
         Args: { other_user: string }
         Returns: string
       }
+      create_group_room: { Args: { p_name: string; p_members: string[] }; Returns: string }
+      add_room_members: { Args: { p_room: string; p_members: string[] }; Returns: undefined }
+      leave_group_room: { Args: { p_room: string }; Returns: undefined }
       is_approval_participant: { Args: { doc_id: string }; Returns: boolean }
       is_room_member: { Args: { p_room: string }; Returns: boolean }
       is_workspace_member: { Args: { ws_id: string }; Returns: boolean }

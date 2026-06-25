@@ -1,7 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Users, Loader2, Pencil, Trash2, SmilePlus, X, ChevronDown, Paperclip } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Users, Loader2, Pencil, Trash2, SmilePlus, X, ChevronDown, Paperclip, UserPlus, LogOut, ArrowLeft } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { uploadImage } from "@/lib/upload"
@@ -12,6 +13,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { MessageBody } from "@/components/chat/MessageBody"
 import { RichComposer, type ComposerPayload } from "@/components/chat/RichComposer"
 import { AttachmentList, type AttachmentItem } from "@/components/chat/AttachmentList"
+import { MemberPickerModal } from "@/components/chat/MemberPickerModal"
 import { Loading, ErrorState } from "@/components/shared/States"
 import type { Tables } from "@/lib/supabase/types"
 
@@ -36,13 +38,18 @@ function dayLabel(iso: string): string {
   return new Date(iso).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric", weekday: "short" })
 }
 
-/** 전체 채팅(단일 그룹방). DM과 별개 테이블(group_*). 발신자 표시·낙관적 전송·실시간·반응·수정/삭제·읽음. */
-export function GroupChat() {
+/** 그룹 채팅방. DM과 별개 테이블(group_*). 전체방(default)·커스텀방(초대) 공용. roomId 없으면 전체방. */
+export function GroupChat({ roomId: roomIdProp }: { roomId?: string }) {
   const supabase = createClient()
+  const router = useRouter()
   const { push } = useUndo()
   const [meId, setMeId] = useState<string | null>(null)
   const [roomId, setRoomId] = useState<string | null>(null)
   const [roomName, setRoomName] = useState("전체 채팅")
+  const [isDefault, setIsDefault] = useState(true)
+  const [memberIds, setMemberIds] = useState<string[]>([]) // 커스텀방 멤버(전체방은 빈 배열=전원)
+  const [inviting, setInviting] = useState(false)
+  const [inviteBusy, setInviteBusy] = useState(false)
   const [people, setPeople] = useState<Record<string, Person>>({})
   const [messages, setMessages] = useState<GMessage[]>([])
   const [reactions, setReactions] = useState<{ id: string; message_id: string; emoji: string; user_id: string }[]>([])
@@ -112,18 +119,32 @@ export function GroupChat() {
         const { data: auth } = await supabase.auth.getUser()
         const me = auth.user?.id ?? null
         setMeId(me)
+        const roomQuery = roomIdProp
+          ? supabase.from("group_rooms").select("id, name, is_default").eq("id", roomIdProp).limit(1).single()
+          : supabase.from("group_rooms").select("id, name, is_default").eq("is_default", true).limit(1).single()
         const [{ data: room, error: roomErr }, { data: profs }] = await Promise.all([
-          supabase.from("group_rooms").select("id, name").eq("is_default", true).limit(1).single(),
+          roomQuery,
           supabase.from("profiles").select("id, name, position"),
         ])
         if (roomErr || !room) {
-          setError("전체 채팅방을 찾을 수 없습니다.")
+          setError("채팅방을 찾을 수 없습니다.")
           setLoading(false)
           return
         }
         setRoomId(room.id)
-        setRoomName(room.name)
+        setIsDefault(room.is_default)
         setPeople(Object.fromEntries((profs ?? []).map((p) => [p.id, { name: p.name, position: p.position }])))
+        // 커스텀방: 멤버 목록 로드 + 이름 미지정 시 참여자 이름으로 표시
+        if (!room.is_default) {
+          const { data: rm } = await supabase.from("room_members").select("user_id").eq("room_id", room.id)
+          const ids = (rm ?? []).map((r) => r.user_id)
+          setMemberIds(ids)
+          const nameOf = (id: string) => (profs ?? []).find((p) => p.id === id)?.name ?? "직원"
+          const others = ids.filter((id) => id !== me)
+          setRoomName(room.name && room.name !== "그룹 채팅" ? room.name : others.map(nameOf).join(", ") || room.name)
+        } else {
+          setRoomName(room.name)
+        }
         const { data: msgs } = await supabase
           .from("group_messages")
           .select("*")
@@ -135,12 +156,12 @@ export function GroupChat() {
         if (me) void supabase.rpc("mark_room_read", { p_room: room.id }).then(() => {})
         setLoading(false)
       } catch {
-        setError("전체 채팅을 불러오지 못했습니다.")
+        setError("채팅을 불러오지 못했습니다.")
         setLoading(false)
       }
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabase])
+  }, [supabase, roomIdProp])
 
   // 실시간 — 방 필터.
   useEffect(() => {
@@ -263,6 +284,28 @@ export function GroupChat() {
     setStagedFiles((prev) => [...prev, ...ok])
   }, [])
 
+  // 멤버 초대(커스텀방)
+  const inviteMembers = async (ids: string[]) => {
+    if (!roomId || ids.length === 0) return
+    setInviteBusy(true)
+    const { error: e } = await supabase.rpc("add_room_members", { p_room: roomId, p_members: ids })
+    setInviteBusy(false)
+    setInviting(false)
+    if (e) return toast.error(e.message)
+    toast.success(`${ids.length}명을 초대했어요.`)
+    const { data: rm } = await supabase.from("room_members").select("user_id").eq("room_id", roomId)
+    setMemberIds((rm ?? []).map((r) => r.user_id))
+  }
+  // 방 나가기(커스텀방)
+  const leaveRoom = async () => {
+    if (!roomId || isDefault) return
+    if (!confirm("이 채팅방에서 나갈까요?")) return
+    const { error: e } = await supabase.rpc("leave_group_room", { p_room: roomId })
+    if (e) return toast.error(e.message)
+    toast.success("채팅방에서 나갔어요.")
+    router.push("/chat")
+  }
+
   // 반응 토글
   const toggleReaction = async (messageId: string, emoji: string) => {
     if (!meId || !roomId) return
@@ -300,14 +343,40 @@ export function GroupChat() {
     <div className="flex h-[calc(100dvh-8rem)] flex-col">
       {/* 헤더 */}
       <div className="flex items-center gap-2 border-b pb-3">
+        <button onClick={() => router.push("/chat")} className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="목록">
+          <ArrowLeft className="size-4" />
+        </button>
         <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary">
           <Users className="size-4" />
         </div>
-        <div className="flex flex-col">
-          <span className="text-sm font-semibold">{roomName}</span>
-          <span className="text-[11px] text-muted-foreground">팀 전원 · {Object.keys(people).length}명</span>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-sm font-semibold">{roomName}</span>
+          <span className="text-[11px] text-muted-foreground">
+            {isDefault ? `팀 전원 · ${Object.keys(people).length}명` : `${memberIds.length}명`}
+          </span>
         </div>
+        {!isDefault && (
+          <>
+            <button onClick={() => setInviting(true)} className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" title="멤버 초대">
+              <UserPlus className="size-4" />
+            </button>
+            <button onClick={leaveRoom} className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-destructive-bg hover:text-destructive" title="방 나가기">
+              <LogOut className="size-4" />
+            </button>
+          </>
+        )}
       </div>
+
+      {inviting && (
+        <MemberPickerModal
+          title="멤버 초대"
+          confirmLabel="초대"
+          excludeIds={memberIds}
+          busy={inviteBusy}
+          onConfirm={(ids) => inviteMembers(ids)}
+          onClose={() => setInviting(false)}
+        />
+      )}
 
       {/* 메시지 */}
       <div ref={scrollRef} onScroll={onScroll} className="relative flex-1 overflow-y-auto py-4">
