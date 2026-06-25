@@ -214,12 +214,24 @@ export function MeetingsView() {
             </>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-0.5 rounded-lg border p-0.5 text-xs">
-            <button onClick={() => setListMode("grid")} className={cn("rounded px-2 py-1 transition-colors", listMode === "grid" ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/50")}>
+        <div className="flex items-center gap-2 pr-1">
+          <div className="inline-flex rounded-full bg-muted p-0.5 text-xs">
+            <button
+              onClick={() => setListMode("grid")}
+              className={cn(
+                "min-w-14 rounded-full px-3 py-1 text-center font-medium transition-colors",
+                listMode === "grid" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
               그리드
             </button>
-            <button onClick={() => setListMode("table")} className={cn("rounded px-2 py-1 transition-colors", listMode === "table" ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/50")}>
+            <button
+              onClick={() => setListMode("table")}
+              className={cn(
+                "min-w-14 rounded-full px-3 py-1 text-center font-medium transition-colors",
+                listMode === "table" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
               표
             </button>
           </div>
