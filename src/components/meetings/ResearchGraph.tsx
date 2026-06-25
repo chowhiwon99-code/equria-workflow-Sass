@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { X, Maximize2, Minimize2, Loader2, Plus, Network, ArrowLeft } from "lucide-react"
+import { X, Maximize2, Minimize2, Loader2, Plus, Network, CornerDownRight } from "lucide-react"
 import { toast } from "sonner"
 import {
   forceSimulation,
@@ -18,15 +18,12 @@ import { swatch } from "@/lib/meetingMeta"
 type GNode = SimulationNodeDatum & { id: string; label: string; group: string; deg?: number }
 type GLink = SimulationLinkDatum<GNode> & { rel?: string }
 type Related = { label: string; rel?: string }
+type Step = { q: string | null; loading: boolean; explanation: string; followups: string[]; related: Related[] }
 type Card = {
   label: string
   x: number
   y: number
-  loading: boolean
-  explanation: string
-  followups: string[]
-  related: Related[]
-  history: string[]
+  steps: Step[] // Q&A 누적(스파이더 웹) — 이전 질문·답이 계속 보임
 }
 
 const PALETTE = ["blue", "green", "orange", "purple", "red", "yellow", "gray"]
@@ -366,8 +363,9 @@ export function ResearchGraph({
     }
   }, [nodes, links])
 
-  // 노드 탐색(꼬리물기) — AI 설명 + 꼬리질문 + 연관 노드. grow=true면 망에 노드 추가.
-  const explore = async (label: string, question: string, grow: boolean) => {
+  // 노드 탐색(꼬리물기) — 새 Step을 카드 스레드에 추가(이전 Q&A 유지) → 설명·꼬리질문 채움. grow=true면 망 성장.
+  const ask = async (label: string, question: string, grow: boolean) => {
+    setCard((c) => (c ? { ...c, steps: [...c.steps, { q: question || null, loading: true, explanation: "", followups: [], related: [] }] } : c))
     try {
       const res = await fetch("/api/meeting-notes/research/node", {
         method: "POST",
@@ -376,38 +374,38 @@ export function ResearchGraph({
       })
       if (!res.ok) throw new Error("탐색에 실패했어요.")
       const data = (await res.json()) as { explanation: string; followups: string[]; related: Related[] }
-      setCard((c) =>
-        c ? { ...c, loading: false, explanation: data.explanation, followups: data.followups ?? [], related: data.related ?? [] } : c
-      )
+      setCard((c) => {
+        if (!c) return c
+        const steps = c.steps.slice()
+        const i = steps.length - 1
+        steps[i] = { ...steps[i], loading: false, explanation: data.explanation, followups: data.followups ?? [], related: data.related ?? [] }
+        return { ...c, steps }
+      })
       if (grow && data.related?.length) apiRef.current?.addNodes(label, data.related)
     } catch (e) {
-      setCard((c) => (c ? { ...c, loading: false } : c))
+      setCard((c) => {
+        if (!c) return c
+        const steps = c.steps.slice()
+        const i = steps.length - 1
+        if (i >= 0) steps[i] = { ...steps[i], loading: false }
+        return { ...c, steps }
+      })
       toast.error(e instanceof Error ? e.message : "탐색에 실패했어요.")
     }
   }
 
-  // 노드 클릭 시 카드 오픈(설명 로드) — 최신 클로저를 ref에 보관(그래프 effect가 호출)
+  // 노드 클릭 시 카드 오픈(새 스레드 시작) — 최신 클로저를 ref에 보관(그래프 effect가 호출)
   useEffect(() => {
     openRef.current = (label, x, y) => {
-      setCard((prev) => ({
-        label,
-        x,
-        y,
-        loading: true,
-        explanation: "",
-        followups: [],
-        related: [],
-        history: prev ? [...prev.history, prev.label] : [],
-      }))
-      void explore(label, "", false)
+      setCard({ label, x, y, steps: [] })
+      void ask(label, "", false)
     }
   })
 
-  // 꼬리질문 — 더 깊이 + 망 성장
+  // 꼬리질문 — 더 깊이(스레드에 누적) + 망 성장
   const onChip = (q: string) => {
     if (!card) return
-    setCard({ ...card, loading: true })
-    void explore(card.label, q, true)
+    void ask(card.label, q, true)
   }
   const closeCard = () => {
     if (selectedRef.current) {
@@ -418,10 +416,18 @@ export function ResearchGraph({
     setCard(null)
   }
   const insertCard = () => {
-    if (!card?.explanation) return
-    onInsert(`## ${card.label}\n${card.explanation}`)
+    if (!card) return
+    const parts = [`## ${card.label}`]
+    for (const s of card.steps) {
+      if (!s.explanation) continue
+      if (s.q) parts.push(`**${s.q}**`)
+      parts.push(s.explanation)
+    }
+    if (parts.length <= 1) return
+    onInsert(parts.join("\n"))
     toast.success("본문에 추가했어요.")
   }
+  const lastStep = card?.steps[card.steps.length - 1]
 
   return (
     <div
@@ -458,37 +464,38 @@ export function ResearchGraph({
             }}
           >
             <div className="mb-1.5 flex items-center justify-between gap-2">
-              <div className="flex min-w-0 items-center gap-1">
-                {card.history.length > 0 && (
-                  <button
-                    onClick={() => {
-                      const prevLabel = card.history[card.history.length - 1]
-                      setCard({ ...card, label: prevLabel, loading: true, history: card.history.slice(0, -1) })
-                      void explore(prevLabel, "", false)
-                    }}
-                    className="shrink-0 text-muted-foreground hover:text-foreground"
-                    aria-label="이전"
-                  >
-                    <ArrowLeft className="size-3.5" />
-                  </button>
-                )}
-                <span className="truncate text-sm font-semibold">{card.label}</span>
-              </div>
+              <span className="truncate text-sm font-semibold">{card.label}</span>
               <button onClick={closeCard} className="shrink-0 text-muted-foreground hover:text-foreground" aria-label="닫기">
                 <X className="size-3.5" />
               </button>
             </div>
 
-            {card.loading ? (
-              <div className="flex items-center gap-1.5 py-2 text-xs text-muted-foreground">
-                <Loader2 className="size-3.5 animate-spin" /> 살펴보는 중…
-              </div>
-            ) : (
+            {/* 누적 Q&A 스레드 — 이전 질문·답이 계속 보임(스파이더 웹) */}
+            <div className="flex max-h-[min(56vh,420px)] flex-col gap-2.5 overflow-y-auto pr-0.5">
+              {card.steps.map((s, si) => (
+                <div key={si} className={si > 0 ? "border-t pt-2" : ""}>
+                  {s.q && (
+                    <p className="mb-1 flex items-start gap-1 text-[11px] font-medium text-primary">
+                      <CornerDownRight className="mt-0.5 size-3 shrink-0" /> {s.q}
+                    </p>
+                  )}
+                  {s.loading ? (
+                    <div className="flex items-center gap-1.5 py-1 text-xs text-muted-foreground">
+                      <Loader2 className="size-3.5 animate-spin" /> 살펴보는 중…
+                    </div>
+                  ) : (
+                    <p className="text-xs leading-relaxed text-foreground/90">{s.explanation}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* 마지막 답의 꼬리질문 + 액션 */}
+            {lastStep && !lastStep.loading && (
               <>
-                <p className="text-xs leading-relaxed text-foreground/90">{card.explanation}</p>
-                {card.followups.length > 0 && (
+                {lastStep.followups.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1">
-                    {card.followups.map((q, i) => (
+                    {lastStep.followups.map((q, i) => (
                       <button
                         key={i}
                         onClick={() => onChip(q)}
@@ -506,9 +513,9 @@ export function ResearchGraph({
                   >
                     <Plus className="size-3" /> 본문에 추가
                   </button>
-                  {card.related.length > 0 && (
+                  {lastStep.related.length > 0 && (
                     <button
-                      onClick={() => apiRef.current?.addNodes(card.label, card.related)}
+                      onClick={() => apiRef.current?.addNodes(card.label, lastStep.related)}
                       className="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
                     >
                       <Network className="size-3" /> 망 확장
