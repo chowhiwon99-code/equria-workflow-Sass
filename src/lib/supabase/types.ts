@@ -1218,6 +1218,156 @@ export type Database = {
         }
         Relationships: []
       }
+      group_rooms: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_default: boolean
+          last_message_at: string | null
+          name: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_default?: boolean
+          last_message_at?: string | null
+          name?: string
+          workspace_id?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_default?: boolean
+          last_message_at?: string | null
+          name?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
+      group_messages: {
+        Row: {
+          body_json: Json | null
+          content: string
+          created_at: string
+          deleted_at: string | null
+          edited_at: string | null
+          id: string
+          parent_id: string | null
+          room_id: string
+          root_id: string | null
+          sender_id: string
+          workspace_id: string
+        }
+        Insert: {
+          body_json?: Json | null
+          content: string
+          created_at?: string
+          deleted_at?: string | null
+          edited_at?: string | null
+          id?: string
+          parent_id?: string | null
+          room_id: string
+          root_id?: string | null
+          sender_id: string
+          workspace_id?: string
+        }
+        Update: {
+          body_json?: Json | null
+          content?: string
+          created_at?: string
+          deleted_at?: string | null
+          edited_at?: string | null
+          id?: string
+          parent_id?: string | null
+          room_id?: string
+          root_id?: string | null
+          sender_id?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
+      group_message_attachments: {
+        Row: {
+          created_at: string
+          id: string
+          message_id: string
+          mime_type: string | null
+          name: string | null
+          size: number | null
+          storage_path: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message_id: string
+          mime_type?: string | null
+          name?: string | null
+          size?: number | null
+          storage_path: string
+          workspace_id?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message_id?: string
+          mime_type?: string | null
+          name?: string | null
+          size?: number | null
+          storage_path?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
+      group_message_reactions: {
+        Row: {
+          created_at: string
+          emoji: string
+          id: string
+          message_id: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          emoji: string
+          id?: string
+          message_id: string
+          user_id: string
+          workspace_id?: string
+        }
+        Update: {
+          created_at?: string
+          emoji?: string
+          id?: string
+          message_id?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
+      group_read_state: {
+        Row: {
+          last_read_at: string
+          room_id: string
+          user_id: string
+        }
+        Insert: {
+          last_read_at?: string
+          room_id: string
+          user_id: string
+        }
+        Update: {
+          last_read_at?: string
+          room_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       google_connections: {
         Row: {
           access_token: string | null
@@ -2281,8 +2431,10 @@ export type Database = {
         Returns: string
       }
       is_approval_participant: { Args: { doc_id: string }; Returns: boolean }
+      is_room_member: { Args: { p_room: string }; Returns: boolean }
       is_workspace_member: { Args: { ws_id: string }; Returns: boolean }
       mark_dm_read: { Args: { conv_id: string }; Returns: number }
+      mark_room_read: { Args: { p_room: string }; Returns: undefined }
       recall_document: { Args: { doc_id: string }; Returns: undefined }
       revise_document: { Args: { doc_id: string }; Returns: undefined }
       set_file_folder: { Args: { p_file: string; p_folder: string | null }; Returns: undefined }
