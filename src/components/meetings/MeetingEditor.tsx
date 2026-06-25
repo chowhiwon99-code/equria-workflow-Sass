@@ -153,7 +153,10 @@ export function MeetingEditor({
         signal: ctrl.signal,
       })
       if (!res.ok) throw new Error("리서치에 실패했어요.")
-      setResearchResult((await res.json()) as { text: string; sources: { url: string; title?: string }[]; searched: boolean })
+      const data = (await res.json()) as { text: string; sources: { url: string; title?: string }[]; searched: boolean }
+      setResearchResult(data)
+      // 리서치하면 그래프도 동시에 — 업무 속도(내용+망 함께 확인)
+      void runGraph(data.text, q, true)
     } catch (e) {
       const aborted = (e as { name?: string } | null)?.name === "AbortError"
       toast.error(aborted ? "리서치가 너무 오래 걸려요. 주제를 좁혀 다시 시도해 주세요." : e instanceof Error ? e.message : "리서치에 실패했어요.")
@@ -306,15 +309,15 @@ export function MeetingEditor({
     links: { source: string; target: string; rel?: string }[]
   } | null>(null)
 
-  const runGraph = async () => {
-    const material = researchResult?.text.trim()
+  const runGraph = async (materialArg?: string, topicArg?: string, silent = false) => {
+    const material = (materialArg ?? researchResult?.text ?? "").trim()
     if (!material || graphBusy) return
     setGraphBusy(true)
     try {
       const res = await fetch("/api/meeting-notes/research/graph", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic: researchQuery, material }),
+        body: JSON.stringify({ topic: topicArg ?? researchQuery, material }),
       })
       if (!res.ok) throw new Error("그래프 생성에 실패했어요.")
       const data = (await res.json()) as {
@@ -322,12 +325,12 @@ export function MeetingEditor({
         links: { source: string; target: string; rel?: string }[]
       }
       if (data.nodes.length === 0) {
-        toast.error("그래프로 만들 내용을 찾지 못했어요.")
+        if (!silent) toast.error("그래프로 만들 내용을 찾지 못했어요.")
         return
       }
       setGraphData(data)
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "그래프 생성에 실패했어요.")
+      if (!silent) toast.error(e instanceof Error ? e.message : "그래프 생성에 실패했어요.")
     } finally {
       setGraphBusy(false)
     }
@@ -621,7 +624,7 @@ export function MeetingEditor({
                     </div>
                   )}
                   <div className="mt-2.5 flex flex-wrap items-center justify-end gap-1.5">
-                    <Button type="button" variant="outline" size="sm" onClick={runGraph} disabled={graphBusy}>
+                    <Button type="button" variant="outline" size="sm" onClick={() => runGraph()} disabled={graphBusy}>
                       {graphBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Network className="size-3.5" />} 그래프
                     </Button>
                     {researchResult.sources.length > 0 && (

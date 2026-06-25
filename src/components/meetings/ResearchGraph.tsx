@@ -146,17 +146,16 @@ export function ResearchGraph({
         const r = radOf(n)
         const base = colorOf(n.group)
         const sel = selectedRef.current?.id === n.id
-        const dim = hover != null && n.id !== hover.id && !neighbors.has(n.id)
+        const focus = hover != null && (n.id === hover.id || neighbors.has(n.id))
+        const dim = hover != null && !focus && !sel
         ctx.globalAlpha = dim ? 0.3 : 1
+        // 플랫 단색 + 발광 글로우(InfraNodus 스타일) — 그라데이션·드롭섀도 없음
         ctx.save()
-        ctx.shadowColor = sel ? base : "rgba(0,0,0,0.22)"
-        ctx.shadowBlur = sel ? r * 1.6 : r * 0.85
-        ctx.shadowOffsetY = sel ? 0 : r * 0.5
-        const g = ctx.createRadialGradient(n.x - r * 0.4, n.y - r * 0.45, r * 0.1, n.x, n.y, r)
-        g.addColorStop(0, `color-mix(in oklch, ${base} 68%, white)`)
-        g.addColorStop(0.65, base)
-        g.addColorStop(1, `color-mix(in oklch, ${base} 88%, black)`)
-        ctx.fillStyle = g
+        if (sel || focus) {
+          ctx.shadowColor = base
+          ctx.shadowBlur = sel ? 16 : 10
+        }
+        ctx.fillStyle = base
         ctx.beginPath()
         ctx.arc(n.x, n.y, r, 0, Math.PI * 2)
         ctx.fill()
