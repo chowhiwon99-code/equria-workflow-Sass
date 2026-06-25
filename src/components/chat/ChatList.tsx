@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { MessagesSquare, NotebookPen } from "lucide-react"
+import { MessagesSquare, NotebookPen, Users } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -135,6 +135,20 @@ export function ChatList() {
         <ErrorState message={error} onRetry={() => { setError(null); load() }} />
       ) : (
         <>
+          {/* 전체 채팅 (팀 전원 단일 그룹방) */}
+          <button
+            onClick={() => router.push("/chat/group")}
+            className="hover-grow flex items-center gap-3 rounded-lg border bg-primary/5 px-3 py-2.5 text-left transition-colors hover:bg-primary/10"
+          >
+            <div className="flex size-9 items-center justify-center rounded-full bg-primary/15 text-primary">
+              <Users className="size-4" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm font-medium">전체 채팅</span>
+              <span className="text-[11px] text-muted-foreground">팀 전원이 함께하는 그룹방</span>
+            </div>
+          </button>
+
           {/* 나와의 채팅 (개인 메모·파일·링크 저장) */}
           {meId && (
             <button
