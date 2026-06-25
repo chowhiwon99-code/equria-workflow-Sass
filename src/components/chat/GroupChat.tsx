@@ -53,6 +53,7 @@ export function GroupChat({ roomId: roomIdProp }: { roomId?: string }) {
   const [people, setPeople] = useState<Record<string, Person>>({})
   const [messages, setMessages] = useState<GMessage[]>([])
   const [reactions, setReactions] = useState<{ id: string; message_id: string; emoji: string; user_id: string }[]>([])
+  const [readStates, setReadStates] = useState<Record<string, string>>({}) // user_id → last_read_at(카카오식 읽음 표시)
   const [attachments, setAttachments] = useState<(AttachmentItem & { message_id: string })[]>([])
   const attachmentsRef = useRef<(AttachmentItem & { message_id: string })[]>([])
   const [stagedFiles, setStagedFiles] = useState<File[]>([])
@@ -112,6 +113,15 @@ export function GroupChat({ roomId: roomIdProp }: { roomId?: string }) {
     [supabase]
   )
 
+  // 방 멤버들의 마지막 읽은 시각 — 메시지별 '안 읽은 인원 수' 계산용.
+  const loadReads = useCallback(
+    async (rid: string) => {
+      const { data } = await supabase.from("group_read_state").select("user_id, last_read_at").eq("room_id", rid)
+      setReadStates(Object.fromEntries((data ?? []).map((r) => [r.user_id, r.last_read_at])))
+    },
+    [supabase]
+  )
+
   // 초기화 — 기본방 조회 + 멤버 이름맵 + 메시지/반응/첨부 + 읽음.
   useEffect(() => {
     ;(async () => {
@@ -153,7 +163,8 @@ export function GroupChat({ roomId: roomIdProp }: { roomId?: string }) {
         setMessages(msgs ?? [])
         void loadReactions(room.id)
         void loadAttachments(room.id)
-        if (me) void supabase.rpc("mark_room_read", { p_room: room.id }).then(() => {})
+        void loadReads(room.id)
+        if (me) void supabase.rpc("mark_room_read", { p_room: room.id }).then(() => void loadReads(room.id))
         setLoading(false)
       } catch {
         setError("채팅을 불러오지 못했습니다.")
@@ -174,7 +185,7 @@ export function GroupChat({ roomId: roomIdProp }: { roomId?: string }) {
         (payload) => {
           const next = payload.new as GMessage
           setMessages((prev) => (prev.some((m) => m.id === next.id) ? prev : [...prev, next]))
-          if (next.sender_id !== meId) void supabase.rpc("mark_room_read", { p_room: roomId }).then(() => {})
+          if (next.sender_id !== meId) void supabase.rpc("mark_room_read", { p_room: roomId }).then(() => void loadReads(roomId))
         }
       )
       .on(
@@ -187,11 +198,12 @@ export function GroupChat({ roomId: roomIdProp }: { roomId?: string }) {
       )
       .on("postgres_changes", { event: "*", schema: "public", table: "group_message_reactions" }, () => void loadReactions(roomId))
       .on("postgres_changes", { event: "*", schema: "public", table: "group_message_attachments" }, () => void loadAttachments(roomId))
+      .on("postgres_changes", { event: "*", schema: "public", table: "group_read_state", filter: `room_id=eq.${roomId}` }, () => void loadReads(roomId))
       .subscribe()
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [supabase, roomId, meId, loadReactions, loadAttachments])
+  }, [supabase, roomId, meId, loadReactions, loadAttachments, loadReads])
 
   // 스크롤
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
@@ -394,6 +406,11 @@ export function GroupChat({ roomId: roomIdProp }: { roomId?: string }) {
               const msgReactions = reactions.filter((r) => r.message_id === m.id)
               const msgAtts = attachments.filter((a) => a.message_id === m.id)
               const grouped2 = grouped && !showDay
+              // 카카오식 안 읽은 인원 수 — 발신자 제외, 마지막 읽은 시각이 이 메시지보다 이전인 멤버.
+              const memberSet = isDefault ? Object.keys(people) : memberIds
+              const unreadBy = m.deleted_at
+                ? 0
+                : memberSet.filter((uid) => uid !== m.sender_id && (!readStates[uid] || readStates[uid] < m.created_at)).length
               return (
                 <div key={m.id}>
                   {showDay && (
@@ -443,6 +460,12 @@ export function GroupChat({ roomId: roomIdProp }: { roomId?: string }) {
                             {msgAtts.length > 0 && <AttachmentList items={msgAtts} className="mt-1" />}
                             {m.edited_at && <span className="ml-1 text-[9px] opacity-60">(수정됨)</span>}
                           </div>
+                        )}
+                        {/* 안 읽은 인원 수(카카오식) — 항상 표시 */}
+                        {unreadBy > 0 && (
+                          <span className="shrink-0 self-end text-[10px] font-medium text-warning" title={`${unreadBy}명 안 읽음`}>
+                            {unreadBy}
+                          </span>
                         )}
                         {/* 시각 + 액션 */}
                         <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
