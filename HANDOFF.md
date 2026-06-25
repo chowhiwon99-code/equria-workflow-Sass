@@ -2,7 +2,8 @@
 
 > **새 세션 읽기 순서:** 이 파일 → 아래 **📂 문서 지도** → `CLAUDE.md` → `.claude/skills/{safe-changes,latest-stack,known-issues}.md`
 > 이 파일은 **"현재 상태 · 다음 할 일 · 합의된 정책"만** 담는다. 깊은 내용은 전용 문서(지도 참조), 과거 상세는 git 커밋 메시지에.
-> 최종 업데이트: **2026-06-24 (세션 13 — 회의노트 **에디터 퀄리티 Part 1**(표 편집·선택 툴바·코드 하이라이트·이미지 정렬·/날짜) + 성능·버그픽스(서울 리전·채팅 첨부·메시지 즉시전송·사이드바 포커스·Drive 카드) 배포 `910b2a8`)**
+> 최종 업데이트: **2026-06-25 (세션 13 — 회의노트(에디터·표·DB·**AI 리서치 5단계**·**꼬리물기**·대화형·이미지/PDF) + **카카오톡식 그룹채팅**(전체방+다중방·초대·읽음, 마이그 071~075) 배포 `992eae5`). 상세=아래 배포 블록·로드맵·WORKLOG.**
+> ⚙️ **작업 방식(하네스/루프):** `.claude/skills/work-harness.md`(작업 SOP·검증 게이트·멀티에이전트 기준) + `/deploy`·`/verify` 명령 + push 전 tsc/lint 훅. 매 작업 = 잘게 순차 → tsc 0·lint 30/0·build 0·(DDL이면 RLS 시뮬) → main-first 배포 → 보고.
 
 ---
 
@@ -19,6 +20,7 @@
 | `.claude/skills/safe-changes.md` | 변경 안전 원칙 (모든 코드/DB 변경 전 — 최우선) |
 | `.claude/skills/latest-stack.md` | AI SDK v6·Supabase 최신 패턴 |
 | `.claude/skills/known-issues.md` | 비차단 기술부채·보류분 |
+| `.claude/skills/work-harness.md` | **작업 방식(하네스/루프)** — 작업 SOP·검증 게이트·멀티에이전트 기준·진행 가시성 |
 | `STUDY.md` | (대표용) 비개발자 학습 코스 — 시스템 이해. 온보딩 필수는 아님 |
 
 > 옛 설계 문서(`PLAN`·`CHAT-HUB`·`GOOGLE-MCP` 아키텍처)는 구현 완료/대체되어 `docs/archive/`로 이동. **현재 상태=이 파일, 구현 진실=코드/마이그레이션.**
