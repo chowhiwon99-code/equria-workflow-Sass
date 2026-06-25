@@ -35,12 +35,18 @@ export async function POST(req: Request) {
   } = await supabase.auth.getUser()
   if (!user) return new Response("Unauthorized", { status: 401 })
 
-  const body = (await req.json().catch(() => null)) as { query?: unknown; context?: unknown } | null
+  const body = (await req.json().catch(() => null)) as { query?: unknown; context?: unknown; prior?: unknown } | null
   const query = typeof body?.query === "string" ? body.query.trim().slice(0, 2000) : ""
   const context = typeof body?.context === "string" ? body.context.slice(0, 4000) : ""
+  const prior = typeof body?.prior === "string" ? body.prior.slice(0, 8000) : ""
   if (!query) return new Response("Bad Request", { status: 400 })
 
-  const prompt = context ? `리서치 주제: ${query}\n\n참고(현재 회의노트 일부):\n${context}` : `리서치 주제: ${query}`
+  // 대화형 — 이전 정리본이 있으면 그 위에 후속 요청을 반영해 고도화.
+  const prompt = prior
+    ? `지금까지 정리한 리서치:\n${prior}\n\n사용자 후속 요청: ${query}\n\n위 정리본을 이 요청에 맞춰 보강·갱신한 새 정리본 전체를 작성하라(누락 없이, 더 깊고 정교하게).`
+    : context
+      ? `리서치 주제: ${query}\n\n참고(현재 회의노트 일부):\n${context}`
+      : `리서치 주제: ${query}`
   const started = Date.now()
 
   let text = ""

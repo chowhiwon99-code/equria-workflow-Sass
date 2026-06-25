@@ -137,26 +137,43 @@ export function MeetingEditor({
   const [researchQuery, setResearchQuery] = useState("")
   const [researchBusy, setResearchBusy] = useState(false)
   const [researchResult, setResearchResult] = useState<{ text: string; sources: { url: string; title?: string }[]; searched: boolean } | null>(null)
+  // 대화형 — 이전 질문 누적(고도화). 마지막 정리본(researchResult)을 prior로 넘겨 이어감.
+  const [researchTurns, setResearchTurns] = useState<{ role: "user" | "assistant"; text: string }[]>([])
+  const [followupQuery, setFollowupQuery] = useState("")
 
-  const runResearch = async () => {
-    const q = researchQuery.trim()
+  // 리서치 실행 — followup이 있으면 이전 정리본 위에 이어서 고도화.
+  const runResearch = async (followup?: string) => {
+    const isFollow = typeof followup === "string"
+    const q = (isFollow ? followup : researchQuery).trim()
     if (!q || researchBusy) return
     setResearchBusy(true)
-    setResearchResult(null)
+    const prior = isFollow ? researchResult?.text : undefined
+    if (isFollow) setFollowupQuery("")
+    else {
+      setResearchResult(null)
+      setResearchTurns([])
+    }
+    setResearchTurns((t) => [...t, { role: "user", text: q }])
+    const topicForGraph = isFollow ? researchQuery : q
     const ctrl = new AbortController()
     const timer = setTimeout(() => ctrl.abort(), 75000)
     try {
       const res = await fetch("/api/meeting-notes/research", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: q, context: editorRef.current?.getText().slice(0, 4000) ?? "" }),
+        body: JSON.stringify({
+          query: q,
+          context: prior ? "" : (editorRef.current?.getText().slice(0, 4000) ?? ""),
+          prior: prior ?? "",
+        }),
         signal: ctrl.signal,
       })
       if (!res.ok) throw new Error("리서치에 실패했어요.")
       const data = (await res.json()) as { text: string; sources: { url: string; title?: string }[]; searched: boolean }
       setResearchResult(data)
-      // 리서치하면 그래프도 동시에 — 업무 속도(내용+망 함께 확인)
-      void runGraph(data.text, q, true)
+      setResearchTurns((t) => [...t, { role: "assistant", text: data.text }])
+      // 리서치하면 그래프도 동시에 — 내용+망 함께(고도화 시 망도 갱신)
+      void runGraph(data.text, topicForGraph, true)
     } catch (e) {
       const aborted = (e as { name?: string } | null)?.name === "AbortError"
       toast.error(aborted ? "리서치가 너무 오래 걸려요. 주제를 좁혀 다시 시도해 주세요." : e instanceof Error ? e.message : "리서치에 실패했어요.")
@@ -603,16 +620,67 @@ export function MeetingEditor({
                   placeholder="조사할 주제 (예: 2026 K-뷰티 트렌드, 경쟁사 N사 동향)"
                   className={`${fieldClass} flex-1`}
                 />
-                <Button type="button" size="sm" onClick={runResearch} disabled={researchBusy || !researchQuery.trim()}>
+                <Button type="button" size="sm" onClick={() => runResearch()} disabled={researchBusy || !researchQuery.trim()}>
                   {researchBusy && <Loader2 className="size-3.5 animate-spin" />} 검색
                 </Button>
               </div>
+
+              {/* 대화 히스토리(이전 질문) — 누적 고도화 흐름 */}
+              {researchTurns.filter((t) => t.role === "user").length > 1 && (
+                <div className="mt-2 flex flex-col gap-1">
+                  {researchTurns
+                    .filter((t) => t.role === "user")
+                    .slice(0, -1)
+                    .map((t, i) => (
+                      <div key={i} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <span className="rounded bg-muted px-1.5 py-0.5">질문 {i + 1}</span>
+                        <span className="truncate">{t.text}</span>
+                      </div>
+                    ))}
+                </div>
+              )}
+
+              {researchBusy && !researchResult && (
+                <div className="mt-2 flex items-center gap-1.5 py-3 text-xs text-muted-foreground">
+                  <Loader2 className="size-3.5 animate-spin" /> 자료를 모으는 중…
+                </div>
+              )}
               {researchResult && (
                 <>
                   {!researchResult.searched && (
                     <p className="mt-2 text-[11px] text-warning">⚠️ 웹 검색 비활성 — Claude 지식 기반(최신성 한계). Anthropic 콘솔에서 web search 활성화가 필요해요.</p>
                   )}
                   <div className="mt-2 max-h-72 overflow-y-auto whitespace-pre-wrap break-words text-sm">{researchResult.text}</div>
+
+                  {/* 대화형 후속 질문 — 정리본을 이어서 고도화 */}
+                  <div className="mt-2 border-t pt-2">
+                    <div className="mb-1 flex flex-wrap gap-1">
+                      {["더 깊게 파줘", "출처 더 찾아줘", "경쟁사 중심으로", "최신 데이터로", "리스크·반론도"].map((q) => (
+                        <button
+                          key={q}
+                          type="button"
+                          onClick={() => runResearch(q)}
+                          disabled={researchBusy}
+                          className="rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                        >
+                          {q}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex gap-1.5">
+                      <input
+                        value={followupQuery}
+                        onChange={(e) => setFollowupQuery(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && followupQuery.trim() && runResearch(followupQuery)}
+                        placeholder="이어서 더 물어보기 (예: B2B 사례 중심으로 다시)"
+                        disabled={researchBusy}
+                        className={`${fieldClass} flex-1`}
+                      />
+                      <Button type="button" size="sm" variant="outline" onClick={() => followupQuery.trim() && runResearch(followupQuery)} disabled={researchBusy || !followupQuery.trim()}>
+                        {researchBusy ? <Loader2 className="size-3.5 animate-spin" /> : "이어서"}
+                      </Button>
+                    </div>
+                  </div>
                   {researchResult.sources.length > 0 && (
                     <div className="mt-2 flex flex-col gap-0.5 border-t pt-2">
                       <span className="text-[11px] font-medium text-muted-foreground">출처</span>
