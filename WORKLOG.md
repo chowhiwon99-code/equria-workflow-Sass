@@ -5,6 +5,18 @@
 
 ---
 
+## 세션13 후반 — 그룹채팅(카카오톡식) [`141b80b`~`3338917`]
+**무엇/왜:** 로드맵 ①그룹채팅. DM(`direct_*`)은 user_a/user_b 2인 고정이라 그룹 부적합 → **별도 `group_*` 테이블 병렬 구축**(Explore 에이전트가 DM RLS 5대 위험 짚음 → DM 미접촉이 가장 안전). 단일 전체방 + 카카오톡식 멤버 초대 다중방. **차곡차곡: DB→타입→UI 단계별, 매 단계 tsc/lint/build/RLS 검증.**
+1. **DB 기반(마이그 071·072)** — `group_rooms·group_messages·group_message_attachments·group_message_reactions·group_read_state`. 메시지 모델 DM 동형(body_json·스레드·soft-delete). `is_room_member` 헬퍼·`mark_room_read` RPC·`touch_group_room` 트리거·realtime·기본방 시드. 072=함수 권한 하드닝(anon 제거). RLS=`is_workspace_member`.
+2. **storage(073)** — 그룹 첨부 읽기 정책(ADD-only, DM 024 미접촉) — 멤버 signed URL.
+3. **UI 1차(`668d687`)** — `GroupChat.tsx`(MessageBody·RichComposer·AttachmentList 재사용): 발신자 아바타·이름·직급, 날짜구분, 낙관적 전송+첨부, 실시간(room필터), 반응5종, 본인 수정/소프트삭제(Undo), 읽음. `/chat/group` + ChatList 진입.
+4. **다중방(마이그 074)** — `room_members` + `is_room_member` 재작성(default=ws/커스텀=room_members). `create_group_room`/`add_room_members`/`leave_group_room` RPC. `group_rooms` SELECT=is_room_member(내 방만). GroupChat roomId prop화(`/chat/group/[roomId]`)·헤더 초대/나가기. ChatList 그룹 섹션+생성 모달(`MemberPickerModal` 공용).
+5. **읽음표시(마이그 075)** — `group_read_state` SELECT 멤버공개(쓰기 본인만)+realtime. 메시지별 **안 읽은 인원 수**(카카오식, 발신자 제외·last_read_at<메시지시각) 노란 숫자.
+6. **UI 정리** — 회의 '그래프'→'**꼬리물기**' 명칭 통일(`b172c37`). 그리드/표 토글 균형 세그먼트화(`3338917`).
+**예상이슈 점검:** DM 4테이블 RLS 미접촉(별도 group_*)으로 5대 위험 회피 · RLS 단언 통과(비초대 차단·전체방 유지·멤버 인식) · 보안 advisor ERROR 0·anon 노출 제거 · 타입 수동 추가(드리프트 0). **롤백:** 토글전 `7d41cc6`/읽음전 `b65c30e`/다중방전 `668d687`/그룹챗전 `0030e9e`. **남음:** 답장·타이핑·사이드바 미읽음 합산.
+
+---
+
 ## 사용자 요청 기능/수정 (마스터 체크리스트)
 
 **수정(작은 것 먼저):**

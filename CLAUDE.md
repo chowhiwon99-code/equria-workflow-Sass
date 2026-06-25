@@ -138,7 +138,7 @@ equria-workspace/
 
 ---
 
-## 6. DB 스키마 요약 (약 41개 테이블 · 마이그 001~070)
+## 6. DB 스키마 요약 (약 47개 테이블 · 마이그 001~075)
 
 | 영역 | 테이블 |
 |------|--------|
@@ -147,16 +147,18 @@ equria-workspace/
 | 에이전트 대화 | `conversations` · `messages` |
 | 어시스턴트(대시보드) | `assistant_conversations` · `assistant_messages` |
 | 팀 채팅(DM) | `direct_conversations` · `direct_messages` · `message_attachments` · `message_reactions` |
+| 그룹 채팅 | `group_rooms` · `group_messages` · `group_message_attachments` · `group_message_reactions` · `group_read_state` · `room_members` (전체방+다중방·읽음, 마이그 071~075) |
 | 워크플로우 | `workflows` · `workflow_runs` |
 | 캘린더 | `calendar_events` |
 | MCP | `mcp_servers` · `mcp_tools` |
 | 파일/문서 | `files` · `business_cards` · `tax_invoices` |
+| 회의 | `meeting_notes` · `meeting_note_folders` · `meeting_categories`(분류·중요도, 마이그 070) |
 | 재무 | `finance_entries` · `fx_rates`(환율) |
 | 프로젝트 | `projects` · `project_members` |
 | 알림 | `notifications` |
 | 구글 연동 | `google_connections` |
 
-> 전체 SQL: `supabase/migrations/` (001~070, 73파일). 원격 적용·drift 없음. **세부 진행상황·최신 변경은 HANDOFF.md가 SSOT.**
+> 전체 SQL: `supabase/migrations/` (001~075, 78파일). 원격 적용·drift 없음. **세부 진행상황·최신 변경은 HANDOFF.md가 SSOT.**
 > 기본 에이전트 8개 시드: `supabase/seed.sql` 참고
 
 ---
