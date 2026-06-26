@@ -4,10 +4,11 @@
  * 단가는 100만 토큰(MTok)당 USD 추정치다. Anthropic 가격이 바뀌면 여기만 갱신하면 된다.
  * 정확한 청구액은 Anthropic 콘솔 기준이며, 이 값은 내부 추적·예산 감시용 추정이다.
  */
+// 현재 모델 공식 단가(2026-06): Opus 4.7 = $5/$25 · Sonnet 4.6 = $3/$15 · Haiku 4.5 = $1/$5.
 const PRICE_PER_MTOK: Record<"opus" | "sonnet" | "haiku", { input: number; output: number }> = {
-  opus: { input: 15, output: 75 },
+  opus: { input: 5, output: 25 },
   sonnet: { input: 3, output: 15 },
-  haiku: { input: 0.8, output: 4 },
+  haiku: { input: 1, output: 5 },
 }
 
 /** 모델 id(claude-opus-4-7 / claude-sonnet-4-6 / claude-haiku-4-5 …)를 단가 티어로 매핑. 알 수 없으면 sonnet. */
