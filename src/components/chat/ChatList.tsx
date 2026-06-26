@@ -106,7 +106,7 @@ export function ChatList() {
         gids.length
           ? supabase.from("group_messages").select("room_id, sender_id, content, created_at, deleted_at").in("room_id", gids).order("created_at", { ascending: false })
           : Promise.resolve({ data: [] as { room_id: string; sender_id: string; content: string; created_at: string; deleted_at: string | null }[] }),
-        supabase.from("group_read_state").select("room_id, last_read_at"),
+        supabase.from("group_read_state").select("room_id, last_read_at").eq("user_id", me),
         gids.length ? supabase.from("room_members").select("room_id, user_id").in("room_id", gids) : Promise.resolve({ data: [] as { room_id: string; user_id: string }[] }),
       ])
       const readMap = new Map((greads ?? []).map((r) => [r.room_id, r.last_read_at]))
@@ -163,6 +163,17 @@ export function ChatList() {
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "direct_messages" },
+        () => load()
+      )
+      // 그룹방 새 메시지/수정도 사이드바 미읽음·미리보기에 즉시 반영(RLS가 내 방으로 한정)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "group_messages" },
+        () => load()
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "group_messages" },
         () => load()
       )
       .subscribe()
