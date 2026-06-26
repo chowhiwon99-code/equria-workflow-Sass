@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { Plus, Pin, Lock, Globe } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
+import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -21,14 +22,11 @@ export default function AgentsPage() {
   const supabase = createClient()
   const router = useRouter()
   const [agents, setAgents] = useState<AgentRow[]>([])
-  const [meId, setMeId] = useState<string | null>(null)
+  const meId = useCurrentUserId()
   const [pins, setPins] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
-    const { data: auth } = await supabase.auth.getUser()
-    const me = auth.user?.id ?? null
-    setMeId(me)
     const [{ data: ag }, { data: pn }] = await Promise.all([
       supabase
         .from("agents")

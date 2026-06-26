@@ -4,6 +4,7 @@ import { use, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { Button } from "@/components/ui/button"
 import { BackLink } from "@/components/shared/BackLink"
@@ -23,6 +24,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
   const supabase = createClient()
   const router = useRouter()
   const { push } = useUndo()
+  const me = useCurrentUserId()
   const [initial, setInitial] = useState<AgentFormInitial | null>(null)
   const [versions, setVersions] = useState<VersionRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -30,8 +32,6 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
 
   useEffect(() => {
     ;(async () => {
-      const { data: auth } = await supabase.auth.getUser()
-      const me = auth.user?.id ?? null
       const { data: agent } = await supabase
         .from("agents")
         .select("*")
@@ -67,7 +67,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
       })
       setLoading(false)
     })()
-  }, [supabase, id])
+  }, [supabase, id, me])
 
   const remove = async () => {
     if (!confirm("이 에이전트를 삭제할까요? (위젯에서도 사라집니다 · ⌘Z로 복구 가능)")) return

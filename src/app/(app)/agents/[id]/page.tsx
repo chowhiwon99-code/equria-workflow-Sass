@@ -4,6 +4,7 @@ import { use, useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Pencil, Pin, Lock, Globe } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -22,15 +23,13 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
   const router = useRouter()
   const [agent, setAgent] = useState<AgentDetail | null>(null)
   const [version, setVersion] = useState<Version | null>(null)
-  const [meId, setMeId] = useState<string | null>(null)
+  const meId = useCurrentUserId()
   const [pinned, setPinned] = useState(false)
   const [loading, setLoading] = useState(true)
   const [missing, setMissing] = useState(false)
 
   useEffect(() => {
     ;(async () => {
-      const { data: auth } = await supabase.auth.getUser()
-      setMeId(auth.user?.id ?? null)
       const { data: ag } = await supabase
         .from("agents")
         .select("*")
