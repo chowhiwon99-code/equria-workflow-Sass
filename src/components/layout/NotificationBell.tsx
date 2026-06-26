@@ -1,8 +1,9 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { useRouter, usePathname } from "next/navigation"
 import { Bell } from "lucide-react"
+import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import {
@@ -15,6 +16,11 @@ import type { Notification } from "@/types"
 export function NotificationBell({ userId }: { userId: string }) {
   const supabase = createClient()
   const router = useRouter()
+  const pathname = usePathname()
+  const pathnameRef = useRef(pathname)
+  useEffect(() => {
+    pathnameRef.current = pathname
+  }, [pathname])
   const [items, setItems] = useState<Notification[]>([])
   const [menuOpen, setMenuOpen] = useState(false)
 
@@ -37,13 +43,23 @@ export function NotificationBell({ userId }: { userId: string }) {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` },
-        () => load()
+        (payload) => {
+          load()
+          // 카카오톡식 인앱 알림 — 새 알림(INSERT)이면 토스트. 지금 보고 있는 화면(같은 링크)이면 생략.
+          if (payload.eventType !== "INSERT") return
+          const n = payload.new as Notification
+          if (n.link && pathnameRef.current.startsWith(n.link)) return
+          toast(n.title, {
+            description: n.body ?? undefined,
+            action: n.link ? { label: "보기", onClick: () => router.push(n.link as string) } : undefined,
+          })
+        }
       )
       .subscribe()
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [supabase, userId, load])
+  }, [supabase, userId, load, router])
 
   const unread = items.filter((n) => !n.is_read).length
 
