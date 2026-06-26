@@ -6,6 +6,7 @@ import { AnnouncementBanner } from "@/components/layout/AnnouncementBanner"
 import { AgentChatProvider } from "@/components/agent-chat/AgentChatContext"
 import { FloatingAgentChat } from "@/components/agent-chat/FloatingAgentChat"
 import { UndoProvider } from "@/components/undo/UndoProvider"
+import { CurrentUserProvider } from "@/components/auth/CurrentUserProvider"
 import { Toaster } from "@/components/ui/sonner"
 
 export default async function AppLayout({
@@ -28,7 +29,8 @@ export default async function AppLayout({
     .single()
 
   return (
-    <UndoProvider>
+    <CurrentUserProvider userId={user.id}>
+      <UndoProvider>
       <AgentChatProvider>
         <div className="flex h-screen overflow-hidden">
           <Sidebar />
@@ -41,6 +43,7 @@ export default async function AppLayout({
         <FloatingAgentChat />
         <Toaster />
       </AgentChatProvider>
-    </UndoProvider>
+      </UndoProvider>
+    </CurrentUserProvider>
   )
 }
