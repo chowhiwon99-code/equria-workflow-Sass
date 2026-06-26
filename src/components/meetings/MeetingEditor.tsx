@@ -17,6 +17,7 @@ import { useMeetingAi, AI_ACTION_LABEL, type AiAction } from "./useMeetingAi"
 import type { Tables } from "@/lib/supabase/types"
 
 type Note = Tables<"meeting_notes">
+type GraphData = { nodes: { id: string; label: string; group: string }[]; links: { source: string; target: string; rel?: string }[] }
 const AI_ACTIONS: AiAction[] = ["summarize", "actions", "polish"]
 const VERDICT_LABEL: Record<string, string> = { supported: "검증", weak: "주의", unsupported: "미검증" }
 const VERDICT_COLOR: Record<string, string> = { supported: "green", weak: "yellow", unsupported: "red" }
@@ -118,6 +119,7 @@ export function MeetingEditor({
       meetingDate: note?.meeting_date ?? new Date().toLocaleDateString("en-CA"),
       attendees: note?.attendees ?? "",
       content: note?.content ?? "",
+      graph: (note?.graph as GraphData | null) ?? null,
     }),
     [note]
   )
@@ -321,10 +323,7 @@ export function MeetingEditor({
 
   // 지식 그래프 — 리서치 자료에서 개체·관계 추출 → 움직이는 망(보기 전용 오버레이).
   const [graphBusy, setGraphBusy] = useState(false)
-  const [graphData, setGraphData] = useState<{
-    nodes: { id: string; label: string; group: string }[]
-    links: { source: string; target: string; rel?: string }[]
-  } | null>(null)
+  const [graphData, setGraphData] = useState<GraphData | null>(init.graph)
 
   const runGraph = async (materialArg?: string, topicArg?: string, silent = false) => {
     const material = (materialArg ?? researchResult?.text ?? "").trim()
@@ -363,7 +362,11 @@ export function MeetingEditor({
 
   const dirty =
     canEdit &&
-    (title !== init.title || meetingDate !== init.meetingDate || attendees !== init.attendees || content !== init.content)
+    (title !== init.title ||
+      meetingDate !== init.meetingDate ||
+      attendees !== init.attendees ||
+      content !== init.content ||
+      JSON.stringify(graphData) !== JSON.stringify(init.graph))
 
   useEffect(() => {
     if (!dirty) return
@@ -411,6 +414,7 @@ export function MeetingEditor({
         content,
         meeting_date: meetingDate || null,
         attendees: attendees.trim() || null,
+        graph: graphData,
       }
       if (note?.id) {
         await mustOk(
@@ -733,7 +737,17 @@ export function MeetingEditor({
                                   )}
                                 >
                                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img src={c.image} alt="" loading="lazy" className="size-full object-cover" />
+                                  <img
+                                    src={c.image}
+                                    alt=""
+                                    loading="lazy"
+                                    className="size-full object-cover"
+                                    onError={(e) => {
+                                      // 로드 실패(hotlink 차단 등) 후보 썸네일은 숨김 — 깨진 이미지 노출 방지
+                                      const b = e.currentTarget.closest("button")
+                                      if (b) b.style.display = "none"
+                                    }}
+                                  />
                                   {on && (
                                     <span className="absolute right-1 top-1 rounded-full bg-primary p-0.5 text-primary-foreground">
                                       <Check className="size-3" />
@@ -822,6 +836,20 @@ export function MeetingEditor({
             </div>
           )}
         </>
+      )}
+
+      {/* 저장된 꼬리물기 그래프 복원 — 리서치 세션 밖(노트 다시 열기)에서도 보이게 */}
+      {graphData && !researchResult && (
+        <div className="mt-4">
+          <ResearchGraph
+            nodes={graphData.nodes}
+            links={graphData.links}
+            topic={researchQuery || title}
+            material=""
+            onInsert={(text) => editorRef.current?.chain().focus("end").insertContent(mdToContent(text)).run()}
+            onClose={() => setGraphData(null)}
+          />
+        </div>
       )}
 
       {/* 본문 — Tiptap 블록 에디터 */}

@@ -1660,6 +1660,7 @@ export type Database = {
           content: string
           created_at: string
           folder_id: string | null
+          graph: Json | null
           id: string
           importance: number
           meeting_date: string | null
@@ -1677,6 +1678,7 @@ export type Database = {
           content?: string
           created_at?: string
           folder_id?: string | null
+          graph?: Json | null
           id?: string
           category_id?: string | null
           importance?: number
@@ -1695,6 +1697,7 @@ export type Database = {
           content?: string
           created_at?: string
           folder_id?: string | null
+          graph?: Json | null
           id?: string
           category_id?: string | null
           importance?: number
