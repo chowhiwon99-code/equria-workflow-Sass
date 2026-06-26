@@ -10,8 +10,10 @@ import { mustOk } from "@/lib/supabase/mustOk"
 import { Loading, EmptyState, ErrorState } from "@/components/shared/States"
 import { Button } from "@/components/ui/button"
 import type { CashAccount, CashTransfer, FinanceEntry } from "@/types"
-import { computeBalances } from "@/lib/cashflowGraph"
+import { computeBalances, buildGraph } from "@/lib/cashflowGraph"
 import { CashGrid } from "./CashGrid"
+import { CashFlowCanvas } from "./CashFlowCanvas"
+import { CashTransferModal } from "./CashTransferModal"
 
 /** 현금흐름 지도 — SSOT 부모. 계좌·거래·이체를 한 번 로드, 흐름도(다음 단계)와 그리드가 같은 데이터를 렌더. */
 export function CashFlowView({ range }: { range: { start: string; end: string } | null }) {
@@ -23,6 +25,7 @@ export function CashFlowView({ range }: { range: { start: string; end: string } 
   const [transfers, setTransfers] = useState<CashTransfer[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [transfer, setTransfer] = useState<{ from: string; to: string } | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -61,6 +64,7 @@ export function CashFlowView({ range }: { range: { start: string; end: string } 
   }, [load])
 
   const balances = useMemo(() => computeBalances(accounts, entries, transfers), [accounts, entries, transfers])
+  const graph = useMemo(() => buildGraph(accounts, entries, transfers, { includeCategories: true }), [accounts, entries, transfers])
 
   // ── 계좌 CRUD ──
   const addAccount = async () => {
@@ -104,9 +108,12 @@ export function CashFlowView({ range }: { range: { start: string; end: string } 
             <Plus className="size-3.5" /> 계좌 추가
           </Button>
         </div>
-        <div className="grid h-64 place-items-center rounded-lg border border-dashed text-sm text-muted-foreground">
-          흐름도 — 다음 단계에서 연결됩니다
-        </div>
+        <CashFlowCanvas
+          nodes={graph.nodes}
+          edges={graph.edges}
+          onMoveAccount={(id, x, y) => updateAccount(id, { x, y })}
+          onCreateTransfer={(from, to) => setTransfer({ from, to })}
+        />
       </div>
 
       {/* 그리드 (노션 DB식) */}
@@ -130,6 +137,19 @@ export function CashFlowView({ range }: { range: { start: string; end: string } 
           onAddAccount={addAccount}
           onUpdateAccount={updateAccount}
           onDeleteAccount={deleteAccount}
+        />
+      )}
+
+      {transfer && (
+        <CashTransferModal
+          accounts={accounts}
+          fromId={transfer.from}
+          toId={transfer.to}
+          onClose={() => setTransfer(null)}
+          onSaved={() => {
+            setTransfer(null)
+            load()
+          }}
         />
       )}
     </div>
