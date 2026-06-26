@@ -19,6 +19,7 @@ import { won, money, CURRENCIES, EXPENSE_CATEGORIES, REVENUE_CATEGORIES } from "
 import { downloadCsv, todayStamp } from "@/lib/csv"
 import type { FinanceEntry, TaxInvoice } from "@/types"
 import { usePeriodFilter, prevMonth, type PeriodMode } from "./usePeriodFilter"
+import { CashFlowView } from "./CashFlowView"
 import { aggregateByCurrency, aggregateByCategory, toBreakdown, buildMonthlyTrend, type SumRow } from "./financeAgg"
 import { SummaryCard, TrendBadge, TrendBars, BreakdownBars } from "./financeCharts"
 import { FinanceEntryModal } from "./FinanceEntryModal"
@@ -26,7 +27,7 @@ import { TaxInvoiceModal } from "./TaxInvoiceModal"
 
 type Kind = "expense" | "revenue"
 type KindFilter = "all" | Kind
-type Tab = "summary" | "ledger" | "tax"
+type Tab = "summary" | "cashflow" | "ledger" | "tax"
 const PAGE_SIZE = 50
 
 export function FinanceView() {
@@ -329,6 +330,7 @@ export function FinanceView() {
   ]
   const tabs: [Tab, string][] = [
     ["summary", "요약"],
+    ["cashflow", "현금흐름"],
     ["ledger", "내역"],
     ["tax", "세금계산서"],
   ]
@@ -412,6 +414,8 @@ export function FinanceView() {
 
       {loading ? (
         <Loading rows={6} />
+      ) : tab === "cashflow" ? (
+        <CashFlowView range={range} />
       ) : tab === "summary" ? (
         currencyRows.length === 0 ? (
           <EmptyState
