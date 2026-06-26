@@ -415,7 +415,7 @@ export function FinanceView() {
       {loading ? (
         <Loading rows={6} />
       ) : tab === "cashflow" ? (
-        <CashFlowView range={range} />
+        <CashFlowView />
       ) : tab === "summary" ? (
         currencyRows.length === 0 ? (
           <EmptyState

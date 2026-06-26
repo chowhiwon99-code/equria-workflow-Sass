@@ -733,6 +733,7 @@ export type Database = {
       }
       cash_accounts: {
         Row: {
+          amount: number
           color: string
           created_at: string
           created_by: string | null
@@ -750,6 +751,7 @@ export type Database = {
           y: number | null
         }
         Insert: {
+          amount?: number
           color?: string
           created_at?: string
           created_by?: string | null
@@ -767,6 +769,7 @@ export type Database = {
           y?: number | null
         }
         Update: {
+          amount?: number
           color?: string
           created_at?: string
           created_by?: string | null

@@ -17,6 +17,22 @@ export const ACCOUNT_KINDS = [
 
 export type AccountKind = (typeof ACCOUNT_KINDS)[number]["value"]
 
+/** 슬롯 구분(돈 항목 유형) — 그리드 "구분" 칩/셀렉트 SSOT. kind 값은 cash_accounts.kind에 저장. */
+export const SLOT_TYPES = [
+  { value: "revenue_src", label: "매출", color: "green" },
+  { value: "expense_dst", label: "비용", color: "red" },
+  { value: "reserve", label: "보유금", color: "blue" },
+] as const
+
+export type SlotTypeValue = (typeof SLOT_TYPES)[number]["value"]
+const SLOT_MAP = new Map(SLOT_TYPES.map((s) => [s.value, s]))
+export function slotLabel(kind: string): string {
+  return SLOT_MAP.get(kind as SlotTypeValue)?.label ?? "비용"
+}
+export function slotColor(kind: string): string {
+  return SLOT_MAP.get(kind as SlotTypeValue)?.color ?? "gray"
+}
+
 const KIND_MAP = new Map(ACCOUNT_KINDS.map((k) => [k.value, k]))
 
 export function kindLabel(kind: string): string {

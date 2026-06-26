@@ -1,165 +1,139 @@
 "use client"
 
-import { Trash2, Plus } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { money, CURRENCIES } from "@/lib/finance"
-import { ACCOUNT_KINDS } from "@/lib/cashAccounts"
-import type { CashAccount, CashTransfer, FinanceEntry } from "@/types"
-import { buildMovements, type Balance } from "@/lib/cashflowGraph"
+import { useMemo, useState } from "react"
+import { Trash2, Plus, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
+import { CURRENCIES } from "@/lib/finance"
+import { SLOT_TYPES, slotColor } from "@/lib/cashAccounts"
+import { tagBg } from "@/lib/meetingMeta"
+import type { CashAccount } from "@/types"
 
-/** 노션 데이터베이스식 그리드 — 계좌(인라인 편집) + 거래내역(읽기). 흐름도와 같은 데이터(SSOT). */
+type SortKey = "name" | "kind" | "amount"
+
+/** 슬롯 테이블(LoadSwift st) — 돈 항목을 행으로, 금액을 셀에 직접 타이핑. 입력 즉시 흐름도 반영(부모 SSOT). */
 export function CashGrid({
-  accounts,
-  entries,
-  transfers,
-  balances,
-  onAddAccount,
-  onUpdateAccount,
-  onDeleteAccount,
+  slots,
+  onAddSlot,
+  onUpdateSlot,
+  onDeleteSlot,
 }: {
-  accounts: CashAccount[]
-  entries: FinanceEntry[]
-  transfers: CashTransfer[]
-  balances: Map<string, Balance>
-  onAddAccount: () => void
-  onUpdateAccount: (id: string, patch: Partial<CashAccount>) => void
-  onDeleteAccount: (acc: CashAccount) => void
+  slots: CashAccount[]
+  onAddSlot: () => void
+  onUpdateSlot: (id: string, patch: Partial<CashAccount>) => void
+  onDeleteSlot: (slot: CashAccount) => void
 }) {
-  const movements = buildMovements(accounts, entries, transfers)
+  const [q, setQ] = useState("")
+  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "kind", dir: 1 })
 
-  const th = "px-3 py-2 text-left font-medium"
-  const thR = "px-3 py-2 text-right font-medium"
+  const rows = useMemo(() => {
+    const order: Record<string, number> = { revenue_src: 0, reserve: 1, expense_dst: 2 }
+    const needle = q.trim().toLowerCase()
+    const filtered = needle ? slots.filter((s) => s.name.toLowerCase().includes(needle)) : slots
+    return [...filtered].sort((a, b) => {
+      let d = 0
+      if (sort.key === "name") d = a.name.localeCompare(b.name)
+      else if (sort.key === "amount") d = Number(a.amount) - Number(b.amount)
+      else d = (order[a.kind] ?? 9) - (order[b.kind] ?? 9) || a.name.localeCompare(b.name)
+      return d * sort.dir
+    })
+  }, [slots, q, sort])
+
+  const toggleSort = (key: SortKey) => setSort((s) => (s.key === key ? { key, dir: s.dir === 1 ? -1 : 1 } : { key, dir: 1 }))
+  const sortIcon = (k: SortKey) =>
+    sort.key !== k ? <ArrowUpDown className="size-3 opacity-40" /> : sort.dir === 1 ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* 계좌 / 잔액 */}
-      <section className="flex flex-col gap-1.5">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold">계좌 / 잔액</h3>
-          <button
-            onClick={onAddAccount}
-            className="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <Plus className="size-3" /> 계좌 추가
-          </button>
-        </div>
-        <div className="overflow-x-auto rounded-lg border">
-          <table className="w-full min-w-[720px] text-sm">
-            <thead className="bg-muted/40 text-xs text-muted-foreground">
-              <tr>
-                <th className={th}>계좌명</th>
-                <th className={th}>종류</th>
-                <th className={th}>통화</th>
-                <th className={thR}>기초잔액</th>
-                <th className={thR}>입금</th>
-                <th className={thR}>출금</th>
-                <th className={thR}>잔액</th>
-                <th className="px-2 py-2" />
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {accounts.map((a) => {
-                const b = balances.get(a.id)
-                return (
-                  <tr key={a.id} className="hover:bg-muted/20">
-                    <td className="px-3 py-1.5">
-                      <InlineText value={a.name} onCommit={(v) => onUpdateAccount(a.id, { name: v })} />
-                    </td>
-                    <td className="px-3 py-1.5">
-                      <select
-                        value={a.kind}
-                        onChange={(e) => onUpdateAccount(a.id, { kind: e.target.value })}
-                        className="rounded border-0 bg-transparent text-xs outline-none focus:ring-1 focus:ring-ring"
-                      >
-                        {ACCOUNT_KINDS.map((k) => (
-                          <option key={k.value} value={k.value}>
-                            {k.label}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-3 py-1.5">
-                      <select
-                        value={a.currency}
-                        onChange={(e) => onUpdateAccount(a.id, { currency: e.target.value })}
-                        className="rounded border-0 bg-transparent text-xs outline-none focus:ring-1 focus:ring-ring"
-                      >
-                        {CURRENCIES.map((c) => (
-                          <option key={c.code} value={c.code}>
-                            {c.code}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-3 py-1.5 text-right">
-                      <InlineNumber value={Number(a.opening_balance)} onCommit={(v) => onUpdateAccount(a.id, { opening_balance: v })} />
-                    </td>
-                    <td className="px-3 py-1.5 text-right tabular-nums text-emerald-600">{b ? money(b.inflow, a.currency) : "—"}</td>
-                    <td className="px-3 py-1.5 text-right tabular-nums text-rose-600">{b ? money(b.outflow, a.currency) : "—"}</td>
-                    <td className="px-3 py-1.5 text-right font-semibold tabular-nums">{b ? money(b.balance, a.currency) : "—"}</td>
-                    <td className="px-2 py-1.5 text-right">
-                      <button onClick={() => onDeleteAccount(a)} className="text-muted-foreground transition-colors hover:text-destructive" title="계좌 삭제">
-                        <Trash2 className="size-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {/* 거래 내역 */}
-      <section className="flex flex-col gap-1.5">
+    <section className="flex flex-col gap-2.5 rounded-xl border bg-card p-3">
+      {/* 헤더: 제목·검색·추가 */}
+      <div className="flex flex-wrap items-center gap-2">
         <h3 className="text-sm font-semibold">
-          거래 내역 <span className="text-xs font-normal text-muted-foreground">{movements.length}건</span>
+          현금 슬롯 <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-xs font-normal text-muted-foreground">{slots.length}</span>
         </h3>
-        <div className="overflow-x-auto rounded-lg border">
-          <table className="w-full min-w-[720px] text-sm">
-            <thead className="bg-muted/40 text-xs text-muted-foreground">
+        <div className="relative ml-auto">
+          <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="항목 검색…"
+            className="h-8 w-44 rounded-lg border bg-background pl-7 pr-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+          />
+        </div>
+        <button
+          onClick={onAddSlot}
+          className="inline-flex h-8 items-center gap-1 rounded-lg bg-foreground px-2.5 text-sm font-medium text-background transition-opacity hover:opacity-90"
+        >
+          <Plus className="size-3.5" /> 항목 추가
+        </button>
+      </div>
+
+      {/* 테이블 */}
+      <div className="overflow-x-auto rounded-lg border">
+        <table className="w-full min-w-[560px] text-sm">
+          <thead className="border-b bg-muted/30 text-xs text-muted-foreground">
+            <tr>
+              <th className="px-3 py-2 text-left font-medium">
+                <button onClick={() => toggleSort("name")} className="inline-flex items-center gap-1 hover:text-foreground">항목명 {sortIcon("name")}</button>
+              </th>
+              <th className="px-3 py-2 text-left font-medium">
+                <button onClick={() => toggleSort("kind")} className="inline-flex items-center gap-1 hover:text-foreground">구분 {sortIcon("kind")}</button>
+              </th>
+              <th className="px-3 py-2 text-right font-medium">
+                <button onClick={() => toggleSort("amount")} className="inline-flex items-center gap-1 hover:text-foreground">금액 {sortIcon("amount")}</button>
+              </th>
+              <th className="px-3 py-2 text-left font-medium">통화</th>
+              <th className="w-10 px-2 py-2" />
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {rows.length === 0 ? (
               <tr>
-                <th className={th}>날짜</th>
-                <th className={th}>구분</th>
-                <th className={th}>계좌</th>
-                <th className={th}>상대 / 분류</th>
-                <th className={thR}>금액</th>
-                <th className={th}>메모</th>
+                <td colSpan={5} className="px-3 py-8 text-center text-sm text-muted-foreground">
+                  {q ? "검색 결과가 없어요." : "항목을 추가하고 금액을 입력하면 흐름도에 바로 나타나요."}
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y">
-              {movements.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-3 py-6 text-center text-sm text-muted-foreground">
-                    거래가 없어요. 비용·매출 입력 또는 흐름도에서 이체를 만들어 보세요.
+            ) : (
+              rows.map((s) => (
+                <tr key={s.id} className="group hover:bg-muted/20">
+                  <td className="px-3 py-1">
+                    <InlineText value={s.name} onCommit={(v) => onUpdateSlot(s.id, { name: v })} />
+                  </td>
+                  <td className="px-3 py-1">
+                    <select
+                      value={s.kind}
+                      onChange={(e) => onUpdateSlot(s.id, { kind: e.target.value, color: slotColor(e.target.value) })}
+                      style={{ backgroundColor: tagBg(slotColor(s.kind), 22) }}
+                      className="cursor-pointer rounded-full border-0 px-2 py-0.5 text-xs font-medium outline-none focus:ring-1 focus:ring-ring"
+                    >
+                      {SLOT_TYPES.map((t) => (
+                        <option key={t.value} value={t.value}>{t.label}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-3 py-1 text-right">
+                    <InlineNumber value={Number(s.amount)} onCommit={(v) => onUpdateSlot(s.id, { amount: v })} />
+                  </td>
+                  <td className="px-3 py-1">
+                    <select
+                      value={s.currency}
+                      onChange={(e) => onUpdateSlot(s.id, { currency: e.target.value })}
+                      className="rounded border-0 bg-transparent text-xs outline-none focus:ring-1 focus:ring-ring"
+                    >
+                      {CURRENCIES.map((c) => (
+                        <option key={c.code} value={c.code}>{c.code}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-2 py-1 text-right">
+                    <button onClick={() => onDeleteSlot(s)} className="text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:text-destructive" title="삭제">
+                      <Trash2 className="size-3.5" />
+                    </button>
                   </td>
                 </tr>
-              ) : (
-                movements.map((m) => (
-                  <tr key={m.id} className="hover:bg-muted/20">
-                    <td className="px-3 py-1.5 tabular-nums text-muted-foreground">{m.date.slice(5).replace("-", ".")}</td>
-                    <td className="px-3 py-1.5">
-                      <span
-                        className={cn(
-                          "rounded px-1.5 py-0.5 text-xs",
-                          m.type === "입금" ? "bg-emerald-500/10 text-emerald-600" : m.type === "출금" ? "bg-rose-500/10 text-rose-600" : "bg-blue-500/10 text-blue-600"
-                        )}
-                      >
-                        {m.type}
-                      </span>
-                    </td>
-                    <td className="px-3 py-1.5">{m.account}</td>
-                    <td className="px-3 py-1.5 text-muted-foreground">{m.counter}</td>
-                    <td className="px-3 py-1.5 text-right tabular-nums">{money(m.amount, m.currency)}</td>
-                    <td className="max-w-40 truncate px-3 py-1.5 text-muted-foreground">{m.memo}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </div>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
   )
 }
 
@@ -169,6 +143,7 @@ function InlineText({ value, onCommit }: { value: string; onCommit: (v: string) 
     <input
       key={value}
       defaultValue={value}
+      placeholder="이름"
       onBlur={(e) => {
         const v = e.target.value.trim()
         if (v && v !== value) onCommit(v)
@@ -185,20 +160,28 @@ function InlineText({ value, onCommit }: { value: string; onCommit: (v: string) 
   )
 }
 
+// 금액 셀 — 평소엔 천단위 콤마 표시, 포커스 시 원숫자로 편집.
 function InlineNumber({ value, onCommit }: { value: number; onCommit: (v: number) => void }) {
+  const fmt = (v: number) => (v ? v.toLocaleString() : "")
   return (
     <input
       key={value}
-      defaultValue={String(value)}
+      defaultValue={fmt(value)}
       inputMode="decimal"
+      placeholder="0"
+      onFocus={(e) => {
+        e.currentTarget.value = value ? String(value) : ""
+        e.currentTarget.select()
+      }}
       onBlur={(e) => {
-        const num = Number(e.target.value)
+        const num = Number(e.target.value.replace(/,/g, ""))
         if (!Number.isNaN(num) && num !== value) onCommit(num)
+        else e.currentTarget.value = fmt(value)
       }}
       onKeyDown={(e) => {
         if (e.key === "Enter") e.currentTarget.blur()
       }}
-      className="w-24 rounded border-0 bg-transparent px-1 py-0.5 text-right tabular-nums outline-none focus:bg-background focus:ring-1 focus:ring-ring"
+      className="w-28 rounded border-0 bg-transparent px-1 py-0.5 text-right tabular-nums outline-none focus:bg-background focus:ring-1 focus:ring-ring"
     />
   )
 }

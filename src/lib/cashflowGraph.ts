@@ -163,6 +163,81 @@ export type Movement = {
   memo: string
 }
 
+// ── 슬롯 모델 ── 슬롯 = 돈 항목(매출/비용/보유금), amount에 직접 입력. 흐름: 매출→회사 허브→비용/보유금.
+export const SLOT_INCOME_KIND = "revenue_src"
+export const SLOT_HOLD_KIND = "reserve"
+
+export function slotCategory(kind: string): "income" | "expense" | "hold" {
+  if (kind === SLOT_INCOME_KIND) return "income"
+  if (kind === SLOT_HOLD_KIND) return "hold"
+  return "expense"
+}
+
+export const HUB_ID = "hub"
+
+/** 슬롯들 → 흐름 그래프(CashNode/CashEdge 재사용). 회사 허브 net = Σ매출 − Σ비용 − Σ보유금(통화별). */
+export function buildSlotGraph(slots: CashAccount[]): { nodes: CashNode[]; edges: CashEdge[]; net: { currency: string; amount: number }[] } {
+  const netByCur = new Map<string, number>()
+  const curCount = new Map<string, number>()
+  for (const s of slots) {
+    const amt = n(s.amount)
+    const sign = slotCategory(s.kind) === "income" ? 1 : -1
+    netByCur.set(s.currency, (netByCur.get(s.currency) ?? 0) + sign * amt)
+    curCount.set(s.currency, (curCount.get(s.currency) ?? 0) + 1)
+  }
+  let hubCur = "KRW"
+  let best = -1
+  for (const [c, cnt] of curCount) if (cnt > best) { best = cnt; hubCur = c }
+  const net = [...netByCur.entries()].map(([currency, amount]) => ({ currency, amount }))
+
+  const counts = { income: 0, expense: 0, hold: 0 }
+  const slotNodes: CashNode[] = slots.map((s) => {
+    const cat = slotCategory(s.kind)
+    let pos: { x: number; y: number }
+    if (s.x != null && s.y != null) pos = { x: n(s.x), y: n(s.y) }
+    else if (cat === "income") pos = { x: 40, y: 40 + counts.income++ * 96 }
+    else if (cat === "expense") pos = { x: 640, y: 40 + counts.expense++ * 96 }
+    else pos = { x: 340, y: 320 + counts.hold++ * 96 }
+    return {
+      id: s.id,
+      label: s.name,
+      kind: s.kind,
+      currency: s.currency,
+      color: s.color,
+      x: pos.x,
+      y: pos.y,
+      synthetic: false,
+      balance: n(s.amount),
+      inflow: 0,
+      outflow: 0,
+    }
+  })
+  const hub: CashNode = {
+    id: HUB_ID,
+    label: "회사 보유 현금",
+    kind: "hub",
+    currency: hubCur,
+    color: "blue",
+    x: 340,
+    y: 150,
+    synthetic: true,
+    balance: netByCur.get(hubCur) ?? 0,
+    inflow: 0,
+    outflow: 0,
+  }
+
+  const edges: CashEdge[] = []
+  for (const s of slots) {
+    const amt = n(s.amount)
+    if (amt === 0) continue
+    const cat = slotCategory(s.kind)
+    if (cat === "income") edges.push({ id: `in:${s.id}`, source: s.id, target: HUB_ID, amount: amt, currency: s.currency, kind: "revenue" })
+    else if (cat === "expense") edges.push({ id: `ex:${s.id}`, source: HUB_ID, target: s.id, amount: amt, currency: s.currency, kind: "expense" })
+    else edges.push({ id: `ho:${s.id}`, source: HUB_ID, target: s.id, amount: amt, currency: s.currency, kind: "transfer" })
+  }
+  return { nodes: [hub, ...slotNodes], edges, net }
+}
+
 /** entries(계좌 지정분) + transfers를 거래 한 줄씩으로 병합(최신순). 그리드 표시·export 공용. */
 export function buildMovements(accounts: CashAccount[], entries: FinanceEntry[], transfers: CashTransfer[]): Movement[] {
   const nameById = new Map(accounts.map((a) => [a.id, a.name]))

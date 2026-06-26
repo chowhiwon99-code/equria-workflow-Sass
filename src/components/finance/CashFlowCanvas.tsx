@@ -3,34 +3,29 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
 import { money } from "@/lib/finance"
-import { kindIcon } from "@/lib/cashAccounts"
 import { tagBg } from "@/lib/meetingMeta"
 import type { CashNode, CashEdge } from "@/lib/cashflowGraph"
 
-const NODE_W = 136
-const NODE_H = 60
+const NODE_W = 140
+const NODE_H = 58
 
 type Drag =
   | { kind: "node"; id: string; ox: number; oy: number; moved: boolean }
-  | { kind: "wire"; source: string; x: number; y: number }
   | { kind: "pan"; sx: number; sy: number; tx0: number; ty0: number }
   | null
 
 /**
- * 현금 흐름도 — WorkflowCanvas 포크. 노드=계좌(잔액 보유) + 합성 카테고리(매출처/지출처).
- * 엣지=돈의 이동(금액 라벨·방향 화살표·종류 색). 출력 포트를 끌어 다른 계좌에 놓으면 이체 생성.
- * ⌘/Ctrl+휠 줌, 배경 드래그 팬, 노드 호버 시 in/out 엣지 강조.
+ * 현금 흐름도 — 슬롯(돈 항목) 노드 + 회사 허브. 매출→회사→비용/보유금.
+ * 그리드에서 금액을 바꾸면 부모가 다시 그려 즉시 반영. 노드 드래그 재배치·호버 강조·⌘휠 줌·배경 팬.
  */
 export function CashFlowCanvas({
   nodes,
   edges,
   onMoveAccount,
-  onCreateTransfer,
 }: {
   nodes: CashNode[]
   edges: CashEdge[]
   onMoveAccount: (id: string, x: number, y: number) => void
-  onCreateTransfer: (fromId: string, toId: string) => void
 }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const [drag, setDrag] = useState<Drag>(null)
@@ -78,13 +73,7 @@ export function CashFlowCanvas({
     return { x: p.x + (side === "out" ? NODE_W : 0), y: p.y + NODE_H / 2 }
   }
 
-  const nodeAtPoint = (clientX: number, clientY: number): string | null => {
-    const el = document.elementFromPoint(clientX, clientY)
-    const host = el?.closest("[data-node-id]") as HTMLElement | null
-    return host?.dataset.nodeId ?? null
-  }
-
-  // 드래그(노드 이동 / 이체 끈 / 팬)
+  // 드래그(노드 재배치 / 배경 팬)
   useEffect(() => {
     if (!drag) return
     const onMove = (e: PointerEvent) => {
@@ -96,25 +85,15 @@ export function CashFlowCanvas({
         const ny = Math.max(0, w.y - d.oy)
         if (!d.moved) setDrag({ ...d, moved: true })
         setLocalPos((prev) => ({ ...prev, [d.id]: { x: nx, y: ny } }))
-      } else if (d.kind === "wire") {
-        const w = toWorld(e.clientX, e.clientY)
-        setDrag({ ...d, x: w.x, y: w.y })
       } else if (d.kind === "pan") {
         setView((v) => ({ ...v, tx: d.tx0 + (e.clientX - d.sx), ty: d.ty0 + (e.clientY - d.sy) }))
       }
     }
-    const onUp = (e: PointerEvent) => {
+    const onUp = () => {
       const d = dragRef.current
       if (d?.kind === "node" && d.moved) {
         const lp = localPosRef.current[d.id]
         if (lp) onMoveAccount(d.id, Math.round(lp.x), Math.round(lp.y))
-      } else if (d?.kind === "wire") {
-        const targetId = nodeAtPoint(e.clientX, e.clientY)
-        const src = nodeById.get(d.source)
-        const tgt = targetId ? nodeById.get(targetId) : null
-        if (tgt && targetId !== d.source && src && !src.synthetic && !tgt.synthetic) {
-          onCreateTransfer(d.source, targetId as string)
-        }
       }
       setDrag(null)
     }
@@ -127,7 +106,7 @@ export function CashFlowCanvas({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drag])
 
-  // ⌘/Ctrl + 휠 = 줌(커서 기준). 네이티브 리스너(passive:false)로 preventDefault.
+  // ⌘/Ctrl + 휠 = 줌(커서 기준). 네이티브 리스너(passive:false).
   useEffect(() => {
     const el = wrapRef.current
     if (!el) return
@@ -147,9 +126,7 @@ export function CashFlowCanvas({
     return () => el.removeEventListener("wheel", handler)
   }, [])
 
-  const edgeStroke = (k: CashEdge["kind"]) =>
-    k === "revenue" ? "#10b981" : k === "expense" ? "#f43f5e" : "#3b82f6"
-
+  const edgeStroke = (k: CashEdge["kind"]) => (k === "revenue" ? "#10b981" : k === "expense" ? "#f43f5e" : "#3b82f6")
   const dim = (id: string) => neighbors != null && !neighbors.has(id)
 
   return (
@@ -157,19 +134,19 @@ export function CashFlowCanvas({
       ref={wrapRef}
       onPointerDown={(e) => setDrag({ kind: "pan", sx: e.clientX, sy: e.clientY, tx0: view.tx, ty0: view.ty })}
       className={cn(
-        "relative h-[420px] w-full select-none overflow-hidden rounded-xl border bg-muted/20",
+        "relative h-[440px] w-full select-none overflow-hidden rounded-xl border bg-muted/20",
         "[background-image:radial-gradient(var(--color-border)_1px,transparent_1px)] [background-size:18px_18px]",
-        drag?.kind === "wire" ? "cursor-crosshair" : drag?.kind === "pan" ? "cursor-grabbing" : "cursor-grab"
+        drag?.kind === "pan" ? "cursor-grabbing" : "cursor-grab"
       )}
     >
-      {nodes.length === 0 && (
+      {nodes.length <= 1 && (
         <div className="pointer-events-none absolute inset-0 grid place-items-center px-6 text-center">
-          <p className="text-sm text-muted-foreground">계좌를 추가하면 노드로 나타나요. 노드를 드래그해 배치하고, 오른쪽 점을 끌어 다른 계좌로 이체하세요.</p>
+          <p className="text-sm text-muted-foreground">아래 표에서 항목을 추가하고 금액을 입력하면 흐름이 그려져요. 매출은 왼쪽, 비용·보유금은 오른쪽.</p>
         </div>
       )}
       <div className="absolute right-2 top-2 z-10 rounded-md bg-background/70 px-2 py-0.5 text-[10px] text-muted-foreground">⌘/Ctrl+휠 확대 · 배경 드래그 이동</div>
 
-      {/* 변환 래퍼(줌/팬) — SVG 엣지 + 노드 함께 */}
+      {/* 변환 래퍼(줌/팬) */}
       <div className="absolute left-0 top-0 origin-top-left" style={{ transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.scale})` }}>
         <svg className="pointer-events-none absolute left-0 top-0 overflow-visible" width={1} height={1}>
           <defs>
@@ -185,7 +162,14 @@ export function CashFlowCanvas({
             const faded = dim(edge.source) && dim(edge.target)
             return (
               <g key={edge.id} style={{ opacity: faded ? 0.15 : 1 }}>
-                <path d={bezier(a, b)} fill="none" stroke={edgeStroke(edge.kind)} strokeWidth={1.5 + Math.min(4, Math.log10(Math.max(10, edge.amount)))} markerEnd="url(#cf-arrow)" className="opacity-70" />
+                <path
+                  d={bezier(a, b)}
+                  fill="none"
+                  stroke={edgeStroke(edge.kind)}
+                  strokeWidth={1.5 + Math.min(4, Math.log10(Math.max(10, edge.amount)))}
+                  markerEnd="url(#cf-arrow)"
+                  className="opacity-70"
+                />
                 <text
                   x={mx}
                   y={my - 4}
@@ -198,57 +182,45 @@ export function CashFlowCanvas({
               </g>
             )
           })}
-          {drag?.kind === "wire" &&
-            (() => {
-              const a = portPos(drag.source, "out")
-              return <path d={bezier(a, { x: drag.x, y: drag.y })} fill="none" stroke="var(--color-primary)" strokeWidth={2} strokeDasharray="4 4" />
-            })()}
         </svg>
 
         {/* 노드 */}
         {nodes.map((n) => {
           const p = posOf(n)
-          const Icon = kindIcon(n.kind)
           const faded = dim(n.id)
+          const isHub = n.kind === "hub"
+          const negative = isHub && n.balance < 0
           return (
             <div
               key={n.id}
               data-node-id={n.id}
-              style={{ left: p.x, top: p.y, width: NODE_W, height: NODE_H, opacity: faded ? 0.25 : 1, transition: drag ? "none" : "opacity 0.15s" }}
+              style={{ left: p.x, top: p.y, width: NODE_W, minHeight: NODE_H, opacity: faded ? 0.25 : 1, transition: drag ? "none" : "opacity 0.15s" }}
               onPointerEnter={() => setHover(n.id)}
               onPointerLeave={() => setHover((h) => (h === n.id ? null : h))}
               onPointerDown={(e) => {
                 e.stopPropagation()
-                if (n.synthetic) return
+                if (n.synthetic) return // 허브는 재배치 안 함
                 const w = toWorld(e.clientX, e.clientY)
                 setDrag({ kind: "node", id: n.id, ox: w.x - p.x, oy: w.y - p.y, moved: false })
               }}
               className={cn(
-                "absolute flex touch-none flex-col justify-center rounded-lg border px-2.5 shadow-sm",
-                n.synthetic ? "border-dashed bg-muted/40 text-muted-foreground" : "cursor-grab bg-card active:cursor-grabbing"
+                "absolute flex touch-none flex-col justify-center rounded-xl border px-3 py-2 shadow-sm",
+                isHub ? "border-primary/40 bg-primary/10 ring-1 ring-primary/20" : "cursor-grab bg-card active:cursor-grabbing"
               )}
             >
-              <div className="flex items-center gap-1.5">
-                <span className="grid size-4 shrink-0 place-items-center rounded" style={{ backgroundColor: tagBg(n.color, 40) }}>
-                  <Icon className="size-3" />
-                </span>
-                <span className="truncate text-xs font-semibold">{n.label}</span>
-              </div>
-              {!n.synthetic && <span className="mt-0.5 truncate text-[11px] tabular-nums text-muted-foreground">{money(n.balance, n.currency)}</span>}
-
-              {/* 입력 포트 */}
-              {!n.synthetic && <span className="absolute -left-1.5 top-1/2 size-3 -translate-y-1/2 rounded-full border-2 border-background bg-muted-foreground/40" aria-hidden />}
-              {/* 출력 포트 — 끌어 이체 */}
-              {!n.synthetic && (
-                <span
-                  onPointerDown={(e) => {
-                    e.stopPropagation()
-                    const w = toWorld(e.clientX, e.clientY)
-                    setDrag({ kind: "wire", source: n.id, x: w.x, y: w.y })
-                  }}
-                  title="끌어서 다른 계좌로 이체"
-                  className="absolute -right-1.5 top-1/2 size-3.5 -translate-y-1/2 cursor-crosshair rounded-full border-2 border-background bg-primary hover:scale-125"
-                />
+              {isHub ? (
+                <>
+                  <span className="text-[11px] font-medium text-muted-foreground">{n.label}</span>
+                  <span className={cn("text-sm font-bold tabular-nums", negative ? "text-rose-600" : "text-emerald-600")}>{money(n.balance, n.currency)}</span>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-1.5">
+                    <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: tagBg(n.color, 90) }} />
+                    <span className="truncate text-xs font-semibold">{n.label}</span>
+                  </div>
+                  <span className="mt-0.5 truncate text-[11px] tabular-nums text-muted-foreground">{money(n.balance, n.currency)}</span>
+                </>
               )}
             </div>
           )

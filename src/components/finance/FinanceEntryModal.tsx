@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Modal, fieldClass } from "@/components/shared/Modal"
 import { useUndo } from "@/components/undo/UndoProvider"
 import { categoriesFor, computeAmounts, won, CURRENCIES } from "@/lib/finance"
-import type { FinanceEntry, CashAccount } from "@/types"
+import type { FinanceEntry } from "@/types"
 
 type Kind = "expense" | "revenue"
 
@@ -38,19 +38,8 @@ export function FinanceEntryModal({
   const [tax, setTax] = useState<string>(entry ? String(entry.tax_amount) : "")
   const [fee, setFee] = useState<string>(entry ? String(entry.fee_amount) : "")
   const [currency, setCurrency] = useState<string>(entry?.currency ?? "KRW")
-  const [accountId, setAccountId] = useState<string | null>(entry?.account_id ?? null)
-  const [accounts, setAccounts] = useState<Pick<CashAccount, "id" | "name">[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    void supabase
-      .from("cash_accounts")
-      .select("id, name")
-      .is("deleted_at", null)
-      .order("sort_order")
-      .then(({ data }) => setAccounts((data as Pick<CashAccount, "id" | "name">[]) ?? []))
-  }, [supabase])
 
   const num = (s: string) => (s === "" ? null : Number(s))
   const computed = computeAmounts({
@@ -82,7 +71,6 @@ export function FinanceEntryModal({
       fee_amount: kind === "revenue" ? Number(fee || 0) : 0,
       total_amount: computed.total,
       currency,
-      account_id: accountId,
       source: "manual" as const,
       status: "confirmed" as const,
     }
@@ -100,7 +88,6 @@ export function FinanceEntryModal({
         fee_amount: entry.fee_amount,
         total_amount: entry.total_amount,
         currency: entry.currency,
-        account_id: entry.account_id,
       }
       const { error: err } = await supabase.from("finance_entries").update(payload).eq("id", entry.id)
       setSaving(false)
@@ -188,18 +175,6 @@ export function FinanceEntryModal({
         <label className="text-xs text-muted-foreground">
           거래처/항목명
           <input className={fieldClass} value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="예: 네이버스마트, 레뷰 등" />
-        </label>
-
-        <label className="text-xs text-muted-foreground">
-          계좌 <span className="text-[11px]">(선택 — 현금흐름 지도에 반영)</span>
-          <select className={fieldClass} value={accountId ?? ""} onChange={(e) => setAccountId(e.target.value || null)}>
-            <option value="">계좌 미지정</option>
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
         </label>
 
         <div className="flex gap-2">
