@@ -151,3 +151,43 @@ export function buildGraph(
 
   return { nodes, edges: [...edgeMap.values()] }
 }
+
+export type Movement = {
+  id: string
+  date: string
+  type: "입금" | "출금" | "이체"
+  account: string
+  counter: string
+  currency: string
+  amount: number
+  memo: string
+}
+
+/** entries(계좌 지정분) + transfers를 거래 한 줄씩으로 병합(최신순). 그리드 표시·export 공용. */
+export function buildMovements(accounts: CashAccount[], entries: FinanceEntry[], transfers: CashTransfer[]): Movement[] {
+  const nameById = new Map(accounts.map((a) => [a.id, a.name]))
+  return [
+    ...entries
+      .filter((e) => e.account_id)
+      .map((e) => ({
+        id: `e:${e.id}`,
+        date: e.entry_date,
+        type: e.kind === "revenue" ? ("입금" as const) : ("출금" as const),
+        account: nameById.get(e.account_id ?? "") ?? "—",
+        counter: e.category || e.vendor || "—",
+        currency: e.currency,
+        amount: Number(e.total_amount),
+        memo: e.description ?? "",
+      })),
+    ...transfers.map((t) => ({
+      id: `t:${t.id}`,
+      date: t.transfer_date,
+      type: "이체" as const,
+      account: nameById.get(t.from_account_id) ?? "—",
+      counter: nameById.get(t.to_account_id) ?? "—",
+      currency: t.currency,
+      amount: Number(t.amount),
+      memo: t.memo ?? "",
+    })),
+  ].sort((a, b) => b.date.localeCompare(a.date))
+}

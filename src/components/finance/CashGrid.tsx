@@ -5,18 +5,7 @@ import { cn } from "@/lib/utils"
 import { money, CURRENCIES } from "@/lib/finance"
 import { ACCOUNT_KINDS } from "@/lib/cashAccounts"
 import type { CashAccount, CashTransfer, FinanceEntry } from "@/types"
-import type { Balance } from "@/lib/cashflowGraph"
-
-type Movement = {
-  id: string
-  date: string
-  type: "입금" | "출금" | "이체"
-  account: string
-  counter: string
-  currency: string
-  amount: number
-  memo: string
-}
+import { buildMovements, type Balance } from "@/lib/cashflowGraph"
 
 /** 노션 데이터베이스식 그리드 — 계좌(인라인 편집) + 거래내역(읽기). 흐름도와 같은 데이터(SSOT). */
 export function CashGrid({
@@ -36,31 +25,7 @@ export function CashGrid({
   onUpdateAccount: (id: string, patch: Partial<CashAccount>) => void
   onDeleteAccount: (acc: CashAccount) => void
 }) {
-  const nameById = new Map(accounts.map((a) => [a.id, a.name]))
-  const movements: Movement[] = [
-    ...entries
-      .filter((e) => e.account_id)
-      .map((e) => ({
-        id: `e:${e.id}`,
-        date: e.entry_date,
-        type: e.kind === "revenue" ? ("입금" as const) : ("출금" as const),
-        account: nameById.get(e.account_id ?? "") ?? "—",
-        counter: e.category || e.vendor || "—",
-        currency: e.currency,
-        amount: Number(e.total_amount),
-        memo: e.description ?? "",
-      })),
-    ...transfers.map((t) => ({
-      id: `t:${t.id}`,
-      date: t.transfer_date,
-      type: "이체" as const,
-      account: nameById.get(t.from_account_id) ?? "—",
-      counter: nameById.get(t.to_account_id) ?? "—",
-      currency: t.currency,
-      amount: Number(t.amount),
-      memo: t.memo ?? "",
-    })),
-  ].sort((a, b) => b.date.localeCompare(a.date))
+  const movements = buildMovements(accounts, entries, transfers)
 
   const th = "px-3 py-2 text-left font-medium"
   const thR = "px-3 py-2 text-right font-medium"
