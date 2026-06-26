@@ -5,6 +5,21 @@
 
 ---
 
+## 2026-06-26 · 세션14 — 채팅 UX 정리(리액션·알림·미읽음)·전환속도·Opus단가 (사용자 신고/요청)
+
+**무엇(쪼갠 내용):**
+1. **CardsView 미커밋 변경 되돌림** — 직급 제거+빈줄이 의도치 않은 변경(git HEAD가 정답) → `git restore`로 직급 복원+빈줄 제거.
+2. **리액션 이모지 통일**(작업#1) — DirectChat이 이모지를 lucide 아이콘으로 매핑(REACTION_ICON)해 DM=아이콘/그룹=이모지로 갈림 → renderReaction을 실제 이모지 렌더로, 미사용 lucide import 7종 제거. 대표 결정=이모지.
+3. **그룹채팅 알림(마이그 076)**(작업#2·3) — 진단: DM은 트리거(on_new_dm) 정상인데 그룹은 알림 트리거 자체가 없음. + `notifications.type` CHECK에 'group' 미포함 → AFTER INSERT라 미추가 시 그룹전송 롤백(선제 차단). `handle_new_group_message` 트리거(커스텀방만, 전체방=소음제외=대표결정)·`mark_room_read`가 group 알림도 읽음정리. **롤백검증(DO+RAISE) 통과: 수신자1/발신자0/전체방0, 실데이터 영향 0.**
+4. **카카오톡식 인앱 토스트**(작업#4) — NotificationBell realtime INSERT 시 sonner 토스트(DM·그룹 공통, 보고 있는 방 생략(pathname), 클릭 이동). exhaustive-deps(router) 정리.
+5. **ChatList 그룹 미읽음 회귀**(작업#5) — 075가 group_read_state SELECT를 멤버공개로 확대하자 ChatList가 `.eq(user_id,me)` 없이 읽어 남의 읽은시각 집음 → 필터 추가 + realtime에 group_messages 구독 추가(미읽음 즉시 갱신).
+6. **전환 버벅임**(작업#6) — 측정: loading.tsx 0개라 라우트 전환 시 블로킹 + 27개 컴포넌트가 마운트마다 auth.getUser() 왕복. → `(app)/loading.tsx` 추가(즉시 스켈레톤). getUser 왕복 제거(CurrentUserProvider)는 27파일이라 작업#7로 큐(대표 승인=점진·검증).
+7. **Opus 추정단가 정정** — pricing.ts opus $15/$75(구 Opus3가)→$5/$25(현 Opus4.7). 마이페이지 법무에이전트 추정비용 3배 과대표시 해소. haiku도 $1/$5로.
+
+**예상이슈 점검:** 매 단계 tsc0·lint30/0 유지 · 마이그 076 RLS/CHECK 함정 선제 차단·롤백검증 · 토스트는 (app)레이아웃 Toaster 마운트 확인 · ChatList 수정은 075 RLS 확대의 회귀라 최소수정. **남음:** 작업#7 getUser 스윕. **배포:** 보류(로컬 확인 후) — 단 **마이그 076은 프로덕션 DB 적용+검증 완료(LIVE)**, 프론트는 미배포.
+
+---
+
 ## 세션13 후반 — 그룹채팅(카카오톡식) [`141b80b`~`3338917`]
 **무엇/왜:** 로드맵 ①그룹채팅. DM(`direct_*`)은 user_a/user_b 2인 고정이라 그룹 부적합 → **별도 `group_*` 테이블 병렬 구축**(Explore 에이전트가 DM RLS 5대 위험 짚음 → DM 미접촉이 가장 안전). 단일 전체방 + 카카오톡식 멤버 초대 다중방. **차곡차곡: DB→타입→UI 단계별, 매 단계 tsc/lint/build/RLS 검증.**
 1. **DB 기반(마이그 071·072)** — `group_rooms·group_messages·group_message_attachments·group_message_reactions·group_read_state`. 메시지 모델 DM 동형(body_json·스레드·soft-delete). `is_room_member` 헬퍼·`mark_room_read` RPC·`touch_group_room` 트리거·realtime·기본방 시드. 072=함수 권한 하드닝(anon 제거). RLS=`is_workspace_member`.

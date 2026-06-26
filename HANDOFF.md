@@ -2,7 +2,8 @@
 
 > **새 세션 읽기 순서:** 이 파일 → 아래 **📂 문서 지도** → `CLAUDE.md` → `.claude/skills/{safe-changes,latest-stack,known-issues}.md`
 > 이 파일은 **"현재 상태 · 다음 할 일 · 합의된 정책"만** 담는다. 깊은 내용은 전용 문서(지도 참조), 과거 상세는 git 커밋 메시지에.
-> 최종 업데이트: **2026-06-25 (세션 13 — 회의노트(에디터·표·DB·**AI 리서치 5단계**·**꼬리물기**·대화형·이미지/PDF) + **카카오톡식 그룹채팅**(전체방+다중방·초대·읽음, 마이그 071~075) 배포 `992eae5`). 상세=아래 배포 블록·로드맵·WORKLOG.**
+> 최종 업데이트: **2026-06-26 (세션 14 — 채팅 UX 정리: 리액션 이모지 통일·**그룹채팅 알림**(마이그 076)·**카카오톡식 인앱 토스트**·ChatList 미읽음 회귀수정·전환속도(loading.tsx)·Opus 추정단가 정정). ⚠️ 마이그 076만 프로덕션 LIVE, 프론트는 미배포(로컬 확인 후 배포 예정). 상세=WORKLOG 세션14.**
+> 세션13: 회의노트(에디터·표·DB·AI 리서치 5단계·꼬리물기·대화형·이미지/PDF) + 카카오톡식 그룹채팅(전체방+다중방·초대·읽음, 마이그 071~075) 배포 `992eae5`.
 > ⚙️ **작업 방식(하네스/루프):** `.claude/skills/work-harness.md`(작업 SOP·검증 게이트·멀티에이전트 기준) + `/deploy`·`/verify` 명령 + push 전 tsc/lint 훅. 매 작업 = 잘게 순차 → tsc 0·lint 30/0·build 0·(DDL이면 RLS 시뮬) → main-first 배포 → 보고.
 
 ---
@@ -57,7 +58,8 @@
   - **사이드바 "직원 채팅" 미읽음 빨간 배지**(`useUnreadDms`) · 근태/지출 UI 개선(근무시간·상태요약).
   - 작은 수정(1·2단계): 채팅 알림 자동삭제·스크롤바 간격·파일 다중업로드·파일 공개범위(공개/부서/개인, 044).
   - **다음(5단계 예정)**: 노션식 새 페이지(블록 에디터 + `/`슬래시 + AI 상시) — 가장 큼·단독.
-- **안정도**: `tsc` 0 · `pnpm lint` **30 errors/0 warnings**(전부 기존 `set-state-in-effect`·refs 부채, 신규 0이 베이스라인) · `any` 0 · 마이그 **001~075(78파일) 적용·drift 없음** · **`next build` 성공** → **Vercel 빌드가 실제 게이트**.
+- **안정도**: `tsc` 0 · `pnpm lint` **30 errors/0 warnings**(전부 기존 `set-state-in-effect`·refs 부채, 신규 0이 베이스라인) · `any` 0 · 마이그 **001~076(79파일) 적용·drift 없음** · **`next build` 성공** → **Vercel 빌드가 실제 게이트**.
+- **🆕 세션14 미배포 작업(working tree, feat 브랜치 — 로컬 커밋만, push 보류)**: 리액션 이모지 통일(DirectChat) · **그룹채팅 알림**(마이그 076 `handle_new_group_message` 트리거·커스텀방만·CHECK 'group' 추가·`mark_room_read` 알림정리 — **프로덕션 LIVE·롤백검증 통과**) · **카카오톡식 인앱 토스트**(NotificationBell realtime INSERT→sonner, DM·그룹 공통·현재방 생략) · **ChatList 그룹 미읽음 회귀수정**(075 SELECT 확대로 `.eq(user_id,me)` 누락 → 남의 읽은시각 집던 버그 + group_messages realtime 구독) · `(app)/loading.tsx`(전환 즉시 스켈레톤) · pricing.ts Opus $5/$25 정정. **남은 큰 작업:** getUser 왕복 제거(27파일 CurrentUserProvider, 대표 승인=점진·검증).
 
 > 최근 작업 상세(세션7·8: UI 리프레시·채팅 단계0~6·에이전트/위젯 재설계·캘린더·삭제RLS버그·B1격리·비용추적 등)는 **git 커밋 메시지**에 충실히 기록됨. 여기 중복 안 함.
 
