@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
+import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Loading, ErrorState } from "@/components/shared/States"
 import { renderAgentIcon } from "@/components/agents/AgentIcon"
@@ -14,6 +15,7 @@ type Stats = { calls: number; tokensIn: number; tokensOut: number; agentsUsed: n
 
 export function MyPageView() {
   const supabase = createClient()
+  const me = useCurrentUserId()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -23,12 +25,10 @@ export function MyPageView() {
   const load = useCallback(async () => {
     setError(null)
     try {
-      const { data: auth } = await supabase.auth.getUser()
-      if (!auth.user) {
+      if (!me) {
         setLoading(false)
         return
       }
-      const me = auth.user.id
       const [{ data: prof }, { data: agents }, { data: usage }] = await Promise.all([
         supabase.from("profiles").select("name, department, role, position").eq("id", me).single(),
         supabase
@@ -54,7 +54,7 @@ export function MyPageView() {
     } finally {
       setLoading(false)
     }
-  }, [supabase])
+  }, [supabase, me])
 
   useEffect(() => {
     load()

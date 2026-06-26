@@ -20,6 +20,7 @@ import {
 import { toast } from "sonner"
 import DOMPurify from "isomorphic-dompurify"
 import { createClient } from "@/lib/supabase/client"
+import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { Button } from "@/components/ui/button"
 import { Modal, fieldClass } from "@/components/shared/Modal"
 import { Loading } from "@/components/shared/States"
@@ -71,6 +72,7 @@ function sanitize(html: string): string {
 
 export function MailShell() {
   const supabase = createClient()
+  const me = useCurrentUserId()
   const [connected, setConnected] = useState<boolean | null>(null)
   const [googleEmail, setGoogleEmail] = useState<string | null>(null)
 
@@ -89,19 +91,18 @@ export function MailShell() {
   const [compose, setCompose] = useState<Compose>(EMPTY_COMPOSE)
 
   const checkConnection = useCallback(async () => {
-    const { data: auth } = await supabase.auth.getUser()
-    if (!auth.user) {
+    if (!me) {
       setConnected(false)
       return
     }
     const { data } = await supabase
       .from("google_connections")
       .select("is_active, google_email")
-      .eq("user_id", auth.user.id)
+      .eq("user_id", me)
       .maybeSingle()
     setConnected(!!data?.is_active)
     setGoogleEmail(data?.google_email ?? null)
-  }, [supabase])
+  }, [supabase, me])
 
   useEffect(() => {
     checkConnection()

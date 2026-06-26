@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { Plus, FolderKanban } from "lucide-react"
 import { Select } from "@/components/shared/Select"
+import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -278,6 +279,7 @@ function CreateProjectModal({
   onCreated: () => void
 }) {
   const supabase = createClient()
+  const me = useCurrentUserId()
   const { push } = useUndo()
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
@@ -295,8 +297,7 @@ function CreateProjectModal({
     }
     setSaving(true)
     setError(null)
-    const { data: auth } = await supabase.auth.getUser()
-    if (!auth.user) {
+    if (!me) {
       setError("로그인이 필요합니다.")
       setSaving(false)
       return
@@ -310,7 +311,7 @@ function CreateProjectModal({
         owner_id: ownerId || null,
         start_date: startDate || null,
         due_date: dueDate || null,
-        created_by: auth.user.id,
+        created_by: me,
       })
       .select()
       .single()

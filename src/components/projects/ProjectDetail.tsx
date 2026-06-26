@@ -14,6 +14,7 @@ import { useUndo } from "@/components/undo/UndoProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { PROJECT_STATUS, PROJECT_STATUS_ORDER } from "@/lib/projects"
 import { isFigmaUrl, toFigmaDesktopUrl } from "@/lib/figma"
+import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import type { Project, ProjectStatus, Profile, DriveFile } from "@/types"
 
 type MemberRow = { id: string; user_id: string; role: string; member: { name: string; position: string | null } | null }
@@ -326,6 +327,7 @@ function AddFileModal({
   onAdded: () => void
 }) {
   const supabase = createClient()
+  const me = useCurrentUserId()
   const { push } = useUndo()
   const [name, setName] = useState("")
   const [url, setUrl] = useState("")
@@ -339,7 +341,6 @@ function AddFileModal({
     }
     setSaving(true)
     setError(null)
-    const { data: auth } = await supabase.auth.getUser()
     const source = isFigmaUrl(url) ? "figma" : "link"
     const { data: inserted, error: insErr } = await supabase
       .from("files")
@@ -348,7 +349,7 @@ function AddFileModal({
         web_view_link: url.trim(),
         source,
         project_id: projectId,
-        owner_id: auth.user?.id ?? null,
+        owner_id: me,
       })
       .select()
       .single()

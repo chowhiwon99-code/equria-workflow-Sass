@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { ChevronLeft, ChevronRight, Plus, X, Check, Trash2, CalendarDays, Pencil, Paperclip, Download, Loader2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useUndo } from "@/components/undo/UndoProvider"
@@ -453,6 +454,7 @@ function CreateEventModal({
   onCreated: () => void
 }) {
   const supabase = createClient()
+  const me = useCurrentUserId()
   const { push } = useUndo()
   const isEdit = !!event
   const [title, setTitle] = useState(event?.title ?? "")
@@ -524,8 +526,7 @@ function CreateEventModal({
     }
     setSaving(true)
     setError(null)
-    const { data: auth } = await supabase.auth.getUser()
-    if (!auth.user) {
+    if (!me) {
       setError("로그인이 필요합니다.")
       setSaving(false)
       return
@@ -583,7 +584,7 @@ function CreateEventModal({
     }
     const { data: inserted, error: insErr } = await supabase
       .from("calendar_events")
-      .insert({ ...payload, created_by: auth.user.id })
+      .insert({ ...payload, created_by: me })
       .select()
       .single()
     setSaving(false)

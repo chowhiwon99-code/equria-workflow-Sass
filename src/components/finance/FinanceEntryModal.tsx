@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -25,6 +26,7 @@ export function FinanceEntryModal({
   onSaved: () => void
 }) {
   const supabase = createClient()
+  const me = useCurrentUserId()
   const { push } = useUndo()
   const [kind, setKind] = useState<Kind>((entry?.kind as Kind) ?? "expense")
   const [entryDate, setEntryDate] = useState(entry?.entry_date ?? new Date().toISOString().slice(0, 10))
@@ -52,8 +54,7 @@ export function FinanceEntryModal({
   const submit = async () => {
     setSaving(true)
     setError(null)
-    const { data: auth } = await supabase.auth.getUser()
-    if (!auth.user) {
+    if (!me) {
       setError("로그인이 필요합니다.")
       setSaving(false)
       return
@@ -105,7 +106,7 @@ export function FinanceEntryModal({
     } else {
       const { data: inserted, error: err } = await supabase
         .from("finance_entries")
-        .insert({ ...payload, created_by: auth.user.id })
+        .insert({ ...payload, created_by: me })
         .select()
         .single()
       setSaving(false)

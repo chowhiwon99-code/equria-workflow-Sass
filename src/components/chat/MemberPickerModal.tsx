@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { X, Check, Search, Loader2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { cn } from "@/lib/utils"
 import { fieldClass } from "@/components/shared/Modal"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -32,6 +33,7 @@ export function MemberPickerModal({
   onClose: () => void
 }) {
   const supabase = createClient()
+  const me = useCurrentUserId()
   const [people, setPeople] = useState<Person[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [name, setName] = useState("")
@@ -40,15 +42,13 @@ export function MemberPickerModal({
 
   useEffect(() => {
     ;(async () => {
-      const { data: auth } = await supabase.auth.getUser()
-      const me = auth.user?.id
       const { data } = await supabase.from("profiles").select("id, name, position, department").order("name")
       const ex = new Set([...(me ? [me] : []), ...excludeIds])
       setPeople((data ?? []).filter((p) => !ex.has(p.id)))
       setLoading(false)
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabase])
+  }, [supabase, me])
 
   const toggle = (id: string) =>
     setSelected((prev) => {

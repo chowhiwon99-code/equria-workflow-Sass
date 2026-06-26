@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -46,6 +47,7 @@ export function AgentBuilderForm({
   slides?: boolean
 }) {
   const supabase = createClient()
+  const me = useCurrentUserId()
   const router = useRouter()
   const { push } = useUndo()
   const editing = !!initial
@@ -95,13 +97,11 @@ export function AgentBuilderForm({
     if (!valid || saving) return
     setSaving(true)
     setError(null)
-    const { data: auth } = await supabase.auth.getUser()
-    if (!auth.user) {
+    if (!me) {
       setError("로그인이 필요합니다.")
       setSaving(false)
       return
     }
-    const meId = auth.user.id
 
     if (!editing) {
       // 생성: agents → agent_versions(v1)
@@ -113,7 +113,7 @@ export function AgentBuilderForm({
           category,
           icon,
           is_public: isPublic,
-          created_by: meId,
+          created_by: me,
         })
         .select("id")
         .single()
@@ -131,7 +131,7 @@ export function AgentBuilderForm({
         mcp_servers: mcpServers,
         version: 1,
         is_current: true,
-        created_by: meId,
+        created_by: me,
       })
       if (vErr) {
         setError(vErr.message)
@@ -140,7 +140,7 @@ export function AgentBuilderForm({
       }
       // 만든 사람 위젯에 자동 핀 → 만들자마자 우하단 위젯에 등장(핀이 SSOT이므로).
       // 실패해도 생성 자체는 유지(best-effort).
-      await supabase.from("user_agent_pins").insert({ user_id: meId, agent_id: agent.id })
+      await supabase.from("user_agent_pins").insert({ user_id: me, agent_id: agent.id })
 
       push({
         label: "에이전트 생성",
@@ -206,7 +206,7 @@ export function AgentBuilderForm({
           mcp_servers: mcpServers,
           version,
           is_current: true, // 트리거 handle_new_agent_version 가 이전 버전 is_current=false 처리
-          created_by: meId,
+          created_by: me,
         })
 
       let { error: vErr } = await insertVersion(await readNextVersion())

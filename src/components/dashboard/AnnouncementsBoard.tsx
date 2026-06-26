@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 import { Megaphone, Pin, PinOff, Plus, Trash2, Loader2, ChevronDown } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -22,7 +23,7 @@ function fmtDate(iso: string): string {
  */
 export function AnnouncementsBoard() {
   const supabase = createClient()
-  const [me, setMe] = useState<string | null>(null)
+  const me = useCurrentUserId()
   const [isOwner, setIsOwner] = useState(false)
   const [names, setNames] = useState<Record<string, string>>({})
   const [positions, setPositions] = useState<Record<string, string | null>>({})
@@ -36,9 +37,7 @@ export function AnnouncementsBoard() {
   const [pin, setPin] = useState(false)
 
   const load = useCallback(async () => {
-    const { data: auth } = await supabase.auth.getUser()
-    if (!auth.user) return setLoading(false)
-    setMe(auth.user.id)
+    if (!me) return setLoading(false)
     const [{ data: ws }, { data: anns }, { data: ppl }] = await Promise.all([
       supabase.from("workspaces").select("owner_id").limit(1).maybeSingle(),
       supabase
@@ -48,12 +47,12 @@ export function AnnouncementsBoard() {
         .order("created_at", { ascending: false }),
       supabase.from("profiles").select("id, name, position"),
     ])
-    setIsOwner(!!ws && ws.owner_id === auth.user.id)
+    setIsOwner(!!ws && ws.owner_id === me)
     setList((anns as Ann[]) ?? [])
     setNames(Object.fromEntries((ppl ?? []).map((p) => [p.id, p.name])))
     setPositions(Object.fromEntries((ppl ?? []).map((p) => [p.id, p.position])))
     setLoading(false)
-  }, [supabase])
+  }, [supabase, me])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

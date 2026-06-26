@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Plus, Inbox, FileText, Eye } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Loading } from "@/components/shared/States"
@@ -19,8 +20,8 @@ const BOXES: { key: Box; label: string; icon: typeof Inbox; empty: string }[] = 
 
 export function ApprovalView() {
   const supabase = createClient()
+  const me = useCurrentUserId()
   const router = useRouter()
-  const [me, setMe] = useState<string | null>(null)
   const [ownerId, setOwnerId] = useState<string | null>(null)
   const [people, setPeople] = useState<Person[]>([])
   const [docs, setDocs] = useState<Doc[]>([])
@@ -29,9 +30,7 @@ export function ApprovalView() {
   const [creating, setCreating] = useState(false)
 
   const load = useCallback(async () => {
-    const { data: auth } = await supabase.auth.getUser()
-    if (!auth.user) return setLoading(false)
-    setMe(auth.user.id)
+    if (!me) return setLoading(false)
     const [{ data: ws }, { data: list }, { data: ppl }] = await Promise.all([
       supabase.from("workspaces").select("owner_id").limit(1).maybeSingle(),
       supabase.from("approval_documents").select("*, approval_steps(*)").order("created_at", { ascending: false }),
@@ -41,7 +40,7 @@ export function ApprovalView() {
     setDocs((list as Doc[]) ?? [])
     setPeople((ppl as Person[]) ?? [])
     setLoading(false)
-  }, [supabase])
+  }, [supabase, me])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

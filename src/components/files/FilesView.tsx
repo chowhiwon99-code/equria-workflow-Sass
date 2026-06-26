@@ -19,6 +19,7 @@ import {
 import type { LucideIcon } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
+import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { useUndo } from "@/components/undo/UndoProvider"
@@ -105,6 +106,7 @@ function dateBucket(iso: string, now: Date): { key: string; label: string; order
 
 export function FilesView() {
   const supabase = createClient()
+  const me = useCurrentUserId()
   const { push } = useUndo()
   const inputRef = useRef<HTMLInputElement>(null)
   const [rows, setRows] = useState<FileRow[]>([])
@@ -124,14 +126,13 @@ export function FilesView() {
 
   const load = useCallback(async () => {
     try {
-      const { data: auth } = await supabase.auth.getUser()
-      if (!auth.user) {
+      if (!me) {
         setLoading(false)
         return
       }
       // 일반 파일(프로젝트 미연결)만 — RLS가 본인 개인 + 공개 + 같은 부서만 돌려준다.
       const [{ data: prof }, { data, error: queryError }, { data: fdrs }] = await Promise.all([
-        supabase.from("profiles").select("department").eq("id", auth.user.id).single(),
+        supabase.from("profiles").select("department").eq("id", me).single(),
         supabase
           .from("files")
           .select("id, name, mime_type, size_bytes, source, visibility, folder_id, metadata, created_at")
@@ -150,7 +151,7 @@ export function FilesView() {
     } finally {
       setLoading(false)
     }
-  }, [supabase])
+  }, [supabase, me])
 
   useEffect(() => {
     load()
@@ -186,8 +187,7 @@ export function FilesView() {
     if (ok.length === 0) return
     setUploading(true)
     try {
-      const { data: auth } = await supabase.auth.getUser()
-      if (!auth.user) throw new Error("로그인이 필요합니다.")
+      if (!me) throw new Error("로그인이 필요합니다.")
       // 순차 업로드(스토리지) → 메타데이터는 한 번에 insert. 공개범위·내 부서·현재 폴더 기록.
       const newRows = []
       for (const file of ok) {
@@ -197,7 +197,7 @@ export function FilesView() {
           name: up.name,
           mime_type: up.mimeType,
           size_bytes: up.size,
-          owner_id: auth.user.id,
+          owner_id: me,
           visibility: uploadVis,
           department: myDept,
           folder_id: currentFolder, // 현재 보고 있는 폴더에 바로 분류(루트면 미분류)
@@ -257,9 +257,8 @@ export function FilesView() {
   }
 
   const createFolder = async (name: string) => {
-    const { data: auth } = await supabase.auth.getUser()
-    if (!auth.user) return
-    const { error: e } = await supabase.from("file_folders").insert({ name, created_by: auth.user.id })
+    if (!me) return
+    const { error: e } = await supabase.from("file_folders").insert({ name, created_by: me })
     if (e) return toast.error("폴더를 만들지 못했어요.")
     toast.success("폴더를 만들었어요.")
     load()

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { ArrowLeft, Check, X, Undo2, Loader2, Send, Pencil, RotateCcw } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -19,8 +20,8 @@ type Comment = { id: string; user_id: string; body: string; created_at: string }
 
 export function DocumentDetail({ docId }: { docId: string }) {
   const supabase = createClient()
+  const me = useCurrentUserId()
   const router = useRouter()
-  const [me, setMe] = useState<string | null>(null)
   const [doc, setDoc] = useState<Doc | null>(null)
   const [people, setPeople] = useState<Person[]>([])
   const [comments, setComments] = useState<Comment[]>([])
@@ -32,9 +33,7 @@ export function DocumentDetail({ docId }: { docId: string }) {
   const [editing, setEditing] = useState(false)
 
   const load = useCallback(async () => {
-    const { data: auth } = await supabase.auth.getUser()
-    if (!auth.user) return setLoading(false)
-    setMe(auth.user.id)
+    if (!me) return setLoading(false)
     const [{ data: d }, { data: cs }, { data: ppl }] = await Promise.all([
       supabase.from("approval_documents").select("*, approval_steps(*)").eq("id", docId).maybeSingle(),
       supabase.from("approval_comments").select("id, user_id, body, created_at").eq("document_id", docId).order("created_at"),
@@ -44,7 +43,7 @@ export function DocumentDetail({ docId }: { docId: string }) {
     setComments((cs as Comment[]) ?? [])
     setPeople((ppl as Person[]) ?? [])
     setLoading(false)
-  }, [supabase, docId])
+  }, [supabase, docId, me])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { MessagesSquare, NotebookPen, Users, Plus } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { StatusDot } from "@/components/chat/StatusDot"
@@ -35,11 +36,11 @@ type GroupRoomSummary = {
 
 export function ChatList() {
   const supabase = createClient()
+  const meId = useCurrentUserId()
   const router = useRouter()
   const [rooms, setRooms] = useState<RoomSummary[]>([])
   const [groupRooms, setGroupRooms] = useState<GroupRoomSummary[]>([])
   const [colleagues, setColleagues] = useState<Colleague[]>([])
-  const [meId, setMeId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
@@ -48,13 +49,11 @@ export function ChatList() {
 
   const load = useCallback(async () => {
     try {
-      const { data: auth } = await supabase.auth.getUser()
-      const me = auth.user?.id
-      if (!me) {
+      if (!meId) {
         setLoading(false)
         return
       }
-      setMeId(me)
+      const me = meId
 
       const [{ data: convs }, { data: profs }] = await Promise.all([
         supabase
@@ -143,7 +142,7 @@ export function ChatList() {
     } finally {
       setLoading(false)
     }
-  }, [supabase])
+  }, [supabase, meId])
 
   useEffect(() => {
     load()

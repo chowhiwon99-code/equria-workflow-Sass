@@ -5,6 +5,7 @@ import Link from "next/link"
 import { ArrowLeft, Paperclip, Upload, NotebookPen, FileText, Loader2, Pencil, Trash2, SmilePlus, CornerUpLeft, X, ChevronDown } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
+import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { uploadImage } from "@/lib/upload"
 import { cn } from "@/lib/utils"
@@ -54,8 +55,8 @@ function fmtTime(iso: string): string {
 
 export function DirectChat({ otherUserId }: { otherUserId: string }) {
   const supabase = createClient()
+  const meId = useCurrentUserId()
   const { push } = useUndo()
-  const [meId, setMeId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState("")
   const [otherName, setOtherName] = useState("")
@@ -180,16 +181,12 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
   // 초기화
   useEffect(() => {
     ;(async () => {
-      const { data: auth } = await supabase.auth.getUser()
-      const me = auth.user?.id ?? null
-      setMeId(me)
-
       const { data: other } = await supabase
         .from("profiles")
         .select("name, status_manual, position")
         .eq("id", otherUserId)
         .single()
-      setOtherName(me === otherUserId ? "나와의 채팅" : other?.name ?? "직원")
+      setOtherName(meId === otherUserId ? "나와의 채팅" : other?.name ?? "직원")
       setOtherStatus(other?.status_manual ?? null)
       setOtherPosition(other?.position ?? null)
 
@@ -215,7 +212,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
 
       // 나와의 채팅이 아니면 상대 메시지 + 관련 알림을 읽음 처리.
       // SECURITY DEFINER RPC 로 처리해 RLS/세션 변수를 배제하고 한 번에 갱신한다.
-      if (me && me !== otherUserId) {
+      if (meId && meId !== otherUserId) {
         const { error: readErr } = await supabase.rpc("mark_dm_read", { conv_id: convId })
         if (readErr) console.error("mark_dm_read 실패:", readErr.message)
       }

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Plus, Workflow as WorkflowIcon, Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { Button } from "@/components/ui/button"
 import { normalizeGraph } from "@/lib/workflows"
@@ -21,6 +22,7 @@ type WorkflowRow = {
 
 export function WorkflowsView() {
   const supabase = createClient()
+  const me = useCurrentUserId()
   const router = useRouter()
   const { push } = useUndo()
   const [rows, setRows] = useState<WorkflowRow[]>([])
@@ -69,14 +71,13 @@ export function WorkflowsView() {
   const create = async () => {
     if (creating) return
     setCreating(true)
-    const { data: auth } = await supabase.auth.getUser()
-    if (!auth.user) {
+    if (!me) {
       setCreating(false)
       return
     }
     const { data, error } = await supabase
       .from("workflows")
-      .insert({ name: "새 워크플로우", description: null, steps: [], created_by: auth.user.id })
+      .insert({ name: "새 워크플로우", description: null, steps: [], created_by: me })
       .select("id")
       .single()
     setCreating(false)

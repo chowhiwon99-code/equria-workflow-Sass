@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
+import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -124,6 +125,7 @@ function Segmented({
 
 export function SettingsView() {
   const supabase = createClient()
+  const meId = useCurrentUserId()
   const router = useRouter()
   const { setTheme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
@@ -137,7 +139,6 @@ export function SettingsView() {
   const [status, setStatus] = useState<string | null>(null)
   const [position, setPosition] = useState("")
   // 대표(오너) 전용 — 구성원 직급 일괄 관리
-  const [meId, setMeId] = useState<string | null>(null)
   const [isOwner, setIsOwner] = useState(false)
   const [memberList, setMemberList] = useState<{ id: string; name: string; department: string | null; position: string | null }[]>([])
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -154,15 +155,14 @@ export function SettingsView() {
 
   const load = useCallback(async () => {
     try {
-      const { data: auth } = await supabase.auth.getUser()
-      if (!auth.user) {
+      if (!meId) {
         setLoading(false)
         return
       }
       const { data } = await supabase
         .from("profiles")
         .select("name, department, role, status_manual, position, contact_privacy")
-        .eq("id", auth.user.id)
+        .eq("id", meId)
         .single()
       if (data) {
         setName(data.name ?? "")
@@ -178,15 +178,14 @@ export function SettingsView() {
         })
       }
       // 연락처(email/work_phone/mobile)는 컬럼 권한 회수(마이그 023b)로 직접 select 불가 → RPC(self)로 조회
-      const { data: contact } = await supabase.rpc("directory_contact", { target: auth.user.id })
+      const { data: contact } = await supabase.rpc("directory_contact", { target: meId })
       const c = contact?.[0]
       setEmail(c?.email ?? "")
       setWorkPhone(c?.work_phone ?? "")
       setMobile(c?.mobile ?? "")
       // 대표면 구성원 직급 관리용 목록도 로드
-      setMeId(auth.user.id)
       const { data: ws } = await supabase.from("workspaces").select("owner_id").limit(1).maybeSingle()
-      const owner = !!ws?.owner_id && ws.owner_id === auth.user.id
+      const owner = !!ws?.owner_id && ws.owner_id === meId
       setIsOwner(owner)
       if (owner) {
         const { data: mem } = await supabase.from("profiles").select("id, name, department, position").order("name")
@@ -198,7 +197,7 @@ export function SettingsView() {
     } finally {
       setLoading(false)
     }
-  }, [supabase])
+  }, [supabase, meId])
 
   useEffect(() => {
     load()
@@ -207,8 +206,7 @@ export function SettingsView() {
   const saveProfile = async () => {
     if (!name.trim() || saving) return
     setSaving(true)
-    const { data: auth } = await supabase.auth.getUser()
-    if (!auth.user) {
+    if (!meId) {
       setSaving(false)
       return
     }
@@ -223,7 +221,7 @@ export function SettingsView() {
             mobile: mobile.trim() || null,
             contact_privacy: privacy,
           })
-          .eq("id", auth.user.id)
+          .eq("id", meId)
       )
       toast.success("프로필을 저장했어요.")
       router.refresh() // 서버 레이아웃 재요청 → Header 이름 갱신
@@ -236,9 +234,8 @@ export function SettingsView() {
 
   const setMyStatus = async (value: string) => {
     setStatus(value)
-    const { data: auth } = await supabase.auth.getUser()
-    if (!auth.user) return
-    await supabase.from("profiles").update({ status_manual: value }).eq("id", auth.user.id)
+    if (!meId) return
+    await supabase.from("profiles").update({ status_manual: value }).eq("id", meId)
     toast.success("상태를 변경했어요.")
   }
 

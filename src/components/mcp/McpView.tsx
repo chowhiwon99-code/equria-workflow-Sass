@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { Plug, Plus, RefreshCw, Trash2, ChevronDown, Loader2, Wrench } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
+import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { Button } from "@/components/ui/button"
 import { Modal, fieldClass } from "@/components/shared/Modal"
 import { Loading, EmptyState, ErrorState } from "@/components/shared/States"
@@ -29,6 +30,7 @@ function envKeyPreview(name: string): string {
 
 export function McpView() {
   const supabase = createClient()
+  const me = useCurrentUserId()
   const [isAdmin, setIsAdmin] = useState(false)
   const [servers, setServers] = useState<Server[]>([])
   const [tools, setTools] = useState<Record<string, Tool[]>>({})
@@ -57,14 +59,13 @@ export function McpView() {
 
   useEffect(() => {
     ;(async () => {
-      const { data: auth } = await supabase.auth.getUser()
-      if (auth.user) {
-        const { data: prof } = await supabase.from("profiles").select("role").eq("id", auth.user.id).maybeSingle()
+      if (me) {
+        const { data: prof } = await supabase.from("profiles").select("role").eq("id", me).maybeSingle()
         setIsAdmin(prof?.role === "admin")
       }
     })()
     load()
-  }, [supabase, load])
+  }, [supabase, load, me])
 
   const add = async () => {
     if (!form.name.trim() || !form.url.trim()) {

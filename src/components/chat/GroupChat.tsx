@@ -9,6 +9,7 @@ import { uploadImage } from "@/lib/upload"
 import { cn } from "@/lib/utils"
 import { fieldClass } from "@/components/shared/Modal"
 import { useUndo } from "@/components/undo/UndoProvider"
+import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { MessageBody } from "@/components/chat/MessageBody"
 import { RichComposer, type ComposerPayload } from "@/components/chat/RichComposer"
@@ -41,9 +42,9 @@ function dayLabel(iso: string): string {
 /** 그룹 채팅방. DM과 별개 테이블(group_*). 전체방(default)·커스텀방(초대) 공용. roomId 없으면 전체방. */
 export function GroupChat({ roomId: roomIdProp }: { roomId?: string }) {
   const supabase = createClient()
+  const meId = useCurrentUserId()
   const router = useRouter()
   const { push } = useUndo()
-  const [meId, setMeId] = useState<string | null>(null)
   const [roomId, setRoomId] = useState<string | null>(null)
   const [roomName, setRoomName] = useState("전체 채팅")
   const [isDefault, setIsDefault] = useState(true)
@@ -126,9 +127,6 @@ export function GroupChat({ roomId: roomIdProp }: { roomId?: string }) {
   useEffect(() => {
     ;(async () => {
       try {
-        const { data: auth } = await supabase.auth.getUser()
-        const me = auth.user?.id ?? null
-        setMeId(me)
         const roomQuery = roomIdProp
           ? supabase.from("group_rooms").select("id, name, is_default").eq("id", roomIdProp).limit(1).single()
           : supabase.from("group_rooms").select("id, name, is_default").eq("is_default", true).limit(1).single()
@@ -150,7 +148,7 @@ export function GroupChat({ roomId: roomIdProp }: { roomId?: string }) {
           const ids = (rm ?? []).map((r) => r.user_id)
           setMemberIds(ids)
           const nameOf = (id: string) => (profs ?? []).find((p) => p.id === id)?.name ?? "직원"
-          const others = ids.filter((id) => id !== me)
+          const others = ids.filter((id) => id !== meId)
           setRoomName(room.name && room.name !== "그룹 채팅" ? room.name : others.map(nameOf).join(", ") || room.name)
         } else {
           setRoomName(room.name)
@@ -164,7 +162,7 @@ export function GroupChat({ roomId: roomIdProp }: { roomId?: string }) {
         void loadReactions(room.id)
         void loadAttachments(room.id)
         void loadReads(room.id)
-        if (me) void supabase.rpc("mark_room_read", { p_room: room.id }).then(() => void loadReads(room.id))
+        if (meId) void supabase.rpc("mark_room_read", { p_room: room.id }).then(() => void loadReads(room.id))
         setLoading(false)
       } catch {
         setError("채팅을 불러오지 못했습니다.")
@@ -172,7 +170,7 @@ export function GroupChat({ roomId: roomIdProp }: { roomId?: string }) {
       }
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabase, roomIdProp])
+  }, [supabase, roomIdProp, meId])
 
   // 실시간 — 방 필터.
   useEffect(() => {
