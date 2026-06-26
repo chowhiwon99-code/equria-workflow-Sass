@@ -731,6 +731,156 @@ export type Database = {
           },
         ]
       }
+      cash_accounts: {
+        Row: {
+          color: string
+          created_at: string
+          created_by: string | null
+          currency: string
+          deleted_at: string | null
+          id: string
+          kind: string
+          name: string
+          opening_balance: number
+          parent_id: string | null
+          sort_order: number
+          updated_at: string
+          workspace_id: string
+          x: number | null
+          y: number | null
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          deleted_at?: string | null
+          id?: string
+          kind?: string
+          name: string
+          opening_balance?: number
+          parent_id?: string | null
+          sort_order?: number
+          updated_at?: string
+          workspace_id?: string
+          x?: number | null
+          y?: number | null
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          deleted_at?: string | null
+          id?: string
+          kind?: string
+          name?: string
+          opening_balance?: number
+          parent_id?: string | null
+          sort_order?: number
+          updated_at?: string
+          workspace_id?: string
+          x?: number | null
+          y?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_accounts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_accounts_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "cash_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_accounts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cash_transfers: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          currency: string
+          deleted_at: string | null
+          fee_amount: number
+          from_account_id: string
+          id: string
+          memo: string | null
+          to_account_id: string
+          transfer_date: string
+          workspace_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          deleted_at?: string | null
+          fee_amount?: number
+          from_account_id: string
+          id?: string
+          memo?: string | null
+          to_account_id: string
+          transfer_date?: string
+          workspace_id?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          deleted_at?: string | null
+          fee_amount?: number
+          from_account_id?: string
+          id?: string
+          memo?: string | null
+          to_account_id?: string
+          transfer_date?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_transfers_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_transfers_from_account_id_fkey"
+            columns: ["from_account_id"]
+            isOneToOne: false
+            referencedRelation: "cash_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_transfers_to_account_id_fkey"
+            columns: ["to_account_id"]
+            isOneToOne: false
+            referencedRelation: "cash_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_transfers_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversations: {
         Row: {
           agent_id: string | null
@@ -1093,6 +1243,7 @@ export type Database = {
       }
       finance_entries: {
         Row: {
+          account_id: string | null
           amount: number
           category: string | null
           created_at: string
@@ -1118,6 +1269,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          account_id?: string | null
           amount?: number
           category?: string | null
           created_at?: string
@@ -1143,6 +1295,7 @@ export type Database = {
           workspace_id?: string
         }
         Update: {
+          account_id?: string | null
           amount?: number
           category?: string | null
           created_at?: string
