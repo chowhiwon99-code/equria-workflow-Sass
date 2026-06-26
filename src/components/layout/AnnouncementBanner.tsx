@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { Megaphone, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 
 const DISMISS_KEY = "equria:announcement-dismissed"
 
@@ -23,12 +24,10 @@ function dismissedIds(): string[] {
 export function AnnouncementBanner() {
   const supabase = createClient()
   const [ann, setAnn] = useState<{ id: string; title: string; content: string } | null>(null)
-  const [meId, setMeId] = useState<string | null>(null)
+  const meId = useCurrentUserId()
 
   const load = useCallback(async () => {
-    const { data: auth } = await supabase.auth.getUser()
-    if (!auth.user) return
-    setMeId(auth.user.id)
+    if (!meId) return
     const { data } = await supabase
       .from("announcements")
       .select("id, title, content")
@@ -37,7 +36,7 @@ export function AnnouncementBanner() {
       .limit(1)
       .maybeSingle()
     setAnn(data && !dismissedIds().includes(data.id) ? data : null)
-  }, [supabase])
+  }, [supabase, meId])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

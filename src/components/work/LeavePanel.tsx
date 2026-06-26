@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
+import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -26,7 +27,7 @@ const TYPES = ["연차", "반차", "병가", "경조사", "공가", "기타"] as
 
 export function LeavePanel() {
   const supabase = createClient()
-  const [me, setMe] = useState<string | null>(null)
+  const me = useCurrentUserId()
   const [isAdmin, setIsAdmin] = useState(false)
   const [names, setNames] = useState<Record<string, string>>({})
   const [positions, setPositions] = useState<Record<string, string | null>>({})
@@ -41,11 +42,9 @@ export function LeavePanel() {
   const [reason, setReason] = useState("")
 
   const load = useCallback(async () => {
-    const { data: auth } = await supabase.auth.getUser()
-    if (!auth.user) return setLoading(false)
-    setMe(auth.user.id)
+    if (!me) return setLoading(false)
     const [{ data: prof }, { data: list }, { data: ppl }] = await Promise.all([
-      supabase.from("profiles").select("role").eq("id", auth.user.id).single(),
+      supabase.from("profiles").select("role").eq("id", me).single(),
       supabase
         .from("leave_requests")
         .select("id, leave_type, start_date, end_date, reason, status, user_id, created_at")
@@ -57,7 +56,7 @@ export function LeavePanel() {
     setNames(Object.fromEntries((ppl ?? []).map((p) => [p.id, p.name])))
     setPositions(Object.fromEntries((ppl ?? []).map((p) => [p.id, p.position])))
     setLoading(false)
-  }, [supabase])
+  }, [supabase, me])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

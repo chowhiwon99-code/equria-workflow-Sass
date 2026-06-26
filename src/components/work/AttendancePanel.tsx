@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
+import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -52,7 +53,7 @@ export function workDuration(checkIn: string | null, checkOut: string | null): s
 
 export function AttendancePanel() {
   const supabase = createClient()
-  const [me, setMe] = useState<string | null>(null)
+  const me = useCurrentUserId()
   const [recs, setRecs] = useState<Rec[]>([]) // 선택한 달의 내 근태
   const [today, setToday] = useState<Rec | null>(null) // 오늘 기록(항상 오늘 — 월 이동과 무관)
   const [ym, setYm] = useState<YM>(currentYM)
@@ -60,25 +61,23 @@ export function AttendancePanel() {
   const [busy, setBusy] = useState(false)
 
   const load = useCallback(async () => {
-    const { data: auth } = await supabase.auth.getUser()
-    if (!auth.user) return setLoading(false)
-    setMe(auth.user.id)
+    if (!me) return setLoading(false)
     const { start, end } = monthRange(ym)
     const cols = "id, work_date, check_in, check_out, status"
     const [{ data: month }, { data: td }] = await Promise.all([
       supabase
         .from("attendance_records")
         .select(cols)
-        .eq("user_id", auth.user.id)
+        .eq("user_id", me)
         .gte("work_date", start)
         .lt("work_date", end)
         .order("work_date", { ascending: false }),
-      supabase.from("attendance_records").select(cols).eq("user_id", auth.user.id).eq("work_date", todayStr()).maybeSingle(),
+      supabase.from("attendance_records").select(cols).eq("user_id", me).eq("work_date", todayStr()).maybeSingle(),
     ])
     setRecs((month as Rec[]) ?? [])
     setToday((td as Rec) ?? null)
     setLoading(false)
-  }, [supabase, ym])
+  }, [supabase, ym, me])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

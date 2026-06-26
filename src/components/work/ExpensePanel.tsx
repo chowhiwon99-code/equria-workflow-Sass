@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
+import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -27,7 +28,7 @@ const CATEGORIES = ["식비", "교통", "접대", "사무용품", "출장", "기
 
 export function ExpensePanel() {
   const supabase = createClient()
-  const [me, setMe] = useState<string | null>(null)
+  const me = useCurrentUserId()
   const [isAdmin, setIsAdmin] = useState(false)
   const [names, setNames] = useState<Record<string, string>>({})
   const [positions, setPositions] = useState<Record<string, string | null>>({})
@@ -43,11 +44,9 @@ export function ExpensePanel() {
   const [desc, setDesc] = useState("")
 
   const load = useCallback(async () => {
-    const { data: auth } = await supabase.auth.getUser()
-    if (!auth.user) return setLoading(false)
-    setMe(auth.user.id)
+    if (!me) return setLoading(false)
     const [{ data: prof }, { data: list }, { data: ppl }] = await Promise.all([
-      supabase.from("profiles").select("role").eq("id", auth.user.id).single(),
+      supabase.from("profiles").select("role").eq("id", me).single(),
       supabase
         .from("expense_reports")
         .select("id, title, amount, category, spent_on, description, status, user_id, created_at")
@@ -59,7 +58,7 @@ export function ExpensePanel() {
     setNames(Object.fromEntries((ppl ?? []).map((p) => [p.id, p.name])))
     setPositions(Object.fromEntries((ppl ?? []).map((p) => [p.id, p.position])))
     setLoading(false)
-  }, [supabase])
+  }, [supabase, me])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
