@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Paperclip, Upload, NotebookPen, FileText, Loader2, Pencil, Trash2, SmilePlus, CornerUpLeft, X, ChevronDown, ThumbsUp, Heart, Laugh, PartyPopper, Eye, Check, type LucideIcon } from "lucide-react"
+import { ArrowLeft, Paperclip, Upload, NotebookPen, FileText, Loader2, Pencil, Trash2, SmilePlus, CornerUpLeft, X, ChevronDown } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { mustOk } from "@/lib/supabase/mustOk"
@@ -912,18 +912,9 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
 
 const QUICK_EMOJIS = ["👍", "❤️", "😂", "🎉", "👀", "✅"]
 
-// 반응은 이모지로 저장(데이터 호환)하되, 표시는 lucide 아이콘 + 색으로 통일. 매핑에 없으면 이모지 그대로.
-const REACTION_ICON: Record<string, { Icon: LucideIcon; color: string }> = {
-  "👍": { Icon: ThumbsUp, color: "text-sky-500" },
-  "❤️": { Icon: Heart, color: "text-rose-500" },
-  "😂": { Icon: Laugh, color: "text-amber-500" },
-  "🎉": { Icon: PartyPopper, color: "text-violet-500" },
-  "👀": { Icon: Eye, color: "text-teal-500" },
-  "✅": { Icon: Check, color: "text-emerald-500" },
-}
-function renderReaction(emoji: string, className: string) {
-  const r = REACTION_ICON[emoji]
-  return r ? <r.Icon className={cn(className, r.color)} /> : <span>{emoji}</span>
+// 반응 표시 = 실제 이모지(DM·그룹 동일). 호출부 아이콘 크기 클래스를 글자 크기로 환산.
+function renderReaction(emoji: string, sizeClass: string) {
+  return <span className={cn("leading-none", sizeClass === "size-4" ? "text-base" : "text-sm")}>{emoji}</span>
 }
 
 /** 버블 옆 인라인 "반응 추가" 트리거 — 클릭 시 빠른 이모지 팝오버. data-emoji-open으로 부모 호버클러스터를 열려있는 동안 유지. */
