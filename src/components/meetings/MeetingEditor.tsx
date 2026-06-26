@@ -324,6 +324,7 @@ export function MeetingEditor({
   // 지식 그래프 — 리서치 자료에서 개체·관계 추출 → 움직이는 망(보기 전용 오버레이).
   const [graphBusy, setGraphBusy] = useState(false)
   const [graphData, setGraphData] = useState<GraphData | null>(init.graph)
+  const [graphCollapsed, setGraphCollapsed] = useState(false) // X=접기(데이터 유지) — 저장 시 그래프 삭제 방지
 
   const runGraph = async (materialArg?: string, topicArg?: string, silent = false) => {
     const material = (materialArg ?? researchResult?.text ?? "").trim()
@@ -838,19 +839,29 @@ export function MeetingEditor({
         </>
       )}
 
-      {/* 저장된 꼬리물기 그래프 복원 — 리서치 세션 밖(노트 다시 열기)에서도 보이게 */}
-      {graphData && !researchResult && (
-        <div className="mt-4">
-          <ResearchGraph
-            nodes={graphData.nodes}
-            links={graphData.links}
-            topic={researchQuery || title}
-            material=""
-            onInsert={(text) => editorRef.current?.chain().focus("end").insertContent(mdToContent(text)).run()}
-            onClose={() => setGraphData(null)}
-          />
-        </div>
-      )}
+      {/* 저장된 꼬리물기 그래프 복원 — 리서치 세션 밖(노트 다시 열기)에서도 보이게. X=접기(데이터 유지, 저장해도 안 지워짐). */}
+      {graphData &&
+        !researchResult &&
+        (graphCollapsed ? (
+          <button
+            type="button"
+            onClick={() => setGraphCollapsed(false)}
+            className="mt-4 inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <Network className="size-3.5" /> 꼬리물기 그래프 보기
+          </button>
+        ) : (
+          <div className="mt-4">
+            <ResearchGraph
+              nodes={graphData.nodes}
+              links={graphData.links}
+              topic={researchQuery || title}
+              material=""
+              onInsert={(text) => editorRef.current?.chain().focus("end").insertContent(mdToContent(text)).run()}
+              onClose={() => setGraphCollapsed(true)}
+            />
+          </div>
+        ))}
 
       {/* 본문 — Tiptap 블록 에디터 */}
       <div className="mt-5 min-h-[45vh]">
