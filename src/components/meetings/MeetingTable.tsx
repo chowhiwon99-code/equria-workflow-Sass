@@ -57,7 +57,6 @@ export function MeetingTable({
 }) {
   const supabase = createClient()
   const [sort, setSort] = useState<"date" | "importance">("date")
-  const [filterCat, setFilterCat] = useState<string | null>(null)
   const [manage, setManage] = useState(false)
   const [newName, setNewName] = useState("")
   const [newColor, setNewColor] = useState<string>("blue")
@@ -92,12 +91,10 @@ export function MeetingTable({
     if (!confirm("이 분류를 삭제할까요? (회의의 분류만 해제됩니다)")) return
     const { error } = await supabase.from("meeting_categories").delete().eq("id", id)
     if (error) return toast.error(error.message)
-    if (filterCat === id) setFilterCat(null)
     onReload()
   }
 
-  const rows = notes
-    .filter((n) => (filterCat === null ? true : n.category_id === filterCat))
+  const rows = [...notes]
     .sort((a, b) =>
       sort === "importance"
         ? b.importance - a.importance
@@ -120,19 +117,6 @@ export function MeetingTable({
         <span className="text-muted-foreground">정렬</span>
         {sortBtn("date", "날짜")}
         {sortBtn("importance", "중요도")}
-        <div className="mx-1 h-4 w-px bg-border" />
-        <span className="text-muted-foreground">분류</span>
-        <button
-          onClick={() => setFilterCat(null)}
-          className={cn("rounded-lg px-2 py-1 transition-colors", filterCat === null ? "bg-primary/10 font-medium text-primary" : "text-muted-foreground hover:bg-muted/50")}
-        >
-          전체
-        </button>
-        {categories.map((c) => (
-          <button key={c.id} onClick={() => setFilterCat(c.id)} className={cn("rounded-lg transition-transform", filterCat === c.id && "ring-2 ring-primary")}>
-            <Tag name={c.name} color={c.color} />
-          </button>
-        ))}
         <button onClick={() => setManage((m) => !m)} className="ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-1 text-muted-foreground hover:bg-muted/50 hover:text-foreground">
           <Settings2 className="size-3.5" /> 분류 관리
         </button>
