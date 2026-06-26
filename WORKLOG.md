@@ -5,6 +5,20 @@
 
 ---
 
+## 2026-06-26 · 세션15 — 현금흐름 지도 MVP (대형 신규·계획승인 후 단계적)
+
+**무엇/왜:** 회사 현금흐름을 **n8n식 흐름도 ↔ 노션식 그리드** 두 뷰(같은 데이터)로 보고 경리업무를 툴에서. **계획모드**(Explore 3개 병렬 + Plan 1개)로 재사용자산(finance·WorkflowCanvas·ResearchGraph·csv/PDF·meeting_categories) 파악 후 설계→승인. 확정: **계좌/잔액 모델·SSOT 양방향·기존 /finance 위 확장·MVP먼저(급여=P2·은행연동=P3)·노션 UX**. 계획서=`~/.claude/plans/misty-crafting-lighthouse.md`.
+1. **마이그 078** — `cash_accounts`(계좌/버킷·잔액·종류·색·x/y)·`cash_transfers`(내부이체)·`finance_entries.account_id`(nullable). RLS=finance(035) 패턴 복제. 프로덕션 적용+구조/RLS/advisor 검증(새 테이블 보안ERROR 0). types.ts **외과적 추가**(전체 재생성본은 기존 회의코드와 타입 충돌→미채택).
+2. **순수 모델** — `cashflowGraph`(computeBalances 통화별·합산금지, buildGraph=계좌+이체+카테고리 외부노드, buildMovements)·`cashAccounts`(종류 SSOT).
+3. **CashFlowView(SSOT 부모)+CashGrid(노션DB식 인라인편집)** + `/finance` "현금흐름" 탭(period 공유).
+4. **CashFlowCanvas** — WorkflowCanvas 포크(노드=계좌+합성카테고리, 엣지=금액라벨·방향 화살표·종류색)+ResearchGraph 호버 neighbor 강조·⌘휠 줌·배경 팬 이식+포트드래그=이체. `CashTransferModal`.
+5. **FinanceEntryModal 계좌 select** — 매출/비용→계좌 연결로 흐름도·잔액 반영.
+6. **CSV/PDF export**(거래내역 CSV·잔액요약+거래 PDF, 의존성 0).
+
+**예상이슈 점검:** 매 단계 tsc0·lint30/0, 최종 **next build 0**. 078 additive/nullable→기존 finance 무영향·RLS workspace 격리. SSOT=부모 load+파생(useMemo)+공유 mutation 핸들러(useUndo). **남음:** P2 급여엔진(4대보험·3.3%·소득세, 대표전용 RLS=attendance_viewers 패턴)·P3 정기/현금런웨이·전자결재연동·.xlsx·감사로그·오픈뱅킹(계좌모델이 seam). **미배포(로컬 21커밋, push 보류).**
+
+---
+
 ## 2026-06-26 · 세션14 — 채팅 UX 정리(리액션·알림·미읽음)·전환속도·Opus단가 (사용자 신고/요청)
 
 **무엇(쪼갠 내용):**

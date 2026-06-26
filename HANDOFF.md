@@ -58,8 +58,9 @@
   - **사이드바 "직원 채팅" 미읽음 빨간 배지**(`useUnreadDms`) · 근태/지출 UI 개선(근무시간·상태요약).
   - 작은 수정(1·2단계): 채팅 알림 자동삭제·스크롤바 간격·파일 다중업로드·파일 공개범위(공개/부서/개인, 044).
   - **다음(5단계 예정)**: 노션식 새 페이지(블록 에디터 + `/`슬래시 + AI 상시) — 가장 큼·단독.
-- **안정도**: `tsc` 0 · `pnpm lint` **30 errors/0 warnings**(전부 기존 `set-state-in-effect`·refs 부채, 신규 0이 베이스라인) · `any` 0 · 마이그 **001~077(80파일) 적용·drift 없음** · **`next build` 성공** → **Vercel 빌드가 실제 게이트**.
+- **안정도**: `tsc` 0 · `pnpm lint` **30 errors/0 warnings**(전부 기존 `set-state-in-effect`·refs 부채, 신규 0이 베이스라인) · `any` 0 · 마이그 **001~078(81파일) 적용·drift 없음** · **`next build` 성공** → **Vercel 빌드가 실제 게이트**.
 - **🆕 세션14 미배포 작업(working tree, feat 브랜치 — 로컬 커밋만, push 보류)**: 리액션 이모지 통일(DirectChat) · **그룹채팅 알림**(마이그 076 `handle_new_group_message` 트리거·커스텀방만·CHECK 'group' 추가·`mark_room_read` 알림정리 — **프로덕션 LIVE·롤백검증 통과**) · **카카오톡식 인앱 토스트**(NotificationBell realtime INSERT→sonner, DM·그룹 공통·현재방 생략) · **ChatList 그룹 미읽음 회귀수정**(075 SELECT 확대로 `.eq(user_id,me)` 누락 → 남의 읽은시각 집던 버그 + group_messages realtime 구독) · `(app)/loading.tsx`(전환 즉시 스켈레톤) · pricing.ts Opus $5/$25 정정 · **🆕 회의노트 표 분류칩 제거·꼬리물기 그래프 영구화(마이그 077·LIVE)·그래프 X=접기** · **🆕 getUser 왕복 제거 완료**(`CurrentUserProvider` 도입 — 서버 레이아웃의 user.id를 client context로 주입, 클라 컴포넌트/페이지 ~27곳 `auth.getUser()` 마운트 왕복 제거, 병렬 워크플로 마이그 후 tsc0·lint30/0·build0 전수검증). 남은 클라 getUser 0(서버·upload 유틸만).
+- **🆕 세션15 현금흐름 지도 MVP(미배포, 계획승인 후 단계적·매 단계 tsc0/lint30-0/build0)**: 기존 `/finance`에 **"현금흐름" 탭** 추가. **계좌·잔액 모델**(마이그 078 `cash_accounts`·`cash_transfers`·`finance_entries.account_id`, **프로덕션 LIVE**·RLS=035 패턴·advisor 0). **SSOT 양방향**: 흐름도(`CashFlowCanvas`=WorkflowCanvas 포크+ResearchGraph 호버/줌 이식, 노드=계좌+합성 카테고리, 엣지=이체/매출/비용 금액라벨·방향, 포트드래그=이체) ↔ **노션DB식 그리드**(`CashGrid` 인라인편집)가 같은 데이터. `cashflowGraph`(computeBalances 통화별·buildGraph·buildMovements)·`cashAccounts`(종류). FinanceEntryModal 계좌 select. CSV/PDF export(의존성0). **급여=P2(대표전용, attendance_viewers 패턴)·예측/오픈뱅킹=P3** — 계획서 `~/.claude/plans/misty-crafting-lighthouse.md`.
 
 > 최근 작업 상세(세션7·8: UI 리프레시·채팅 단계0~6·에이전트/위젯 재설계·캘린더·삭제RLS버그·B1격리·비용추적 등)는 **git 커밋 메시지**에 충실히 기록됨. 여기 중복 안 함.
 
