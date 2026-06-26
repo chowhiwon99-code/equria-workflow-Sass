@@ -15,6 +15,8 @@
 5. **ChatList 그룹 미읽음 회귀**(작업#5) — 075가 group_read_state SELECT를 멤버공개로 확대하자 ChatList가 `.eq(user_id,me)` 없이 읽어 남의 읽은시각 집음 → 필터 추가 + realtime에 group_messages 구독 추가(미읽음 즉시 갱신).
 6. **전환 버벅임**(작업#6) — 측정: loading.tsx 0개라 라우트 전환 시 블로킹 + 27개 컴포넌트가 마운트마다 auth.getUser() 왕복. → `(app)/loading.tsx` 추가(즉시 스켈레톤). getUser 왕복 제거(CurrentUserProvider)는 27파일이라 작업#7로 큐(대표 승인=점진·검증).
 7. **Opus 추정단가 정정** — pricing.ts opus $15/$75(구 Opus3가)→$5/$25(현 Opus4.7). 마이페이지 법무에이전트 추정비용 3배 과대표시 해소. haiku도 $1/$5로.
+8. **회의노트 정리(작업#8·9·10)** — 표 뷰 분류 색태그 필터 칩 제거(분류 컬럼·관리·정렬 유지) · 이미지 진단: 저장 이미지는 정상(DB·URL 200 검증), 깨진 건 리서치 "이미지 찾기" 후보 썸네일→`onError`로 숨김 · **꼬리물기 그래프 영구화**: 마이그 077 `meeting_notes.graph`(jsonb)→저장 시 graphData 저장, 노트 재오픈 시 독립 렌더로 인터랙티브 복원(LIVE, 노드 성장분은 v1 제외) · 인라인 코드리뷰로 "그래프 X→저장 시 삭제" 버그 잡아 **X=접기(graphCollapsed)·다시보기 버튼**으로 수정.
+9. **getUser 왕복 제거(작업#7)** — `CurrentUserProvider`(서버 (app)레이아웃 user.id→client context)+`useCurrentUserId()`. 첫 적용 useUnreadDms 검증 후 인라인 9곳 + **병렬 워크플로(18에이전트, 파일당 1)** + agents 클라페이지 3곳 = 클라 컴포넌트 ~27곳 전환. 매 배치 tsc0·lint30/0, 최종 next build 0 전수검증. 남은 getUser=서버(레이아웃·proxy·서버페이지)·upload 유틸뿐(마운트 왕복 아님).
 
 **예상이슈 점검:** 매 단계 tsc0·lint30/0 유지 · 마이그 076 RLS/CHECK 함정 선제 차단·롤백검증 · 토스트는 (app)레이아웃 Toaster 마운트 확인 · ChatList 수정은 075 RLS 확대의 회귀라 최소수정. **남음:** 작업#7 getUser 스윕. **배포:** 보류(로컬 확인 후) — 단 **마이그 076은 프로덕션 DB 적용+검증 완료(LIVE)**, 프론트는 미배포.
 
