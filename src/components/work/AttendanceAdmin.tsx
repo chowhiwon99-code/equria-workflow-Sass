@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 import { Users, ShieldCheck, Search } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { MonthStepper, currentYM, monthRange, type YM } from "@/components/shared/MonthStepper"
@@ -42,7 +43,7 @@ function summarize(records: Rec[]) {
  */
 export function AttendanceAdmin() {
   const supabase = createClient()
-  const [meId, setMeId] = useState<string | null>(null)
+  const meId = useCurrentUserId()
   const [ownerId, setOwnerId] = useState<string | null>(null)
   const [members, setMembers] = useState<Member[]>([])
   const [recs, setRecs] = useState<Rec[]>([]) // 선택 월 전체 멤버 기록
@@ -56,8 +57,6 @@ export function AttendanceAdmin() {
   const [showPerms, setShowPerms] = useState(false)
 
   const load = useCallback(async () => {
-    const { data: auth } = await supabase.auth.getUser()
-    setMeId(auth.user?.id ?? null)
     const { start, end } = monthRange(ym)
     const cols = "id, user_id, work_date, check_in, check_out, status"
     const [{ data: ws }, { data: profs }, { data: monthRows }, { data: tdRows }, { data: vw }] = await Promise.all([

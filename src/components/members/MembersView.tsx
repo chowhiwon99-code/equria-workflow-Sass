@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Users, MessageSquare, Mail, Phone, Smartphone, ChevronDown, type LucideIcon } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
+import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { fieldClass } from "@/components/shared/Modal"
@@ -26,7 +27,7 @@ export function MembersView() {
   const supabase = createClient()
   const router = useRouter()
   const [members, setMembers] = useState<Member[]>([])
-  const [meId, setMeId] = useState<string | null>(null)
+  const meId = useCurrentUserId()
   const [ownerId, setOwnerId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -38,8 +39,6 @@ export function MembersView() {
 
   const load = useCallback(async () => {
     try {
-      const { data: auth } = await supabase.auth.getUser()
-      setMeId(auth.user?.id ?? null)
       // 목록은 비민감 필드만. 연락처(email/전화)는 펼칠 때 directory_contact RPC로 공개 항목만 가져온다.
       const [{ data, error: queryError }, { data: ws }] = await Promise.all([
         supabase.from("profiles").select("id, name, department, position, status_manual, role").order("name"),

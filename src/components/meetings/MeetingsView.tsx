@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { Plus, NotebookPen, ChevronRight } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
+import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Select } from "@/components/shared/Select"
@@ -29,7 +30,7 @@ const SORT_OPTIONS = [
 
 export function MeetingsView() {
   const supabase = createClient()
-  const [me, setMe] = useState<string | null>(null)
+  const me = useCurrentUserId()
   const [isAdmin, setIsAdmin] = useState(false)
   const [names, setNames] = useState<Record<string, string>>({})
   const [positions, setPositions] = useState<Record<string, string | null>>({})
@@ -46,11 +47,9 @@ export function MeetingsView() {
   const [listMode, setListMode] = useState<"grid" | "table">("grid")
 
   const load = useCallback(async () => {
-    const { data: auth } = await supabase.auth.getUser()
-    if (!auth.user) return setLoading(false)
-    setMe(auth.user.id)
+    if (!me) return setLoading(false)
     const [{ data: prof }, { data: list }, { data: ppl }, { data: fdrs }, { data: cats }] = await Promise.all([
-      supabase.from("profiles").select("role").eq("id", auth.user.id).single(),
+      supabase.from("profiles").select("role").eq("id", me).single(),
       supabase.from("meeting_notes").select("*").order("created_at", { ascending: false }),
       supabase.from("profiles").select("id, name, position"),
       supabase.from("meeting_note_folders").select("id, name, created_at").order("created_at"),
@@ -63,7 +62,7 @@ export function MeetingsView() {
     setFolders((fdrs as FolderRow[]) ?? [])
     setCategories((cats as Category[]) ?? [])
     setLoading(false)
-  }, [supabase])
+  }, [supabase, me])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -94,9 +93,8 @@ export function MeetingsView() {
   }
 
   const createFolder = async (name: string) => {
-    const { data: auth } = await supabase.auth.getUser()
-    if (!auth.user) return
-    const { error } = await supabase.from("meeting_note_folders").insert({ name, created_by: auth.user.id })
+    if (!me) return
+    const { error } = await supabase.from("meeting_note_folders").insert({ name, created_by: me })
     if (error) return toast.error("폴더를 만들지 못했어요.")
     toast.success("폴더를 만들었어요.")
     load()

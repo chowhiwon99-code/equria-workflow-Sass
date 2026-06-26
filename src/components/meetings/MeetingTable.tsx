@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react"
 import { toast } from "sonner"
 import { Plus, Trash2, Settings2, Check } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { cn } from "@/lib/utils"
 import { fieldClass } from "@/components/shared/Modal"
 import type { Tables } from "@/lib/supabase/types"
@@ -56,6 +57,7 @@ export function MeetingTable({
   onReload: () => void
 }) {
   const supabase = createClient()
+  const me = useCurrentUserId()
   const [sort, setSort] = useState<"date" | "importance">("date")
   const [manage, setManage] = useState(false)
   const [newName, setNewName] = useState("")
@@ -78,10 +80,9 @@ export function MeetingTable({
   const addCategory = async () => {
     const name = newName.trim()
     if (!name) return
-    const { data: auth } = await supabase.auth.getUser()
     const { error } = await supabase
       .from("meeting_categories")
-      .insert({ name, color: newColor, created_by: auth.user?.id ?? null, sort_order: categories.length })
+      .insert({ name, color: newColor, created_by: me, sort_order: categories.length })
     if (error) return toast.error(error.message)
     setNewName("")
     onReload()
