@@ -30,14 +30,21 @@ export function CashFlowView() {
   const me = useCurrentUserId()
   const { push } = useUndo()
   const [slots, setSlots] = useState<CashAccount[]>([])
+  const [opening, setOpening] = useState<Record<string, number>>({})
+  const [defaultCurrency, setDefaultCurrency] = useState("KRW")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
-      const { data, error: e } = await supabase.from("cash_accounts").select("*").is("deleted_at", null).order("sort_order")
+      const [{ data: slotData, error: e }, { data: settings }] = await Promise.all([
+        supabase.from("cash_accounts").select("*").is("deleted_at", null).order("sort_order"),
+        supabase.from("cashflow_settings").select("opening_cash, default_currency").maybeSingle(),
+      ])
       if (e) throw e
-      setSlots((data as CashAccount[]) ?? [])
+      setSlots((slotData as CashAccount[]) ?? [])
+      setOpening((settings?.opening_cash as Record<string, number>) ?? {})
+      setDefaultCurrency(settings?.default_currency ?? "KRW")
       setError(null)
     } catch {
       setError("현금흐름을 불러오지 못했어요.")
@@ -58,7 +65,7 @@ export function CashFlowView() {
     return () => window.removeEventListener("equria:reload", h)
   }, [load])
 
-  const graph = useMemo(() => buildSlotGraph(slots), [slots])
+  const graph = useMemo(() => buildSlotGraph(slots, opening, defaultCurrency), [slots, opening, defaultCurrency])
 
   // ── 슬롯 CRUD ──
   const addSlot = async () => {
@@ -102,7 +109,13 @@ export function CashFlowView() {
     const slotRows = slots
       .map((s) => `<tr><td>${esc(s.name)}</td><td>${esc(slotLabel(s.kind))}</td><td class="r">${esc(money(Number(s.amount), s.currency))}</td></tr>`)
       .join("")
-    const netRows = graph.net.map((nt) => `<tr><td><b>회사 보유 현금</b></td><td></td><td class="r"><b>${esc(money(nt.amount, nt.currency))}</b></td></tr>`).join("")
+    const netRows = graph.summary
+      .map(
+        (s) =>
+          `<tr><td><b>가용현금 (${s.currency})</b></td><td></td><td class="r"><b>${esc(money(s.available, s.currency))}</b></td></tr>` +
+          `<tr><td>순이익 (${s.currency})</td><td></td><td class="r">${esc(money(s.netProfit, s.currency))}</td></tr>`
+      )
+      .join("")
     win.document.write(
       `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>현금흐름</title><style>${PRINT_CSS}</style></head><body>` +
         `<h1>현금흐름 지도</h1><h2>항목</h2>` +
@@ -124,14 +137,12 @@ export function CashFlowView() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-semibold">현금 흐름도</h3>
-            {graph.net.map((nt) => (
-              <span
-                key={nt.currency}
-                className={cn("rounded-full px-2 py-0.5 text-xs font-medium tabular-nums", nt.amount < 0 ? "bg-rose-500/10 text-rose-600" : "bg-emerald-500/10 text-emerald-600")}
-              >
-                남는 현금 {money(nt.amount, nt.currency)}
-              </span>
-            ))}
+            <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium tabular-nums", graph.pool.available < 0 ? "bg-rose-500/10 text-rose-600" : "bg-emerald-500/10 text-emerald-600")}>
+              가용현금 {money(graph.pool.available, graph.pool.currency)}
+            </span>
+            <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium tabular-nums", graph.pool.netProfit < 0 ? "bg-rose-500/10 text-rose-600" : "bg-blue-500/10 text-blue-600")}>
+              순이익 {money(graph.pool.netProfit, graph.pool.currency)}
+            </span>
           </div>
           <div className="flex items-center gap-1.5">
             <Button size="sm" variant="outline" onClick={exportCsv} disabled={slots.length === 0}>

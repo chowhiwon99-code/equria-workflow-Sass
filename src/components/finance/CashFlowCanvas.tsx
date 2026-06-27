@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
 import { money } from "@/lib/finance"
 import { tagBg } from "@/lib/meetingMeta"
-import type { CashNode, CashEdge } from "@/lib/cashflowGraph"
+import { POOL_ID, type CashNode, type CashEdge } from "@/lib/cashflowGraph"
 
 const NODE_W = 140
 const NODE_H = 58
@@ -57,6 +57,14 @@ export function CashFlowCanvas({
     }
     return s
   }, [hover, edges])
+
+  // 슬롯 id → flow(매출/비용/보유) — 호버 툴팁용
+  const flowByNode = useMemo(() => {
+    const m = new Map<string, CashEdge["kind"]>()
+    for (const e of edges) m.set(e.source === POOL_ID ? e.target : e.source, e.kind)
+    return m
+  }, [edges])
+  const available = nodeById.get(POOL_ID)?.balance ?? 0
 
   const toWorld = (clientX: number, clientY: number) => {
     const r = wrapRef.current?.getBoundingClientRect()
@@ -185,43 +193,64 @@ export function CashFlowCanvas({
         </svg>
 
         {/* 노드 */}
-        {nodes.map((n) => {
-          const p = posOf(n)
-          const faded = dim(n.id)
-          const isHub = n.kind === "hub"
-          const negative = isHub && n.balance < 0
+        {nodes.map((node) => {
+          const p = posOf(node)
+          const faded = dim(node.id)
+
+          // 가운데 풀 — 가용현금 + 분해(시작/매출/비용/보유/순이익)
+          if (node.kind === "pool") {
+            const negative = node.balance < 0
+            return (
+              <div
+                key={node.id}
+                data-node-id={node.id}
+                style={{ left: p.x, top: p.y, width: 190, opacity: faded ? 0.3 : 1, transition: drag ? "none" : "opacity 0.15s" }}
+                onPointerEnter={() => setHover(node.id)}
+                onPointerLeave={() => setHover((h) => (h === node.id ? null : h))}
+                onPointerDown={(e) => e.stopPropagation()}
+                className="absolute flex flex-col gap-0.5 rounded-2xl border border-primary/40 bg-primary/10 px-3.5 py-3 shadow-md ring-1 ring-primary/20"
+              >
+                <span className="text-[11px] font-medium text-muted-foreground">{node.label}</span>
+                <span className={cn("text-base font-bold tabular-nums", negative ? "text-rose-600" : "text-foreground")}>{money(node.balance, node.currency)}</span>
+                <div className="mt-1 space-y-0.5 border-t pt-1 text-[10px] tabular-nums text-muted-foreground">
+                  <PoolLine label="시작 보유" v={money(node.opening ?? 0, node.currency)} />
+                  <PoolLine label="+ 매출" v={money(node.revenue ?? 0, node.currency)} cls="text-emerald-600" />
+                  <PoolLine label="− 비용" v={money(node.expense ?? 0, node.currency)} cls="text-rose-600" />
+                  {(node.reserve ?? 0) > 0 && <PoolLine label="− 보유" v={money(node.reserve ?? 0, node.currency)} cls="text-blue-600" />}
+                  <PoolLine label="순이익" v={money(node.netProfit ?? 0, node.currency)} cls={cn("font-semibold", (node.netProfit ?? 0) < 0 ? "text-rose-600" : "text-foreground")} />
+                </div>
+              </div>
+            )
+          }
+
+          // 슬롯 — 호버 시 효과 툴팁("이 비용이 없으면 가용 ₩X")
+          const flow = flowByNode.get(node.id)
+          const tip =
+            flow === "revenue"
+              ? `이 매출이 가용현금을 ${money(node.balance, node.currency)} 늘려요`
+              : flow === "reserve"
+                ? `보유/적립 ${money(node.balance, node.currency)} — 가용현금에서 빠져 자산으로 쌓여요`
+                : `이 비용이 없으면 가용현금이 ${money(available + node.balance, node.currency)} 였을 거예요`
           return (
             <div
-              key={n.id}
-              data-node-id={n.id}
+              key={node.id}
+              data-node-id={node.id}
+              title={tip}
               style={{ left: p.x, top: p.y, width: NODE_W, minHeight: NODE_H, opacity: faded ? 0.25 : 1, transition: drag ? "none" : "opacity 0.15s" }}
-              onPointerEnter={() => setHover(n.id)}
-              onPointerLeave={() => setHover((h) => (h === n.id ? null : h))}
+              onPointerEnter={() => setHover(node.id)}
+              onPointerLeave={() => setHover((h) => (h === node.id ? null : h))}
               onPointerDown={(e) => {
                 e.stopPropagation()
-                if (n.synthetic) return // 허브는 재배치 안 함
                 const w = toWorld(e.clientX, e.clientY)
-                setDrag({ kind: "node", id: n.id, ox: w.x - p.x, oy: w.y - p.y, moved: false })
+                setDrag({ kind: "node", id: node.id, ox: w.x - p.x, oy: w.y - p.y, moved: false })
               }}
-              className={cn(
-                "absolute flex touch-none flex-col justify-center rounded-xl border px-3 py-2 shadow-sm",
-                isHub ? "border-primary/40 bg-primary/10 ring-1 ring-primary/20" : "cursor-grab bg-card active:cursor-grabbing"
-              )}
+              className="absolute flex cursor-grab touch-none flex-col justify-center rounded-xl border bg-card px-3 py-2 shadow-sm active:cursor-grabbing"
             >
-              {isHub ? (
-                <>
-                  <span className="text-[11px] font-medium text-muted-foreground">{n.label}</span>
-                  <span className={cn("text-sm font-bold tabular-nums", negative ? "text-rose-600" : "text-emerald-600")}>{money(n.balance, n.currency)}</span>
-                </>
-              ) : (
-                <>
-                  <div className="flex items-center gap-1.5">
-                    <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: tagBg(n.color, 90) }} />
-                    <span className="truncate text-xs font-semibold">{n.label}</span>
-                  </div>
-                  <span className="mt-0.5 truncate text-[11px] tabular-nums text-muted-foreground">{money(n.balance, n.currency)}</span>
-                </>
-              )}
+              <div className="flex items-center gap-1.5">
+                <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: tagBg(node.color, 90) }} />
+                <span className="truncate text-xs font-semibold">{node.label}</span>
+              </div>
+              <span className="mt-0.5 truncate text-[11px] tabular-nums text-muted-foreground">{money(node.balance, node.currency)}</span>
             </div>
           )
         })}
@@ -233,4 +262,13 @@ export function CashFlowCanvas({
 function bezier(a: { x: number; y: number }, b: { x: number; y: number }): string {
   const dx = Math.max(40, Math.abs(b.x - a.x) * 0.5)
   return `M ${a.x} ${a.y} C ${a.x + dx} ${a.y}, ${b.x - dx} ${b.y}, ${b.x} ${b.y}`
+}
+
+function PoolLine({ label, v, cls }: { label: string; v: string; cls?: string }) {
+  return (
+    <div className="flex justify-between gap-2">
+      <span>{label}</span>
+      <span className={cls}>{v}</span>
+    </div>
+  )
 }
