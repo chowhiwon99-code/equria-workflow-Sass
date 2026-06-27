@@ -733,6 +733,7 @@ export type Database = {
       }
       cash_accounts: {
         Row: {
+          category_id: string | null
           amount: number
           color: string
           created_at: string
@@ -751,6 +752,7 @@ export type Database = {
           y: number | null
         }
         Insert: {
+          category_id?: string | null
           amount?: number
           color?: string
           created_at?: string
@@ -769,6 +771,7 @@ export type Database = {
           y?: number | null
         }
         Update: {
+          category_id?: string | null
           amount?: number
           color?: string
           created_at?: string
@@ -803,6 +806,54 @@ export type Database = {
           },
           {
             foreignKeyName: "cash_accounts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cash_categories: {
+        Row: {
+          color: string
+          created_at: string
+          created_by: string | null
+          flow: string
+          id: string
+          name: string
+          sort_order: number
+          workspace_id: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          flow?: string
+          id?: string
+          name: string
+          sort_order?: number
+          workspace_id?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          flow?: string
+          id?: string
+          name?: string
+          sort_order?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_categories_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_categories_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -879,6 +930,45 @@ export type Database = {
             foreignKeyName: "cash_transfers_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cashflow_settings: {
+        Row: {
+          default_currency: string
+          opening_cash: Json
+          updated_at: string
+          updated_by: string | null
+          workspace_id: string
+        }
+        Insert: {
+          default_currency?: string
+          opening_cash?: Json
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id?: string
+        }
+        Update: {
+          default_currency?: string
+          opening_cash?: Json
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cashflow_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cashflow_settings_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
