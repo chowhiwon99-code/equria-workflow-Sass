@@ -1,26 +1,22 @@
 // 손익 → 함수가 살아있는 엑셀(.xlsx). exceljs는 클릭 시에만 lazy import(SSR/번들 격리).
-// 셀에 실제 수식을 넣어 열어서 숫자를 바꾸면 자동 재계산된다.
+// 행마다 입력 필드를 D열부터 배치하고, 금액 셀에 그 행 유형의 AST에서 만든 실제 수식을 넣는다(앱과 동일 결과).
+
+import { toExcelFormula, type CalcNode, type CalcField } from "./calcFormula"
 
 export type PnlRow = {
   name: string
-  kindLabel: string // "매출" | "비용" | "보유금" (SUMIF 매칭용)
-  typeLabel: string // "정액" | "수량" | "채널"
-  item_type: "fixed" | "qty" | "channel"
-  units: number
-  unit_price: number
-  rate: number // 0–1
-  extra: number
-  amount: number // 정액일 때만 사용(계산형은 수식 셀)
+  kindLabel: string // "매출" | "비용" | "보유금" (SUMIF 매칭)
+  typeLabel: string
+  fields: CalcField[] // 순서대로 D,E,F… 배치
+  values: Record<string, number>
+  ast: CalcNode | null // null = 정액(값)
+  amount: number // 정액일 때
   currency: string
 }
 
-/**
- * 컬럼: A 항목명 · B 구분 · C 유형 · D 판매수/갯수 · E 단가 · F 수수료% · G 택배비/부가세 · H 금액(수식) · I 통화
- *  - channel: H = D*(E*(1−F)−G)
- *  - qty:     H = D*E + G
- *  - fixed:   H = 입력 금액(값)
- *  하단: 총매출 = SUMIF(B,"매출",H) · 총비용 = SUMIF(B,"비용",H) · 순이익 = 총매출 − 총비용
- */
+const INPUT_COLS = ["D", "E", "F", "G", "H", "I"] // 입력 최대 6칸
+const AMT = "J"
+
 export async function downloadPnlXlsx(filename: string, rows: PnlRow[]) {
   const ExcelJS = (await import("exceljs")).default
   const wb = new ExcelJS.Workbook()
@@ -29,11 +25,13 @@ export async function downloadPnlXlsx(filename: string, rows: PnlRow[]) {
   ws.columns = [
     { header: "항목명", width: 22 },
     { header: "구분", width: 8 },
-    { header: "유형", width: 8 },
-    { header: "판매수/갯수", width: 12 },
-    { header: "단가", width: 12 },
-    { header: "수수료%", width: 9 },
-    { header: "택배비/부가세", width: 13 },
+    { header: "유형", width: 14 },
+    { header: "입력1", width: 11 },
+    { header: "입력2", width: 11 },
+    { header: "입력3", width: 11 },
+    { header: "입력4", width: 11 },
+    { header: "입력5", width: 11 },
+    { header: "입력6", width: 11 },
     { header: "금액", width: 16 },
     { header: "통화", width: 7 },
   ]
@@ -41,42 +39,39 @@ export async function downloadPnlXlsx(filename: string, rows: PnlRow[]) {
   head.font = { bold: true }
   head.eachCell((c) => {
     c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEFF2F7" } }
-    c.alignment = { vertical: "middle" }
   })
 
   rows.forEach((r, i) => {
     const rn = i + 2
-    ws.addRow([
-      r.name,
-      r.kindLabel,
-      r.typeLabel,
-      r.item_type === "fixed" ? null : r.units || 0,
-      r.item_type === "fixed" ? null : r.unit_price || 0,
-      r.item_type === "channel" ? r.rate || 0 : null,
-      r.item_type === "fixed" ? null : r.extra || 0,
-      null,
-      r.currency,
-    ])
-    const h = ws.getCell(`H${rn}`)
-    if (r.item_type === "channel") h.value = { formula: `D${rn}*(E${rn}*(1-F${rn})-G${rn})` }
-    else if (r.item_type === "qty") h.value = { formula: `D${rn}*E${rn}+G${rn}` }
-    else h.value = r.amount
-    ws.getCell(`F${rn}`).numFmt = "0.00%"
-    for (const col of ["D", "E", "G", "H"]) ws.getCell(`${col}${rn}`).numFmt = "#,##0"
+    ws.getCell(`A${rn}`).value = r.name
+    ws.getCell(`B${rn}`).value = r.kindLabel
+    ws.getCell(`C${rn}`).value = r.typeLabel
+    const colOf: Record<string, string> = {}
+    r.fields.slice(0, INPUT_COLS.length).forEach((fld, k) => {
+      const col = INPUT_COLS[k]
+      colOf[fld.key] = col
+      const cell = ws.getCell(`${col}${rn}`)
+      cell.value = Number(r.values[fld.key] ?? 0)
+      cell.numFmt = fld.kind === "percent" ? "0.00%" : "#,##0"
+    })
+    const amt = ws.getCell(`${AMT}${rn}`)
+    amt.value = r.ast ? { formula: `IFERROR(${toExcelFormula(r.ast, colOf, rn)},0)` } : r.amount
+    amt.numFmt = "#,##0"
+    ws.getCell(`K${rn}`).value = r.currency
   })
 
-  const last = rows.length + 1 // 마지막 데이터 행
+  const last = rows.length + 1
   const base = last + 2
   const totals: [string, string][] = [
-    ["총매출", `SUMIF(B2:B${last},"매출",H2:H${last})`],
-    ["총비용", `SUMIF(B2:B${last},"비용",H2:H${last})`],
-    ["순이익", `H${base}-H${base + 1}`],
+    ["총매출", `SUMIF(B2:B${last},"매출",${AMT}2:${AMT}${last})`],
+    ["총비용", `SUMIF(B2:B${last},"비용",${AMT}2:${AMT}${last})`],
+    ["순이익", `${AMT}${base}-${AMT}${base + 1}`],
   ]
   totals.forEach(([label, formula], k) => {
     const rn = base + k
     ws.getCell(`A${rn}`).value = label
     ws.getCell(`A${rn}`).font = { bold: true }
-    const h = ws.getCell(`H${rn}`)
+    const h = ws.getCell(`${AMT}${rn}`)
     h.value = rows.length ? { formula } : 0
     h.font = { bold: true }
     h.numFmt = "#,##0"

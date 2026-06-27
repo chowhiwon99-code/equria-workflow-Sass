@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
-import { Download, FileDown, Settings, X, Sheet } from "lucide-react"
+import { Download, FileDown, Settings, X, Sheet, Calculator } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { useUndo } from "@/components/undo/UndoProvider"
@@ -13,12 +13,13 @@ import { downloadCsv, todayStamp } from "@/lib/csv"
 import { downloadPnlXlsx } from "@/lib/xlsx"
 import { money, CURRENCIES, computeSlotAmount } from "@/lib/finance"
 import { slotLabel, CASHFLOW_TEMPLATES, ITEM_TYPES } from "@/lib/cashAccounts"
-import { evalFormula, flowToKind, type CalcNode } from "@/lib/calcFormula"
+import { evalFormula, flowToKind, BUILTIN_FIELDS, QTY_AST, CHANNEL_AST, type CalcNode, type CalcField } from "@/lib/calcFormula"
 import { cn } from "@/lib/utils"
 import type { CashAccount, CashCalcType } from "@/types"
 import { buildSlotGraph } from "@/lib/cashflowGraph"
 import { CashGrid } from "./CashGrid"
 import { CashFlowSummary } from "./CashFlowSummary"
+import { CalcTypeBuilder } from "./CalcTypeBuilder"
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-0000000000e1"
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => (c === "&" ? "&amp;" : c === "<" ? "&lt;" : c === ">" ? "&gt;" : "&quot;"))
@@ -37,6 +38,7 @@ export function CashFlowView() {
   const [opening, setOpening] = useState<Record<string, number>>({})
   const [defaultCurrency, setDefaultCurrency] = useState("KRW")
   const [showSettings, setShowSettings] = useState(false)
+  const [showBuilder, setShowBuilder] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -153,18 +155,35 @@ export function CashFlowView() {
   }
   // 함수가 살아있는 엑셀 — 열어서 숫자 바꾸면 자동 재계산.
   const exportXlsx = async () => {
-    const rows = slots.map((s) => ({
-      name: s.name,
-      kindLabel: slotLabel(s.kind),
-      typeLabel: ITEM_TYPES.find((t) => t.value === s.item_type)?.label ?? "정액",
-      item_type: (s.item_type === "qty" || s.item_type === "channel" ? s.item_type : "fixed") as "fixed" | "qty" | "channel",
-      units: Number(s.units),
-      unit_price: Number(s.unit_price),
-      rate: Number(s.rate),
-      extra: Number(s.extra),
-      amount: Number(s.amount),
-      currency: s.currency,
-    }))
+    const rows = slots.map((s) => {
+      const ct = s.calc_type_id ? calcTypes.find((t) => t.id === s.calc_type_id) : undefined
+      let fields: CalcField[] = []
+      let values: Record<string, number> = {}
+      let ast: CalcNode | null = null
+      if (ct) {
+        fields = (ct.fields as unknown as CalcField[]) ?? []
+        values = (s.field_values as Record<string, number>) ?? {}
+        ast = (ct.formula as { ast?: CalcNode } | null)?.ast ?? null
+      } else if (s.item_type === "channel") {
+        fields = BUILTIN_FIELDS.channel
+        ast = CHANNEL_AST
+        values = { units: Number(s.units), unit_price: Number(s.unit_price), rate: Number(s.rate), extra: Number(s.extra) }
+      } else if (s.item_type === "qty") {
+        fields = BUILTIN_FIELDS.qty
+        ast = QTY_AST
+        values = { units: Number(s.units), unit_price: Number(s.unit_price), extra: Number(s.extra) }
+      }
+      return {
+        name: s.name,
+        kindLabel: slotLabel(s.kind),
+        typeLabel: ct ? ct.name : ITEM_TYPES.find((t) => t.value === s.item_type)?.label ?? "정액",
+        fields,
+        values,
+        ast,
+        amount: Number(s.amount),
+        currency: s.currency,
+      }
+    })
     try {
       await downloadPnlXlsx(`손익_${todayStamp()}.xlsx`, rows)
     } catch {
@@ -230,6 +249,9 @@ export function CashFlowView() {
             </span>
           </div>
           <div className="flex items-center gap-1.5">
+            <Button size="sm" variant="outline" onClick={() => setShowBuilder(true)}>
+              <Calculator className="size-3.5" /> 계산 유형
+            </Button>
             <Button size="sm" variant={showSettings ? "default" : "outline"} onClick={() => setShowSettings((v) => !v)}>
               <Settings className="size-3.5" /> 설정
             </Button>
@@ -294,6 +316,8 @@ export function CashFlowView() {
 
       {/* 슬롯 표 — 금액 직접 입력 */}
       <CashGrid slots={slots} pool={graph.pool} calcTypes={calcTypes} onAddSlot={addSlot} onUpdateSlot={updateSlot} onDeleteSlot={deleteSlot} />
+
+      {showBuilder && <CalcTypeBuilder types={calcTypes} onClose={() => setShowBuilder(false)} onSaved={load} />}
     </div>
   )
 }
