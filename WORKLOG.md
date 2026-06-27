@@ -5,6 +5,21 @@
 
 ---
 
+## 2026-06-27 · 세션18 — 토스식 요약 비주얼 + **커스텀 계산 유형(AST)** (Part A·B)
+
+**무엇/왜:** 대표 피드백 — ① 엑셀 계산 항목(수수료·개수·택배비)을 회사가 직접 정의·커스터마이징(중요·기획 후 진행) ② 흐름도 화살표 의미 불명·토스/애플답지 않음. 디자인 패널(4방향) + Plan 에이전트(계산 아키텍처)로 설계→승인. 결정: 계산=풀 커스텀, 비주얼=토스식 요약.
+- **Part A 토스식 요약**(`CashFlowSummary`): n8n 노드그래프 → 회사 가용현금/순이익 히어로 카드 + 매출→회사→비용 은은한 곡선(두께=금액·회색 삼각화살표 제거) + 매출/비용 항목 breakdown 막대. `CashFlowView` 기본 뷰 교체. 의존성 0.
+- **Part B 커스텀 계산 유형(AST)**: 핵심 = **하나의 수식 AST에서 앱 계산(`evalFormula`)과 엑셀 수식 문자열(`toExcelFormula`)을 동시 생성** → 앱·엑셀 절대 불일치 없음.
+  - **마이그 082**: `cash_calc_types`(name·flow·fields jsonb·formula jsonb, RLS=cash_categories) + `cash_accounts.calc_type_id`·`field_values jsonb`. 레거시 컬럼 유지(무회귀). 프로덕션 LIVE.
+  - `calcFormula.ts`(CalcNode AST·eval·toExcel·빌트인 AST·한국어 템플릿·flowToKind·미리보기). `computeSlotAmount`/`updateSlot`: calc_type_id면 evalFormula(AST,field_values)·kind=flow(롤업 유지). `buildSlotGraph` 무변경.
+  - `CashGrid`: 유형 select에 회사 커스텀 추가, 커스텀 행은 fields를 인라인 클러스터(InlineNumber/InlinePercent 재사용)·금액 자동.
+  - `xlsx` AST화: 행마다 필드 D열~ 배치, 금액 셀=toExcelFormula(빌트인·커스텀 단일 경로), SUMIF 총계.
+  - `CalcTypeBuilder` 모달: 템플릿 시드(채널/수량/구독/정률)+필드 이름변경+수식·샘플 미리보기. '계산 유형' 버튼.
+
+**예상이슈 점검:** 매 단계 tsc0·lint30/0·build0. 082 additive·RLS 격리. `values` 예약어→`field_values`. **남음: Phase C(AI 명령/요약)**, 빌더 자유 조합·유형별 엑셀 시트는 후순위. **미배포(로컬 38커밋).**
+
+---
+
 ## 2026-06-27 · 세션17 — 현금흐름 → **손익 계산기(P&L) + 함수 엑셀** (Phase A)
 
 **무엇/왜:** 대표가 보여준 **실제 수작업 손익 스프레드시트**(채널별 판매수익·생산/마케팅/물류 비용·순수익)가 진짜 스펙. "슬롯에 금액 하나"로는 부족 → 항목마다 **함수가 들어간 계산** + **수식 살아있는 엑셀**이 핵심. 계획모드(Explore 2: exceljs·기존 계산모델)로 설계→승인. 순서=계산 엔진+엑셀 먼저(흐름도 토스/애플 미화는 Phase B), 매출=제품×채널.
