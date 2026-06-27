@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react"
 import { Trash2, Plus, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
 import { CURRENCIES } from "@/lib/finance"
-import { SLOT_TYPES, slotColor } from "@/lib/cashAccounts"
-import { tagBg } from "@/lib/meetingMeta"
+import { SLOT_TYPES } from "@/lib/cashAccounts"
+import { tagBg, swatch, CATEGORY_COLORS } from "@/lib/meetingMeta"
 import type { CashAccount } from "@/types"
 
 type SortKey = "name" | "kind" | "amount"
@@ -23,6 +23,7 @@ export function CashGrid({
 }) {
   const [q, setQ] = useState("")
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "kind", dir: 1 })
+  const [colorFor, setColorFor] = useState<string | null>(null)
 
   const rows = useMemo(() => {
     const order: Record<string, number> = { revenue_src: 0, reserve: 1, expense_dst: 2 }
@@ -94,13 +95,37 @@ export function CashGrid({
               rows.map((s) => (
                 <tr key={s.id} className="group hover:bg-muted/20">
                   <td className="px-3 py-1">
-                    <InlineText value={s.name} onCommit={(v) => onUpdateSlot(s.id, { name: v })} />
+                    <div className="relative flex items-center gap-1.5">
+                      <button
+                        onClick={() => setColorFor(colorFor === s.id ? null : s.id)}
+                        className="size-3.5 shrink-0 rounded-full ring-1 ring-border transition-transform hover:scale-110"
+                        style={{ backgroundColor: swatch(s.color) }}
+                        title="색 변경"
+                      />
+                      {colorFor === s.id && (
+                        <div className="absolute left-0 top-6 z-20 flex gap-1 rounded-lg border bg-popover p-1.5 shadow-md">
+                          {CATEGORY_COLORS.map((c) => (
+                            <button
+                              key={c}
+                              onClick={() => {
+                                onUpdateSlot(s.id, { color: c })
+                                setColorFor(null)
+                              }}
+                              className="size-4 rounded-full ring-1 ring-border transition-transform hover:scale-110"
+                              style={{ backgroundColor: swatch(c) }}
+                              title={c}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      <InlineText value={s.name} onCommit={(v) => onUpdateSlot(s.id, { name: v })} />
+                    </div>
                   </td>
                   <td className="px-3 py-1">
                     <select
                       value={s.kind}
-                      onChange={(e) => onUpdateSlot(s.id, { kind: e.target.value, color: slotColor(e.target.value) })}
-                      style={{ backgroundColor: tagBg(slotColor(s.kind), 22) }}
+                      onChange={(e) => onUpdateSlot(s.id, { kind: e.target.value })}
+                      style={{ backgroundColor: tagBg(s.color, 22) }}
                       className="cursor-pointer rounded-full border-0 px-2 py-0.5 text-xs font-medium outline-none focus:ring-1 focus:ring-ring"
                     >
                       {SLOT_TYPES.map((t) => (
