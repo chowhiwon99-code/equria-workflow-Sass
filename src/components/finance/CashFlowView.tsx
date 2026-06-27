@@ -11,7 +11,7 @@ import { Loading, ErrorState } from "@/components/shared/States"
 import { Button } from "@/components/ui/button"
 import { downloadCsv, todayStamp } from "@/lib/csv"
 import { money, CURRENCIES } from "@/lib/finance"
-import { slotLabel } from "@/lib/cashAccounts"
+import { slotLabel, CASHFLOW_TEMPLATES } from "@/lib/cashAccounts"
 import { cn } from "@/lib/utils"
 import type { CashAccount } from "@/types"
 import { buildSlotGraph } from "@/lib/cashflowGraph"
@@ -115,6 +115,18 @@ export function CashFlowView() {
     load()
   }
 
+  // ── 업종 템플릿(빈 상태 진입) ──
+  const seedTemplate = async (tid: string) => {
+    if (!me) return
+    const tpl = CASHFLOW_TEMPLATES.find((t) => t.id === tid)
+    if (!tpl) return
+    const rows = tpl.slots.map((s, i) => ({ name: s.name, kind: s.kind, color: s.color, amount: s.amount ?? 0, currency: defaultCurrency, created_by: me, sort_order: i }))
+    const { error: e } = await supabase.from("cash_accounts").insert(rows)
+    if (e) return toast.error("템플릿을 불러오지 못했어요.")
+    toast.success(`${tpl.label} 템플릿을 불러왔어요.`)
+    load()
+  }
+
   // ── Export ──
   const exportCsv = () => {
     const headers = ["항목", "구분", "금액", "통화"]
@@ -153,6 +165,20 @@ export function CashFlowView() {
 
   return (
     <div className="flex flex-col gap-4">
+      {slots.length === 0 && (
+        <div className="rounded-xl border bg-card p-4 text-center">
+          <p className="text-sm font-medium">업종 템플릿으로 빠르게 시작</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">대표적인 매출·비용 항목을 미리 채워드려요. 이후 자유롭게 편집·추가·삭제하세요.</p>
+          <div className="mt-3 flex flex-wrap justify-center gap-2">
+            {CASHFLOW_TEMPLATES.map((t) => (
+              <Button key={t.id} size="sm" variant="outline" onClick={() => seedTemplate(t.id)}>
+                {t.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* 흐름도 */}
       <div className="flex flex-col gap-2 rounded-xl border bg-card/30 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">

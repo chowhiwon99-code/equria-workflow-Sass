@@ -33,6 +33,59 @@ export function slotColor(kind: string): string {
   return SLOT_MAP.get(kind as SlotTypeValue)?.color ?? "gray"
 }
 
+/** 업종별 시작 템플릿 — 대표 매출·비용 항목을 미리 채움(이후 자유 편집). 빈 상태 진입용. */
+export type SlotTemplate = { name: string; kind: SlotTypeValue; color: string; amount?: number }
+export const CASHFLOW_TEMPLATES: { id: string; label: string; slots: SlotTemplate[] }[] = [
+  {
+    id: "ecommerce",
+    label: "이커머스",
+    slots: [
+      { name: "스마트스토어 매출", kind: "revenue_src", color: "green" },
+      { name: "쿠팡 매출", kind: "revenue_src", color: "green" },
+      { name: "광고비", kind: "expense_dst", color: "red" },
+      { name: "판매 수수료", kind: "expense_dst", color: "orange" },
+      { name: "인건비", kind: "expense_dst", color: "purple" },
+      { name: "물류비", kind: "expense_dst", color: "yellow" },
+      { name: "사내 보유금", kind: "reserve", color: "blue" },
+    ],
+  },
+  {
+    id: "manufacturing",
+    label: "제조",
+    slots: [
+      { name: "제품 매출", kind: "revenue_src", color: "green" },
+      { name: "원자재비", kind: "expense_dst", color: "red" },
+      { name: "인건비", kind: "expense_dst", color: "purple" },
+      { name: "설비·유지보수", kind: "expense_dst", color: "orange" },
+      { name: "임대료", kind: "expense_dst", color: "yellow" },
+      { name: "사내 보유금", kind: "reserve", color: "blue" },
+    ],
+  },
+  {
+    id: "service",
+    label: "서비스",
+    slots: [
+      { name: "용역·서비스 매출", kind: "revenue_src", color: "green" },
+      { name: "인건비", kind: "expense_dst", color: "purple" },
+      { name: "마케팅비", kind: "expense_dst", color: "red" },
+      { name: "임대료", kind: "expense_dst", color: "yellow" },
+      { name: "운영비", kind: "expense_dst", color: "orange" },
+      { name: "사내 보유금", kind: "reserve", color: "blue" },
+    ],
+  },
+  {
+    id: "general",
+    label: "일반",
+    slots: [
+      { name: "매출", kind: "revenue_src", color: "green" },
+      { name: "인건비", kind: "expense_dst", color: "purple" },
+      { name: "임대료", kind: "expense_dst", color: "yellow" },
+      { name: "운영비", kind: "expense_dst", color: "orange" },
+      { name: "사내 보유금", kind: "reserve", color: "blue" },
+    ],
+  },
+]
+
 const KIND_MAP = new Map(ACCOUNT_KINDS.map((k) => [k.value, k]))
 
 export function kindLabel(kind: string): string {
