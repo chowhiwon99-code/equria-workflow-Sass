@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
-import { Download, FileDown, Settings, X } from "lucide-react"
+import { Download, FileDown, Settings, X, Sheet } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { useUndo } from "@/components/undo/UndoProvider"
@@ -10,8 +10,9 @@ import { mustOk } from "@/lib/supabase/mustOk"
 import { Loading, ErrorState } from "@/components/shared/States"
 import { Button } from "@/components/ui/button"
 import { downloadCsv, todayStamp } from "@/lib/csv"
+import { downloadPnlXlsx } from "@/lib/xlsx"
 import { money, CURRENCIES, computeSlotAmount } from "@/lib/finance"
-import { slotLabel, CASHFLOW_TEMPLATES } from "@/lib/cashAccounts"
+import { slotLabel, CASHFLOW_TEMPLATES, ITEM_TYPES } from "@/lib/cashAccounts"
 import { cn } from "@/lib/utils"
 import type { CashAccount } from "@/types"
 import { buildSlotGraph } from "@/lib/cashflowGraph"
@@ -137,6 +138,26 @@ export function CashFlowView() {
     const rows = slots.map((s) => [s.name, slotLabel(s.kind), Number(s.amount), s.currency])
     downloadCsv(`현금흐름_${todayStamp()}.csv`, headers, rows)
   }
+  // 함수가 살아있는 엑셀 — 열어서 숫자 바꾸면 자동 재계산.
+  const exportXlsx = async () => {
+    const rows = slots.map((s) => ({
+      name: s.name,
+      kindLabel: slotLabel(s.kind),
+      typeLabel: ITEM_TYPES.find((t) => t.value === s.item_type)?.label ?? "정액",
+      item_type: (s.item_type === "qty" || s.item_type === "channel" ? s.item_type : "fixed") as "fixed" | "qty" | "channel",
+      units: Number(s.units),
+      unit_price: Number(s.unit_price),
+      rate: Number(s.rate),
+      extra: Number(s.extra),
+      amount: Number(s.amount),
+      currency: s.currency,
+    }))
+    try {
+      await downloadPnlXlsx(`손익_${todayStamp()}.xlsx`, rows)
+    } catch {
+      toast.error("엑셀 생성에 실패했어요.")
+    }
+  }
   const exportPdf = () => {
     const win = window.open("", "_blank", "width=900,height=1000")
     if (!win) {
@@ -198,6 +219,9 @@ export function CashFlowView() {
           <div className="flex items-center gap-1.5">
             <Button size="sm" variant={showSettings ? "default" : "outline"} onClick={() => setShowSettings((v) => !v)}>
               <Settings className="size-3.5" /> 설정
+            </Button>
+            <Button size="sm" variant="outline" onClick={exportXlsx} disabled={slots.length === 0}>
+              <Sheet className="size-3.5" /> 엑셀
             </Button>
             <Button size="sm" variant="outline" onClick={exportCsv} disabled={slots.length === 0}>
               <Download className="size-3.5" /> CSV
