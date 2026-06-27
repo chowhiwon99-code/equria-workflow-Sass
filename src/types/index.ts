@@ -22,6 +22,7 @@ export type TaxInvoice = Tables<"tax_invoices">
 export type CashAccount = Tables<"cash_accounts">
 export type CashTransfer = Tables<"cash_transfers">
 export type CashCategory = Tables<"cash_categories">
+export type CashCalcType = Tables<"cash_calc_types">
 export type CashflowSettings = Tables<"cashflow_settings">
 export type BusinessCard = Tables<"business_cards">
 export type GoogleConnection = Tables<"google_connections">

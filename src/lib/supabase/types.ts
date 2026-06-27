@@ -733,6 +733,8 @@ export type Database = {
       }
       cash_accounts: {
         Row: {
+          calc_type_id: string | null
+          field_values: Json
           extra: number
           item_type: string
           rate: number
@@ -757,6 +759,8 @@ export type Database = {
           y: number | null
         }
         Insert: {
+          calc_type_id?: string | null
+          field_values?: Json
           extra?: number
           item_type?: string
           rate?: number
@@ -781,6 +785,8 @@ export type Database = {
           y?: number | null
         }
         Update: {
+          calc_type_id?: string | null
+          field_values?: Json
           extra?: number
           item_type?: string
           rate?: number
@@ -821,6 +827,57 @@ export type Database = {
           },
           {
             foreignKeyName: "cash_accounts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cash_calc_types: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          fields: Json
+          flow: string
+          formula: Json
+          id: string
+          name: string
+          sort_order: number
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          fields?: Json
+          flow?: string
+          formula?: Json
+          id?: string
+          name: string
+          sort_order?: number
+          workspace_id?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          fields?: Json
+          flow?: string
+          formula?: Json
+          id?: string
+          name?: string
+          sort_order?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_calc_types_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_calc_types_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
