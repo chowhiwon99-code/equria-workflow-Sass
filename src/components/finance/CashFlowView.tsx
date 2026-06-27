@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
-import { Download, FileDown } from "lucide-react"
+import { Download, FileDown, Settings, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { useUndo } from "@/components/undo/UndoProvider"
@@ -10,7 +10,7 @@ import { mustOk } from "@/lib/supabase/mustOk"
 import { Loading, ErrorState } from "@/components/shared/States"
 import { Button } from "@/components/ui/button"
 import { downloadCsv, todayStamp } from "@/lib/csv"
-import { money } from "@/lib/finance"
+import { money, CURRENCIES } from "@/lib/finance"
 import { slotLabel } from "@/lib/cashAccounts"
 import { cn } from "@/lib/utils"
 import type { CashAccount } from "@/types"
@@ -18,6 +18,7 @@ import { buildSlotGraph } from "@/lib/cashflowGraph"
 import { CashGrid } from "./CashGrid"
 import { CashFlowCanvas } from "./CashFlowCanvas"
 
+const WORKSPACE_ID = "00000000-0000-0000-0000-0000000000e1"
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => (c === "&" ? "&amp;" : c === "<" ? "&lt;" : c === ">" ? "&gt;" : "&quot;"))
 const PRINT_CSS = `body{font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;color:#111;margin:24px;-webkit-print-color-adjust:exact}h1{font-size:18px;margin:0}h2{font-size:14px;margin:18px 0 4px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #ddd;padding:4px 8px;text-align:left}th{background:#f5f5f5}.r{text-align:right;font-variant-numeric:tabular-nums}@media print{@page{margin:14mm}}`
 
@@ -32,6 +33,7 @@ export function CashFlowView() {
   const [slots, setSlots] = useState<CashAccount[]>([])
   const [opening, setOpening] = useState<Record<string, number>>({})
   const [defaultCurrency, setDefaultCurrency] = useState("KRW")
+  const [showSettings, setShowSettings] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -66,6 +68,25 @@ export function CashFlowView() {
   }, [load])
 
   const graph = useMemo(() => buildSlotGraph(slots, opening, defaultCurrency), [slots, opening, defaultCurrency])
+  const currencies = useMemo(() => Array.from(new Set([defaultCurrency, ...slots.map((s) => s.currency)])), [defaultCurrency, slots])
+
+  // ── 설정(보유현금·기본통화) — 입력 즉시 흐름도 반영 + 저장(upsert) ──
+  const saveSettings = async (nextOpening: Record<string, number>, nextCurrency: string) => {
+    await mustOk(
+      supabase
+        .from("cashflow_settings")
+        .upsert({ workspace_id: WORKSPACE_ID, opening_cash: nextOpening, default_currency: nextCurrency, updated_by: me, updated_at: new Date().toISOString() }, { onConflict: "workspace_id" })
+    )
+  }
+  const setOpeningFor = (currency: string, value: number) => {
+    const next = { ...opening, [currency]: value }
+    setOpening(next)
+    saveSettings(next, defaultCurrency)
+  }
+  const setDefaultCur = (currency: string) => {
+    setDefaultCurrency(currency)
+    saveSettings(opening, currency)
+  }
 
   // ── 슬롯 CRUD ──
   const addSlot = async () => {
@@ -145,6 +166,9 @@ export function CashFlowView() {
             </span>
           </div>
           <div className="flex items-center gap-1.5">
+            <Button size="sm" variant={showSettings ? "default" : "outline"} onClick={() => setShowSettings((v) => !v)}>
+              <Settings className="size-3.5" /> 설정
+            </Button>
             <Button size="sm" variant="outline" onClick={exportCsv} disabled={slots.length === 0}>
               <Download className="size-3.5" /> CSV
             </Button>
@@ -153,6 +177,51 @@ export function CashFlowView() {
             </Button>
           </div>
         </div>
+        {showSettings && (
+          <div className="rounded-lg border bg-card p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-sm font-medium">현금흐름 설정</span>
+              <button onClick={() => setShowSettings(false)} className="text-muted-foreground hover:text-foreground" aria-label="닫기">
+                <X className="size-4" />
+              </button>
+            </div>
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                기본 통화
+                <select
+                  value={defaultCurrency}
+                  onChange={(e) => setDefaultCur(e.target.value)}
+                  className="h-8 rounded-lg border bg-background px-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring"
+                >
+                  {CURRENCIES.map((c) => (
+                    <option key={c.code} value={c.code}>{c.code}</option>
+                  ))}
+                </select>
+              </label>
+              {currencies.map((cur) => (
+                <label key={cur} className="flex flex-col gap-1 text-xs text-muted-foreground">
+                  시작 보유현금 ({cur})
+                  <input
+                    key={`${cur}:${opening[cur] ?? 0}`}
+                    defaultValue={opening[cur] ? opening[cur].toLocaleString() : ""}
+                    inputMode="decimal"
+                    placeholder="0"
+                    onFocus={(e) => {
+                      e.currentTarget.value = opening[cur] ? String(opening[cur]) : ""
+                      e.currentTarget.select()
+                    }}
+                    onBlur={(e) => setOpeningFor(cur, Number(e.target.value.replace(/,/g, "")) || 0)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") e.currentTarget.blur()
+                    }}
+                    className="h-8 w-32 rounded-lg border bg-background px-2 text-right text-sm tabular-nums text-foreground outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </label>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">시작 보유현금에 매출을 더하고 비용·보유를 빼서 가용현금·순이익을 계산해요. 입력하면 흐름도에 바로 반영됩니다.</p>
+          </div>
+        )}
         <CashFlowCanvas nodes={graph.nodes} edges={graph.edges} onMoveAccount={(id, x, y) => updateSlot(id, { x, y })} />
       </div>
 
