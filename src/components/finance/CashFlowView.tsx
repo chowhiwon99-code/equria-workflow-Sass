@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils"
 import type { CashAccount } from "@/types"
 import { buildSlotGraph } from "@/lib/cashflowGraph"
 import { CashGrid } from "./CashGrid"
-import { CashFlowCanvas } from "./CashFlowCanvas"
+import { CashFlowSummary } from "./CashFlowSummary"
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-0000000000e1"
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => (c === "&" ? "&amp;" : c === "<" ? "&lt;" : c === ">" ? "&gt;" : "&quot;"))
@@ -208,7 +208,7 @@ export function CashFlowView() {
       <div className="flex flex-col gap-2 rounded-xl border bg-card/30 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-sm font-semibold">현금 흐름도</h3>
+            <h3 className="text-sm font-semibold">손익 요약</h3>
             <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium tabular-nums", graph.pool.available < 0 ? "bg-rose-500/10 text-rose-600" : "bg-emerald-500/10 text-emerald-600")}>
               가용현금 {money(graph.pool.available, graph.pool.currency)}
             </span>
@@ -276,7 +276,7 @@ export function CashFlowView() {
             <p className="mt-2 text-xs text-muted-foreground">시작 보유현금에 매출을 더하고 비용·보유를 빼서 가용현금·순이익을 계산해요. 입력하면 흐름도에 바로 반영됩니다.</p>
           </div>
         )}
-        <CashFlowCanvas nodes={graph.nodes} edges={graph.edges} onMoveAccount={(id, x, y) => updateSlot(id, { x, y })} />
+        <CashFlowSummary slots={slots} pool={graph.pool} />
       </div>
 
       {/* 슬롯 표 — 금액 직접 입력 */}
