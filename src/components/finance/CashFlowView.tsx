@@ -96,11 +96,11 @@ export function CashFlowView() {
   }
 
   // ── 슬롯 CRUD ──
-  const addSlot = async () => {
+  const addSlot = async (kind = "expense_dst", color = "red") => {
     if (!me) return
     const { error: e } = await supabase
       .from("cash_accounts")
-      .insert({ name: "새 항목", kind: "expense_dst", color: "red", created_by: me, sort_order: slots.length })
+      .insert({ name: "새 항목", kind, color, created_by: me, sort_order: slots.length })
     if (e) return toast.error("항목을 추가하지 못했어요.")
     load()
   }
@@ -311,7 +311,7 @@ export function CashFlowView() {
             <p className="mt-2 text-xs text-muted-foreground">시작 보유현금에 매출을 더하고 비용·보유를 빼서 가용현금·순이익을 계산해요. 입력하면 흐름도에 바로 반영됩니다.</p>
           </div>
         )}
-        <CashFlowSummary slots={slots} pool={graph.pool} />
+        <CashFlowSummary slots={slots} pool={graph.pool} onUpdateSlot={updateSlot} onDeleteSlot={deleteSlot} onAddSlot={addSlot} />
       </div>
 
       {/* 슬롯 표 — 금액 직접 입력 */}
