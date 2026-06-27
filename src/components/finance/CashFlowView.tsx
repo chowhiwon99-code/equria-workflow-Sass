@@ -13,8 +13,9 @@ import { downloadCsv, todayStamp } from "@/lib/csv"
 import { downloadPnlXlsx } from "@/lib/xlsx"
 import { money, CURRENCIES, computeSlotAmount } from "@/lib/finance"
 import { slotLabel, CASHFLOW_TEMPLATES, ITEM_TYPES } from "@/lib/cashAccounts"
+import { evalFormula, flowToKind, type CalcNode } from "@/lib/calcFormula"
 import { cn } from "@/lib/utils"
-import type { CashAccount } from "@/types"
+import type { CashAccount, CashCalcType } from "@/types"
 import { buildSlotGraph } from "@/lib/cashflowGraph"
 import { CashGrid } from "./CashGrid"
 import { CashFlowSummary } from "./CashFlowSummary"
@@ -32,6 +33,7 @@ export function CashFlowView() {
   const me = useCurrentUserId()
   const { push } = useUndo()
   const [slots, setSlots] = useState<CashAccount[]>([])
+  const [calcTypes, setCalcTypes] = useState<CashCalcType[]>([])
   const [opening, setOpening] = useState<Record<string, number>>({})
   const [defaultCurrency, setDefaultCurrency] = useState("KRW")
   const [showSettings, setShowSettings] = useState(false)
@@ -40,12 +42,14 @@ export function CashFlowView() {
 
   const load = useCallback(async () => {
     try {
-      const [{ data: slotData, error: e }, { data: settings }] = await Promise.all([
+      const [{ data: slotData, error: e }, { data: settings }, { data: types }] = await Promise.all([
         supabase.from("cash_accounts").select("*").is("deleted_at", null).order("sort_order"),
         supabase.from("cashflow_settings").select("opening_cash, default_currency").maybeSingle(),
+        supabase.from("cash_calc_types").select("*").order("sort_order"),
       ])
       if (e) throw e
       setSlots((slotData as CashAccount[]) ?? [])
+      setCalcTypes((types as CashCalcType[]) ?? [])
       setOpening((settings?.opening_cash as Record<string, number>) ?? {})
       setDefaultCurrency(settings?.default_currency ?? "KRW")
       setError(null)
@@ -99,11 +103,20 @@ export function CashFlowView() {
     load()
   }
   const updateSlot = async (id: string, patch: Partial<CashAccount>) => {
-    // 어떤 입력칸을 고쳐도 유형(item_type)에 맞춰 amount를 자동 재계산해 저장.
+    // 어떤 입력칸을 고쳐도 amount 자동 재계산: 커스텀 유형이면 AST 평가, 아니면 빌트인.
     const cur = slots.find((s) => s.id === id)
     const merged = { ...cur, ...patch } as CashAccount
-    const amount = computeSlotAmount(merged)
-    await mustOk(supabase.from("cash_accounts").update({ ...patch, amount, updated_at: new Date().toISOString() }).eq("id", id))
+    const derived: Partial<CashAccount> = {}
+    let amount: number
+    if (merged.calc_type_id) {
+      const ct = calcTypes.find((t) => t.id === merged.calc_type_id)
+      const ast = (ct?.formula as { ast?: CalcNode } | null)?.ast ?? null
+      amount = evalFormula(ast, (merged.field_values as Record<string, number>) ?? {})
+      if (ct) derived.kind = flowToKind(ct.flow) // 롤업(매출/비용/보유) 유지
+    } else {
+      amount = computeSlotAmount(merged)
+    }
+    await mustOk(supabase.from("cash_accounts").update({ ...patch, ...derived, amount, updated_at: new Date().toISOString() }).eq("id", id))
     load()
   }
   const deleteSlot = async (slot: CashAccount) => {
@@ -280,7 +293,7 @@ export function CashFlowView() {
       </div>
 
       {/* 슬롯 표 — 금액 직접 입력 */}
-      <CashGrid slots={slots} pool={graph.pool} onAddSlot={addSlot} onUpdateSlot={updateSlot} onDeleteSlot={deleteSlot} />
+      <CashGrid slots={slots} pool={graph.pool} calcTypes={calcTypes} onAddSlot={addSlot} onUpdateSlot={updateSlot} onDeleteSlot={deleteSlot} />
     </div>
   )
 }

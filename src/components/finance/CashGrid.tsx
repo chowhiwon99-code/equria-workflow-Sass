@@ -3,9 +3,10 @@
 import { useMemo, useState } from "react"
 import { Trash2, Plus, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
 import { CURRENCIES, money } from "@/lib/finance"
-import { SLOT_TYPES, ITEM_TYPES } from "@/lib/cashAccounts"
+import { SLOT_TYPES, ITEM_TYPES, slotLabel } from "@/lib/cashAccounts"
 import { tagBg, swatch, CATEGORY_COLORS } from "@/lib/meetingMeta"
-import type { CashAccount } from "@/types"
+import type { CalcField } from "@/lib/calcFormula"
+import type { CashAccount, CashCalcType } from "@/types"
 import type { CashSummary } from "@/lib/cashflowGraph"
 
 type SortKey = "name" | "kind" | "amount"
@@ -18,12 +19,14 @@ type SortKey = "name" | "kind" | "amount"
 export function CashGrid({
   slots,
   pool,
+  calcTypes,
   onAddSlot,
   onUpdateSlot,
   onDeleteSlot,
 }: {
   slots: CashAccount[]
   pool: CashSummary
+  calcTypes: CashCalcType[]
   onAddSlot: () => void
   onUpdateSlot: (id: string, patch: Partial<CashAccount>) => void
   onDeleteSlot: (slot: CashAccount) => void
@@ -108,8 +111,12 @@ export function CashGrid({
               </tr>
             ) : (
               rows.map((s) => {
-                const type = s.item_type
-                const calc = type === "qty" || type === "channel"
+                const customType = s.calc_type_id ? calcTypes.find((t) => t.id === s.calc_type_id) : undefined
+                const isCustom = !!customType
+                const calc = isCustom || s.item_type === "qty" || s.item_type === "channel"
+                const vals = (s.field_values as Record<string, number>) ?? {}
+                const fields = (customType?.fields as unknown as CalcField[]) ?? []
+                const setVal = (key: string, v: number) => onUpdateSlot(s.id, { field_values: { ...vals, [key]: v } })
                 return (
                   <tr key={s.id} className="group hover:bg-muted/20">
                     {/* 항목명 + 색 */}
@@ -140,47 +147,90 @@ export function CashGrid({
                         <InlineText value={s.name} onCommit={(v) => onUpdateSlot(s.id, { name: v })} />
                       </div>
                     </td>
-                    {/* 구분 */}
+                    {/* 구분 — 커스텀 유형은 flow에서 파생(읽기전용) */}
                     <td className="px-2 py-1">
-                      <select
-                        value={s.kind}
-                        onChange={(e) => onUpdateSlot(s.id, { kind: e.target.value })}
-                        style={{ backgroundColor: tagBg(s.color, 22) }}
-                        className="cursor-pointer rounded-full border-0 px-2 py-0.5 text-xs font-medium outline-none focus:ring-1 focus:ring-ring"
-                      >
-                        {SLOT_TYPES.map((t) => (
-                          <option key={t.value} value={t.value}>{t.label}</option>
-                        ))}
-                      </select>
+                      {isCustom ? (
+                        <span className="rounded-full px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: tagBg(s.color, 22) }}>
+                          {slotLabel(s.kind)}
+                        </span>
+                      ) : (
+                        <select
+                          value={s.kind}
+                          onChange={(e) => onUpdateSlot(s.id, { kind: e.target.value })}
+                          style={{ backgroundColor: tagBg(s.color, 22) }}
+                          className="cursor-pointer rounded-full border-0 px-2 py-0.5 text-xs font-medium outline-none focus:ring-1 focus:ring-ring"
+                        >
+                          {SLOT_TYPES.map((t) => (
+                            <option key={t.value} value={t.value}>{t.label}</option>
+                          ))}
+                        </select>
+                      )}
                     </td>
-                    {/* 유형 */}
+                    {/* 유형 — 기본 + 회사 커스텀 */}
                     <td className="px-2 py-1">
                       <select
-                        value={type}
-                        onChange={(e) => onUpdateSlot(s.id, { item_type: e.target.value })}
+                        value={s.calc_type_id ? `c:${s.calc_type_id}` : s.item_type}
+                        onChange={(e) => {
+                          const v = e.target.value
+                          if (v.startsWith("c:")) onUpdateSlot(s.id, { calc_type_id: v.slice(2), item_type: "fixed" })
+                          else onUpdateSlot(s.id, { item_type: v, calc_type_id: null })
+                        }}
                         className="cursor-pointer rounded border bg-background px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-ring"
                       >
-                        {ITEM_TYPES.map((t) => (
-                          <option key={t.value} value={t.value}>{t.label}</option>
-                        ))}
+                        <optgroup label="기본">
+                          {ITEM_TYPES.map((t) => (
+                            <option key={t.value} value={t.value}>{t.label}</option>
+                          ))}
+                        </optgroup>
+                        {calcTypes.length > 0 && (
+                          <optgroup label="커스텀">
+                            {calcTypes.map((t) => (
+                              <option key={t.id} value={`c:${t.id}`}>{t.name}</option>
+                            ))}
+                          </optgroup>
+                        )}
                       </select>
                     </td>
-                    {/* 판매수/갯수 */}
-                    <td className="px-2 py-1 text-right">
-                      {calc ? <InlineNumber width="w-20" value={Number(s.units)} onCommit={(v) => onUpdateSlot(s.id, { units: v })} /> : <Dash />}
-                    </td>
-                    {/* 단가 */}
-                    <td className="px-2 py-1 text-right">
-                      {calc ? <InlineNumber width="w-24" value={Number(s.unit_price)} onCommit={(v) => onUpdateSlot(s.id, { unit_price: v })} /> : <Dash />}
-                    </td>
-                    {/* 수수료% (채널만) */}
-                    <td className="px-2 py-1 text-right">
-                      {type === "channel" ? <InlinePercent value={Number(s.rate)} onCommit={(v) => onUpdateSlot(s.id, { rate: v })} /> : <Dash />}
-                    </td>
-                    {/* 택배비/부가세 (계산형만) */}
-                    <td className="px-2 py-1 text-right">
-                      {calc ? <InlineNumber width="w-20" value={Number(s.extra)} onCommit={(v) => onUpdateSlot(s.id, { extra: v })} /> : <Dash />}
-                    </td>
+                    {isCustom ? (
+                      /* 커스텀: 입력 4칸 자리에 필드 클러스터 */
+                      <td className="px-2 py-1" colSpan={4}>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                          {fields.length === 0 ? (
+                            <span className="text-xs text-muted-foreground/50">필드 없음 — 유형 관리에서 설정</span>
+                          ) : (
+                            fields.map((fld) => (
+                              <label key={fld.key} className="flex items-center gap-1 text-xs text-muted-foreground">
+                                {fld.label}
+                                {fld.kind === "percent" ? (
+                                  <InlinePercent value={Number(vals[fld.key] ?? 0)} onCommit={(v) => setVal(fld.key, v)} />
+                                ) : (
+                                  <InlineNumber width="w-20" value={Number(vals[fld.key] ?? 0)} onCommit={(v) => setVal(fld.key, v)} />
+                                )}
+                              </label>
+                            ))
+                          )}
+                        </div>
+                      </td>
+                    ) : (
+                      <>
+                        {/* 판매수/갯수 */}
+                        <td className="px-2 py-1 text-right">
+                          {calc ? <InlineNumber width="w-20" value={Number(s.units)} onCommit={(v) => onUpdateSlot(s.id, { units: v })} /> : <Dash />}
+                        </td>
+                        {/* 단가 */}
+                        <td className="px-2 py-1 text-right">
+                          {calc ? <InlineNumber width="w-24" value={Number(s.unit_price)} onCommit={(v) => onUpdateSlot(s.id, { unit_price: v })} /> : <Dash />}
+                        </td>
+                        {/* 수수료% (채널만) */}
+                        <td className="px-2 py-1 text-right">
+                          {s.item_type === "channel" ? <InlinePercent value={Number(s.rate)} onCommit={(v) => onUpdateSlot(s.id, { rate: v })} /> : <Dash />}
+                        </td>
+                        {/* 택배비/부가세 (계산형만) */}
+                        <td className="px-2 py-1 text-right">
+                          {calc ? <InlineNumber width="w-20" value={Number(s.extra)} onCommit={(v) => onUpdateSlot(s.id, { extra: v })} /> : <Dash />}
+                        </td>
+                      </>
+                    )}
                     {/* 금액 — 정액은 직접, 계산형은 자동(읽기전용) */}
                     <td className="px-2 py-1 text-right">
                       {calc ? (
