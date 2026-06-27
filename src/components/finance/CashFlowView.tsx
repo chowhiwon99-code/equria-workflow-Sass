@@ -10,7 +10,7 @@ import { mustOk } from "@/lib/supabase/mustOk"
 import { Loading, ErrorState } from "@/components/shared/States"
 import { Button } from "@/components/ui/button"
 import { downloadCsv, todayStamp } from "@/lib/csv"
-import { money, CURRENCIES } from "@/lib/finance"
+import { money, CURRENCIES, computeSlotAmount } from "@/lib/finance"
 import { slotLabel, CASHFLOW_TEMPLATES } from "@/lib/cashAccounts"
 import { cn } from "@/lib/utils"
 import type { CashAccount } from "@/types"
@@ -98,7 +98,11 @@ export function CashFlowView() {
     load()
   }
   const updateSlot = async (id: string, patch: Partial<CashAccount>) => {
-    await mustOk(supabase.from("cash_accounts").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", id))
+    // 어떤 입력칸을 고쳐도 유형(item_type)에 맞춰 amount를 자동 재계산해 저장.
+    const cur = slots.find((s) => s.id === id)
+    const merged = { ...cur, ...patch } as CashAccount
+    const amount = computeSlotAmount(merged)
+    await mustOk(supabase.from("cash_accounts").update({ ...patch, amount, updated_at: new Date().toISOString() }).eq("id", id))
     load()
   }
   const deleteSlot = async (slot: CashAccount) => {

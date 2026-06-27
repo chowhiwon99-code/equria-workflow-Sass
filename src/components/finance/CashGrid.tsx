@@ -3,14 +3,18 @@
 import { useMemo, useState } from "react"
 import { Trash2, Plus, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
 import { CURRENCIES, money } from "@/lib/finance"
-import { SLOT_TYPES } from "@/lib/cashAccounts"
+import { SLOT_TYPES, ITEM_TYPES } from "@/lib/cashAccounts"
 import { tagBg, swatch, CATEGORY_COLORS } from "@/lib/meetingMeta"
 import type { CashAccount } from "@/types"
 import type { CashSummary } from "@/lib/cashflowGraph"
 
 type SortKey = "name" | "kind" | "amount"
 
-/** 슬롯 테이블(LoadSwift st) — 돈 항목을 행으로, 금액을 셀에 직접 타이핑. 입력 즉시 흐름도 반영(부모 SSOT). */
+/**
+ * 손익 계산기 표 — 행마다 유형(정액/수량/채널)에 따라 입력칸이 달라지고 금액이 자동 계산.
+ *  채널(매출): 판매수·단가·수수료%·택배비 → 순이익 자동 / 수량(비용): 갯수·단가 → 금액 자동 / 정액: 금액 직접.
+ * 입력 즉시 부모(SSOT)가 amount 재계산 → 흐름도·합계 반영.
+ */
 export function CashGrid({
   slots,
   pool,
@@ -45,12 +49,15 @@ export function CashGrid({
   const sortIcon = (k: SortKey) =>
     sort.key !== k ? <ArrowUpDown className="size-3 opacity-40" /> : sort.dir === 1 ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />
 
+  const th = "px-2 py-2 text-left font-medium whitespace-nowrap"
+  const thR = "px-2 py-2 text-right font-medium whitespace-nowrap"
+
   return (
     <section className="flex flex-col gap-2.5 rounded-xl border bg-card p-3">
       {/* 헤더: 제목·검색·추가 */}
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="text-sm font-semibold">
-          현금 슬롯 <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-xs font-normal text-muted-foreground">{slots.length}</span>
+          손익 항목 <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-xs font-normal text-muted-foreground">{slots.length}</span>
         </h3>
         <div className="relative ml-auto">
           <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -71,98 +78,144 @@ export function CashGrid({
 
       {/* 테이블 */}
       <div className="overflow-x-auto rounded-lg border">
-        <table className="w-full min-w-[560px] text-sm">
+        <table className="w-full min-w-[900px] text-sm">
           <thead className="border-b bg-muted/30 text-xs text-muted-foreground">
             <tr>
-              <th className="px-3 py-2 text-left font-medium">
+              <th className={th}>
                 <button onClick={() => toggleSort("name")} className="inline-flex items-center gap-1 hover:text-foreground">항목명 {sortIcon("name")}</button>
               </th>
-              <th className="px-3 py-2 text-left font-medium">
+              <th className={th}>
                 <button onClick={() => toggleSort("kind")} className="inline-flex items-center gap-1 hover:text-foreground">구분 {sortIcon("kind")}</button>
               </th>
-              <th className="px-3 py-2 text-right font-medium">
+              <th className={th}>유형</th>
+              <th className={thR}>판매수/갯수</th>
+              <th className={thR}>단가</th>
+              <th className={thR}>수수료%</th>
+              <th className={thR}>택배비/부가세</th>
+              <th className={thR}>
                 <button onClick={() => toggleSort("amount")} className="inline-flex items-center gap-1 hover:text-foreground">금액 {sortIcon("amount")}</button>
               </th>
-              <th className="px-3 py-2 text-left font-medium">통화</th>
-              <th className="w-10 px-2 py-2" />
+              <th className={th}>통화</th>
+              <th className="w-8 px-1 py-2" />
             </tr>
           </thead>
           <tbody className="divide-y">
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-3 py-8 text-center text-sm text-muted-foreground">
-                  {q ? "검색 결과가 없어요." : "항목을 추가하고 금액을 입력하면 흐름도에 바로 나타나요."}
+                <td colSpan={10} className="px-3 py-8 text-center text-sm text-muted-foreground">
+                  {q ? "검색 결과가 없어요." : "항목을 추가하고 유형·금액을 입력하면 자동으로 계산돼요."}
                 </td>
               </tr>
             ) : (
-              rows.map((s) => (
-                <tr key={s.id} className="group hover:bg-muted/20">
-                  <td className="px-3 py-1">
-                    <div className="relative flex items-center gap-1.5">
-                      <button
-                        onClick={() => setColorFor(colorFor === s.id ? null : s.id)}
-                        className="size-3.5 shrink-0 rounded-full ring-1 ring-border transition-transform hover:scale-110"
-                        style={{ backgroundColor: swatch(s.color) }}
-                        title="색 변경"
-                      />
-                      {colorFor === s.id && (
-                        <div className="absolute left-0 top-6 z-20 flex gap-1 rounded-lg border bg-popover p-1.5 shadow-md">
-                          {CATEGORY_COLORS.map((c) => (
-                            <button
-                              key={c}
-                              onClick={() => {
-                                onUpdateSlot(s.id, { color: c })
-                                setColorFor(null)
-                              }}
-                              className="size-4 rounded-full ring-1 ring-border transition-transform hover:scale-110"
-                              style={{ backgroundColor: swatch(c) }}
-                              title={c}
-                            />
-                          ))}
-                        </div>
+              rows.map((s) => {
+                const type = s.item_type
+                const calc = type === "qty" || type === "channel"
+                return (
+                  <tr key={s.id} className="group hover:bg-muted/20">
+                    {/* 항목명 + 색 */}
+                    <td className="px-2 py-1">
+                      <div className="relative flex items-center gap-1.5">
+                        <button
+                          onClick={() => setColorFor(colorFor === s.id ? null : s.id)}
+                          className="size-3.5 shrink-0 rounded-full ring-1 ring-border transition-transform hover:scale-110"
+                          style={{ backgroundColor: swatch(s.color) }}
+                          title="색 변경"
+                        />
+                        {colorFor === s.id && (
+                          <div className="absolute left-0 top-6 z-20 flex gap-1 rounded-lg border bg-popover p-1.5 shadow-md">
+                            {CATEGORY_COLORS.map((c) => (
+                              <button
+                                key={c}
+                                onClick={() => {
+                                  onUpdateSlot(s.id, { color: c })
+                                  setColorFor(null)
+                                }}
+                                className="size-4 rounded-full ring-1 ring-border transition-transform hover:scale-110"
+                                style={{ backgroundColor: swatch(c) }}
+                                title={c}
+                              />
+                            ))}
+                          </div>
+                        )}
+                        <InlineText value={s.name} onCommit={(v) => onUpdateSlot(s.id, { name: v })} />
+                      </div>
+                    </td>
+                    {/* 구분 */}
+                    <td className="px-2 py-1">
+                      <select
+                        value={s.kind}
+                        onChange={(e) => onUpdateSlot(s.id, { kind: e.target.value })}
+                        style={{ backgroundColor: tagBg(s.color, 22) }}
+                        className="cursor-pointer rounded-full border-0 px-2 py-0.5 text-xs font-medium outline-none focus:ring-1 focus:ring-ring"
+                      >
+                        {SLOT_TYPES.map((t) => (
+                          <option key={t.value} value={t.value}>{t.label}</option>
+                        ))}
+                      </select>
+                    </td>
+                    {/* 유형 */}
+                    <td className="px-2 py-1">
+                      <select
+                        value={type}
+                        onChange={(e) => onUpdateSlot(s.id, { item_type: e.target.value })}
+                        className="cursor-pointer rounded border bg-background px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-ring"
+                      >
+                        {ITEM_TYPES.map((t) => (
+                          <option key={t.value} value={t.value}>{t.label}</option>
+                        ))}
+                      </select>
+                    </td>
+                    {/* 판매수/갯수 */}
+                    <td className="px-2 py-1 text-right">
+                      {calc ? <InlineNumber width="w-20" value={Number(s.units)} onCommit={(v) => onUpdateSlot(s.id, { units: v })} /> : <Dash />}
+                    </td>
+                    {/* 단가 */}
+                    <td className="px-2 py-1 text-right">
+                      {calc ? <InlineNumber width="w-24" value={Number(s.unit_price)} onCommit={(v) => onUpdateSlot(s.id, { unit_price: v })} /> : <Dash />}
+                    </td>
+                    {/* 수수료% (채널만) */}
+                    <td className="px-2 py-1 text-right">
+                      {type === "channel" ? <InlinePercent value={Number(s.rate)} onCommit={(v) => onUpdateSlot(s.id, { rate: v })} /> : <Dash />}
+                    </td>
+                    {/* 택배비/부가세 (계산형만) */}
+                    <td className="px-2 py-1 text-right">
+                      {calc ? <InlineNumber width="w-20" value={Number(s.extra)} onCommit={(v) => onUpdateSlot(s.id, { extra: v })} /> : <Dash />}
+                    </td>
+                    {/* 금액 — 정액은 직접, 계산형은 자동(읽기전용) */}
+                    <td className="px-2 py-1 text-right">
+                      {calc ? (
+                        <span className="px-1 font-medium tabular-nums">{money(Number(s.amount), s.currency)}</span>
+                      ) : (
+                        <InlineNumber width="w-24" value={Number(s.amount)} onCommit={(v) => onUpdateSlot(s.id, { amount: v })} />
                       )}
-                      <InlineText value={s.name} onCommit={(v) => onUpdateSlot(s.id, { name: v })} />
-                    </div>
-                  </td>
-                  <td className="px-3 py-1">
-                    <select
-                      value={s.kind}
-                      onChange={(e) => onUpdateSlot(s.id, { kind: e.target.value })}
-                      style={{ backgroundColor: tagBg(s.color, 22) }}
-                      className="cursor-pointer rounded-full border-0 px-2 py-0.5 text-xs font-medium outline-none focus:ring-1 focus:ring-ring"
-                    >
-                      {SLOT_TYPES.map((t) => (
-                        <option key={t.value} value={t.value}>{t.label}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-3 py-1 text-right">
-                    <InlineNumber value={Number(s.amount)} onCommit={(v) => onUpdateSlot(s.id, { amount: v })} />
-                  </td>
-                  <td className="px-3 py-1">
-                    <select
-                      value={s.currency}
-                      onChange={(e) => onUpdateSlot(s.id, { currency: e.target.value })}
-                      className="rounded border-0 bg-transparent text-xs outline-none focus:ring-1 focus:ring-ring"
-                    >
-                      {CURRENCIES.map((c) => (
-                        <option key={c.code} value={c.code}>{c.code}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-2 py-1 text-right">
-                    <button onClick={() => onDeleteSlot(s)} className="text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:text-destructive" title="삭제">
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  </td>
-                </tr>
-              ))
+                    </td>
+                    {/* 통화 */}
+                    <td className="px-2 py-1">
+                      <select
+                        value={s.currency}
+                        onChange={(e) => onUpdateSlot(s.id, { currency: e.target.value })}
+                        className="rounded border-0 bg-transparent text-xs outline-none focus:ring-1 focus:ring-ring"
+                      >
+                        {CURRENCIES.map((c) => (
+                          <option key={c.code} value={c.code}>{c.code}</option>
+                        ))}
+                      </select>
+                    </td>
+                    {/* 삭제 */}
+                    <td className="px-1 py-1 text-right">
+                      <button onClick={() => onDeleteSlot(s)} className="text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:text-destructive" title="삭제">
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })
             )}
           </tbody>
           {slots.length > 0 && (
             <tfoot className="border-t-2 bg-muted/30 text-xs">
               <tr>
-                <td className="px-3 py-2 text-muted-foreground" colSpan={5}>
+                <td className="px-3 py-2 text-muted-foreground" colSpan={10}>
                   <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 tabular-nums">
                     <span>총매출 <b className="text-emerald-600">{money(pool.revenue, pool.currency)}</b></span>
                     <span>총비용 <b className="text-rose-600">{money(pool.expense, pool.currency)}</b></span>
@@ -177,6 +230,10 @@ export function CashGrid({
       </div>
     </section>
   )
+}
+
+function Dash() {
+  return <span className="text-muted-foreground/30">—</span>
 }
 
 // 비제어 인라인 셀 — value 변경(재로드) 시 key로 리마운트, blur/Enter 시 커밋.
@@ -202,8 +259,8 @@ function InlineText({ value, onCommit }: { value: string; onCommit: (v: string) 
   )
 }
 
-// 금액 셀 — 평소엔 천단위 콤마 표시, 포커스 시 원숫자로 편집.
-function InlineNumber({ value, onCommit }: { value: number; onCommit: (v: number) => void }) {
+// 숫자 셀 — 평소엔 천단위 콤마, 포커스 시 원숫자.
+function InlineNumber({ value, onCommit, width = "w-28" }: { value: number; onCommit: (v: number) => void; width?: string }) {
   const fmt = (v: number) => (v ? v.toLocaleString() : "")
   return (
     <input
@@ -223,7 +280,36 @@ function InlineNumber({ value, onCommit }: { value: number; onCommit: (v: number
       onKeyDown={(e) => {
         if (e.key === "Enter") e.currentTarget.blur()
       }}
-      className="w-28 rounded border-0 bg-transparent px-1 py-0.5 text-right tabular-nums outline-none focus:bg-background focus:ring-1 focus:ring-ring"
+      className={`${width} rounded border-0 bg-transparent px-1 py-0.5 text-right tabular-nums outline-none focus:bg-background focus:ring-1 focus:ring-ring`}
     />
+  )
+}
+
+// 수수료% 셀 — 저장은 0–1, 표시·입력은 %.
+function InlinePercent({ value, onCommit }: { value: number; onCommit: (v: number) => void }) {
+  const fmt = (v: number) => (v ? String(+(v * 100).toFixed(2)) : "")
+  return (
+    <span className="inline-flex items-center">
+      <input
+        key={value}
+        defaultValue={fmt(value)}
+        inputMode="decimal"
+        placeholder="0"
+        onFocus={(e) => {
+          e.currentTarget.value = value ? String(+(value * 100).toFixed(2)) : ""
+          e.currentTarget.select()
+        }}
+        onBlur={(e) => {
+          const num = Number(e.target.value.replace(/,/g, ""))
+          if (!Number.isNaN(num)) onCommit(num / 100)
+          else e.currentTarget.value = fmt(value)
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur()
+        }}
+        className="w-12 rounded border-0 bg-transparent px-1 py-0.5 text-right tabular-nums outline-none focus:bg-background focus:ring-1 focus:ring-ring"
+      />
+      <span className="text-xs text-muted-foreground">%</span>
+    </span>
   )
 }

@@ -25,6 +25,14 @@ export const SLOT_TYPES = [
 ] as const
 
 export type SlotTypeValue = (typeof SLOT_TYPES)[number]["value"]
+
+/** 계산 유형 — 행 금액을 어떻게 계산하나(computeSlotAmount). */
+export const ITEM_TYPES = [
+  { value: "fixed", label: "정액" }, // 금액 직접
+  { value: "qty", label: "수량" }, // 갯수 × 단가
+  { value: "channel", label: "채널" }, // 판매수 × (단가 × (1−수수료) − 택배비)
+] as const
+export type ItemTypeValue = (typeof ITEM_TYPES)[number]["value"]
 const SLOT_MAP = new Map(SLOT_TYPES.map((s) => [s.value, s]))
 export function slotLabel(kind: string): string {
   return SLOT_MAP.get(kind as SlotTypeValue)?.label ?? "비용"

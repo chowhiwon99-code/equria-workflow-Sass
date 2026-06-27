@@ -57,6 +57,34 @@ export function computeAmounts(input: {
   return { amount: base, total }
 }
 
+/**
+ * 손익 계산기 행 금액 — item_type별. 결과를 cash_accounts.amount에 기록(buildSlotGraph가 그대로 롤업).
+ *  - channel(매출): 판매수 × (단가 × (1 − 수수료율) − 택배비)   // rate=수수료율(0–1), extra=단위당 택배비
+ *  - qty(비용):     갯수 × 단가 + 정액(부가세 등)
+ *  - fixed:         입력 금액 그대로
+ */
+export function computeSlotAmount(input: {
+  item_type?: string | null
+  units?: number | null
+  unit_price?: number | null
+  rate?: number | null
+  extra?: number | null
+  amount?: number | null
+}): number {
+  const units = Number(input.units ?? 0)
+  const unitPrice = Number(input.unit_price ?? 0)
+  const rate = Number(input.rate ?? 0)
+  const extra = Number(input.extra ?? 0)
+  switch (input.item_type) {
+    case "channel":
+      return units * (unitPrice * (1 - rate) - extra)
+    case "qty":
+      return units * unitPrice + extra
+    default:
+      return Number(input.amount ?? 0)
+  }
+}
+
 /** 지원 통화 — 비용/매출을 KRW 외 달러·유로·엔·위안·비트코인으로 기록·정리. */
 export const CURRENCIES = [
   { code: "KRW", symbol: "₩", label: "원 (KRW)" },
