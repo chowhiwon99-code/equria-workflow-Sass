@@ -2,21 +2,24 @@
 
 import { useMemo, useState } from "react"
 import { Trash2, Plus, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
-import { CURRENCIES } from "@/lib/finance"
+import { CURRENCIES, money } from "@/lib/finance"
 import { SLOT_TYPES } from "@/lib/cashAccounts"
 import { tagBg, swatch, CATEGORY_COLORS } from "@/lib/meetingMeta"
 import type { CashAccount } from "@/types"
+import type { CashSummary } from "@/lib/cashflowGraph"
 
 type SortKey = "name" | "kind" | "amount"
 
 /** 슬롯 테이블(LoadSwift st) — 돈 항목을 행으로, 금액을 셀에 직접 타이핑. 입력 즉시 흐름도 반영(부모 SSOT). */
 export function CashGrid({
   slots,
+  pool,
   onAddSlot,
   onUpdateSlot,
   onDeleteSlot,
 }: {
   slots: CashAccount[]
+  pool: CashSummary
   onAddSlot: () => void
   onUpdateSlot: (id: string, patch: Partial<CashAccount>) => void
   onDeleteSlot: (slot: CashAccount) => void
@@ -156,6 +159,20 @@ export function CashGrid({
               ))
             )}
           </tbody>
+          {slots.length > 0 && (
+            <tfoot className="border-t-2 bg-muted/30 text-xs">
+              <tr>
+                <td className="px-3 py-2 text-muted-foreground" colSpan={5}>
+                  <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 tabular-nums">
+                    <span>총매출 <b className="text-emerald-600">{money(pool.revenue, pool.currency)}</b></span>
+                    <span>총비용 <b className="text-rose-600">{money(pool.expense, pool.currency)}</b></span>
+                    <span>순이익 <b className={pool.netProfit < 0 ? "text-rose-600" : "text-foreground"}>{money(pool.netProfit, pool.currency)}</b></span>
+                    <span>가용현금 <b className={pool.available < 0 ? "text-rose-600" : "text-foreground"}>{money(pool.available, pool.currency)}</b></span>
+                  </div>
+                </td>
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
     </section>

@@ -252,7 +252,7 @@ export function CashFlowView() {
       </div>
 
       {/* 슬롯 표 — 금액 직접 입력 */}
-      <CashGrid slots={slots} onAddSlot={addSlot} onUpdateSlot={updateSlot} onDeleteSlot={deleteSlot} />
+      <CashGrid slots={slots} pool={graph.pool} onAddSlot={addSlot} onUpdateSlot={updateSlot} onDeleteSlot={deleteSlot} />
     </div>
   )
 }
