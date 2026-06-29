@@ -5,26 +5,28 @@ import { cn } from "@/lib/utils"
 import { money } from "@/lib/finance"
 import { tagBg } from "@/lib/meetingMeta"
 import { slotCategory, type CashSummary } from "@/lib/cashflowGraph"
-import type { CashAccount } from "@/types"
+import { BUILTIN_FIELDS, type CalcField } from "@/lib/calcFormula"
+import type { CashAccount, CashCalcType } from "@/types"
 
 // 토스식 손익 요약 — 매출 → 회사 가용현금 → 비용 흐름(곡선 두께=금액) + 항목 박스를 그 자리에서 편집/삭제/추가.
+// 계산형 박스는 그 유형의 입력 필드(판매수·단가·수수료% 등)를 박스 안에서 바로 입력 → 금액 자동.
 export function CashFlowSummary({
   slots,
   pool,
+  calcTypes,
   onUpdateSlot,
   onDeleteSlot,
   onAddSlot,
 }: {
   slots: CashAccount[]
   pool: CashSummary
+  calcTypes: CashCalcType[]
   onUpdateSlot: (id: string, patch: Partial<CashAccount>) => void
   onDeleteSlot: (slot: CashAccount) => void
   onAddSlot: (kind: string, color: string) => void
 }) {
   const cur = pool.currency
   const bucket = (flow: "income" | "expense") => slots.filter((s) => slotCategory(s.kind) === flow).sort((a, b) => Number(b.amount) - Number(a.amount))
-  const revItems = bucket("income")
-  const expItems = bucket("expense")
 
   const maxFlow = Math.max(pool.revenue, pool.expense, 1)
   const w = (a: number) => 3 + 22 * Math.sqrt(Math.min(1, a / maxFlow))
@@ -61,10 +63,10 @@ export function CashFlowSummary({
         </div>
       </div>
 
-      {/* 항목 박스 — 그 자리에서 편집/삭제/추가 */}
+      {/* 항목 박스 — 그 자리에서 편집/삭제/추가 (계산형은 입력 필드까지) */}
       <div className="grid gap-3 md:grid-cols-2">
-        <EditBucket title="매출" tone="emerald" total={money(pool.revenue, cur)} items={revItems} cur={cur} onUpdateSlot={onUpdateSlot} onDeleteSlot={onDeleteSlot} onAdd={() => onAddSlot("revenue_src", "green")} />
-        <EditBucket title="비용" tone="rose" total={money(pool.expense, cur)} items={expItems} cur={cur} onUpdateSlot={onUpdateSlot} onDeleteSlot={onDeleteSlot} onAdd={() => onAddSlot("expense_dst", "red")} />
+        <EditBucket title="매출" tone="emerald" total={money(pool.revenue, cur)} items={bucket("income")} cur={cur} calcTypes={calcTypes} onUpdateSlot={onUpdateSlot} onDeleteSlot={onDeleteSlot} onAdd={() => onAddSlot("revenue_src", "green")} />
+        <EditBucket title="비용" tone="rose" total={money(pool.expense, cur)} items={bucket("expense")} cur={cur} calcTypes={calcTypes} onUpdateSlot={onUpdateSlot} onDeleteSlot={onDeleteSlot} onAdd={() => onAddSlot("expense_dst", "red")} />
       </div>
     </div>
   )
@@ -84,12 +86,32 @@ function SideCard({ className, tone, label, value }: { className: string; tone: 
   )
 }
 
+// 슬롯의 입력 필드·값 접근(빌트인=레거시 컬럼, 커스텀=field_values)
+function fieldsOf(
+  s: CashAccount,
+  calcTypes: CashCalcType[],
+  onUpdateSlot: (id: string, patch: Partial<CashAccount>) => void
+): { fields: CalcField[]; getVal: (k: string) => number; setVal: (k: string, v: number) => void } {
+  if (s.calc_type_id) {
+    const ct = calcTypes.find((t) => t.id === s.calc_type_id)
+    const fields = (ct?.fields as unknown as CalcField[]) ?? []
+    const vals = (s.field_values as Record<string, number>) ?? {}
+    return { fields, getVal: (k) => Number(vals[k] ?? 0), setVal: (k, v) => onUpdateSlot(s.id, { field_values: { ...vals, [k]: v } }) }
+  }
+  if (s.item_type === "channel" || s.item_type === "qty") {
+    const legacy: Record<string, number> = { units: Number(s.units), unit_price: Number(s.unit_price), rate: Number(s.rate), extra: Number(s.extra) }
+    return { fields: BUILTIN_FIELDS[s.item_type], getVal: (k) => legacy[k] ?? 0, setVal: (k, v) => onUpdateSlot(s.id, { [k]: v } as Partial<CashAccount>) }
+  }
+  return { fields: [], getVal: () => 0, setVal: () => {} }
+}
+
 function EditBucket({
   title,
   tone,
   total,
   items,
   cur,
+  calcTypes,
   onUpdateSlot,
   onDeleteSlot,
   onAdd,
@@ -99,11 +121,13 @@ function EditBucket({
   total: string
   items: CashAccount[]
   cur: string
+  calcTypes: CashCalcType[]
   onUpdateSlot: (id: string, patch: Partial<CashAccount>) => void
   onDeleteSlot: (slot: CashAccount) => void
   onAdd: () => void
 }) {
   const max = Math.max(1, ...items.map((i) => Number(i.amount)))
+  const barCls = tone === "emerald" ? "bg-emerald-500/70" : "bg-rose-500/70"
   return (
     <section className="flex flex-col gap-2 rounded-2xl border bg-card p-3.5">
       <div className="flex items-baseline justify-between">
@@ -112,26 +136,46 @@ function EditBucket({
       </div>
       <div className="flex flex-col gap-1">
         {items.map((s) => {
-          const editable = s.item_type === "fixed" && !s.calc_type_id
+          const { fields, getVal, setVal } = fieldsOf(s, calcTypes, onUpdateSlot)
+          const isCalc = fields.length > 0 || (!!s.calc_type_id)
+          const editableAmount = s.item_type === "fixed" && !s.calc_type_id
           return (
-            <div key={s.id} className="group flex items-center gap-2 rounded-lg px-1 py-0.5 hover:bg-muted/40">
-              <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: tagBg(s.color, 90) }} />
-              <div className="w-24 shrink-0">
-                <InlineText value={s.name} onCommit={(v) => onUpdateSlot(s.id, { name: v })} />
+            <div key={s.id} className={cn("group rounded-lg px-1 py-0.5 hover:bg-muted/40", isCalc && "border")}>
+              {/* 헤더: 점·이름·막대·금액·삭제 */}
+              <div className="flex items-center gap-2">
+                <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: tagBg(s.color, 90) }} />
+                <div className="w-24 shrink-0">
+                  <InlineText value={s.name} onCommit={(v) => onUpdateSlot(s.id, { name: v })} />
+                </div>
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                  <div className={cn("h-full rounded-full", barCls)} style={{ width: `${Math.max(3, (Number(s.amount) / max) * 100)}%` }} />
+                </div>
+                <div className="w-24 shrink-0 text-right">
+                  {editableAmount ? (
+                    <InlineNumber value={Number(s.amount)} onCommit={(v) => onUpdateSlot(s.id, { amount: v })} />
+                  ) : (
+                    <span className="px-1 text-xs font-medium tabular-nums">{money(Number(s.amount), cur)}</span>
+                  )}
+                </div>
+                <button onClick={() => onDeleteSlot(s)} className="shrink-0 text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:text-destructive" title="삭제">
+                  <Trash2 className="size-3.5" />
+                </button>
               </div>
-              <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-                <div className={cn("h-full rounded-full", tone === "emerald" ? "bg-emerald-500/70" : "bg-rose-500/70")} style={{ width: `${Math.max(3, (Number(s.amount) / max) * 100)}%` }} />
-              </div>
-              <div className="w-24 shrink-0 text-right">
-                {editable ? (
-                  <InlineNumber value={Number(s.amount)} onCommit={(v) => onUpdateSlot(s.id, { amount: v })} />
-                ) : (
-                  <span className="px-1 text-xs tabular-nums text-muted-foreground" title="계산형 — 표에서 값 편집">{money(Number(s.amount), cur)}</span>
-                )}
-              </div>
-              <button onClick={() => onDeleteSlot(s)} className="shrink-0 text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:text-destructive" title="삭제">
-                <Trash2 className="size-3.5" />
-              </button>
+              {/* 계산형: 입력 필드 클러스터 */}
+              {isCalc && fields.length > 0 && (
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 py-0.5 pl-4">
+                  {fields.map((fld) => (
+                    <label key={fld.key} className="flex items-center gap-0.5 text-[11px] text-muted-foreground">
+                      {fld.label}
+                      {fld.kind === "percent" ? (
+                        <InlinePercent value={getVal(fld.key)} onCommit={(v) => setVal(fld.key, v)} />
+                      ) : (
+                        <InlineNumber value={getVal(fld.key)} onCommit={(v) => setVal(fld.key, v)} width="w-16" />
+                      )}
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
           )
         })}
@@ -166,7 +210,7 @@ function InlineText({ value, onCommit }: { value: string; onCommit: (v: string) 
   )
 }
 
-function InlineNumber({ value, onCommit }: { value: number; onCommit: (v: number) => void }) {
+function InlineNumber({ value, onCommit, width = "w-full" }: { value: number; onCommit: (v: number) => void; width?: string }) {
   const fmt = (v: number) => (v ? v.toLocaleString() : "")
   return (
     <input
@@ -186,7 +230,36 @@ function InlineNumber({ value, onCommit }: { value: number; onCommit: (v: number
       onKeyDown={(e) => {
         if (e.key === "Enter") e.currentTarget.blur()
       }}
-      className="w-full rounded border-0 bg-transparent px-1 py-0.5 text-right text-xs tabular-nums outline-none focus:bg-background focus:ring-1 focus:ring-ring"
+      className={cn(width, "rounded border-0 bg-transparent px-1 py-0.5 text-right text-xs tabular-nums outline-none focus:bg-background focus:ring-1 focus:ring-ring")}
     />
+  )
+}
+
+// 수수료% — 저장 0–1, 표시·입력 %.
+function InlinePercent({ value, onCommit }: { value: number; onCommit: (v: number) => void }) {
+  const fmt = (v: number) => (v ? String(+(v * 100).toFixed(2)) : "")
+  return (
+    <span className="inline-flex items-center">
+      <input
+        key={value}
+        defaultValue={fmt(value)}
+        inputMode="decimal"
+        placeholder="0"
+        onFocus={(e) => {
+          e.currentTarget.value = value ? String(+(value * 100).toFixed(2)) : ""
+          e.currentTarget.select()
+        }}
+        onBlur={(e) => {
+          const num = Number(e.target.value.replace(/,/g, ""))
+          if (!Number.isNaN(num)) onCommit(num / 100)
+          else e.currentTarget.value = fmt(value)
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur()
+        }}
+        className="w-10 rounded border-0 bg-transparent px-1 py-0.5 text-right text-xs tabular-nums outline-none focus:bg-background focus:ring-1 focus:ring-ring"
+      />
+      %
+    </span>
   )
 }
