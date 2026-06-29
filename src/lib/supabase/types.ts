@@ -733,6 +733,7 @@ export type Database = {
       }
       cash_accounts: {
         Row: {
+          note: string | null
           calc_type_id: string | null
           field_values: Json
           extra: number
@@ -759,6 +760,7 @@ export type Database = {
           y: number | null
         }
         Insert: {
+          note?: string | null
           calc_type_id?: string | null
           field_values?: Json
           extra?: number
@@ -785,6 +787,7 @@ export type Database = {
           y?: number | null
         }
         Update: {
+          note?: string | null
           calc_type_id?: string | null
           field_values?: Json
           extra?: number
@@ -1009,6 +1012,7 @@ export type Database = {
       }
       cashflow_settings: {
         Row: {
+          pool_pos: Json | null
           default_currency: string
           opening_cash: Json
           updated_at: string
@@ -1016,6 +1020,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          pool_pos?: Json | null
           default_currency?: string
           opening_cash?: Json
           updated_at?: string
@@ -1023,6 +1028,7 @@ export type Database = {
           workspace_id?: string
         }
         Update: {
+          pool_pos?: Json | null
           default_currency?: string
           opening_cash?: Json
           updated_at?: string

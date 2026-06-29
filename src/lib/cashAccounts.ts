@@ -1,5 +1,7 @@
 import type { LucideIcon } from "lucide-react"
 import { Wallet, Landmark, CreditCard, PiggyBank, TrendingUp, TrendingDown, Circle } from "lucide-react"
+import type { CashAccount, CashCalcType } from "@/types"
+import { BUILTIN_FIELDS, type CalcField } from "@/lib/calcFormula"
 
 /**
  * 현금흐름 계좌/버킷 종류(노드 유형) SSOT.
@@ -104,4 +106,23 @@ export function kindIcon(kind: string): LucideIcon {
 }
 export function kindDefaultColor(kind: string): string {
   return KIND_MAP.get(kind as AccountKind)?.color ?? "gray"
+}
+
+/** 슬롯의 입력 필드·값 접근(빌트인=레거시 컬럼 units/unit_price/rate/extra, 커스텀=field_values). 그리드/캔버스 공용. */
+export function fieldsOf(
+  s: CashAccount,
+  calcTypes: CashCalcType[],
+  onUpdateSlot: (id: string, patch: Partial<CashAccount>) => void
+): { fields: CalcField[]; getVal: (k: string) => number; setVal: (k: string, v: number) => void } {
+  if (s.calc_type_id) {
+    const ct = calcTypes.find((t) => t.id === s.calc_type_id)
+    const fields = (ct?.fields as unknown as CalcField[]) ?? []
+    const vals = (s.field_values as Record<string, number>) ?? {}
+    return { fields, getVal: (k) => Number(vals[k] ?? 0), setVal: (k, v) => onUpdateSlot(s.id, { field_values: { ...vals, [k]: v } }) }
+  }
+  if (s.item_type === "channel" || s.item_type === "qty") {
+    const legacy: Record<string, number> = { units: Number(s.units), unit_price: Number(s.unit_price), rate: Number(s.rate), extra: Number(s.extra) }
+    return { fields: BUILTIN_FIELDS[s.item_type], getVal: (k) => legacy[k] ?? 0, setVal: (k, v) => onUpdateSlot(s.id, { [k]: v } as Partial<CashAccount>) }
+  }
+  return { fields: [], getVal: () => 0, setVal: () => {} }
 }

@@ -62,7 +62,8 @@ export const POOL_ID = "pool"
 export function buildSlotGraph(
   slots: CashAccount[],
   opening: Record<string, number> = {},
-  defaultCurrency = "KRW"
+  defaultCurrency = "KRW",
+  poolPos?: { x: number; y: number } | null
 ): { nodes: CashNode[]; edges: CashEdge[]; summary: CashSummary[]; pool: CashSummary } {
   const agg = new Map<string, { revenue: number; expense: number; reserve: number }>()
   const curCount = new Map<string, number>()
@@ -123,7 +124,7 @@ export function buildSlotGraph(
 
   const poolNode: CashNode = {
     id: POOL_ID, label: "회사 가용 현금", kind: "pool", currency: poolCur, color: "blue",
-    x: 380, y: 190, synthetic: true, balance: pool.available, inflow: 0, outflow: 0,
+    x: poolPos?.x ?? 380, y: poolPos?.y ?? 190, synthetic: true, balance: pool.available, inflow: 0, outflow: 0,
     opening: pool.opening, revenue: pool.revenue, expense: pool.expense, reserve: pool.reserve, netProfit: pool.netProfit,
   }
 
