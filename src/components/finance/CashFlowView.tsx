@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils"
 import type { CashAccount, CashCalcType } from "@/types"
 import { buildSlotGraph } from "@/lib/cashflowGraph"
 import { CashGrid } from "./CashGrid"
-import { CashFlowSummary } from "./CashFlowSummary"
+import { CashFlowCanvas } from "./CashFlowCanvas"
 import { CalcTypeBuilder } from "./CalcTypeBuilder"
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-0000000000e1"
@@ -39,6 +39,7 @@ export function CashFlowView() {
   const [defaultCurrency, setDefaultCurrency] = useState("KRW")
   const [showSettings, setShowSettings] = useState(false)
   const [showBuilder, setShowBuilder] = useState(false)
+  const [poolPos, setPoolPos] = useState<{ x: number; y: number } | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -46,7 +47,7 @@ export function CashFlowView() {
     try {
       const [{ data: slotData, error: e }, { data: settings }, { data: types }] = await Promise.all([
         supabase.from("cash_accounts").select("*").is("deleted_at", null).order("sort_order"),
-        supabase.from("cashflow_settings").select("opening_cash, default_currency").maybeSingle(),
+        supabase.from("cashflow_settings").select("opening_cash, default_currency, pool_pos").maybeSingle(),
         supabase.from("cash_calc_types").select("*").order("sort_order"),
       ])
       if (e) throw e
@@ -54,6 +55,7 @@ export function CashFlowView() {
       setCalcTypes((types as CashCalcType[]) ?? [])
       setOpening((settings?.opening_cash as Record<string, number>) ?? {})
       setDefaultCurrency(settings?.default_currency ?? "KRW")
+      setPoolPos((settings?.pool_pos as { x: number; y: number } | null) ?? null)
       setError(null)
     } catch {
       setError("현금흐름을 불러오지 못했어요.")
@@ -74,16 +76,24 @@ export function CashFlowView() {
     return () => window.removeEventListener("equria:reload", h)
   }, [load])
 
-  const graph = useMemo(() => buildSlotGraph(slots, opening, defaultCurrency), [slots, opening, defaultCurrency])
+  const graph = useMemo(() => buildSlotGraph(slots, opening, defaultCurrency, poolPos), [slots, opening, defaultCurrency, poolPos])
   const currencies = useMemo(() => Array.from(new Set([defaultCurrency, ...slots.map((s) => s.currency)])), [defaultCurrency, slots])
 
   // ── 설정(보유현금·기본통화) — 입력 즉시 흐름도 반영 + 저장(upsert) ──
-  const saveSettings = async (nextOpening: Record<string, number>, nextCurrency: string) => {
+  const saveSettings = async (nextOpening: Record<string, number>, nextCurrency: string, nextPool: { x: number; y: number } | null = poolPos) => {
     await mustOk(
       supabase
         .from("cashflow_settings")
-        .upsert({ workspace_id: WORKSPACE_ID, opening_cash: nextOpening, default_currency: nextCurrency, updated_by: me, updated_at: new Date().toISOString() }, { onConflict: "workspace_id" })
+        .upsert({ workspace_id: WORKSPACE_ID, opening_cash: nextOpening, default_currency: nextCurrency, pool_pos: nextPool, updated_by: me, updated_at: new Date().toISOString() }, { onConflict: "workspace_id" })
     )
+  }
+  // 캔버스 이동 — 슬롯은 x/y 직접 저장(재계산·reload 없음), pool은 설정에 낙관적 저장.
+  const moveAccount = async (id: string, x: number, y: number) => {
+    await mustOk(supabase.from("cash_accounts").update({ x, y }).eq("id", id))
+  }
+  const movePool = (x: number, y: number) => {
+    setPoolPos({ x, y })
+    saveSettings(opening, defaultCurrency, { x, y })
   }
   const setOpeningFor = (currency: string, value: number) => {
     const next = { ...opening, [currency]: value }
@@ -311,7 +321,18 @@ export function CashFlowView() {
             <p className="mt-2 text-xs text-muted-foreground">시작 보유현금에 매출을 더하고 비용·보유를 빼서 가용현금·순이익을 계산해요. 입력하면 흐름도에 바로 반영됩니다.</p>
           </div>
         )}
-        <CashFlowSummary slots={slots} pool={graph.pool} calcTypes={calcTypes} onUpdateSlot={updateSlot} onDeleteSlot={deleteSlot} onAddSlot={addSlot} />
+        <CashFlowCanvas
+          nodes={graph.nodes}
+          edges={graph.edges}
+          slots={slots}
+          calcTypes={calcTypes}
+          pool={graph.pool}
+          onUpdateSlot={updateSlot}
+          onDeleteSlot={deleteSlot}
+          onAddSlot={addSlot}
+          onMoveAccount={moveAccount}
+          onMovePool={movePool}
+        />
       </div>
 
       {/* 슬롯 표 — 금액 직접 입력 */}
