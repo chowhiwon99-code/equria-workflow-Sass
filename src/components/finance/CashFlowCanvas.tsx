@@ -142,8 +142,15 @@ export function CashFlowCanvas({
               }
             }
             const cur = slotById.get(d.id)?.category_id ?? null
-            if (gid !== cur) onUpdateSlot(d.id, gid ? { category_id: gid } : { category_id: null, x, y })
-            else if (!gid) onMoveAccount(d.id, x, y)
+            if (gid !== cur) {
+              // 그룹 변경 → reload 후 계산 위치(스택/자유)로 가도록 임시 localPos 제거.
+              onUpdateSlot(d.id, gid ? { category_id: gid } : { category_id: null, x, y })
+              setLocalPos((prev) => {
+                const n = { ...prev }
+                delete n[d.id]
+                return n
+              })
+            } else if (!gid) onMoveAccount(d.id, x, y)
           }
         }
       }
@@ -184,7 +191,7 @@ export function CashFlowCanvas({
   }
   const dragging = (id: string) => drag?.kind === "node" && drag.id === id
   const groupNet = (items: CashAccount[]) => items.reduce((a, s) => a + (slotCategory(s.kind) === "income" ? Number(s.amount) : -Number(s.amount)), 0)
-  const pp = poolPos ?? { x: 380, y: 190 }
+  const pp = localPos[POOL_ID] ?? poolPos ?? { x: 380, y: 190 }
 
   return (
     <div

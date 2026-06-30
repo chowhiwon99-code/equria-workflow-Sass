@@ -181,14 +181,16 @@ export function CashFlowView() {
   }
 
   // ── Export ──
+  const gname = (id: string | null) => (id ? groups.find((g) => g.id === id)?.name ?? null : null)
   const exportCsv = () => {
-    const headers = ["항목", "구분", "금액", "통화"]
-    const rows = slots.map((s) => [s.name, slotLabel(s.kind), Number(s.amount), s.currency])
+    const headers = ["그룹", "항목", "구분", "금액", "통화"]
+    const rows = slots.map((s) => [gname(s.category_id) ?? "", s.name, slotLabel(s.kind), Number(s.amount), s.currency])
     downloadCsv(`현금흐름_${todayStamp()}.csv`, headers, rows)
   }
-  // 함수가 살아있는 엑셀 — 열어서 숫자 바꾸면 자동 재계산.
+  // 함수가 살아있는 엑셀 — 열어서 숫자 바꾸면 자동 재계산. 그룹 순서대로 정렬해 섹션·소계 생성.
   const exportXlsx = async () => {
-    const rows = slots.map((s) => {
+    const ordered = [...groups.flatMap((g) => slots.filter((s) => s.category_id === g.id)), ...slots.filter((s) => !s.category_id)]
+    const rows = ordered.map((s) => {
       const ct = s.calc_type_id ? calcTypes.find((t) => t.id === s.calc_type_id) : undefined
       let fields: CalcField[] = []
       let values: Record<string, number> = {}
@@ -208,6 +210,7 @@ export function CashFlowView() {
       }
       return {
         name: s.name,
+        group: gname(s.category_id),
         kindLabel: slotLabel(s.kind),
         typeLabel: ct ? ct.name : ITEM_TYPES.find((t) => t.value === s.item_type)?.label ?? "정액",
         fields,
@@ -363,7 +366,7 @@ export function CashFlowView() {
       </div>
 
       {/* 슬롯 표 — 금액 직접 입력 */}
-      <CashGrid slots={slots} pool={graph.pool} calcTypes={calcTypes} onAddSlot={addSlot} onUpdateSlot={updateSlot} onDeleteSlot={deleteSlot} />
+      <CashGrid slots={slots} groups={groups} pool={graph.pool} calcTypes={calcTypes} onAddSlot={addSlot} onUpdateSlot={updateSlot} onDeleteSlot={deleteSlot} />
 
       {showBuilder && <CalcTypeBuilder types={calcTypes} onClose={() => setShowBuilder(false)} onSaved={load} />}
     </div>
