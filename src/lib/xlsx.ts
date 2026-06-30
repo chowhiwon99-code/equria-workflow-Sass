@@ -16,29 +16,37 @@ export type PnlRow = {
   currency: string
 }
 
-const INPUT_COLS = ["D", "E", "F", "G", "H", "I"]
-const AMT = "J"
-const NCOLS = 11
 const THIN = { style: "thin" as const, color: { argb: "FFDCE0E6" } }
 const ALL_BORDER = { top: THIN, left: THIN, bottom: THIN, right: THIN }
 const rowFill = (kind: string): string | null =>
   kind === "매출" ? "FFEAF7EF" : kind === "비용" ? "FFFCECEE" : kind === "보유금" ? "FFEAF1FE" : null
+// 1-indexed 컬럼 번호 → 엑셀 문자(A,B,…,Z,AA…). 계산 칸(필드) 수 무제한 지원.
+const colLetter = (n: number): string => {
+  let s = ""
+  while (n > 0) {
+    const m = (n - 1) % 26
+    s = String.fromCharCode(65 + m) + s
+    n = Math.floor((n - 1) / 26)
+  }
+  return s
+}
 
 // rows는 그룹 순서대로 정렬되어 옴(그룹 항목들 → 미그룹). 그룹이 바뀌면 섹션 헤더/소계 삽입.
 export async function downloadPnlXlsx(filename: string, rows: PnlRow[]) {
   const ExcelJS = (await import("exceljs")).default
   const wb = new ExcelJS.Workbook()
   const ws = wb.addWorksheet("손익", { views: [{ state: "frozen", ySplit: 1 }] })
+  // 계산 칸(필드) 수에 맞춰 입력 컬럼을 동적 배치 — 6칸 초과해도 잘리지 않게(엑셀 수식 정확).
+  const maxFields = Math.max(0, ...rows.map((r) => r.fields.length))
+  const INPUT_COLS = Array.from({ length: maxFields }, (_, i) => colLetter(4 + i))
+  const AMT = colLetter(4 + maxFields)
+  const CUR = colLetter(5 + maxFields)
+  const NCOLS = 5 + maxFields
   ws.columns = [
     { header: "항목명", width: 24 },
     { header: "구분", width: 8 },
     { header: "유형", width: 16 },
-    { header: "입력1", width: 11 },
-    { header: "입력2", width: 11 },
-    { header: "입력3", width: 11 },
-    { header: "입력4", width: 11 },
-    { header: "입력5", width: 11 },
-    { header: "입력6", width: 11 },
+    ...INPUT_COLS.map((_, i) => ({ header: `입력${i + 1}`, width: 11 })),
     { header: "금액", width: 16 },
     { header: "통화", width: 7 },
   ]
@@ -57,8 +65,9 @@ export async function downloadPnlXlsx(filename: string, rows: PnlRow[]) {
     ws.getCell(`B${rn}`).value = r.kindLabel
     ws.getCell(`C${rn}`).value = r.typeLabel
     const colOf: Record<string, string> = {}
-    r.fields.slice(0, INPUT_COLS.length).forEach((fld, k) => {
+    r.fields.forEach((fld, k) => {
       const col = INPUT_COLS[k]
+      if (!col) return
       colOf[fld.key] = col
       const cell = ws.getCell(`${col}${rn}`)
       cell.value = Number(r.values[fld.key] ?? 0)
@@ -68,7 +77,7 @@ export async function downloadPnlXlsx(filename: string, rows: PnlRow[]) {
     amt.value = r.ast ? { formula: `IFERROR(${toExcelFormula(r.ast, colOf, rn)},0)` } : r.amount
     amt.numFmt = "#,##0"
     amt.font = { bold: true }
-    ws.getCell(`K${rn}`).value = r.currency
+    ws.getCell(`${CUR}${rn}`).value = r.currency
     const fg = rowFill(r.kindLabel)
     if (fg) fillRow(rn, fg)
   }

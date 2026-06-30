@@ -75,11 +75,10 @@ export function CashFlowCanvas({
   }, [localPos])
   // 로드 후: 그룹에 속한 카드는 flex 자식이라 localPos 불필요 → 정리(드롭 깜빡임 없이 자연 안착).
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLocalPos((prev) => {
       let changed = false
       const n = { ...prev }
-      for (const s of slots) if (s.category_id && n[s.id]) {
+      for (const s of slots) if (s.category_id && n[s.id] && !(dragRef.current?.kind === "node" && dragRef.current.id === s.id)) {
         delete n[s.id]
         changed = true
       }
@@ -227,7 +226,14 @@ export function CashFlowCanvas({
     calcTypes,
     onUpdateSlot,
     onDeleteSlot,
-    onUngroup: s.category_id ? () => onUpdateSlot(s.id, { category_id: null, x: Math.round((localPos[s.id]?.x ?? 0) + 240) || 480, y: Math.round(localPos[s.id]?.y ?? 0) || 120 }) : undefined,
+    onUngroup: s.category_id
+      ? () => {
+          // 그룹 오른쪽 옆에 자유 배치(falsy 0 폴백 버그 없이).
+          const g = groups.find((x) => x.id === s.category_id)
+          const base = g ? groupPos(g) : { x: 420, y: 120 }
+          onUpdateSlot(s.id, { category_id: null, x: Math.round(base.x + NODE_W + 60), y: Math.round(base.y + 20) })
+        }
+      : undefined,
   })
 
   return (
