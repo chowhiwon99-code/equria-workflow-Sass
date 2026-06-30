@@ -890,6 +890,9 @@ export type Database = {
       }
       cash_categories: {
         Row: {
+          collapsed: boolean
+          x: number | null
+          y: number | null
           color: string
           created_at: string
           created_by: string | null
@@ -900,6 +903,9 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          collapsed?: boolean
+          x?: number | null
+          y?: number | null
           color?: string
           created_at?: string
           created_by?: string | null
@@ -910,6 +916,9 @@ export type Database = {
           workspace_id?: string
         }
         Update: {
+          collapsed?: boolean
+          x?: number | null
+          y?: number | null
           color?: string
           created_at?: string
           created_by?: string | null

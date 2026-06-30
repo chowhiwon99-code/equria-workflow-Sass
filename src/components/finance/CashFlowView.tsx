@@ -15,7 +15,7 @@ import { money, CURRENCIES, computeSlotAmount } from "@/lib/finance"
 import { slotLabel, CASHFLOW_TEMPLATES, ITEM_TYPES } from "@/lib/cashAccounts"
 import { evalFormula, flowToKind, BUILTIN_FIELDS, QTY_AST, CHANNEL_AST, type CalcNode, type CalcField } from "@/lib/calcFormula"
 import { cn } from "@/lib/utils"
-import type { CashAccount, CashCalcType } from "@/types"
+import type { CashAccount, CashCalcType, CashCategory } from "@/types"
 import { buildSlotGraph } from "@/lib/cashflowGraph"
 import { CashGrid } from "./CashGrid"
 import { CashFlowCanvas } from "./CashFlowCanvas"
@@ -35,6 +35,7 @@ export function CashFlowView() {
   const { push } = useUndo()
   const [slots, setSlots] = useState<CashAccount[]>([])
   const [calcTypes, setCalcTypes] = useState<CashCalcType[]>([])
+  const [groups, setGroups] = useState<CashCategory[]>([])
   const [opening, setOpening] = useState<Record<string, number>>({})
   const [defaultCurrency, setDefaultCurrency] = useState("KRW")
   const [showSettings, setShowSettings] = useState(false)
@@ -45,13 +46,15 @@ export function CashFlowView() {
 
   const load = useCallback(async () => {
     try {
-      const [{ data: slotData, error: e }, { data: settings }, { data: types }] = await Promise.all([
+      const [{ data: slotData, error: e }, { data: settings }, { data: types }, { data: grps }] = await Promise.all([
         supabase.from("cash_accounts").select("*").is("deleted_at", null).order("sort_order"),
         supabase.from("cashflow_settings").select("opening_cash, default_currency, pool_pos").maybeSingle(),
         supabase.from("cash_calc_types").select("*").order("sort_order"),
+        supabase.from("cash_categories").select("*").order("sort_order"),
       ])
       if (e) throw e
       setSlots((slotData as CashAccount[]) ?? [])
+      setGroups((grps as CashCategory[]) ?? [])
       setCalcTypes((types as CashCalcType[]) ?? [])
       setOpening((settings?.opening_cash as Record<string, number>) ?? {})
       setDefaultCurrency(settings?.default_currency ?? "KRW")
@@ -142,6 +145,26 @@ export function CashFlowView() {
         await supabase.from("cash_accounts").update({ deleted_at: new Date().toISOString() }).eq("id", slot.id)
       },
     })
+    load()
+  }
+
+  // ── 그룹(cash_categories 재활용) — 조직화 레이어, 순이익 계산엔 무관 ──
+  const addGroup = async () => {
+    if (!me) return
+    const { error: e } = await supabase.from("cash_categories").insert({ name: "새 그룹", color: "gray", created_by: me, sort_order: groups.length, x: 80, y: 80 })
+    if (e) return toast.error("그룹을 추가하지 못했어요.")
+    load()
+  }
+  const moveGroup = async (id: string, x: number, y: number) => {
+    await mustOk(supabase.from("cash_categories").update({ x, y }).eq("id", id))
+  }
+  const updateGroup = async (id: string, patch: Partial<CashCategory>) => {
+    await mustOk(supabase.from("cash_categories").update(patch).eq("id", id))
+    load()
+  }
+  const deleteGroup = async (id: string) => {
+    await supabase.from("cash_accounts").update({ category_id: null }).eq("category_id", id) // 소속 해제
+    await supabase.from("cash_categories").delete().eq("id", id)
     load()
   }
 
@@ -322,13 +345,18 @@ export function CashFlowView() {
           </div>
         )}
         <CashFlowCanvas
-          nodes={graph.nodes}
           slots={slots}
-          calcTypes={calcTypes}
+          groups={groups}
           pool={graph.pool}
+          poolPos={poolPos}
+          calcTypes={calcTypes}
           onUpdateSlot={updateSlot}
           onDeleteSlot={deleteSlot}
           onAddSlot={addSlot}
+          onAddGroup={addGroup}
+          onMoveGroup={moveGroup}
+          onUpdateGroup={updateGroup}
+          onDeleteGroup={deleteGroup}
           onMoveAccount={moveAccount}
           onMovePool={movePool}
         />
