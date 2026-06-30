@@ -15,7 +15,7 @@ export function InlineText({ value, onCommit, className, placeholder = "이름" 
         if (v && v !== value) onCommit(v)
       }}
       onKeyDown={(e) => {
-        if (e.key === "Enter") e.currentTarget.blur()
+        if (e.key === "Enter" && !e.nativeEvent.isComposing) e.currentTarget.blur()
         if (e.key === "Escape") {
           e.currentTarget.value = value
           e.currentTarget.blur()
@@ -44,7 +44,7 @@ export function InlineNumber({ value, onCommit, width = "w-full" }: { value: num
         else e.currentTarget.value = fmt(value)
       }}
       onKeyDown={(e) => {
-        if (e.key === "Enter") e.currentTarget.blur()
+        if (e.key === "Enter" && !e.nativeEvent.isComposing) e.currentTarget.blur()
       }}
       className={cn(width, "rounded border-0 bg-transparent px-1 py-0.5 text-right text-xs tabular-nums outline-none focus:bg-background focus:ring-1 focus:ring-ring")}
     />
@@ -70,7 +70,7 @@ export function InlinePercent({ value, onCommit }: { value: number; onCommit: (v
           else e.currentTarget.value = fmt(value)
         }}
         onKeyDown={(e) => {
-          if (e.key === "Enter") e.currentTarget.blur()
+          if (e.key === "Enter" && !e.nativeEvent.isComposing) e.currentTarget.blur()
         }}
         className="w-10 rounded border-0 bg-transparent px-1 py-0.5 text-right text-xs tabular-nums outline-none focus:bg-background focus:ring-1 focus:ring-ring"
       />

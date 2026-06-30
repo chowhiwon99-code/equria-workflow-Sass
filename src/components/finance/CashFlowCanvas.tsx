@@ -62,6 +62,7 @@ export function CashFlowCanvas({
   }, [drag])
   const [view, setView] = useState({ scale: 1, tx: 0, ty: 0 })
   const [localPos, setLocalPos] = useState<Record<string, { x: number; y: number }>>({})
+  const [justGrouped, setJustGrouped] = useState<string | null>(null) // 방금 그룹에 들어간 카드 → 비눗방울 등장
   const viewRef = useRef(view)
   const localPosRef = useRef(localPos)
   useEffect(() => {
@@ -140,6 +141,10 @@ export function CashFlowCanvas({
             if (gid !== cur) {
               onUpdateSlot(d.id, gid ? { category_id: gid } : { category_id: null, x, y })
               clear(d.id) // 계산 위치(스택/자유)로 복귀
+              if (gid) {
+                setJustGrouped(d.id)
+                setTimeout(() => setJustGrouped((p) => (p === d.id ? null : p)), 1000)
+              }
             } else if (!gid) {
               onMoveAccount(d.id, x, y) // 자유 이동 → localPos 유지(reload 없음)
             } else {
@@ -240,27 +245,28 @@ export function CashFlowCanvas({
           const items = (itemsByGroup.get(g.id) ?? []).filter((s) => !dragging(s.id))
           const allItems = itemsByGroup.get(g.id) ?? []
           return (
-            <div key={g.id} data-group-id={g.id} style={{ left: gp.x - GPAD, top: gp.y - GTOP, width: NODE_W + GPAD * 2, zIndex: dragging(g.id) ? 40 : 1 }} className="absolute rounded-2xl border-2 border-dashed bg-muted/20 pb-0.5">
-              <div className="flex h-[26px] cursor-grab touch-none items-center gap-1 px-2 active:cursor-grabbing" onPointerDown={(e) => startDrag(e, g.id, gp)}>
-                <GripVertical className="size-3 shrink-0 text-muted-foreground/60" />
-                <button onPointerDown={(e) => e.stopPropagation()} onClick={() => onUpdateGroup(g.id, { collapsed: !g.collapsed })} className="shrink-0 text-muted-foreground/70">
-                  {g.collapsed ? <ChevronRight className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+            <div key={g.id} data-group-id={g.id} style={{ left: gp.x - GPAD, top: gp.y - GTOP, width: NODE_W + GPAD * 2, zIndex: dragging(g.id) ? 40 : 1 }} className="absolute rounded-[20px] border border-border/70 bg-muted/25 shadow-sm">
+              <div className="flex h-9 cursor-grab touch-none items-center gap-1.5 rounded-t-[20px] px-2.5 active:cursor-grabbing" onPointerDown={(e) => startDrag(e, g.id, gp)}>
+                <button onPointerDown={(e) => e.stopPropagation()} onClick={() => onUpdateGroup(g.id, { collapsed: !g.collapsed })} className="shrink-0 text-muted-foreground/50 hover:text-foreground">
+                  {g.collapsed ? <ChevronRight className="size-4" /> : <ChevronDown className="size-4" />}
                 </button>
                 <div className="min-w-0 flex-1" onPointerDown={(e) => e.stopPropagation()}>
-                  <InlineText value={g.name} onCommit={(v) => onUpdateGroup(g.id, { name: v })} className="w-full text-xs font-semibold" />
+                  <InlineText value={g.name} onCommit={(v) => onUpdateGroup(g.id, { name: v })} className="w-full text-[13px] font-bold" placeholder="그룹 이름" />
                 </div>
-                <button onPointerDown={(e) => e.stopPropagation()} onClick={() => onDeleteGroup(g.id)} title="그룹 해제(항목은 유지)" className="shrink-0 text-[10px] text-muted-foreground/70 hover:text-destructive">해제</button>
+                <span className="shrink-0 rounded-full bg-background/70 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{allItems.length}</span>
+                <button onPointerDown={(e) => e.stopPropagation()} onClick={() => onDeleteGroup(g.id)} title="그룹 해제(항목은 유지)" className="shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground/60 hover:bg-destructive/10 hover:text-destructive">해제</button>
               </div>
               {!g.collapsed && items.length > 0 && (
-                <div className="flex flex-col gap-2 px-2 pt-0.5">
+                <div className="flex flex-col gap-1.5 px-1.5">
                   {items.map((s) => (
-                    <SlotCard key={s.id} {...slotCardProps(s)} mode="flex" inGroup onGrip={(e) => startFlexDrag(e, s.id)} />
+                    <SlotCard key={s.id} {...slotCardProps(s)} mode="flex" inGroup entering={justGrouped === s.id} onGrip={(e) => startFlexDrag(e, s.id)} />
                   ))}
                 </div>
               )}
-              {!g.collapsed && allItems.length === 0 && <div className="px-2 py-3 text-center text-[10px] text-muted-foreground/50">여기로 박스를 끌어다 넣기</div>}
-              <div className="flex items-center justify-end gap-1 px-2 py-1 text-[11px] tabular-nums text-muted-foreground">
-                소계 <b className={groupNet(allItems) < 0 ? "text-rose-600" : "text-emerald-600"}>{money(groupNet(allItems), pool.currency)}</b>
+              {!g.collapsed && allItems.length === 0 && <div className="mx-1.5 rounded-xl border border-dashed border-border/60 px-2 py-4 text-center text-[10px] text-muted-foreground/50">여기로 박스를 끌어다 넣기</div>}
+              <div className="mt-1.5 flex items-center justify-between gap-1 rounded-b-[20px] border-t border-border/50 bg-background/40 px-2.5 py-1.5 text-[11px] tabular-nums">
+                <span className="text-muted-foreground">소계</span>
+                <b className={groupNet(allItems) < 0 ? "text-rose-600" : "text-emerald-600"}>{money(groupNet(allItems), pool.currency)}</b>
               </div>
             </div>
           )
@@ -302,6 +308,7 @@ function SlotCard({
   pos,
   dragging,
   inGroup,
+  entering,
   onGrip,
   onUpdateSlot,
   onDeleteSlot,
@@ -313,6 +320,7 @@ function SlotCard({
   pos?: { x: number; y: number }
   dragging?: boolean
   inGroup: boolean
+  entering?: boolean
   onGrip: (e: React.PointerEvent) => void
   onUpdateSlot: (id: string, patch: Partial<CashAccount>) => void
   onDeleteSlot: (slot: CashAccount) => void
@@ -323,17 +331,17 @@ function SlotCard({
   const { fields, getVal, setVal } = fieldsOf(s, calcTypes, onUpdateSlot)
   const style = mode === "absolute" ? { left: pos?.x, top: pos?.y, width: NODE_W, pointerEvents: dragging ? ("none" as const) : undefined, zIndex: dragging ? 50 : 3 } : { width: NODE_W }
   return (
-    <div data-node-id={s.id} style={style} className={cn("overflow-hidden rounded-2xl border bg-card shadow-sm", mode === "absolute" && "absolute")}>
-      <div className="flex h-5 cursor-grab touch-none items-center bg-muted/60 px-1.5 active:cursor-grabbing" onPointerDown={onGrip}>
-        <GripVertical className="size-3 text-muted-foreground/60" />
-        <span className="ml-1 size-2 rounded-full" style={{ backgroundColor: tagBg(s.color, 90) }} />
+    <div data-node-id={s.id} style={style} className={cn("group/card overflow-hidden rounded-xl border bg-card shadow-sm transition-shadow hover:shadow-md", mode === "absolute" && "absolute", entering && "cf-bubble-in")}>
+      <div className="flex h-6 cursor-grab touch-none items-center gap-1 px-2 hover:bg-muted/30 active:cursor-grabbing" onPointerDown={onGrip}>
+        <GripVertical className="size-3 text-muted-foreground/40" />
+        <span className="size-2 rounded-full" style={{ backgroundColor: tagBg(s.color, 90) }} />
         <span className="flex-1" />
         {inGroup && onUngroup && (
-          <button onPointerDown={(e) => e.stopPropagation()} onClick={onUngroup} title="그룹에서 빼기" className="mr-1.5 text-muted-foreground/60 hover:text-foreground">
+          <button onPointerDown={(e) => e.stopPropagation()} onClick={onUngroup} title="그룹에서 빼기" className="text-muted-foreground/40 opacity-0 transition-opacity hover:text-foreground group-hover/card:opacity-100">
             <CornerUpRight className="size-3" />
           </button>
         )}
-        <button onPointerDown={(e) => e.stopPropagation()} onClick={() => onDeleteSlot(s)} title="삭제" className="text-muted-foreground/60 hover:text-destructive">
+        <button onPointerDown={(e) => e.stopPropagation()} onClick={() => onDeleteSlot(s)} title="삭제" className="text-muted-foreground/40 opacity-0 transition-opacity hover:text-destructive group-hover/card:opacity-100">
           <Trash2 className="size-3" />
         </button>
       </div>
