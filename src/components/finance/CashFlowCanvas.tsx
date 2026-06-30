@@ -5,13 +5,12 @@ import { GripVertical, Trash2, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { money } from "@/lib/finance"
 import { tagBg } from "@/lib/meetingMeta"
-import { POOL_ID, type CashNode, type CashEdge, type CashSummary } from "@/lib/cashflowGraph"
+import { POOL_ID, type CashNode, type CashSummary } from "@/lib/cashflowGraph"
 import { SLOT_TYPES, slotLabel, fieldsOf } from "@/lib/cashAccounts"
 import { InlineText, InlineNumber, InlinePercent } from "./inline"
 import type { CashAccount, CashCalcType } from "@/types"
 
 const NODE_W = 210
-const PORT_Y = 34 // 카드 헤더 높이 ≈ 엣지 연결 y
 
 type Drag =
   | { kind: "node"; id: string; ox: number; oy: number; moved: boolean; sx: number; sy: number }
@@ -20,11 +19,10 @@ type Drag =
 
 /**
  * 편집 가능한 현금흐름 캔버스 — 카드 상단 그립으로 드래그(입력칸과 충돌 없음), 회사 가용현금(pool)도 드래그.
- * 박스 안에서 구분·이름·금액(또는 계산필드)·설명 편집. ⌘/Ctrl+휠 줌, 배경 드래그 팬. 엣지 두께=금액(화살촉 없음).
+ * 박스 안에서 구분·이름·금액(또는 계산필드)·설명 편집. ⌘/Ctrl+휠 줌, 배경 드래그 팬. (연결선 없음 — 박스 자유 배치.)
  */
 export function CashFlowCanvas({
   nodes,
-  edges,
   slots,
   calcTypes,
   pool,
@@ -35,7 +33,6 @@ export function CashFlowCanvas({
   onMovePool,
 }: {
   nodes: CashNode[]
-  edges: CashEdge[]
   slots: CashAccount[]
   calcTypes: CashCalcType[]
   pool: CashSummary
@@ -77,11 +74,6 @@ export function CashFlowCanvas({
     const v = viewRef.current
     return { x: (sx - v.tx) / v.scale, y: (sy - v.ty) / v.scale }
   }
-  const portPos = (id: string, side: "in" | "out") => {
-    const p = posOfId(id)
-    return { x: p.x + (side === "out" ? NODE_W : 0), y: p.y + PORT_Y }
-  }
-
   // 드래그(그립=노드 / 배경=팬)
   useEffect(() => {
     if (!drag) return
@@ -144,9 +136,6 @@ export function CashFlowCanvas({
     const p = posOfId(id)
     setDrag({ kind: "node", id, ox: w.x - p.x, oy: w.y - p.y, moved: false, sx: e.clientX, sy: e.clientY })
   }
-  const edgeStroke = (k: CashEdge["kind"]) => (k === "revenue" ? "#10b981" : k === "expense" ? "#f43f5e" : "#3b82f6")
-  const maxEdge = Math.max(1, ...edges.map((e) => e.amount))
-  const ew = (a: number) => 2 + Math.min(12, Math.sqrt(a / maxEdge) * 12)
 
   return (
     <div
@@ -171,23 +160,6 @@ export function CashFlowCanvas({
 
       {/* 변환 래퍼(줌/팬) */}
       <div className="absolute left-0 top-0 origin-top-left" style={{ transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.scale})` }}>
-        <svg className="pointer-events-none absolute left-0 top-0 overflow-visible" width={1} height={1}>
-          {edges.map((edge) => {
-            const a = portPos(edge.source, "out")
-            const b = portPos(edge.target, "in")
-            const mx = (a.x + b.x) / 2
-            const my = (a.y + b.y) / 2
-            return (
-              <g key={edge.id}>
-                <path d={bezier(a, b)} fill="none" stroke={edgeStroke(edge.kind)} strokeWidth={ew(edge.amount)} strokeLinecap="round" className="opacity-60" />
-                <text x={mx} y={my - 5} textAnchor="middle" className="fill-foreground text-[10px] font-medium" style={{ paintOrder: "stroke", stroke: "var(--color-background)", strokeWidth: 3 }}>
-                  {money(edge.amount, edge.currency)}
-                </text>
-              </g>
-            )
-          })}
-        </svg>
-
         {nodes.map((node) => {
           const p = posOf(node)
           if (node.kind === "pool") {
@@ -280,9 +252,4 @@ function Line({ label, v, cls }: { label: string; v: string; cls?: string }) {
       <span className={cls}>{v}</span>
     </div>
   )
-}
-
-function bezier(a: { x: number; y: number }, b: { x: number; y: number }): string {
-  const dx = Math.max(40, Math.abs(b.x - a.x) * 0.5)
-  return `M ${a.x} ${a.y} C ${a.x + dx} ${a.y}, ${b.x - dx} ${b.y}, ${b.x} ${b.y}`
 }

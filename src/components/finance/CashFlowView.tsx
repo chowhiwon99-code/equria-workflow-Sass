@@ -323,7 +323,6 @@ export function CashFlowView() {
         )}
         <CashFlowCanvas
           nodes={graph.nodes}
-          edges={graph.edges}
           slots={slots}
           calcTypes={calcTypes}
           pool={graph.pool}
