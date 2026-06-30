@@ -3,7 +3,7 @@
 import { Fragment, useMemo, useState } from "react"
 import { Trash2, Plus, Search, ArrowUpDown, ArrowUp, ArrowDown, SlidersHorizontal } from "lucide-react"
 import { CURRENCIES, money } from "@/lib/finance"
-import { SLOT_TYPES, ITEM_TYPES, slotLabel, fieldsOf } from "@/lib/cashAccounts"
+import { SLOT_TYPES, ITEM_TYPES, slotLabel, slotColor, fieldsOf } from "@/lib/cashAccounts"
 import { tagBg, swatch, CATEGORY_COLORS } from "@/lib/meetingMeta"
 import type { CalcField } from "@/lib/calcFormula"
 import type { CashAccount, CashCalcType, CashCategory } from "@/types"
@@ -120,7 +120,7 @@ export function CashGrid({
           {isOtherCustom ? (
             <span className="rounded-full px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: tagBg(s.color, 22) }}>{slotLabel(s.kind)}</span>
           ) : (
-            <select value={s.kind} onChange={(e) => onUpdateSlot(s.id, { kind: e.target.value })} style={{ backgroundColor: tagBg(s.color, 22) }} className="cursor-pointer rounded-full border-0 px-2 py-0.5 text-xs font-medium outline-none focus:ring-1 focus:ring-ring">
+            <select value={s.kind} onChange={(e) => onUpdateSlot(s.id, { kind: e.target.value, color: slotColor(e.target.value) })} style={{ backgroundColor: tagBg(s.color, 22) }} className="cursor-pointer rounded-full border-0 px-2 py-0.5 text-xs font-medium outline-none focus:ring-1 focus:ring-ring">
               {SLOT_TYPES.map((t) => (
                 <option key={t.value} value={t.value}>{t.label}</option>
               ))}

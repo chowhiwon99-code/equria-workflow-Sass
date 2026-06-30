@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 import { money } from "@/lib/finance"
 import { tagBg } from "@/lib/meetingMeta"
 import { POOL_ID, slotCategory, type CashSummary } from "@/lib/cashflowGraph"
-import { SLOT_TYPES, slotLabel, fieldsOf } from "@/lib/cashAccounts"
+import { SLOT_TYPES, slotLabel, slotColor, fieldsOf } from "@/lib/cashAccounts"
 import { InlineText, InlineNumber, InlinePercent } from "./inline"
 import type { CashAccount, CashCalcType, CashCategory } from "@/types"
 
@@ -368,7 +368,7 @@ function SlotCard({
           {isCustom ? (
             <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium" style={{ backgroundColor: tagBg(s.color, 22) }}>{slotLabel(s.kind)}</span>
           ) : (
-            <select value={s.kind} onChange={(e) => onUpdateSlot(s.id, { kind: e.target.value })} style={{ backgroundColor: tagBg(s.color, 22) }} className="shrink-0 cursor-pointer rounded-full border-0 px-1.5 py-0.5 text-[10px] font-medium outline-none focus:ring-1 focus:ring-ring">
+            <select value={s.kind} onChange={(e) => onUpdateSlot(s.id, { kind: e.target.value, color: slotColor(e.target.value) })} style={{ backgroundColor: tagBg(s.color, 22) }} className="shrink-0 cursor-pointer rounded-full border-0 px-1.5 py-0.5 text-[10px] font-medium outline-none focus:ring-1 focus:ring-ring">
               {SLOT_TYPES.map((t) => (
                 <option key={t.value} value={t.value}>{t.label}</option>
               ))}
