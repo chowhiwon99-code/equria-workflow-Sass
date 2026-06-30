@@ -403,6 +403,7 @@ export function CashFlowView() {
           onDeleteGroup={deleteGroup}
           onMoveAccount={moveAccount}
           onMovePool={movePool}
+          onSetOpening={setOpeningFor}
         />
       </div>
 

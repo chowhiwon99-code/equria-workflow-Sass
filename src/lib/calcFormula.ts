@@ -109,7 +109,7 @@ export function flowToKind(flow: string): string {
 
 /** 사람이 읽는 수식 문자열(미리보기용). */
 export function formulaToText(ast: CalcNode, fields: CalcField[]): string {
-  const label = (key: string) => fields.find((x) => x.key === key)?.label ?? key
+  const label = (key: string) => fields.find((x) => x.key === key)?.label || key
   const walk = (n: CalcNode): string => {
     if (n.t === "const") return String(n.v)
     if (n.t === "field") return label(n.key)

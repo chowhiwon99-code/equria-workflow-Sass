@@ -38,6 +38,7 @@ export function CashFlowCanvas({
   onDeleteGroup,
   onMoveAccount,
   onMovePool,
+  onSetOpening,
 }: {
   slots: CashAccount[]
   groups: CashCategory[]
@@ -53,6 +54,7 @@ export function CashFlowCanvas({
   onDeleteGroup: (id: string) => void
   onMoveAccount: (id: string, x: number, y: number) => void
   onMovePool: (x: number, y: number) => void
+  onSetOpening: (currency: string, value: number) => void
 }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const [drag, setDrag] = useState<Drag>(null)
@@ -71,6 +73,19 @@ export function CashFlowCanvas({
   useEffect(() => {
     localPosRef.current = localPos
   }, [localPos])
+  // 로드 후: 그룹에 속한 카드는 flex 자식이라 localPos 불필요 → 정리(드롭 깜빡임 없이 자연 안착).
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLocalPos((prev) => {
+      let changed = false
+      const n = { ...prev }
+      for (const s of slots) if (s.category_id && n[s.id]) {
+        delete n[s.id]
+        changed = true
+      }
+      return changed ? n : prev
+    })
+  }, [slots])
 
   const slotById = useMemo(() => new Map(slots.map((s) => [s.id, s])), [slots])
   const groupIdSet = useMemo(() => new Set(groups.map((g) => g.id)), [groups])
@@ -140,7 +155,7 @@ export function CashFlowCanvas({
             const cur = live.slotById.get(d.id)?.category_id ?? null
             if (gid !== cur) {
               onUpdateSlot(d.id, gid ? { category_id: gid } : { category_id: null, x, y })
-              clear(d.id) // 계산 위치(스택/자유)로 복귀
+              // 드롭 지점에 둔 채 로드 → 그룹된 카드 localPos는 아래 effect가 정리(옛 위치로 깜빡임 없이 안착).
               if (gid) {
                 setJustGrouped(d.id)
                 setTimeout(() => setJustGrouped((p) => (p === d.id ? null : p)), 1000)
@@ -281,7 +296,10 @@ export function CashFlowCanvas({
             <p className="text-[11px] font-medium uppercase tracking-wide text-primary/70">회사 가용 현금</p>
             <p className={cn("text-[20px] font-bold leading-tight tabular-nums", pool.available < 0 ? "text-rose-600" : "text-foreground")}>{money(pool.available, pool.currency)}</p>
             <div className="mt-1.5 space-y-0.5 border-t border-primary/15 pt-1.5 text-[10px] tabular-nums text-muted-foreground">
-              <Line label="시작 보유" v={money(pool.opening, pool.currency)} />
+              <div className="flex items-center justify-between gap-2">
+                <span>시작 보유(편집)</span>
+                <InlineNumber value={pool.opening} onCommit={(v) => onSetOpening(pool.currency, v)} width="w-24" />
+              </div>
               <Line label="+ 매출" v={money(pool.revenue, pool.currency)} cls="text-emerald-600" />
               <Line label="− 비용" v={money(pool.expense, pool.currency)} cls="text-rose-600" />
               <Line label="순이익" v={money(pool.netProfit, pool.currency)} cls={cn("font-semibold", pool.netProfit < 0 ? "text-rose-600" : "text-foreground")} />

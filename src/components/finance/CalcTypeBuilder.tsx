@@ -38,6 +38,27 @@ function buildAstFromSteps(steps: Step[]): CalcNode | null {
   return lastNode
 }
 
+// 기존 수식(AST)을 편집 가능한 스텝으로 분해 — 편집 시 현재 수식을 그대로 보고 바로 고칠 수 있게. (buildAstFromSteps의 역연산)
+function astToSteps(ast: CalcNode | null): Step[] {
+  if (!ast) return []
+  if (ast.t === "field") return [{ id: "e0", name: "금액", left: { t: "field", key: ast.key }, op: "+", right: { t: "num", v: 0 } }]
+  if (ast.t === "const") return [{ id: "e0", name: "금액", left: { t: "num", v: ast.v }, op: "+", right: { t: "num", v: 0 } }]
+  const steps: Step[] = []
+  let i = 0
+  const operand = (n: CalcNode): Operand => {
+    if (n.t === "field") return { t: "field", key: n.key }
+    if (n.t === "const") return { t: "num", v: n.v }
+    if (n.op === "-" && n.a.t === "const" && n.a.v === 1 && n.b.t === "field") return { t: "oneMinus", key: n.b.key } // (1 − 필드)
+    const left = operand(n.a)
+    const right = operand(n.b)
+    const id = `e${i++}`
+    steps.push({ id, name: `스텝${steps.length + 1}`, left, op: n.op, right })
+    return { t: "step", id }
+  }
+  operand(ast)
+  return steps
+}
+
 /** 회사가 계산 유형(필드+수식)을 직접 정의 — ① 템플릿에서 시작, ② 직접 만들기(스텝 조립). 미리보기 후 저장. */
 export function CalcTypeBuilder({ types, editType, onClose, onSaved }: { types: CashCalcType[]; editType?: CashCalcType | null; onClose: () => void; onSaved: () => void }) {
   const supabase = createClient()
@@ -48,7 +69,7 @@ export function CalcTypeBuilder({ types, editType, onClose, onSaved }: { types: 
   const [flow, setFlow] = useState<"revenue" | "expense" | "reserve">((editType?.flow as "revenue" | "expense" | "reserve") ?? "expense")
   const [fields, setFields] = useState<CalcField[]>((editType?.fields as unknown as CalcField[]) ?? [])
   const [templateAst, setTemplateAst] = useState<CalcNode | null>(null)
-  const [steps, setSteps] = useState<Step[]>([])
+  const [steps, setSteps] = useState<Step[]>(() => astToSteps((editType?.formula as { ast?: CalcNode } | null)?.ast ?? null))
   const [seq, setSeq] = useState(100)
   const [busy, setBusy] = useState(false)
 
@@ -150,7 +171,7 @@ export function CalcTypeBuilder({ types, editType, onClose, onSaved }: { types: 
         )}
         {isEdit && (
           <p className="rounded-lg bg-muted/50 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
-            칸(필드)을 <b>추가·삭제·이름변경</b>하세요. 새 칸이 금액에 반영되려면 아래 <b>수식 스텝</b>으로 다시 조립하면 됩니다 — 스텝을 안 만들면 기존 수식이 유지돼요.
+            현재 수식이 아래 <b>수식 스텝</b>으로 펼쳐져 있어요. 칸(필드)을 <b>추가·삭제·이름변경</b>하고, 스텝을 고치거나 <b>+스텝</b>으로 더하면 금액 계산이 바뀝니다. (마지막 스텝 = 최종 금액)
           </p>
         )}
 
