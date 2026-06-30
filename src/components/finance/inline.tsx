@@ -4,12 +4,12 @@ import { cn } from "@/lib/utils"
 
 // 비제어 인라인 에디터 — value 변경(재로드) 시 key로 리마운트해 입력 중 값을 덮지 않음.
 
-export function InlineText({ value, onCommit, className }: { value: string; onCommit: (v: string) => void; className?: string }) {
+export function InlineText({ value, onCommit, className, placeholder = "이름" }: { value: string; onCommit: (v: string) => void; className?: string; placeholder?: string }) {
   return (
     <input
       key={value}
       defaultValue={value}
-      placeholder="이름"
+      placeholder={placeholder}
       onBlur={(e) => {
         const v = e.target.value.trim()
         if (v && v !== value) onCommit(v)

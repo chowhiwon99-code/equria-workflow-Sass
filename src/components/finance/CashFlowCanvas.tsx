@@ -11,11 +11,8 @@ import { InlineText, InlineNumber, InlinePercent } from "./inline"
 import type { CashAccount, CashCalcType, CashCategory } from "@/types"
 
 const NODE_W = 210
-const STACK_H = 104 // 그룹 안 카드 1개 세로 간격
-const GHEAD = 30 // 그룹 헤더
-const GFOOT = 28 // 그룹 소계
 const GPAD = 8
-const GTOP = 4 // 그룹 박스 상단 여백(렌더·드롭 히트 공용)
+const GTOP = 4 // 그룹 박스 상단 여백
 
 type Drag =
   | { kind: "node"; id: string; ox: number; oy: number; moved: boolean; sx: number; sy: number }
@@ -23,8 +20,8 @@ type Drag =
   | null
 
 /**
- * 편집 캔버스 + 그룹 — 카드/그룹을 ⠿그립으로 드래그. 박스를 그룹 위로 놓으면 합쳐지고(자동 세로 스택), 밖으로 놓으면 빠짐.
- * 박스 안 구분/이름/금액(또는 계산필드)/설명 편집. ⌘휠 줌·배경 팬. (연결선 없음.)
+ * 편집 캔버스 + 그룹 — 카드/그룹을 ⠿그립으로 드래그. 박스를 그룹 위로 놓으면 합쳐지고(자동 세로 스택, flex), 밖으로 놓으면 빠짐.
+ * 그룹 안 항목은 컨테이너의 flex 자식이라 들어가는 즉시 자연 높이로 정렬(겹침 없음). ⌘휠 줌·배경 팬. (연결선 없음.)
  */
 export function CashFlowCanvas({
   slots,
@@ -86,15 +83,8 @@ export function CashFlowCanvas({
   const groupPos = (g: CashCategory) => localPos[g.id] ?? { x: g.x != null ? Number(g.x) : 60, y: g.y != null ? Number(g.y) : 60 }
   const slotPos = (s: CashAccount): { x: number; y: number } => {
     if (localPos[s.id]) return localPos[s.id]
-    if (s.category_id) {
-      const g = groups.find((x) => x.id === s.category_id)
-      const items = itemsByGroup.get(s.category_id) ?? []
-      const idx = items.findIndex((x) => x.id === s.id)
-      const gp = g ? groupPos(g) : { x: 60, y: 60 }
-      return { x: gp.x + GPAD, y: gp.y + GHEAD + Math.max(0, idx) * STACK_H }
-    }
     const i = freeSlots.findIndex((x) => x.id === s.id)
-    return { x: s.x != null ? Number(s.x) : 480 + (i % 3) * 232, y: s.y != null ? Number(s.y) : 90 + Math.floor(i / 3) * 116 }
+    return { x: s.x != null ? Number(s.x) : 480 + (i % 3) * 232, y: s.y != null ? Number(s.y) : 90 + Math.floor(i / 3) * 150 }
   }
 
   const toWorld = (clientX: number, clientY: number) => {
@@ -106,9 +96,9 @@ export function CashFlowCanvas({
   }
 
   // onUp은 window 리스너라 [drag] 시점 클로저를 잡음 → 드래그 중 slots/groups가 바뀌어도 최신값을 읽도록 ref 미러.
-  const liveRef = useRef({ groups, itemsByGroup, slotById, groupIdSet })
+  const liveRef = useRef({ slotById, groupIdSet })
   useEffect(() => {
-    liveRef.current = { groups, itemsByGroup, slotById, groupIdSet }
+    liveRef.current = { slotById, groupIdSet }
   })
 
   useEffect(() => {
@@ -129,6 +119,12 @@ export function CashFlowCanvas({
     const onUp = (e: PointerEvent) => {
       const d = dragRef.current
       const live = liveRef.current
+      const clear = (id: string) =>
+        setLocalPos((prev) => {
+          const n = { ...prev }
+          delete n[id]
+          return n
+        })
       if (d?.kind === "node" && d.moved) {
         const lp = localPosRef.current[d.id]
         if (lp) {
@@ -137,28 +133,18 @@ export function CashFlowCanvas({
           if (d.id === POOL_ID) onMovePool(x, y)
           else if (live.groupIdSet.has(d.id)) onMoveGroup(d.id, x, y)
           else {
-            // 드롭 지점(월드 좌표)이 어느 그룹 박스 안인지 — DOM 겹침과 무관하게 위치로 판정.
-            const wpt = toWorld(e.clientX, e.clientY)
-            let gid: string | null = null
-            for (const g of live.groups) {
-              const gp = localPosRef.current[g.id] ?? { x: g.x != null ? Number(g.x) : 60, y: g.y != null ? Number(g.y) : 60 }
-              const n = (live.itemsByGroup.get(g.id) ?? []).length
-              const gh = g.collapsed ? GHEAD + GFOOT : GHEAD + Math.max(1, n) * STACK_H + GFOOT
-              if (wpt.x >= gp.x - GPAD && wpt.x <= gp.x + NODE_W + GPAD && wpt.y >= gp.y - GTOP && wpt.y <= gp.y - GTOP + gh) {
-                gid = g.id
-                break
-              }
-            }
+            // 그룹 항목은 컨테이너의 자식 → 드롭 지점 아래 [data-group-id]를 찾음(드래그 카드는 pointer-events:none).
+            const el = document.elementFromPoint(e.clientX, e.clientY)
+            const gid = (el?.closest("[data-group-id]") as HTMLElement | null)?.dataset.groupId ?? null
             const cur = live.slotById.get(d.id)?.category_id ?? null
             if (gid !== cur) {
-              // 그룹 변경 → reload 후 계산 위치(스택/자유)로 가도록 임시 localPos 제거.
               onUpdateSlot(d.id, gid ? { category_id: gid } : { category_id: null, x, y })
-              setLocalPos((prev) => {
-                const n = { ...prev }
-                delete n[d.id]
-                return n
-              })
-            } else if (!gid) onMoveAccount(d.id, x, y)
+              clear(d.id) // 계산 위치(스택/자유)로 복귀
+            } else if (!gid) {
+              onMoveAccount(d.id, x, y) // 자유 이동 → localPos 유지(reload 없음)
+            } else {
+              clear(d.id) // 같은 그룹에 도로 → flex 스택으로 복귀
+            }
           }
         }
       }
@@ -173,6 +159,7 @@ export function CashFlowCanvas({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drag])
 
+  // ⌘/Ctrl + 휠 = 줌(커서 기준)
   useEffect(() => {
     const el = wrapRef.current
     if (!el) return
@@ -192,14 +179,36 @@ export function CashFlowCanvas({
     return () => el.removeEventListener("wheel", handler)
   }, [])
 
+  // 위치를 아는 노드(자유 슬롯·pool·그룹) 드래그 시작 — localPos 시드해 즉시 그 자리에서 뜸.
   const startDrag = (e: React.PointerEvent, id: string, p: { x: number; y: number }) => {
     e.stopPropagation()
     const w = toWorld(e.clientX, e.clientY)
     setDrag({ kind: "node", id, ox: w.x - p.x, oy: w.y - p.y, moved: false, sx: e.clientX, sy: e.clientY })
+    setLocalPos((prev) => ({ ...prev, [id]: p }))
+  }
+  // 그룹 안 flex 카드 드래그 시작 — DOM에서 현재 월드 위치를 재서 리프트.
+  const startFlexDrag = (e: React.PointerEvent, id: string) => {
+    e.stopPropagation()
+    const card = (e.currentTarget as HTMLElement).closest("[data-node-id]") as HTMLElement | null
+    const rect = card?.getBoundingClientRect()
+    const cw = rect ? toWorld(rect.left, rect.top) : slotPos(slotById.get(id)!)
+    const w = toWorld(e.clientX, e.clientY)
+    setDrag({ kind: "node", id, ox: w.x - cw.x, oy: w.y - cw.y, moved: false, sx: e.clientX, sy: e.clientY })
+    setLocalPos((prev) => ({ ...prev, [id]: cw }))
   }
   const dragging = (id: string) => drag?.kind === "node" && drag.id === id
   const groupNet = (items: CashAccount[]) => items.reduce((a, s) => a + (slotCategory(s.kind) === "income" ? Number(s.amount) : -Number(s.amount)), 0)
   const pp = localPos[POOL_ID] ?? poolPos ?? { x: 380, y: 190 }
+  const draggedSlot = drag?.kind === "node" ? slotById.get(drag.id) : undefined
+  const liftedGrouped = draggedSlot && draggedSlot.category_id && localPos[draggedSlot.id] ? draggedSlot : null // 그룹에서 들린 카드(별도 절대배치)
+
+  const slotCardProps = (s: CashAccount) => ({
+    slot: s,
+    calcTypes,
+    onUpdateSlot,
+    onDeleteSlot,
+    onUngroup: s.category_id ? () => onUpdateSlot(s.id, { category_id: null, x: Math.round((localPos[s.id]?.x ?? 0) + 240) || 480, y: Math.round(localPos[s.id]?.y ?? 0) || 120 }) : undefined,
+  })
 
   return (
     <div
@@ -225,13 +234,13 @@ export function CashFlowCanvas({
       <div className="absolute right-2 top-2 z-10 rounded-md bg-background/70 px-2 py-0.5 text-[10px] text-muted-foreground">⌘/Ctrl+휠 확대 · 배경 드래그 이동 · 카드 ⠿ 손잡이로 이동·그룹</div>
 
       <div className="absolute left-0 top-0 origin-top-left" style={{ transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.scale})` }}>
-        {/* 그룹 컨테이너(배경) */}
+        {/* 그룹 컨테이너 — flex 세로 스택(자동 높이) */}
         {groups.map((g) => {
           const gp = groupPos(g)
-          const items = itemsByGroup.get(g.id) ?? []
-          const h = g.collapsed ? GHEAD + GFOOT : GHEAD + Math.max(1, items.length) * STACK_H + GFOOT
+          const items = (itemsByGroup.get(g.id) ?? []).filter((s) => !dragging(s.id))
+          const allItems = itemsByGroup.get(g.id) ?? []
           return (
-            <div key={g.id} data-group-id={g.id} style={{ left: gp.x - GPAD, top: gp.y - GTOP, width: NODE_W + GPAD * 2, height: h, zIndex: dragging(g.id) ? 40 : 1 }} className="absolute rounded-2xl border-2 border-dashed bg-muted/20" >
+            <div key={g.id} data-group-id={g.id} style={{ left: gp.x - GPAD, top: gp.y - GTOP, width: NODE_W + GPAD * 2, zIndex: dragging(g.id) ? 40 : 1 }} className="absolute rounded-2xl border-2 border-dashed bg-muted/20 pb-0.5">
               <div className="flex h-[26px] cursor-grab touch-none items-center gap-1 px-2 active:cursor-grabbing" onPointerDown={(e) => startDrag(e, g.id, gp)}>
                 <GripVertical className="size-3 shrink-0 text-muted-foreground/60" />
                 <button onPointerDown={(e) => e.stopPropagation()} onClick={() => onUpdateGroup(g.id, { collapsed: !g.collapsed })} className="shrink-0 text-muted-foreground/70">
@@ -242,9 +251,16 @@ export function CashFlowCanvas({
                 </div>
                 <button onPointerDown={(e) => e.stopPropagation()} onClick={() => onDeleteGroup(g.id)} title="그룹 해제(항목은 유지)" className="shrink-0 text-[10px] text-muted-foreground/70 hover:text-destructive">해제</button>
               </div>
-              {/* 소계 */}
-              <div className="absolute inset-x-0 bottom-0 flex h-[26px] items-center justify-end gap-1 px-2 text-[11px] tabular-nums text-muted-foreground">
-                소계 <b className={groupNet(items) < 0 ? "text-rose-600" : "text-emerald-600"}>{money(groupNet(items), pool.currency)}</b>
+              {!g.collapsed && items.length > 0 && (
+                <div className="flex flex-col gap-2 px-2 pt-0.5">
+                  {items.map((s) => (
+                    <SlotCard key={s.id} {...slotCardProps(s)} mode="flex" inGroup onGrip={(e) => startFlexDrag(e, s.id)} />
+                  ))}
+                </div>
+              )}
+              {!g.collapsed && allItems.length === 0 && <div className="px-2 py-3 text-center text-[10px] text-muted-foreground/50">여기로 박스를 끌어다 넣기</div>}
+              <div className="flex items-center justify-end gap-1 px-2 py-1 text-[11px] tabular-nums text-muted-foreground">
+                소계 <b className={groupNet(allItems) < 0 ? "text-rose-600" : "text-emerald-600"}>{money(groupNet(allItems), pool.currency)}</b>
               </div>
             </div>
           )
@@ -267,25 +283,13 @@ export function CashFlowCanvas({
           </div>
         </div>
 
-        {/* 슬롯 카드(그룹 내 + 자유) */}
-        {slots.map((s) => {
-          const g = s.category_id ? groups.find((x) => x.id === s.category_id) : undefined
-          if (g?.collapsed) return null // 접힌 그룹의 항목 숨김
-          return (
-            <SlotCard
-              key={s.id}
-              slot={s}
-              calcTypes={calcTypes}
-              pos={slotPos(s)}
-              dragging={dragging(s.id)}
-              inGroup={!!s.category_id}
-              onGrip={(e) => startDrag(e, s.id, slotPos(s))}
-              onUpdateSlot={onUpdateSlot}
-              onDeleteSlot={onDeleteSlot}
-              onUngroup={s.category_id ? () => onUpdateSlot(s.id, { category_id: null, x: Math.round(slotPos(s).x + 240), y: Math.round(slotPos(s).y) }) : undefined}
-            />
-          )
-        })}
+        {/* 자유 슬롯(절대배치) */}
+        {freeSlots.map((s) => (
+          <SlotCard key={s.id} {...slotCardProps(s)} mode="absolute" pos={slotPos(s)} dragging={dragging(s.id)} inGroup={false} onGrip={(e) => startDrag(e, s.id, slotPos(s))} />
+        ))}
+
+        {/* 그룹에서 들어올린 카드(드래그 중) — 컨테이너 밖, 맨 위 */}
+        {liftedGrouped && <SlotCard {...slotCardProps(liftedGrouped)} mode="absolute" pos={localPos[liftedGrouped.id]} dragging inGroup onGrip={(e) => startFlexDrag(e, liftedGrouped.id)} />}
       </div>
     </div>
   )
@@ -294,6 +298,7 @@ export function CashFlowCanvas({
 function SlotCard({
   slot: s,
   calcTypes,
+  mode,
   pos,
   dragging,
   inGroup,
@@ -304,8 +309,9 @@ function SlotCard({
 }: {
   slot: CashAccount
   calcTypes: CashCalcType[]
-  pos: { x: number; y: number }
-  dragging: boolean
+  mode: "flex" | "absolute"
+  pos?: { x: number; y: number }
+  dragging?: boolean
   inGroup: boolean
   onGrip: (e: React.PointerEvent) => void
   onUpdateSlot: (id: string, patch: Partial<CashAccount>) => void
@@ -315,8 +321,9 @@ function SlotCard({
   const isCustom = !!s.calc_type_id
   const calc = isCustom || s.item_type === "qty" || s.item_type === "channel"
   const { fields, getVal, setVal } = fieldsOf(s, calcTypes, onUpdateSlot)
+  const style = mode === "absolute" ? { left: pos?.x, top: pos?.y, width: NODE_W, pointerEvents: dragging ? ("none" as const) : undefined, zIndex: dragging ? 50 : 3 } : { width: NODE_W }
   return (
-    <div data-node-id={s.id} style={{ left: pos.x, top: pos.y, width: NODE_W, pointerEvents: dragging ? "none" : undefined, zIndex: dragging ? 50 : 3 }} className="absolute overflow-hidden rounded-2xl border bg-card shadow-sm">
+    <div data-node-id={s.id} style={style} className={cn("overflow-hidden rounded-2xl border bg-card shadow-sm", mode === "absolute" && "absolute")}>
       <div className="flex h-5 cursor-grab touch-none items-center bg-muted/60 px-1.5 active:cursor-grabbing" onPointerDown={onGrip}>
         <GripVertical className="size-3 text-muted-foreground/60" />
         <span className="ml-1 size-2 rounded-full" style={{ backgroundColor: tagBg(s.color, 90) }} />
@@ -362,7 +369,7 @@ function SlotCard({
             <InlineNumber value={Number(s.amount)} onCommit={(v) => onUpdateSlot(s.id, { amount: v })} width="w-full" />
           </div>
         )}
-        <InlineText value={s.note ?? ""} onCommit={(v) => onUpdateSlot(s.id, { note: v })} className="w-full text-[11px] text-muted-foreground" />
+        <InlineText value={s.note ?? ""} onCommit={(v) => onUpdateSlot(s.id, { note: v })} className="w-full text-[11px] text-muted-foreground" placeholder="설명" />
       </div>
     </div>
   )
