@@ -78,8 +78,8 @@ export function CashGrid({
 
   // 표 계산 컬럼 = 회사 "기본 계산 유형"의 필드(동적). 라벨 인라인 수정 → 유형 갱신.
   const dfields = (defaultType?.fields as unknown as CalcField[]) ?? []
-  const ncol = Math.max(1, dfields.length)
-  const NCOL = dfields.length + 6 // 항목명·구분·유형 + 필드 + 금액·통화·삭제
+  const ncol = Math.max(1, dfields.length) // 표의 계산 필드 컬럼 수(필드 없으면 '계산' 1칸)
+  const NCOL = ncol + 6 // 항목명·구분·유형 + 필드(ncol) + 금액·통화·삭제 — 헤더 컬럼 수와 일치
   const renameField = (i: number, label: string) => {
     if (!defaultType) return
     onUpdateCalcType(defaultType.id, { fields: dfields.map((f, j) => (j === i ? { ...f, label } : f)) as unknown as CashCalcType["fields"] })
