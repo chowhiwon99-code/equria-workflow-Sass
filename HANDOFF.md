@@ -2,8 +2,7 @@
 
 > **새 세션 읽기 순서:** 이 파일 → 아래 **📂 문서 지도** → `CLAUDE.md` → `.claude/skills/{safe-changes,latest-stack,known-issues}.md`
 > 이 파일은 **"현재 상태 · 다음 할 일 · 합의된 정책"만** 담는다. 깊은 내용은 전용 문서(지도 참조), 과거 상세는 git 커밋 메시지에.
-> 최종 업데이트: **2026-06-27 (세션 16 — 현금흐름 지도 v2: 좌→우 파이프라인(매출→회사 가용현금→비용/보유)·시작 보유현금 설정·슬롯 색 커스터마이징·업종 템플릿·합계행. 마이그 078~080. 제품 정체성을 'AX 도입 플랫폼'으로 명시). ⚠️ 마이그 076·078·079·080 프로덕션 LIVE, 프론트 미배포(로컬 확인 후 배포). 상세=WORKLOG 세션15~16.**
-> 세션13: 회의노트(에디터·표·DB·AI 리서치 5단계·꼬리물기·대화형·이미지/PDF) + 카카오톡식 그룹채팅(전체방+다중방·초대·읽음, 마이그 071~075) 배포 `992eae5`.
+> 최종 업데이트: **2026-06-30 (세션 21 — 현금흐름 → 손익(P&L) 계산기 완성·배포).** 드래그 캔버스(박스·**그룹 컨테이너**·회사 가용현금 pool) · **계산 칸을 회사가 직접 편집**(부가세 등, AST 수식 스텝 빌더) · **함수 살아있는 엑셀/CSV**(그룹 섹션·소계) · 구분 색 자동(매출 초록/비용 빨강). **마이그 078~085 DB LIVE · 배포 `dae6aae` 프로덕션 LIVE.** 상세=WORKLOG 세션15~21.
 > ⚙️ **작업 방식(하네스/루프):** `.claude/skills/work-harness.md`(작업 SOP·검증 게이트·멀티에이전트 기준) + `/deploy`·`/verify` 명령 + push 전 tsc/lint 훅. 매 작업 = 잘게 순차 → tsc 0·lint 30/0·build 0·(DDL이면 RLS 시뮬) → main-first 배포 → 보고.
 
 ---
@@ -28,21 +27,12 @@
 
 ---
 
-## 🎯 지금 상태 (2026-06-22)
+## 🎯 지금 상태 (2026-06-30)
 
 - **제품**: 사내 직원용 AI 워크스페이스 → **B2B 멀티테넌트(회사별 판매) SaaS로 전환 중**.
   - ⚠️ **브랜드명 미정.** 코드에 박힌 `EQURIA`·`이큐리아`·`K-뷰티`는 판매 제품명/도메인이 아니라 **첫 번째 사내 고객(우리 회사)의 맥락이 하드코딩된 흔적**. 철학 = **"회사별 커스터마이징"**(각 회사 업무에 AI가 진짜 작동하게).
-- **배포**: 프로덕션 `main` = **`3338917`** (세션13: **그룹채팅**(전체방+카카오톡식 다중방·초대·읽음표시) + 회의 꼬리물기·대화형 리서치 + 회의 DB 뷰) · https://equria-workflow-sass.vercel.app · **롤백 후보 `7d41cc6`**(토글UI 전) / `b65c30e`(읽음표시 전) / `668d687`(다중방 전) / `b172c37`(그룹챗 전) / `0030e9e`(꼬리물기 묶음 전). 이전 배포분은 git 커밋·아래 로드맵 ✅ 참조.
-  - **🆕 세션13 그룹채팅 [`141b80b`~`7d41cc6`] (마이그 071~075)**: DM(`direct_*`) 미접촉·별도 `group_*` 테이블로 병렬 구축(RLS 수술 위험 회피). **전체방**(default=워크스페이스 전원) + **카카오톡식 다중방**(멤버 초대→`create_group_room`, `room_members`, `add_room_members`/`leave_group_room`). `is_room_member`(default=ws/커스텀=room_members, SECURITY DEFINER). 발신자 표시·낙관적 전송·첨부(chat-files, storage정책 073)·반응·수정/소프트삭제·**읽음표시(카카오식 안읽은 인원 수**, `group_read_state` SELECT 멤버공개·쓰기 본인만, 075). `/chat/group/[roomId]`·`MemberPickerModal`(생성/초대 공용). **RLS 단언 통과**(비초대 차단·전체방 유지). **남은 것:** 답장(스레드)·타이핑·사이드바 미읽음 합산. 명칭: 회의 '그래프'→'꼬리물기'(`b172c37`).
-  - **🆕 세션13 그래프 고도화 + 대화형 [`e9d14bd`~`0030e9e`]**: ① 리서치 응답 지연 완화(웹서치 5→3·클라 75s 타임아웃). ② 지식 그래프 = 인라인 패널(전체화면 토글)·**플랫 단색 노드**(InfraNodus식)·크기변화(차수)·⌘+휠 줌·팬·호버 강조. ③ **리서치 시 그래프 자동 생성**(내용+망 동시). ④ **노드 클릭 꼬리물기**(`/research/node`): 옆 팝오버 카드 = AI설명+꼬리질문칩+연관, 칩 클릭 시 **이전 Q&A 누적 스레드**(스파이더 웹)·망 성장(노드 동적 추가)·본문삽입(스레드 전체). ⑤ **대화형 리서치**(`/research` prior 누적): 후속 입력·퀵칩으로 정리본 고도화, 그래프도 함께 갱신. ⑥ 이미지 크기 프리셋(S/M/L/원본·연구삽입 기본60%)·**PDF 저장**(인쇄식, dep0). 새 dep: `d3-force`. `lib/safeFetch`(SSRF).
-  - **🆕 리서치 지식 그래프 [`6314ae8`]**: 리서치 결과 `그래프` 버튼 → `/research/graph`(generateObject+Zod로 개체·관계 추출) → `ResearchGraph.tsx`(**d3-force**(dep 추가) 물리 + 직접 캔버스, 노드 드래그·호버 강조·group색, 보기 전용 풀스크린 오버레이). 웹서치 없이도 동작(자료 텍스트 기반). **남음:** 노트에 영구 임베드(커스텀 노드).
-  - **🆕 세션13 AI 리서치 Part 2 [`ac77c71`~`8bc6bf2`]**: 회의 에디터 `리서치` 버튼 → **2a** 웹검색(Anthropic web_search)·신뢰도 1·2차 정리·출처(`/api/meeting-notes/research`, 미활성 시 Claude 폴백) → **2b** 출처 og:image 추출·다중선택·meeting-media 저장 삽입(`/research/images`·`/image-import`·`lib/safeFetch` SSRF가드) → **2c** 보고서/기획서 초안(`/research/draft`)·적대적 검증(`/research/verify` generateObject+Zod, 주장별 supported/weak/unsupported). 비용 `agent_usage` best-effort. **⚠️ 전제(대표 액션): Anthropic 콘솔 web search 활성+결제** — 미활성이면 2a 폴백·2b 출처 없음. AI=유료기능(요금제 게이팅 추후).
-  - **🆕 세션13 회의노트 — 표 강화 + 회의 DB [`e603f85`~`a9f19e6`]**: 표 선 가시화·노션식 메뉴(행/열 전방위·헤더·병합)·**셀 배경색 8종·열 균등분할**. **🆕 회의 DB 뷰**(마이그 070 `meeting_categories`+회의 속성 category_id/importance/meeting_time + `set_meeting_meta` RPC): `/meetings`에 **표(DB) 토글** — 분류 색태그·중요도·일시 인라인 편집, 분류 관리(사용자 정의·색7), 정렬/필터. 기본 분류 5종 시드(All-Hands 등). 단일분류·고정중요도(0~4). `lib/meetingMeta`(프로젝트 재사용). **다음:** 파일 컬럼·프로젝트(중요도) 연동.
-  - **🆕 세션13 회의노트 에디터 퀄리티 Part 1 [`651e503`+`910b2a8`]**: Tiptap 에디터의 "표면적" 블록편집을 실제 기능으로 — **표**(커서 표안 플로팅 컨트롤: 행/열 추가·삭제·헤더토글·병합/분할·삭제 + 열 리사이즈 그립 CSS), **선택 인라인 툴바**(BubbleMenu: 굵게·기울임·취소선·코드·형광펜·링크), **코드 하이라이트**(CodeBlockLowlight+lowlight 8개언어·언어드롭다운·복사), **이미지 정렬/alt**(BubbleMenu), `/날짜`. 신규 컴포넌트 `editor/EditorMenus.tsx`·`CodeBlockView.tsx`. **새 deps(전부 Tiptap v3 공식·소형): `@tiptap/extension-bubble-menu`·`@tiptap/extension-code-block-lowlight`·`lowlight`·`@tiptap/extension-highlight`·`highlight.js`(언어 8개만 등록).** 프론트만(DB 무변), 읽기전용 메뉴 숨김. 무거운 항목(토글·멘션·/AI인라인·이미지 드래그리사이즈)은 패스트팔로우.
-  - **🆕 세션13 성능·버그픽스 [`9f503da`~]**: ④ 메시지 전송 즉시반영(컴포저 즉시 clear + send 낙관적 말풍선=클라생성 id로 에코 dedup, 실패 시 복원) ⑤ 사이드바 방향키 포커스 ring을 항목에 딱 맞게(ring-inset) ⑥ Files의 Google Drive 카드 한 줄 컴팩트화.
-  - **🆕 세션12 성능·버그픽스 [`1745445`]**: ① **페이지 전환 느림** = Vercel 함수가 iad1(미국)인데 Supabase는 서울 → 매 요청 태평양 왕복(레이아웃 getUser+profiles+페이지쿼리). **`vercel.json` `regions:["icn1"]`(서울)**으로 co-locate → 왕복 ~10ms. ② **채팅 첨부 `about:blank`** = 파일 링크 `target=_blank`+`download`+크로스오리진 → 빈 탭. **target 제거 + Supabase 서명 `download` 옵션**(그 자리 다운로드). ③ **첨부 깜빡임/지연** = `loadAttachments` 매 realtime 이벤트마다 전체 재서명·교체 → **증분 서명**(캐시 재사용·병합, `attachmentsRef`). ※받은사람 열람불가설은 빗나감(스토리지 정책 024로 이미 해결돼 있었음).
-  - **세션10(2026-06-22) 배포분 [`46070b5`]**: 멀티에이전트 전체 코드리뷰(12렌즈·확정 21건) 후 고가치 5건 수정 — ① 채팅 영속성(스트림 중단/에러에도 메시지·비용 유실 방지: 유저 메시지 **스트리밍 전 선저장** + `result.consumeStream()` + `onError` 실패 usage 기록) ② MCP 서버 수정/삭제 **워크스페이스 격리**(service_role→유저 스코프 클라이언트, RLS 0행→404) ③ 어시스턴트 비용 insert `void`→`await`(미전송 버그) ④ 대화생성 실패 500. **🆕 캘린더 팀수정**(마이그 062): `cal_update/cal_delete`를 작성자 본인→**워크스페이스 멤버 전체**로 확대(남이 만든 일정도 수정/삭제 가능, 테넌트 격리 유지) + 프론트 0행 무음실패→에러 노출. 롤백 후보 **`d6f6c55`**.
-  - **세션9(2026-06-12~14) 배포분**: 전자결재 재상신/편집(060)·채번버그(061)·**드롭다운 선택 복구**(Select `onClick`=Base UI 메뉴 API — 라이브 블로커였음)·채팅 **작성중 인디케이터 + 메시지 시간**(`self-center` 정렬). 마이그 043~061 프로덕션 적용 완료(프론트=DB 일치). 롤백 후보 **`1a7dec2`**(채팅 시간정렬 전), 더 이전 `16daca9`.
+- **배포**: 프로덕션 `main` = **`dae6aae`** (세션21: **현금흐름 손익 계산기** 전체) · https://equria-workflow-sass.vercel.app (서울 icn1) · **롤백 후보**: `95f65f1`(리뷰픽스 전) · `3338917`(현금흐름 전체 전 = 세션13 그룹채팅).
+  - **과거 배포 상세 = git 커밋·WORKLOG.** 굵직한 묶음: **세션15~21 현금흐름 손익계산기**(마이그 078~085, 아래 §현금흐름 블록) · **세션13~14 그룹채팅**(카카오톡식 전체방+다중방·읽음, 마이그 071~076)·**회의노트 노션식 에디터 + AI 리서치/꼬리물기 지식그래프**(마이그 070·077, `d3-force`·Tiptap v3 확장·`lib/safeFetch` SSRF)·getUser 왕복 제거(`CurrentUserProvider`) · **세션10~12** 멀티에이전트 코드리뷰 픽스·캘린더 팀수정(062)·**icn1 리전 이동**(전환속도) · **세션9** 전자결재·드롭다운 복구. ⚠️ AI 리서치 실사용 전제 = Anthropic 콘솔 web search 활성+결제(대표 액션).
   - ⚠️ **배포 팁**: `main`·`feat`를 같은 SHA로 동시 push하면 Vercel이 중복제거해 프로덕션 승격을 건너뛸 때가 있음 → **`main`을 먼저 push해 프로덕션 빌드 확인 후 `feat` push**.
   - 작업 흐름: `feat`에서 작업 → 브랜치 push마다 **프리뷰 자동배포**(라이브 무영향) → `main` push만 프로덕션 배포.
   - 🆕 **작업 하네스(세션12 `cacf4f4`)**: `/deploy`(이 시퀀스 자동)·`/verify`(tsc+lint 게이트) 명령 + `.claude/settings.json` 훅(**pre-push 게이트**=push 전 tsc 강제·lint 회귀차단 / **Stop 검증**=src 변경 턴 tsc 자동) + `work-harness` 스킬(작업 SOP·멀티에이전트 기준·진행상황 가시성). ⚠️ 훅은 `/hooks` 1회 열거나 재시작해야 활성.
@@ -58,15 +48,17 @@
   - **사이드바 "직원 채팅" 미읽음 빨간 배지**(`useUnreadDms`) · 근태/지출 UI 개선(근무시간·상태요약).
   - 작은 수정(1·2단계): 채팅 알림 자동삭제·스크롤바 간격·파일 다중업로드·파일 공개범위(공개/부서/개인, 044).
   - **다음(5단계 예정)**: 노션식 새 페이지(블록 에디터 + `/`슬래시 + AI 상시) — 가장 큼·단독.
-- **안정도**: `tsc` 0 · `pnpm lint` **30 errors/0 warnings**(전부 기존 `set-state-in-effect`·refs 부채, 신규 0이 베이스라인) · `any` 0 · 마이그 **001~078(81파일) 적용·drift 없음** · **`next build` 성공** → **Vercel 빌드가 실제 게이트**.
-- **🆕 세션14 미배포 작업(working tree, feat 브랜치 — 로컬 커밋만, push 보류)**: 리액션 이모지 통일(DirectChat) · **그룹채팅 알림**(마이그 076 `handle_new_group_message` 트리거·커스텀방만·CHECK 'group' 추가·`mark_room_read` 알림정리 — **프로덕션 LIVE·롤백검증 통과**) · **카카오톡식 인앱 토스트**(NotificationBell realtime INSERT→sonner, DM·그룹 공통·현재방 생략) · **ChatList 그룹 미읽음 회귀수정**(075 SELECT 확대로 `.eq(user_id,me)` 누락 → 남의 읽은시각 집던 버그 + group_messages realtime 구독) · `(app)/loading.tsx`(전환 즉시 스켈레톤) · pricing.ts Opus $5/$25 정정 · **🆕 회의노트 표 분류칩 제거·꼬리물기 그래프 영구화(마이그 077·LIVE)·그래프 X=접기** · **🆕 getUser 왕복 제거 완료**(`CurrentUserProvider` 도입 — 서버 레이아웃의 user.id를 client context로 주입, 클라 컴포넌트/페이지 ~27곳 `auth.getUser()` 마운트 왕복 제거, 병렬 워크플로 마이그 후 tsc0·lint30/0·build0 전수검증). 남은 클라 getUser 0(서버·upload 유틸만).
-- **🆕 세션15 현금흐름 지도 MVP(미배포, 계획승인 후 단계적·매 단계 tsc0/lint30-0/build0)**: 기존 `/finance`에 **"현금흐름" 탭** 추가. **계좌·잔액 모델**(마이그 078 `cash_accounts`·`cash_transfers`·`finance_entries.account_id`, **프로덕션 LIVE**·RLS=035 패턴·advisor 0). **SSOT 양방향**: 흐름도(`CashFlowCanvas`=WorkflowCanvas 포크+ResearchGraph 호버/줌 이식, 노드=계좌+합성 카테고리, 엣지=이체/매출/비용 금액라벨·방향, 포트드래그=이체) ↔ **노션DB식 그리드**(`CashGrid` 인라인편집)가 같은 데이터. `cashflowGraph`(computeBalances 통화별·buildGraph·buildMovements)·`cashAccounts`(종류). FinanceEntryModal 계좌 select. CSV/PDF export(의존성0). **급여=P2(대표전용, attendance_viewers 패턴)·예측/오픈뱅킹=P3** — 계획서 `~/.claude/plans/misty-crafting-lighthouse.md`.
+- **안정도**: `tsc` 0 · `pnpm lint` **30 errors/0 warnings**(전부 기존 `set-state-in-effect`·refs 부채, 신규 0이 베이스라인) · `any` 0 · 마이그 **001~085(88파일) 적용·drift 없음** · **`next build` 성공** → **Vercel 빌드가 실제 게이트**.
+- **🆕 세션14 (✅ 라이브)**: 그룹채팅 알림(마이그 076)·카카오톡식 인앱 토스트(NotificationBell)·ChatList 그룹 미읽음 회귀수정 · `(app)/loading.tsx`(전환 스켈레톤) · pricing Opus $5/$25 정정 · **getUser 왕복 제거**(`CurrentUserProvider` — 서버 레이아웃 user.id를 client context로, 클라 ~27곳 마운트 왕복 제거).
+- **🆕 현금흐름 → 손익(P&L) 계산기 `/finance` (✅ 라이브, 세션15~21, 마이그 078~085)**: 매출·비용·보유를 **드래그 캔버스**(박스 자유 배치 + **그룹 컨테이너**(이름·접기·소계, 박스 드래그로 묶기/빼기, flex 오토레이아웃) · **회사 가용현금 pool**(시작보유 인라인 편집)) ↔ **노션DB식 표**(`CashGrid`, 그룹 섹션·소계)가 같은 데이터(SSOT). **계산 칸을 회사가 직접 편집** — 표 헤더 라벨 인라인 + "칸 편집"으로 부가세 등 칸 추가·삭제 + **수식 스텝 빌더**(기존 AST를 스텝으로 분해해 바로 수정). "회사 기본 계산 유형"(`cash_calc_types` 1개)을 표의 **동적 컬럼**으로 승격 → 캔버스·엑셀 자동 반영(구분 강제 안 함=매출·비용 공용). **함수 살아있는 엑셀/CSV**(`exceljs` lazy, 셀=AST 실수식·입력칸 동적, 그룹 섹션·소계 SUMIF, 색·테두리·헤더고정). 구분 색 자동(매출 초록/비용 빨강/보유 파랑, 개별 변경 가능). **단일 AST 엔진**(`calcFormula`: `evalFormula`=앱 · `toExcelFormula`=엑셀)으로 앱=엑셀 일치. 신규 lib: `calcFormula`·`cashflowGraph`(buildSlotGraph 롤업)·`cashAccounts`(fieldsOf·SLOT_TYPES)·`xlsx`·`inline`. 마이그 078(슬롯)·079(amount)·080(카테고리·설정)·081(item_type)·082(calc_types·field_values)·083(note·pool_pos)·084(그룹 x/y/collapsed)·085(default_calc_type_id), RLS=035/080 패턴. **남은 것:** 급여(P2 대표전용)·예측/오픈뱅킹(P3)·현금흐름 AI 코칭. (알려진 한계: 시드 insert RLS 멀티테넌트 견고화·다통화 pool 표시 = `known-issues`.)
 
 > 최근 작업 상세(세션7·8: UI 리프레시·채팅 단계0~6·에이전트/위젯 재설계·캘린더·삭제RLS버그·B1격리·비용추적 등)는 **git 커밋 메시지**에 충실히 기록됨. 여기 중복 안 함.
 
 ---
 
 ## 🔴 다음 할 일 (우선순위)
+
+> **현금흐름 손익계산기(세션15~21) ✅ 완료·배포.** 다음 후보: **현금흐름 AI 코칭**(절감 제안·이상 탐지) · 기존 색 일괄정리(구분색으로) · 급여(P2 대표전용) · 예측/오픈뱅킹(P3) · 또는 아래 **멀티테넌시 B1-b**(두 번째 회사 받기 전 필수).
 
 ### 🆕 기능 로드맵 (세션10·2026-06-22 · 대표 승인 · 진행 중)
 > 8영역 멀티에이전트 코드조사 기반. 순서 = 안전 win→추가형→큰작업→AI고도화. 매 단계 예상이슈+검증(tsc/빌드/RLS시뮬) 후 보고·배포.
@@ -138,7 +130,7 @@
 
 - **GitHub**: `chowhiwon99-code/equria-workflow-Sass` (main=프로덕션, 작업브랜치 `feat/toss-ui-refresh`).
 - **Vercel**: team `team_wcW0NMU7oiIxNndyV1afigbp` · project `prj_CcCTUr8eIYpaStaj6RNq7VoLPZG6` (`equria-workflow-sass`) · 배포보호 off.
-- **Supabase**: project `dutovtfdckhayyvhtuxu` (ap-northeast-2 서울) · 마이그 **001~068(71파일)**.
+- **Supabase**: project `dutovtfdckhayyvhtuxu` (ap-northeast-2 서울) · 마이그 **001~085(88파일)**.
 - **.env.local**: ANTHROPIC · Supabase(URL·anon·service_role) · Google 4종 · `WORKSPACE_PASSWORD` 채워짐. ⚠️ **시크릿 값은 문서/채팅에 적지 말 것**(HANDOFF는 git 추적).
 - **테스트 계정**: 조휘원(`c6817c63-943f-4257-8500-f9840ad39bde`)·이동규·김건 (워크스페이스 비번 로그인). 모델: 기본 `claude-sonnet-4-6` / 복잡 `claude-opus-4-7`.
 - 링크: [GitHub](https://github.com/chowhiwon99-code/equria-workflow-Sass) · [Vercel](https://vercel.com/chowhiwon99-2151s-projects/equria-workflow-sass) · [Supabase](https://supabase.com/dashboard/project/dutovtfdckhayyvhtuxu) · 메모리 `~/.claude/projects/-Users-johwiwon-equria-workspace/memory/`
