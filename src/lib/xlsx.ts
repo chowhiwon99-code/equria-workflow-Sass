@@ -81,7 +81,10 @@ export async function downloadPnlXlsx(filename: string, rows: PnlRow[]) {
       ws.getCell(`A${rn}`).value = `${curGroup} 소계`
       ws.getCell(`A${rn}`).font = { bold: true }
       const h = ws.getCell(`${AMT}${rn}`)
-      h.value = { formula: `SUM(${AMT}${groupStart}:${AMT}${rn - 1})` }
+      // 표의 그룹 소계(순=매출−비용−보유)와 동일하게 — 단순 SUM(부호 무시)이 아니라 구분별 부호 적용.
+      const gs = groupStart
+      const ge = rn - 1
+      h.value = { formula: `SUMIF(B${gs}:B${ge},"매출",${AMT}${gs}:${AMT}${ge})-SUMIF(B${gs}:B${ge},"비용",${AMT}${gs}:${AMT}${ge})-SUMIF(B${gs}:B${ge},"보유금",${AMT}${gs}:${AMT}${ge})` }
       h.numFmt = "#,##0"
       h.font = { bold: true }
       fillRow(rn, "FFF1F5F9")

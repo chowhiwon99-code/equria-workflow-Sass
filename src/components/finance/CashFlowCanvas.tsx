@@ -15,6 +15,7 @@ const STACK_H = 104 // 그룹 안 카드 1개 세로 간격
 const GHEAD = 30 // 그룹 헤더
 const GFOOT = 28 // 그룹 소계
 const GPAD = 8
+const GTOP = 4 // 그룹 박스 상단 여백(렌더·드롭 히트 공용)
 
 type Drag =
   | { kind: "node"; id: string; ox: number; oy: number; moved: boolean; sx: number; sy: number }
@@ -104,6 +105,12 @@ export function CashFlowCanvas({
     return { x: (sx - v.tx) / v.scale, y: (sy - v.ty) / v.scale }
   }
 
+  // onUp은 window 리스너라 [drag] 시점 클로저를 잡음 → 드래그 중 slots/groups가 바뀌어도 최신값을 읽도록 ref 미러.
+  const liveRef = useRef({ groups, itemsByGroup, slotById, groupIdSet })
+  useEffect(() => {
+    liveRef.current = { groups, itemsByGroup, slotById, groupIdSet }
+  })
+
   useEffect(() => {
     if (!drag) return
     const onMove = (e: PointerEvent) => {
@@ -121,27 +128,28 @@ export function CashFlowCanvas({
     }
     const onUp = (e: PointerEvent) => {
       const d = dragRef.current
+      const live = liveRef.current
       if (d?.kind === "node" && d.moved) {
         const lp = localPosRef.current[d.id]
         if (lp) {
           const x = Math.round(lp.x)
           const y = Math.round(lp.y)
           if (d.id === POOL_ID) onMovePool(x, y)
-          else if (groupIdSet.has(d.id)) onMoveGroup(d.id, x, y)
+          else if (live.groupIdSet.has(d.id)) onMoveGroup(d.id, x, y)
           else {
             // 드롭 지점(월드 좌표)이 어느 그룹 박스 안인지 — DOM 겹침과 무관하게 위치로 판정.
             const wpt = toWorld(e.clientX, e.clientY)
             let gid: string | null = null
-            for (const g of groups) {
+            for (const g of live.groups) {
               const gp = localPosRef.current[g.id] ?? { x: g.x != null ? Number(g.x) : 60, y: g.y != null ? Number(g.y) : 60 }
-              const n = (itemsByGroup.get(g.id) ?? []).length
+              const n = (live.itemsByGroup.get(g.id) ?? []).length
               const gh = g.collapsed ? GHEAD + GFOOT : GHEAD + Math.max(1, n) * STACK_H + GFOOT
-              if (wpt.x >= gp.x - GPAD && wpt.x <= gp.x + NODE_W + GPAD && wpt.y >= gp.y - 4 && wpt.y <= gp.y - 4 + gh) {
+              if (wpt.x >= gp.x - GPAD && wpt.x <= gp.x + NODE_W + GPAD && wpt.y >= gp.y - GTOP && wpt.y <= gp.y - GTOP + gh) {
                 gid = g.id
                 break
               }
             }
-            const cur = slotById.get(d.id)?.category_id ?? null
+            const cur = live.slotById.get(d.id)?.category_id ?? null
             if (gid !== cur) {
               // 그룹 변경 → reload 후 계산 위치(스택/자유)로 가도록 임시 localPos 제거.
               onUpdateSlot(d.id, gid ? { category_id: gid } : { category_id: null, x, y })
@@ -223,7 +231,7 @@ export function CashFlowCanvas({
           const items = itemsByGroup.get(g.id) ?? []
           const h = g.collapsed ? GHEAD + GFOOT : GHEAD + Math.max(1, items.length) * STACK_H + GFOOT
           return (
-            <div key={g.id} data-group-id={g.id} style={{ left: gp.x - GPAD, top: gp.y - 4, width: NODE_W + GPAD * 2, height: h, zIndex: dragging(g.id) ? 40 : 1 }} className="absolute rounded-2xl border-2 border-dashed bg-muted/20" >
+            <div key={g.id} data-group-id={g.id} style={{ left: gp.x - GPAD, top: gp.y - GTOP, width: NODE_W + GPAD * 2, height: h, zIndex: dragging(g.id) ? 40 : 1 }} className="absolute rounded-2xl border-2 border-dashed bg-muted/20" >
               <div className="flex h-[26px] cursor-grab touch-none items-center gap-1 px-2 active:cursor-grabbing" onPointerDown={(e) => startDrag(e, g.id, gp)}>
                 <GripVertical className="size-3 shrink-0 text-muted-foreground/60" />
                 <button onPointerDown={(e) => e.stopPropagation()} onClick={() => onUpdateGroup(g.id, { collapsed: !g.collapsed })} className="shrink-0 text-muted-foreground/70">
