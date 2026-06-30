@@ -39,19 +39,22 @@ function buildAstFromSteps(steps: Step[]): CalcNode | null {
 }
 
 /** 회사가 계산 유형(필드+수식)을 직접 정의 — ① 템플릿에서 시작, ② 직접 만들기(스텝 조립). 미리보기 후 저장. */
-export function CalcTypeBuilder({ types, onClose, onSaved }: { types: CashCalcType[]; onClose: () => void; onSaved: () => void }) {
+export function CalcTypeBuilder({ types, editType, onClose, onSaved }: { types: CashCalcType[]; editType?: CashCalcType | null; onClose: () => void; onSaved: () => void }) {
   const supabase = createClient()
   const me = useCurrentUserId()
-  const [mode, setMode] = useState<"template" | "custom">("template")
-  const [name, setName] = useState("")
-  const [flow, setFlow] = useState<"revenue" | "expense" | "reserve">("expense")
-  const [fields, setFields] = useState<CalcField[]>([])
+  const isEdit = !!editType
+  const [mode, setMode] = useState<"template" | "custom">(editType ? "custom" : "template")
+  const [name, setName] = useState(editType?.name ?? "")
+  const [flow, setFlow] = useState<"revenue" | "expense" | "reserve">((editType?.flow as "revenue" | "expense" | "reserve") ?? "expense")
+  const [fields, setFields] = useState<CalcField[]>((editType?.fields as unknown as CalcField[]) ?? [])
   const [templateAst, setTemplateAst] = useState<CalcNode | null>(null)
   const [steps, setSteps] = useState<Step[]>([])
-  const [seq, setSeq] = useState(1)
+  const [seq, setSeq] = useState(100)
   const [busy, setBusy] = useState(false)
 
-  const ast = mode === "template" ? templateAst : buildAstFromSteps(steps)
+  const editAst = (editType?.formula as { ast?: CalcNode } | null)?.ast ?? null
+  // 편집모드: 스텝을 안 만들면 기존 수식 유지, 스텝을 만들면 그것으로 교체.
+  const ast = mode === "template" ? templateAst : isEdit && steps.length === 0 ? editAst : buildAstFromSteps(steps)
   const ready = ast != null && fields.length > 0
 
   // 템플릿
@@ -93,9 +96,16 @@ export function CalcTypeBuilder({ types, onClose, onSaved }: { types: CashCalcTy
   const save = async () => {
     if (!me) return
     if (!name.trim()) return toast.error("유형 이름을 입력해 주세요.")
-    if (!ready || !ast) return toast.error(mode === "template" ? "템플릿을 선택해 주세요." : "필드와 스텝을 추가해 수식을 완성해 주세요.")
+    if (!ready || !ast) return toast.error(isEdit ? "필드를 1개 이상 두세요." : mode === "template" ? "템플릿을 선택해 주세요." : "필드와 스텝을 추가해 수식을 완성해 주세요.")
     setBusy(true)
     try {
+      if (isEdit && editType) {
+        await mustOk(supabase.from("cash_calc_types").update({ name: name.trim(), flow, fields, formula: { ast } }).eq("id", editType.id))
+        toast.success("계산 칸을 수정했어요.")
+        onSaved()
+        onClose()
+        return
+      }
       await mustOk(
         supabase.from("cash_calc_types").insert({ workspace_id: WORKSPACE_ID, name: name.trim(), flow, fields, formula: { ast }, created_by: me, sort_order: types.length })
       )
@@ -122,20 +132,27 @@ export function CalcTypeBuilder({ types, onClose, onSaved }: { types: CashCalcTy
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="flex max-h-[88vh] w-full max-w-xl flex-col gap-3 overflow-y-auto rounded-2xl border bg-popover p-4 shadow-[var(--shadow-lg)]" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
-          <span className="text-sm font-semibold">계산 유형 만들기</span>
+          <span className="text-sm font-semibold">{isEdit ? "계산 칸·수식 편집" : "계산 유형 만들기"}</span>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label="닫기">
             <X className="size-4" />
           </button>
         </div>
 
-        {/* 모드 토글 */}
-        <div className="flex gap-1 rounded-lg bg-muted p-0.5 text-xs">
-          {(["template", "custom"] as const).map((m) => (
-            <button key={m} onClick={() => switchMode(m)} className={cn("flex-1 rounded-md py-1.5 font-medium transition-colors", mode === m ? "bg-background shadow-sm" : "text-muted-foreground")}>
-              {m === "template" ? "템플릿에서 시작" : "직접 만들기"}
-            </button>
-          ))}
-        </div>
+        {/* 모드 토글 (편집모드에선 숨김) */}
+        {!isEdit && (
+          <div className="flex gap-1 rounded-lg bg-muted p-0.5 text-xs">
+            {(["template", "custom"] as const).map((m) => (
+              <button key={m} onClick={() => switchMode(m)} className={cn("flex-1 rounded-md py-1.5 font-medium transition-colors", mode === m ? "bg-background shadow-sm" : "text-muted-foreground")}>
+                {m === "template" ? "템플릿에서 시작" : "직접 만들기"}
+              </button>
+            ))}
+          </div>
+        )}
+        {isEdit && (
+          <p className="rounded-lg bg-muted/50 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
+            칸(필드)을 <b>추가·삭제·이름변경</b>하세요. 새 칸이 금액에 반영되려면 아래 <b>수식 스텝</b>으로 다시 조립하면 됩니다 — 스텝을 안 만들면 기존 수식이 유지돼요.
+          </p>
+        )}
 
         {mode === "template" && (
           <div className="flex max-h-52 flex-col gap-1 overflow-y-auto">

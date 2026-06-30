@@ -1021,6 +1021,7 @@ export type Database = {
       }
       cashflow_settings: {
         Row: {
+          default_calc_type_id: string | null
           pool_pos: Json | null
           default_currency: string
           opening_cash: Json
@@ -1029,6 +1030,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          default_calc_type_id?: string | null
           pool_pos?: Json | null
           default_currency?: string
           opening_cash?: Json
@@ -1037,6 +1039,7 @@ export type Database = {
           workspace_id?: string
         }
         Update: {
+          default_calc_type_id?: string | null
           pool_pos?: Json | null
           default_currency?: string
           opening_cash?: Json

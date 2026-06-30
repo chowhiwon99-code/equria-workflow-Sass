@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import { Download, FileDown, Settings, X, Sheet, Calculator } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
@@ -22,6 +22,7 @@ import { CashFlowCanvas } from "./CashFlowCanvas"
 import { CalcTypeBuilder } from "./CalcTypeBuilder"
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-0000000000e1"
+const DEFAULT_TYPE_NAME = "기본 계산" // 회사가 편집하는 표 계산 칸의 출처(시드 1회)
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => (c === "&" ? "&amp;" : c === "<" ? "&lt;" : c === ">" ? "&gt;" : "&quot;"))
 const PRINT_CSS = `body{font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;color:#111;margin:24px;-webkit-print-color-adjust:exact}h1{font-size:18px;margin:0}h2{font-size:14px;margin:18px 0 4px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #ddd;padding:4px 8px;text-align:left}th{background:#f5f5f5}.r{text-align:right;font-variant-numeric:tabular-nums}@media print{@page{margin:14mm}}`
 
@@ -40,7 +41,10 @@ export function CashFlowView() {
   const [defaultCurrency, setDefaultCurrency] = useState("KRW")
   const [showSettings, setShowSettings] = useState(false)
   const [showBuilder, setShowBuilder] = useState(false)
+  const [editType, setEditType] = useState<CashCalcType | null>(null)
   const [poolPos, setPoolPos] = useState<{ x: number; y: number } | null>(null)
+  const [defaultCalcTypeId, setDefaultCalcTypeId] = useState<string | null>(null)
+  const seededRef = useRef(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -48,24 +52,45 @@ export function CashFlowView() {
     try {
       const [{ data: slotData, error: e }, { data: settings }, { data: types }, { data: grps }] = await Promise.all([
         supabase.from("cash_accounts").select("*").is("deleted_at", null).order("sort_order"),
-        supabase.from("cashflow_settings").select("opening_cash, default_currency, pool_pos").maybeSingle(),
+        supabase.from("cashflow_settings").select("opening_cash, default_currency, pool_pos, default_calc_type_id").maybeSingle(),
         supabase.from("cash_calc_types").select("*").order("sort_order"),
         supabase.from("cash_categories").select("*").order("sort_order"),
       ])
       if (e) throw e
+      let typeList = (types as CashCalcType[]) ?? []
+      let defId = (settings?.default_calc_type_id as string | null) ?? null
+      // 회사 "기본 계산 유형" 1회 멱등 시드 — 표 계산 칸(필드)의 출처. 회사가 이 유형을 편집해 칸을 바꿈.
+      if (!defId && me && !seededRef.current) {
+        seededRef.current = true
+        const existing = typeList.find((t) => t.name === DEFAULT_TYPE_NAME)
+        if (existing) defId = existing.id
+        else {
+          const { data: created } = await supabase
+            .from("cash_calc_types")
+            .insert({ workspace_id: WORKSPACE_ID, name: DEFAULT_TYPE_NAME, flow: "revenue", fields: BUILTIN_FIELDS.channel, formula: { ast: CHANNEL_AST }, created_by: me, sort_order: -1 })
+            .select()
+            .single()
+          if (created) {
+            typeList = [created as CashCalcType, ...typeList]
+            defId = created.id
+          }
+        }
+        if (defId) await supabase.from("cashflow_settings").upsert({ workspace_id: WORKSPACE_ID, default_calc_type_id: defId, updated_by: me, updated_at: new Date().toISOString() }, { onConflict: "workspace_id" })
+      }
       setSlots((slotData as CashAccount[]) ?? [])
       setGroups((grps as CashCategory[]) ?? [])
-      setCalcTypes((types as CashCalcType[]) ?? [])
+      setCalcTypes(typeList)
       setOpening((settings?.opening_cash as Record<string, number>) ?? {})
       setDefaultCurrency(settings?.default_currency ?? "KRW")
       setPoolPos((settings?.pool_pos as { x: number; y: number } | null) ?? null)
+      setDefaultCalcTypeId(defId)
       setError(null)
     } catch {
       setError("현금흐름을 불러오지 못했어요.")
     } finally {
       setLoading(false)
     }
-  }, [supabase])
+  }, [supabase, me])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -81,6 +106,7 @@ export function CashFlowView() {
 
   const graph = useMemo(() => buildSlotGraph(slots, opening, defaultCurrency, poolPos), [slots, opening, defaultCurrency, poolPos])
   const currencies = useMemo(() => Array.from(new Set([defaultCurrency, ...slots.map((s) => s.currency)])), [defaultCurrency, slots])
+  const defaultType = useMemo(() => calcTypes.find((t) => t.id === defaultCalcTypeId) ?? null, [calcTypes, defaultCalcTypeId])
 
   // ── 설정(보유현금·기본통화) — 입력 즉시 흐름도 반영 + 저장(upsert) ──
   const saveSettings = async (nextOpening: Record<string, number>, nextCurrency: string, nextPool: { x: number; y: number } | null = poolPos) => {
@@ -113,7 +139,7 @@ export function CashFlowView() {
     if (!me) return
     const { error: e } = await supabase
       .from("cash_accounts")
-      .insert({ name: "새 항목", kind, color, created_by: me, sort_order: slots.length })
+      .insert({ name: "새 항목", kind, color, calc_type_id: defaultCalcTypeId, created_by: me, sort_order: slots.length })
     if (e) return toast.error("항목을 추가하지 못했어요.")
     load()
   }
@@ -127,7 +153,8 @@ export function CashFlowView() {
       const ct = calcTypes.find((t) => t.id === merged.calc_type_id)
       const ast = (ct?.formula as { ast?: CalcNode } | null)?.ast ?? null
       amount = evalFormula(ast, (merged.field_values as Record<string, number>) ?? {})
-      if (ct) derived.kind = flowToKind(ct.flow) // 롤업(매출/비용/보유) 유지
+      // 회사 기본 계산 유형은 구분을 강제하지 않음(매출·비용 모두 같은 칸 사용). 그 외 명명 유형만 flow→구분.
+      if (ct && ct.id !== defaultCalcTypeId) derived.kind = flowToKind(ct.flow)
     } else {
       amount = computeSlotAmount(merged)
     }
@@ -166,6 +193,20 @@ export function CashFlowView() {
     await supabase.from("cash_accounts").update({ category_id: null }).eq("category_id", id) // 소속 해제
     await supabase.from("cash_categories").delete().eq("id", id)
     load()
+  }
+
+  // 회사 기본 계산 유형(표 칸) 편집 — 필드/수식 변경 후 그 유형을 쓰는 행들 금액 재계산.
+  const onUpdateCalcType = async (id: string, patch: Partial<CashCalcType>) => {
+    await mustOk(supabase.from("cash_calc_types").update(patch).eq("id", id))
+    const ct = { ...calcTypes.find((t) => t.id === id), ...patch } as CashCalcType
+    const ast = (ct.formula as { ast?: CalcNode } | null)?.ast ?? null
+    const affected = slots.filter((s) => s.calc_type_id === id)
+    await Promise.all(affected.map((s) => supabase.from("cash_accounts").update({ amount: evalFormula(ast, (s.field_values as Record<string, number>) ?? {}) }).eq("id", s.id)))
+    load()
+  }
+  const editColumns = () => {
+    if (defaultType) setEditType(defaultType)
+    setShowBuilder(true)
   }
 
   // ── 업종 템플릿(빈 상태 진입) ──
@@ -366,9 +407,9 @@ export function CashFlowView() {
       </div>
 
       {/* 슬롯 표 — 금액 직접 입력 */}
-      <CashGrid slots={slots} groups={groups} pool={graph.pool} calcTypes={calcTypes} onAddSlot={addSlot} onUpdateSlot={updateSlot} onDeleteSlot={deleteSlot} />
+      <CashGrid slots={slots} groups={groups} pool={graph.pool} calcTypes={calcTypes} defaultType={defaultType} onAddSlot={addSlot} onUpdateSlot={updateSlot} onDeleteSlot={deleteSlot} onUpdateCalcType={onUpdateCalcType} onEditColumns={editColumns} />
 
-      {showBuilder && <CalcTypeBuilder types={calcTypes} onClose={() => setShowBuilder(false)} onSaved={load} />}
+      {showBuilder && <CalcTypeBuilder types={calcTypes} editType={editType} onClose={() => { setShowBuilder(false); setEditType(null) }} onSaved={load} />}
     </div>
   )
 }

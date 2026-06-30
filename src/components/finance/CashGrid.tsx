@@ -1,9 +1,9 @@
 "use client"
 
 import { Fragment, useMemo, useState } from "react"
-import { Trash2, Plus, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
+import { Trash2, Plus, Search, ArrowUpDown, ArrowUp, ArrowDown, SlidersHorizontal } from "lucide-react"
 import { CURRENCIES, money } from "@/lib/finance"
-import { SLOT_TYPES, ITEM_TYPES, slotLabel } from "@/lib/cashAccounts"
+import { SLOT_TYPES, ITEM_TYPES, slotLabel, fieldsOf } from "@/lib/cashAccounts"
 import { tagBg, swatch, CATEGORY_COLORS } from "@/lib/meetingMeta"
 import type { CalcField } from "@/lib/calcFormula"
 import type { CashAccount, CashCalcType, CashCategory } from "@/types"
@@ -20,17 +20,23 @@ export function CashGrid({
   groups,
   pool,
   calcTypes,
+  defaultType,
   onAddSlot,
   onUpdateSlot,
   onDeleteSlot,
+  onUpdateCalcType,
+  onEditColumns,
 }: {
   slots: CashAccount[]
   groups: CashCategory[]
   pool: CashSummary
   calcTypes: CashCalcType[]
+  defaultType: CashCalcType | null
   onAddSlot: () => void
   onUpdateSlot: (id: string, patch: Partial<CashAccount>) => void
   onDeleteSlot: (slot: CashAccount) => void
+  onUpdateCalcType: (id: string, patch: Partial<CashCalcType>) => void
+  onEditColumns: () => void
 }) {
   const [q, setQ] = useState("")
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "kind", dir: 1 })
@@ -70,13 +76,22 @@ export function CashGrid({
   const th = "px-2 py-2 text-left font-medium whitespace-nowrap"
   const thR = "px-2 py-2 text-right font-medium whitespace-nowrap"
 
+  // 표 계산 컬럼 = 회사 "기본 계산 유형"의 필드(동적). 라벨 인라인 수정 → 유형 갱신.
+  const dfields = (defaultType?.fields as unknown as CalcField[]) ?? []
+  const ncol = Math.max(1, dfields.length)
+  const NCOL = dfields.length + 6 // 항목명·구분·유형 + 필드 + 금액·통화·삭제
+  const renameField = (i: number, label: string) => {
+    if (!defaultType) return
+    onUpdateCalcType(defaultType.id, { fields: dfields.map((f, j) => (j === i ? { ...f, label } : f)) as unknown as CashCalcType["fields"] })
+  }
+
   const renderRow = (s: CashAccount) => {
     const customType = s.calc_type_id ? calcTypes.find((t) => t.id === s.calc_type_id) : undefined
-    const isCustom = !!customType
-    const calc = isCustom || s.item_type === "qty" || s.item_type === "channel"
-    const vals = (s.field_values as Record<string, number>) ?? {}
-    const fields = (customType?.fields as unknown as CalcField[]) ?? []
-    const setVal = (key: string, v: number) => onUpdateSlot(s.id, { field_values: { ...vals, [key]: v } })
+    const isDefault = !!defaultType && s.calc_type_id === defaultType.id
+    const isOtherCustom = !!customType && !isDefault
+    const { fields, getVal, setVal } = fieldsOf(s, calcTypes, onUpdateSlot)
+    const calc = fields.length > 0
+    const editor = (f: CalcField) => (f.kind === "percent" ? <InlinePercent value={getVal(f.key)} onCommit={(v) => setVal(f.key, v)} /> : <InlineNumber width="w-20" value={getVal(f.key)} onCommit={(v) => setVal(f.key, v)} />)
     return (
       <tr key={s.id} className="group hover:bg-muted/20">
         <td className="px-2 py-1">
@@ -102,7 +117,7 @@ export function CashGrid({
           </div>
         </td>
         <td className="px-2 py-1">
-          {isCustom ? (
+          {isOtherCustom ? (
             <span className="rounded-full px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: tagBg(s.color, 22) }}>{slotLabel(s.kind)}</span>
           ) : (
             <select value={s.kind} onChange={(e) => onUpdateSlot(s.id, { kind: e.target.value })} style={{ backgroundColor: tagBg(s.color, 22) }} className="cursor-pointer rounded-full border-0 px-2 py-0.5 text-xs font-medium outline-none focus:ring-1 focus:ring-ring">
@@ -136,28 +151,31 @@ export function CashGrid({
             )}
           </select>
         </td>
-        {isCustom ? (
-          <td className="px-2 py-1" colSpan={4}>
+        {isDefault ? (
+          dfields.map((f) => (
+            <td key={f.key} className="px-2 py-1 text-right">{editor(f)}</td>
+          ))
+        ) : calc ? (
+          <td className="px-2 py-1" colSpan={ncol}>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              {fields.length === 0 ? (
-                <span className="text-xs text-muted-foreground/50">필드 없음 — 유형 관리에서 설정</span>
-              ) : (
-                fields.map((fld) => (
-                  <label key={fld.key} className="flex items-center gap-1 text-xs text-muted-foreground">
-                    {fld.label}
-                    {fld.kind === "percent" ? <InlinePercent value={Number(vals[fld.key] ?? 0)} onCommit={(v) => setVal(fld.key, v)} /> : <InlineNumber width="w-20" value={Number(vals[fld.key] ?? 0)} onCommit={(v) => setVal(fld.key, v)} />}
-                  </label>
-                ))
-              )}
+              {fields.map((f) => (
+                <label key={f.key} className="flex items-center gap-1 text-xs text-muted-foreground">
+                  {f.label}
+                  {editor(f)}
+                </label>
+              ))}
             </div>
           </td>
+        ) : dfields.length > 0 ? (
+          dfields.map((f) => (
+            <td key={f.key} className="px-2 py-1 text-right">
+              <Dash />
+            </td>
+          ))
         ) : (
-          <>
-            <td className="px-2 py-1 text-right">{calc ? <InlineNumber width="w-20" value={Number(s.units)} onCommit={(v) => onUpdateSlot(s.id, { units: v })} /> : <Dash />}</td>
-            <td className="px-2 py-1 text-right">{calc ? <InlineNumber width="w-24" value={Number(s.unit_price)} onCommit={(v) => onUpdateSlot(s.id, { unit_price: v })} /> : <Dash />}</td>
-            <td className="px-2 py-1 text-right">{s.item_type === "channel" ? <InlinePercent value={Number(s.rate)} onCommit={(v) => onUpdateSlot(s.id, { rate: v })} /> : <Dash />}</td>
-            <td className="px-2 py-1 text-right">{calc ? <InlineNumber width="w-20" value={Number(s.extra)} onCommit={(v) => onUpdateSlot(s.id, { extra: v })} /> : <Dash />}</td>
-          </>
+          <td className="px-2 py-1 text-center">
+            <Dash />
+          </td>
         )}
         <td className="px-2 py-1 text-right">
           {calc ? <span className="px-1 font-medium tabular-nums">{money(Number(s.amount), s.currency)}</span> : <InlineNumber width="w-24" value={Number(s.amount)} onCommit={(v) => onUpdateSlot(s.id, { amount: v })} />}
@@ -188,6 +206,9 @@ export function CashGrid({
           <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="항목 검색…" className="h-8 w-44 rounded-lg border bg-background pl-7 pr-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
         </div>
+        <button onClick={onEditColumns} className="inline-flex h-8 items-center gap-1 rounded-lg border px-2.5 text-sm font-medium text-muted-foreground hover:bg-muted" title="계산 칸·수식 편집(부가세 등 추가)">
+          <SlidersHorizontal className="size-3.5" /> 칸 편집
+        </button>
         <button onClick={onAddSlot} className="inline-flex h-8 items-center gap-1 rounded-lg bg-foreground px-2.5 text-sm font-medium text-background transition-opacity hover:opacity-90">
           <Plus className="size-3.5" /> 항목 추가
         </button>
@@ -200,10 +221,15 @@ export function CashGrid({
               <th className={th}><button onClick={() => toggleSort("name")} className="inline-flex items-center gap-1 hover:text-foreground">항목명 {sortIcon("name")}</button></th>
               <th className={th}><button onClick={() => toggleSort("kind")} className="inline-flex items-center gap-1 hover:text-foreground">구분 {sortIcon("kind")}</button></th>
               <th className={th}>유형</th>
-              <th className={thR}>판매수/갯수</th>
-              <th className={thR}>단가</th>
-              <th className={thR}>수수료%</th>
-              <th className={thR}>택배비/부가세</th>
+              {dfields.length > 0 ? (
+                dfields.map((f, i) => (
+                  <th key={f.key} className={thR}>
+                    <ColHeader label={f.label} editable={!!defaultType} onCommit={(v) => renameField(i, v)} />
+                  </th>
+                ))
+              ) : (
+                <th className={thR}>계산</th>
+              )}
               <th className={thR}><button onClick={() => toggleSort("amount")} className="inline-flex items-center gap-1 hover:text-foreground">금액 {sortIcon("amount")}</button></th>
               <th className={th}>통화</th>
               <th className="w-8 px-1 py-2" />
@@ -212,14 +238,14 @@ export function CashGrid({
           <tbody className="divide-y">
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-3 py-8 text-center text-sm text-muted-foreground">{q ? "검색 결과가 없어요." : "항목을 추가하고 유형·금액을 입력하면 자동으로 계산돼요."}</td>
+                <td colSpan={NCOL} className="px-3 py-8 text-center text-sm text-muted-foreground">{q ? "검색 결과가 없어요." : "항목을 추가하고 유형·금액을 입력하면 자동으로 계산돼요."}</td>
               </tr>
             ) : (
               <>
                 {sections.secs.map((sec) => (
                   <Fragment key={sec.group.id}>
                     <tr className="bg-muted/40">
-                      <td colSpan={10} className="px-2 py-1.5">
+                      <td colSpan={NCOL} className="px-2 py-1.5">
                         <div className="flex items-center gap-2 text-xs font-semibold">
                           <span className="size-2.5 rounded-full" style={{ backgroundColor: swatch(sec.group.color) }} />
                           {sec.group.name}
@@ -235,7 +261,7 @@ export function CashGrid({
                 ))}
                 {sections.ungrouped.length > 0 && sections.secs.length > 0 && (
                   <tr className="bg-muted/20">
-                    <td colSpan={10} className="px-2 py-1 text-xs text-muted-foreground">그룹 없음</td>
+                    <td colSpan={NCOL} className="px-2 py-1 text-xs text-muted-foreground">그룹 없음</td>
                   </tr>
                 )}
                 {sections.ungrouped.map(renderRow)}
@@ -245,7 +271,7 @@ export function CashGrid({
           {slots.length > 0 && (
             <tfoot className="border-t-2 bg-muted/30 text-xs">
               <tr>
-                <td className="px-3 py-2 text-muted-foreground" colSpan={10}>
+                <td className="px-3 py-2 text-muted-foreground" colSpan={NCOL}>
                   <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 tabular-nums">
                     <span>총매출 <b className="text-emerald-600">{money(pool.revenue, pool.currency)}</b></span>
                     <span>총비용 <b className="text-rose-600">{money(pool.expense, pool.currency)}</b></span>
@@ -264,6 +290,30 @@ export function CashGrid({
 
 function Dash() {
   return <span className="text-muted-foreground/30">—</span>
+}
+
+// 계산 컬럼 헤더 — 라벨 인라인 수정(기본 유형 fields[i].label 갱신).
+function ColHeader({ label, editable, onCommit }: { label: string; editable: boolean; onCommit: (v: string) => void }) {
+  if (!editable) return <span>{label}</span>
+  return (
+    <input
+      key={label}
+      defaultValue={label}
+      title="칸 이름 — 수정 가능"
+      onBlur={(e) => {
+        const v = e.target.value.trim()
+        if (v && v !== label) onCommit(v)
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && !e.nativeEvent.isComposing) e.currentTarget.blur()
+        if (e.key === "Escape") {
+          e.currentTarget.value = label
+          e.currentTarget.blur()
+        }
+      }}
+      className="w-20 rounded border-0 bg-transparent text-right font-medium text-muted-foreground outline-none hover:bg-background focus:bg-background focus:text-foreground focus:ring-1 focus:ring-ring"
+    />
+  )
 }
 
 function InlineText({ value, onCommit }: { value: string; onCommit: (v: string) => void }) {
