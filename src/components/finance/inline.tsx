@@ -26,7 +26,7 @@ export function InlineText({ value, onCommit, className, placeholder = "이름" 
   )
 }
 
-export function InlineNumber({ value, onCommit, width = "w-full" }: { value: number; onCommit: (v: number) => void; width?: string }) {
+export function InlineNumber({ value, onCommit, onLive, width = "w-full" }: { value: number; onCommit: (v: number) => void; onLive?: (v: number) => void; width?: string }) {
   const fmt = (v: number) => (v ? v.toLocaleString() : "")
   return (
     <input
@@ -38,6 +38,7 @@ export function InlineNumber({ value, onCommit, width = "w-full" }: { value: num
         e.currentTarget.value = value ? String(value) : ""
         e.currentTarget.select()
       }}
+      onChange={onLive ? (e) => { const num = Number(e.currentTarget.value.replace(/,/g, "")); if (!Number.isNaN(num)) onLive(num) } : undefined}
       onBlur={(e) => {
         const num = Number(e.target.value.replace(/,/g, ""))
         if (!Number.isNaN(num) && num !== value) onCommit(num)
@@ -51,7 +52,7 @@ export function InlineNumber({ value, onCommit, width = "w-full" }: { value: num
   )
 }
 
-export function InlinePercent({ value, onCommit }: { value: number; onCommit: (v: number) => void }) {
+export function InlinePercent({ value, onCommit, onLive }: { value: number; onCommit: (v: number) => void; onLive?: (v: number) => void }) {
   const fmt = (v: number) => (v ? String(+(v * 100).toFixed(2)) : "")
   return (
     <span className="inline-flex items-center">
@@ -64,6 +65,7 @@ export function InlinePercent({ value, onCommit }: { value: number; onCommit: (v
           e.currentTarget.value = value ? String(+(value * 100).toFixed(2)) : ""
           e.currentTarget.select()
         }}
+        onChange={onLive ? (e) => { const num = Number(e.currentTarget.value.replace(/,/g, "")); if (!Number.isNaN(num)) onLive(num / 100) } : undefined}
         onBlur={(e) => {
           const num = Number(e.target.value.replace(/,/g, ""))
           if (!Number.isNaN(num)) onCommit(num / 100)

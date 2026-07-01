@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react"
 import { Wallet, Landmark, CreditCard, PiggyBank, TrendingUp, TrendingDown, Circle } from "lucide-react"
 import type { CashAccount, CashCalcType } from "@/types"
-import { BUILTIN_FIELDS, type CalcField } from "@/lib/calcFormula"
+import { BUILTIN_FIELDS, QTY_AST, CHANNEL_AST, type CalcField, type CalcNode } from "@/lib/calcFormula"
 
 /**
  * 현금흐름 계좌/버킷 종류(노드 유형) SSOT.
@@ -30,9 +30,9 @@ export type SlotTypeValue = (typeof SLOT_TYPES)[number]["value"]
 
 /** 계산 유형 — 행 금액을 어떻게 계산하나(computeSlotAmount). */
 export const ITEM_TYPES = [
-  { value: "fixed", label: "정액" }, // 금액 직접
-  { value: "qty", label: "수량" }, // 갯수 × 단가
-  { value: "channel", label: "채널" }, // 판매수 × (단가 × (1−수수료) − 택배비)
+  { value: "fixed", label: "직접 입력" }, // 금액 직접
+  { value: "qty", label: "개수 × 단가" }, // 개수 × 개당 가격 (+추가금)
+  { value: "channel", label: "채널 판매" }, // 개수 × (개당 가격 × (1−수수료) − 배송비)
 ] as const
 export type ItemTypeValue = (typeof ITEM_TYPES)[number]["value"]
 const SLOT_MAP = new Map(SLOT_TYPES.map((s) => [s.value, s]))
@@ -106,6 +106,14 @@ export function kindIcon(kind: string): LucideIcon {
 }
 export function kindDefaultColor(kind: string): string {
   return KIND_MAP.get(kind as AccountKind)?.color ?? "gray"
+}
+
+/** 슬롯의 금액 계산 AST(빌트인 qty/channel 또는 커스텀 유형). 정액=null(직접 입력). 실시간 미리보기 공용. */
+export function astOf(s: CashAccount, calcTypes: CashCalcType[]): CalcNode | null {
+  if (s.calc_type_id) return ((calcTypes.find((t) => t.id === s.calc_type_id)?.formula) as { ast?: CalcNode } | null)?.ast ?? null
+  if (s.item_type === "qty") return QTY_AST
+  if (s.item_type === "channel") return CHANNEL_AST
+  return null
 }
 
 /** 슬롯의 입력 필드·값 접근(빌트인=레거시 컬럼 units/unit_price/rate/extra, 커스텀=field_values). 그리드/캔버스 공용. */

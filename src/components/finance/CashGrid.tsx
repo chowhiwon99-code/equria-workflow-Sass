@@ -1,11 +1,11 @@
 "use client"
 
 import { Fragment, useMemo, useState } from "react"
-import { Trash2, Plus, Search, ArrowUpDown, ArrowUp, ArrowDown, SlidersHorizontal } from "lucide-react"
+import { Trash2, Plus, Search, ArrowUpDown, ArrowUp, ArrowDown, SlidersHorizontal, ChevronDown, ChevronRight } from "lucide-react"
 import { CURRENCIES, money } from "@/lib/finance"
-import { SLOT_TYPES, ITEM_TYPES, slotLabel, slotColor, fieldsOf } from "@/lib/cashAccounts"
+import { SLOT_TYPES, ITEM_TYPES, slotLabel, slotColor, fieldsOf, astOf } from "@/lib/cashAccounts"
 import { tagBg, swatch, CATEGORY_COLORS } from "@/lib/meetingMeta"
-import type { CalcField } from "@/lib/calcFormula"
+import { evalFormula, type CalcField } from "@/lib/calcFormula"
 import type { CashAccount, CashCalcType, CashCategory } from "@/types"
 import { slotCategory, type CashSummary } from "@/lib/cashflowGraph"
 
@@ -41,6 +41,15 @@ export function CashGrid({
   const [q, setQ] = useState("")
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "kind", dir: 1 })
   const [colorFor, setColorFor] = useState<string | null>(null)
+  const [live, setLive] = useState<Record<string, Record<string, number>>>({}) // 타이핑 즉시 금액 미리보기(슬롯별 필드 override)
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set()) // 표에서 접은 그룹(로컬·뷰 전용, 소계는 계속 표시)
+  const toggleCollapse = (id: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
 
   const rows = useMemo(() => {
     const order: Record<string, number> = { revenue_src: 0, reserve: 1, expense_dst: 2 }
@@ -91,7 +100,10 @@ export function CashGrid({
     const isOtherCustom = !!customType && !isDefault
     const { fields, getVal, setVal } = fieldsOf(s, calcTypes, onUpdateSlot)
     const calc = fields.length > 0
-    const editor = (f: CalcField) => (f.kind === "percent" ? <InlinePercent value={getVal(f.key)} onCommit={(v) => setVal(f.key, v)} /> : <InlineNumber width="w-20" value={getVal(f.key)} onCommit={(v) => setVal(f.key, v)} />)
+    const setLiveVal = (k: string, v: number) => setLive((p) => ({ ...p, [s.id]: { ...p[s.id], [k]: v } }))
+    const ast = astOf(s, calcTypes)
+    const shownAmount = calc && ast ? evalFormula(ast, { ...Object.fromEntries(fields.map((f) => [f.key, getVal(f.key)])), ...(live[s.id] ?? {}) }) : Number(s.amount)
+    const editor = (f: CalcField) => (f.kind === "percent" ? <InlinePercent value={getVal(f.key)} onCommit={(v) => setVal(f.key, v)} onLive={(v) => setLiveVal(f.key, v)} /> : <InlineNumber width="w-20" value={getVal(f.key)} onCommit={(v) => setVal(f.key, v)} onLive={(v) => setLiveVal(f.key, v)} />)
     return (
       <tr key={s.id} className="group hover:bg-muted/20">
         <td className="px-2 py-1">
@@ -178,7 +190,7 @@ export function CashGrid({
           </td>
         )}
         <td className="px-2 py-1 text-right">
-          {calc ? <span className="px-1 font-medium tabular-nums">{money(Number(s.amount), s.currency)}</span> : <InlineNumber width="w-24" value={Number(s.amount)} onCommit={(v) => onUpdateSlot(s.id, { amount: v })} />}
+          {calc ? <span className="px-1 font-medium tabular-nums">{money(shownAmount, s.currency)}</span> : <InlineNumber width="w-24" value={Number(s.amount)} onCommit={(v) => onUpdateSlot(s.id, { amount: v })} />}
         </td>
         <td className="px-2 py-1">
           <select value={s.currency} onChange={(e) => onUpdateSlot(s.id, { currency: e.target.value })} className="rounded border-0 bg-transparent text-xs outline-none focus:ring-1 focus:ring-ring">
@@ -242,23 +254,29 @@ export function CashGrid({
               </tr>
             ) : (
               <>
-                {sections.secs.map((sec) => (
-                  <Fragment key={sec.group.id}>
-                    <tr className="bg-muted/40">
-                      <td colSpan={NCOL} className="px-2 py-1.5">
-                        <div className="flex items-center gap-2 text-xs font-semibold">
-                          <span className="size-2.5 rounded-full" style={{ backgroundColor: swatch(sec.group.color) }} />
-                          {sec.group.name}
-                          <span className="rounded-full bg-background/70 px-1.5 text-[10px] font-normal text-muted-foreground">{sec.items.length}</span>
-                          <span className="ml-auto font-normal tabular-nums text-muted-foreground">
-                            소계 <b className={groupNet(sec.items) < 0 ? "text-rose-600" : "text-emerald-600"}>{money(groupNet(sec.items), pool.currency)}</b>
-                          </span>
-                        </div>
-                      </td>
-                    </tr>
-                    {sec.items.map(renderRow)}
-                  </Fragment>
-                ))}
+                {sections.secs.map((sec) => {
+                  const isCollapsed = collapsed.has(sec.group.id)
+                  return (
+                    <Fragment key={sec.group.id}>
+                      <tr className="bg-muted/40">
+                        <td colSpan={NCOL} className="px-2 py-1.5">
+                          <div className="flex items-center gap-2 text-xs font-semibold">
+                            <button onClick={() => toggleCollapse(sec.group.id)} className="flex items-center gap-2 hover:text-foreground" title={isCollapsed ? "펼치기" : "접기"}>
+                              {isCollapsed ? <ChevronRight className="size-3.5 text-muted-foreground" /> : <ChevronDown className="size-3.5 text-muted-foreground" />}
+                              <span className="size-2.5 rounded-full" style={{ backgroundColor: swatch(sec.group.color) }} />
+                              {sec.group.name}
+                              <span className="rounded-full bg-background/70 px-1.5 text-[10px] font-normal text-muted-foreground">{sec.items.length}</span>
+                            </button>
+                            <span className="ml-auto font-normal tabular-nums text-muted-foreground">
+                              소계 <b className={groupNet(sec.items) < 0 ? "text-rose-600" : "text-emerald-600"}>{money(groupNet(sec.items), pool.currency)}</b>
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                      {!isCollapsed && sec.items.map(renderRow)}
+                    </Fragment>
+                  )
+                })}
                 {sections.ungrouped.length > 0 && sections.secs.length > 0 && (
                   <tr className="bg-muted/20">
                     <td colSpan={NCOL} className="px-2 py-1 text-xs text-muted-foreground">그룹 없음</td>
@@ -338,7 +356,7 @@ function InlineText({ value, onCommit }: { value: string; onCommit: (v: string) 
   )
 }
 
-function InlineNumber({ value, onCommit, width = "w-28" }: { value: number; onCommit: (v: number) => void; width?: string }) {
+function InlineNumber({ value, onCommit, onLive, width = "w-28" }: { value: number; onCommit: (v: number) => void; onLive?: (v: number) => void; width?: string }) {
   const fmt = (v: number) => (v ? v.toLocaleString() : "")
   return (
     <input
@@ -350,6 +368,7 @@ function InlineNumber({ value, onCommit, width = "w-28" }: { value: number; onCo
         e.currentTarget.value = value ? String(value) : ""
         e.currentTarget.select()
       }}
+      onChange={onLive ? (e) => { const num = Number(e.currentTarget.value.replace(/,/g, "")); if (!Number.isNaN(num)) onLive(num) } : undefined}
       onBlur={(e) => {
         const num = Number(e.target.value.replace(/,/g, ""))
         if (!Number.isNaN(num) && num !== value) onCommit(num)
@@ -363,7 +382,7 @@ function InlineNumber({ value, onCommit, width = "w-28" }: { value: number; onCo
   )
 }
 
-function InlinePercent({ value, onCommit }: { value: number; onCommit: (v: number) => void }) {
+function InlinePercent({ value, onCommit, onLive }: { value: number; onCommit: (v: number) => void; onLive?: (v: number) => void }) {
   const fmt = (v: number) => (v ? String(+(v * 100).toFixed(2)) : "")
   return (
     <span className="inline-flex items-center">
@@ -376,6 +395,7 @@ function InlinePercent({ value, onCommit }: { value: number; onCommit: (v: numbe
           e.currentTarget.value = value ? String(+(value * 100).toFixed(2)) : ""
           e.currentTarget.select()
         }}
+        onChange={onLive ? (e) => { const num = Number(e.currentTarget.value.replace(/,/g, "")); if (!Number.isNaN(num)) onLive(num / 100) } : undefined}
         onBlur={(e) => {
           const num = Number(e.target.value.replace(/,/g, ""))
           if (!Number.isNaN(num)) onCommit(num / 100)

@@ -47,15 +47,15 @@ const op = (o: "+" | "-" | "*" | "/", a: CalcNode, b: CalcNode): CalcNode => ({ 
 // ── 빌트인 유형(fixed/qty/channel)의 필드·AST — 레거시 컬럼 키(units/unit_price/rate/extra) 사용 ──
 export const BUILTIN_FIELDS: Record<"qty" | "channel", CalcField[]> = {
   qty: [
-    { key: "units", label: "갯수", kind: "number" },
-    { key: "unit_price", label: "단가", kind: "number" },
-    { key: "extra", label: "정액(부가세 등)", kind: "number" },
+    { key: "units", label: "개수", kind: "number" },
+    { key: "unit_price", label: "개당 가격", kind: "number" },
+    { key: "extra", label: "추가금", kind: "number" },
   ],
   channel: [
-    { key: "units", label: "판매수", kind: "number" },
-    { key: "unit_price", label: "단가", kind: "number" },
+    { key: "units", label: "개수", kind: "number" },
+    { key: "unit_price", label: "개당 가격", kind: "number" },
     { key: "rate", label: "수수료", kind: "percent" },
-    { key: "extra", label: "택배비", kind: "number" },
+    { key: "extra", label: "배송비", kind: "number" },
   ],
 }
 // qty: 갯수 × 단가 + 정액

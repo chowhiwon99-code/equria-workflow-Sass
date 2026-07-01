@@ -6,7 +6,8 @@ import { cn } from "@/lib/utils"
 import { money } from "@/lib/finance"
 import { tagBg } from "@/lib/meetingMeta"
 import { POOL_ID, slotCategory, type CashSummary } from "@/lib/cashflowGraph"
-import { SLOT_TYPES, slotLabel, slotColor, fieldsOf } from "@/lib/cashAccounts"
+import { SLOT_TYPES, ITEM_TYPES, slotLabel, slotColor, fieldsOf, astOf } from "@/lib/cashAccounts"
+import { evalFormula } from "@/lib/calcFormula"
 import { InlineText, InlineNumber, InlinePercent } from "./inline"
 import type { CashAccount, CashCalcType, CashCategory } from "@/types"
 
@@ -29,6 +30,7 @@ export function CashFlowCanvas({
   pool,
   poolPos,
   calcTypes,
+  defaultCalcTypeId,
   onUpdateSlot,
   onDeleteSlot,
   onAddSlot,
@@ -45,6 +47,7 @@ export function CashFlowCanvas({
   pool: CashSummary
   poolPos: { x: number; y: number } | null
   calcTypes: CashCalcType[]
+  defaultCalcTypeId: string | null
   onUpdateSlot: (id: string, patch: Partial<CashAccount>) => void
   onDeleteSlot: (slot: CashAccount) => void
   onAddSlot: (kind: string, color: string) => void
@@ -224,6 +227,7 @@ export function CashFlowCanvas({
   const slotCardProps = (s: CashAccount) => ({
     slot: s,
     calcTypes,
+    defaultCalcTypeId,
     onUpdateSlot,
     onDeleteSlot,
     onUngroup: s.category_id
@@ -328,6 +332,7 @@ export function CashFlowCanvas({
 function SlotCard({
   slot: s,
   calcTypes,
+  defaultCalcTypeId,
   mode,
   pos,
   dragging,
@@ -340,6 +345,7 @@ function SlotCard({
 }: {
   slot: CashAccount
   calcTypes: CashCalcType[]
+  defaultCalcTypeId: string | null
   mode: "flex" | "absolute"
   pos?: { x: number; y: number }
   dragging?: boolean
@@ -350,9 +356,14 @@ function SlotCard({
   onDeleteSlot: (slot: CashAccount) => void
   onUngroup?: () => void
 }) {
-  const isCustom = !!s.calc_type_id
-  const calc = isCustom || s.item_type === "qty" || s.item_type === "channel"
+  // 계산칸 표시 = 계산유형(기본 포함)이거나 수량/채널. 구분 잠금은 '명명 커스텀'만(기본계산·수량/채널은 구분 편집 유지 — 표와 동일).
+  const calc = !!s.calc_type_id || s.item_type === "qty" || s.item_type === "channel"
+  const isOtherCustom = !!s.calc_type_id && s.calc_type_id !== defaultCalcTypeId
   const { fields, getVal, setVal } = fieldsOf(s, calcTypes, onUpdateSlot)
+  // 타이핑 즉시 금액 미리보기 — 입력 중 로컬 override로 계산(커밋은 blur에서 DB 반영).
+  const [live, setLive] = useState<Record<string, number>>({})
+  const ast = astOf(s, calcTypes)
+  const shownAmount = calc && ast ? evalFormula(ast, { ...Object.fromEntries(fields.map((f) => [f.key, getVal(f.key)])), ...live }) : Number(s.amount)
   const style = mode === "absolute" ? { left: pos?.x, top: pos?.y, width: NODE_W, pointerEvents: dragging ? ("none" as const) : undefined, zIndex: dragging ? 50 : 3 } : { width: NODE_W }
   return (
     <div data-node-id={s.id} style={style} className={cn("group/card overflow-hidden rounded-xl border bg-card shadow-sm transition-shadow hover:shadow-md", mode === "absolute" && "absolute", entering && "cf-bubble-in")}>
@@ -371,7 +382,7 @@ function SlotCard({
       </div>
       <div className="flex flex-col gap-1 px-2.5 pb-2 pt-1" onPointerDown={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-1.5">
-          {isCustom ? (
+          {isOtherCustom ? (
             <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium" style={{ backgroundColor: tagBg(s.color, 22) }}>{slotLabel(s.kind)}</span>
           ) : (
             <select value={s.kind} onChange={(e) => onUpdateSlot(s.id, { kind: e.target.value, color: slotColor(e.target.value) })} style={{ backgroundColor: tagBg(s.color, 22) }} className="shrink-0 cursor-pointer rounded-full border-0 px-1.5 py-0.5 text-[10px] font-medium outline-none focus:ring-1 focus:ring-ring">
@@ -384,17 +395,43 @@ function SlotCard({
             <InlineText value={s.name} onCommit={(v) => onUpdateSlot(s.id, { name: v })} className="w-full text-sm font-semibold" />
           </div>
         </div>
+        {/* 유형(계산 방식) — 표와 동일. 정액→수량/채널/커스텀 전환 시 아래 계산칸 등장. */}
+        <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
+          유형
+          <select
+            value={s.calc_type_id ? `c:${s.calc_type_id}` : s.item_type}
+            onChange={(e) => {
+              const v = e.target.value
+              if (v.startsWith("c:")) onUpdateSlot(s.id, { calc_type_id: v.slice(2), item_type: "fixed" })
+              else onUpdateSlot(s.id, { item_type: v, calc_type_id: null })
+            }}
+            className="flex-1 cursor-pointer rounded border bg-background px-1 py-0.5 text-[10px] text-foreground outline-none focus:ring-1 focus:ring-ring"
+          >
+            <optgroup label="기본">
+              {ITEM_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </optgroup>
+            {calcTypes.length > 0 && (
+              <optgroup label="커스텀">
+                {calcTypes.map((t) => (
+                  <option key={t.id} value={`c:${t.id}`}>{t.name}</option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+        </label>
         {calc ? (
           <>
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <div className="flex flex-col gap-0.5 rounded-lg bg-muted/30 px-2 py-1.5">
               {fields.map((fld) => (
-                <label key={fld.key} className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
-                  {fld.label}
-                  {fld.kind === "percent" ? <InlinePercent value={getVal(fld.key)} onCommit={(v) => setVal(fld.key, v)} /> : <InlineNumber value={getVal(fld.key)} onCommit={(v) => setVal(fld.key, v)} width="w-14" />}
+                <label key={fld.key} className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                  <span className="truncate">{fld.label}</span>
+                  {fld.kind === "percent" ? <InlinePercent value={getVal(fld.key)} onCommit={(v) => setVal(fld.key, v)} onLive={(v) => setLive((p) => ({ ...p, [fld.key]: v }))} /> : <InlineNumber value={getVal(fld.key)} onCommit={(v) => setVal(fld.key, v)} onLive={(v) => setLive((p) => ({ ...p, [fld.key]: v }))} width="w-20" />}
                 </label>
               ))}
             </div>
-            <p className="text-right text-sm font-bold tabular-nums">{money(Number(s.amount), s.currency)}</p>
+            <p className="text-right text-sm font-bold tabular-nums">{money(shownAmount, s.currency)}</p>
           </>
         ) : (
           <div className="text-right">

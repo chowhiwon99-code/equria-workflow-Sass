@@ -139,9 +139,10 @@ export function CashFlowView() {
   // ── 슬롯 CRUD ──
   const addSlot = async (kind = "expense_dst", color = "red") => {
     if (!me) return
+    // 새 항목 기본 = "개수 × 단가"(빌트인 qty). 사용자가 유형에서 직접 입력/채널 판매로 바꿀 수 있음.
     const { error: e } = await supabase
       .from("cash_accounts")
-      .insert({ name: "새 항목", kind, color, calc_type_id: defaultCalcTypeId, created_by: me, sort_order: slots.length })
+      .insert({ name: "새 항목", kind, color, item_type: "qty", calc_type_id: null, created_by: me, sort_order: slots.length })
     if (e) return toast.error("항목을 추가하지 못했어요.")
     load()
   }
@@ -402,6 +403,7 @@ export function CashFlowView() {
           pool={graph.pool}
           poolPos={poolPos}
           calcTypes={calcTypes}
+          defaultCalcTypeId={defaultCalcTypeId}
           onUpdateSlot={updateSlot}
           onDeleteSlot={deleteSlot}
           onAddSlot={addSlot}
