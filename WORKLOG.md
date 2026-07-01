@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-07-01 · 세션23 — 현금흐름 AI 코칭 (건강도·절감·이상)
+
+**무엇/왜:** 대표 — 세션15~21로 만든 손익(P&L) 계산기 위에 **AI 코칭**을 얹음. `/finance` "AI 코칭" 버튼 → 현재 손익 스냅샷을 Claude가 분석해 **건강도·비용 절감 제안·이상 신호**를 구조화 카드로. 착수 전 설계안 리뷰 + 2결정 확정(**구조화 카드**·**현재 스냅샷만**).
+- **조사(Explore 팬아웃):** 현금흐름 데이터 모델(`buildSlotGraph`→통화별 `CashSummary`+pool)·기존 AI 라우트 패턴(assistant streamText+비용추적 / ocr generateObject)·RLS(035/080)·UI 훅 지점(`CashFlowView` 헤더 버튼군) 맵.
+- **설계 결정:** ① **DDL 0·RLS 변경 0·읽기 전용**(기존 데이터 분석만 = safe-changes 최상, 마이그 불필요) ② 카드형이라 스트리밍 아닌 **`generateObject` 원샷**(zod 스키마 검증) ③ 저장 안 함(즉석 생성) ④ sonnet-4-6·온도 0.3.
+- **구현(잘게 순차):** ① `lib/claude/schemas` `cashCoachSchema`(health/savings/anomalies) ② `lib/cashCoach`(순수 — `buildCoachPayload` 클라·`buildCoachPrompt` 서버, 비용률·항목 비중 **사전계산**으로 모델 산술오류 방지) ③ `api/finance/cashflow-coach`(auth→generateObject→`agent_usage` 비용추적, assistant 패턴) ④ `CashCoachPanel`(자체 완결 — fetch+상태+카드, 열면 1회 자동 분석+다시 분석) ⑤ `CashFlowView` 버튼+렌더 최소 배선.
+- **환각 억제:** 시스템 프롬프트에 "일반론 금지·근거(금액/비율) 필수·근거 없으면 빈 배열·건강하면 good 솔직히·통화 안 섞기" 명시.
+- **배포:** 로컬 스모크(라우트 등록·미들웨어 307·dev 에러 0) → 커밋 `84b55ab` → **main-first** ff-only push → feat push. Vercel 프로덕션 배포. 롤백 후보 `9d353c3`(=dae6aae 코드 동일).
+
+**예상이슈 점검:** tsc 0·lint 30/0(신규 0, 새 effect는 기존 disable 패턴)·build 0·새 라우트 컴파일 확인. 읽기 전용이라 RLS 시뮬/적대검증 불요. E2E(인증 세션 실제 Claude 카드)=프로덕션 확인.
+
+---
+
 ## 2026-06-30 · 세션22 — 배포 + 적대 코드리뷰 + 문서 정리
 
 **무엇/왜:** 세션15~21 현금흐름 손익계산기를 프로덕션 배포 → 적대 코드리뷰 → .md 중복정리(다음 세션 매끄럽게). 대표 지시.
