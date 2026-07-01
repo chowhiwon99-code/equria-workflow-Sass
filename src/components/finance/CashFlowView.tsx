@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
-import { Download, FileDown, Settings, X, Sheet, Calculator } from "lucide-react"
+import { Download, FileDown, Settings, X, Sheet, Calculator, Sparkles } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { useUndo } from "@/components/undo/UndoProvider"
@@ -20,6 +20,7 @@ import { buildSlotGraph } from "@/lib/cashflowGraph"
 import { CashGrid } from "./CashGrid"
 import { CashFlowCanvas } from "./CashFlowCanvas"
 import { CalcTypeBuilder } from "./CalcTypeBuilder"
+import { CashCoachPanel } from "./CashCoachPanel"
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-0000000000e1"
 const DEFAULT_TYPE_NAME = "기본 계산" // 회사가 편집하는 표 계산 칸의 출처(시드 1회)
@@ -40,6 +41,7 @@ export function CashFlowView() {
   const [opening, setOpening] = useState<Record<string, number>>({})
   const [defaultCurrency, setDefaultCurrency] = useState("KRW")
   const [showSettings, setShowSettings] = useState(false)
+  const [showCoach, setShowCoach] = useState(false)
   const [showBuilder, setShowBuilder] = useState(false)
   const [editType, setEditType] = useState<CashCalcType | null>(null)
   const [poolPos, setPoolPos] = useState<{ x: number; y: number } | null>(null)
@@ -326,6 +328,9 @@ export function CashFlowView() {
             </span>
           </div>
           <div className="flex items-center gap-1.5">
+            <Button size="sm" variant={showCoach ? "default" : "outline"} onClick={() => setShowCoach((v) => !v)} disabled={slots.length === 0}>
+              <Sparkles className="size-3.5" /> AI 코칭
+            </Button>
             <Button size="sm" variant="outline" onClick={() => setShowBuilder(true)}>
               <Calculator className="size-3.5" /> 계산 유형
             </Button>
@@ -387,6 +392,9 @@ export function CashFlowView() {
             </div>
             <p className="mt-2 text-xs text-muted-foreground">시작 보유현금에 매출을 더하고 비용·보유를 빼서 가용현금·순이익을 계산해요. 입력하면 흐름도에 바로 반영됩니다.</p>
           </div>
+        )}
+        {showCoach && slots.length > 0 && (
+          <CashCoachPanel slots={slots} summaries={graph.summary} groups={groups} onClose={() => setShowCoach(false)} />
         )}
         <CashFlowCanvas
           slots={slots}

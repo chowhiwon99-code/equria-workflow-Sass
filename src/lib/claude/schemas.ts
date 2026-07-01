@@ -28,3 +28,32 @@ export const businessCardSchema = z.object({
   website: z.string().describe("웹사이트/URL"),
 })
 export type BusinessCardResult = z.infer<typeof businessCardSchema>
+
+/** 현금흐름 AI 코칭 결과 — 현재 손익(P&L) 스냅샷 분석. 근거(금액·비율) 있는 것만, 없으면 빈 배열. */
+export const cashCoachSchema = z.object({
+  health: z.object({
+    level: z.enum(["good", "caution", "warning"]).describe("전반 재무 건강도: good=양호, caution=주의, warning=경고"),
+    headline: z.string().describe("한 줄 진단 (예: 흑자지만 비용 비중이 높음)"),
+    summary: z.string().describe("2~3문장 종합 진단. 데이터의 실제 숫자·비율 근거로."),
+  }),
+  savings: z
+    .array(
+      z.object({
+        title: z.string().describe("절감 제안 제목 (간결, 대상 항목 언급)"),
+        detail: z.string().describe("구체적 실행 방안. 반드시 금액/비율 근거를 포함."),
+        target: z.string().describe("대상 항목명(정확히). 특정 항목 없으면 빈 문자열"),
+      })
+    )
+    .describe("비용 절감 기회 0~4개. 근거 있는 것만. 없으면 빈 배열."),
+  anomalies: z
+    .array(
+      z.object({
+        severity: z.enum(["info", "caution", "warning"]).describe("info=참고, caution=주의, warning=경고"),
+        title: z.string().describe("이상 신호 제목"),
+        detail: z.string().describe("왜 이상한지 + 권장 조치. 숫자 근거 포함."),
+        target: z.string().describe("대상 항목명. 없으면 빈 문자열"),
+      })
+    )
+    .describe("이상 신호 0~4개. 비용>매출·특정 비용 과다·순이익 마이너스·통화 편중·가용현금 부족 등. 없으면 빈 배열."),
+})
+export type CashCoachResult = z.infer<typeof cashCoachSchema>
