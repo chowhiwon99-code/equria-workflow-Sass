@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { X, Trash2, Loader2, Plus } from "lucide-react"
+import { X, Trash2, Loader2, Plus, Search } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
@@ -9,12 +9,17 @@ import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { fieldClass } from "@/components/shared/Modal"
 import { Button } from "@/components/ui/button"
-import { CALC_TEMPLATES, formulaToText, evalFormula, type CalcField, type CalcNode } from "@/lib/calcFormula"
+import { CALC_TEMPLATES, BUILDER_PATTERNS, TEMPLATE_CATEGORIES, templateCategory, formulaToText, evalFormula, type BuilderPattern, type CalcField, type CalcNode } from "@/lib/calcFormula"
 import { money } from "@/lib/finance"
 import type { CashCalcType } from "@/types"
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-0000000000e1"
 const flowLabel = (flow: string) => (flow === "revenue" ? "매출" : flow === "reserve" ? "보유금" : "비용")
+// 템플릿 라벨 "이름 — 수식" 분리(표시용).
+const splitLabel = (label: string): [string, string] => {
+  const i = label.indexOf(" — ")
+  return i >= 0 ? [label.slice(0, i), label.slice(i + 3)] : [label, ""]
+}
 
 // ── 직접 만들기(스텝 조립) ──
 type Operand = { t: "field"; key: string } | { t: "step"; id: string } | { t: "num"; v: number } | { t: "oneMinus"; key: string }
@@ -38,7 +43,7 @@ function buildAstFromSteps(steps: Step[]): CalcNode | null {
   return lastNode
 }
 
-// 기존 수식(AST)을 편집 가능한 스텝으로 분해 — 편집 시 현재 수식을 그대로 보고 바로 고칠 수 있게. (buildAstFromSteps의 역연산)
+// 기존 수식(AST)을 편집 가능한 스텝으로 분해 — 편집/고급 전환 시 현재 수식을 그대로 보고 바로 고칠 수 있게.
 function astToSteps(ast: CalcNode | null): Step[] {
   if (!ast) return []
   if (ast.t === "field") return [{ id: "e0", name: "금액", left: { t: "field", key: ast.key }, op: "+", right: { t: "num", v: 0 } }]
@@ -59,7 +64,10 @@ function astToSteps(ast: CalcNode | null): Step[] {
   return steps
 }
 
-/** 회사가 계산 유형(필드+수식)을 직접 정의 — ① 템플릿에서 시작, ② 직접 만들기(스텝 조립). 미리보기 후 저장. */
+/**
+ * 회사가 계산 유형(필드+수식)을 직접 정의.
+ * ① 템플릿에서 시작(업종 카테고리·검색) ② 직접 만들기(흔한 패턴 고르고 칸 채우기, 고급=스텝 조립). 미리보기 후 저장.
+ */
 export function CalcTypeBuilder({ types, editType, onClose, onSaved }: { types: CashCalcType[]; editType?: CashCalcType | null; onClose: () => void; onSaved: () => void }) {
   const supabase = createClient()
   const me = useCurrentUserId()
@@ -72,29 +80,59 @@ export function CalcTypeBuilder({ types, editType, onClose, onSaved }: { types: 
   const [steps, setSteps] = useState<Step[]>(() => astToSteps((editType?.formula as { ast?: CalcNode } | null)?.ast ?? null))
   const [seq, setSeq] = useState(100)
   const [busy, setBusy] = useState(false)
+  // 템플릿 탐색
+  const [tplCat, setTplCat] = useState<string>("전체")
+  const [tplQuery, setTplQuery] = useState("")
+  // 커스텀: 선택 패턴 id("custom"=고급 스텝, null=미선택)
+  const [patternId, setPatternId] = useState<string | null>(editType ? "custom" : null)
+  const [patternAst, setPatternAst] = useState<CalcNode | null>(null)
 
   const editAst = (editType?.formula as { ast?: CalcNode } | null)?.ast ?? null
-  // 편집모드: 스텝을 안 만들면 기존 수식 유지, 스텝을 만들면 그것으로 교체.
-  const ast = mode === "template" ? templateAst : isEdit && steps.length === 0 ? editAst : buildAstFromSteps(steps)
+  const isPattern = mode === "custom" && !!patternId && patternId !== "custom"
+  const isAdvanced = mode === "custom" && patternId === "custom"
+  const ast = mode === "template" ? templateAst : isPattern ? patternAst : isAdvanced && isEdit && steps.length === 0 ? editAst : buildAstFromSteps(steps)
   const ready = ast != null && fields.length > 0
+  const showDetail = (mode === "template" && !!templateAst) || (mode === "custom" && !!patternId)
 
   // 템플릿
+  const tplList = CALC_TEMPLATES.filter((t) => {
+    if (tplCat !== "전체" && templateCategory(t.id) !== tplCat) return false
+    const q = tplQuery.trim().toLowerCase()
+    return !q || t.label.toLowerCase().includes(q)
+  })
   const pickTemplate = (id: string) => {
     const t = CALC_TEMPLATES.find((x) => x.id === id)
     if (!t) return
-    setName((n) => n || t.label.split(" — ")[0])
+    setName((n) => n || splitLabel(t.label)[0])
     setFlow(t.flow)
     setFields(t.fields.map((x) => ({ ...x })))
     setTemplateAst(t.ast)
   }
 
-  // 직접 만들기
+  // 모드/패턴
   const switchMode = (m: "template" | "custom") => {
     setMode(m)
     setFields([])
     setTemplateAst(null)
     setSteps([])
+    setPatternId(null)
+    setPatternAst(null)
   }
+  const pickPattern = (p: BuilderPattern) => {
+    const keys = p.slots.map((_, i) => `f${seq + i}`)
+    setSeq((s) => s + p.slots.length)
+    setFields(p.slots.map((s, i) => ({ key: keys[i], label: s.label, kind: s.kind })))
+    setPatternAst(p.build(keys))
+    setSteps([])
+    setPatternId(p.id)
+  }
+  const pickAdvanced = () => {
+    const seed = patternAst ?? editAst
+    if (seed) setSteps(astToSteps(seed))
+    setPatternAst(null)
+    setPatternId("custom")
+  }
+
   const addField = () => {
     const key = `f${seq}`
     setSeq((s) => s + 1)
@@ -117,7 +155,7 @@ export function CalcTypeBuilder({ types, editType, onClose, onSaved }: { types: 
   const save = async () => {
     if (!me) return
     if (!name.trim()) return toast.error("유형 이름을 입력해 주세요.")
-    if (!ready || !ast) return toast.error(isEdit ? "필드를 1개 이상 두세요." : mode === "template" ? "템플릿을 선택해 주세요." : "필드와 스텝을 추가해 수식을 완성해 주세요.")
+    if (!ready || !ast) return toast.error(isEdit ? "필드를 1개 이상 두세요." : mode === "template" ? "템플릿을 선택해 주세요." : "계산 방식을 고르고 칸을 채워 주세요.")
     setBusy(true)
     try {
       if (isEdit && editType) {
@@ -127,15 +165,14 @@ export function CalcTypeBuilder({ types, editType, onClose, onSaved }: { types: 
         onClose()
         return
       }
-      await mustOk(
-        supabase.from("cash_calc_types").insert({ workspace_id: WORKSPACE_ID, name: name.trim(), flow, fields, formula: { ast }, created_by: me, sort_order: types.length })
-      )
+      await mustOk(supabase.from("cash_calc_types").insert({ workspace_id: WORKSPACE_ID, name: name.trim(), flow, fields, formula: { ast }, created_by: me, sort_order: types.length }))
       toast.success("계산 유형을 추가했어요.")
       setName("")
       setTemplateAst(null)
       setFields([])
       setSteps([])
-      onSaved()
+      setPatternId(null)
+      setPatternAst(null)
     } catch {
       toast.error("저장에 실패했어요.")
     } finally {
@@ -148,6 +185,7 @@ export function CalcTypeBuilder({ types, editType, onClose, onSaved }: { types: 
   }
 
   const selCls = "rounded border bg-background px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-ring"
+  const chip = "rounded-full border px-2.5 py-1 text-xs transition-colors"
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
@@ -175,18 +213,43 @@ export function CalcTypeBuilder({ types, editType, onClose, onSaved }: { types: 
           </p>
         )}
 
+        {/* ── 템플릿에서 시작: 검색 + 카테고리 + 목록 ── */}
         {mode === "template" && (
-          <div className="flex max-h-52 flex-col gap-1 overflow-y-auto">
-            {CALC_TEMPLATES.map((t) => (
-              <button key={t.id} onClick={() => pickTemplate(t.id)} className={cn("rounded-lg border px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-muted", templateAst === t.ast && "border-primary bg-muted")}>
-                <span className="mr-1 rounded bg-muted px-1 py-0.5">{flowLabel(t.flow)}</span>
-                {t.label}
-              </button>
-            ))}
+          <div className="flex flex-col gap-2">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <input value={tplQuery} onChange={(e) => setTplQuery(e.target.value)} placeholder="템플릿 검색 (예: 구독, 마진, 수수료)" className="h-8 w-full rounded-lg border bg-background pl-7 pr-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {["전체", ...TEMPLATE_CATEGORIES].map((cat) => (
+                <button key={cat} onClick={() => setTplCat(cat)} className={cn(chip, tplCat === cat ? "border-primary bg-primary/10 font-medium text-primary" : "text-muted-foreground hover:bg-muted")}>
+                  {cat}
+                </button>
+              ))}
+            </div>
+            <div className="flex max-h-56 flex-col gap-1 overflow-y-auto">
+              {tplList.length === 0 ? (
+                <p className="px-2 py-6 text-center text-xs text-muted-foreground">검색 결과가 없어요.</p>
+              ) : (
+                tplList.map((t) => {
+                  const [tName, tFormula] = splitLabel(t.label)
+                  return (
+                    <button key={t.id} onClick={() => pickTemplate(t.id)} className={cn("rounded-lg border px-2.5 py-1.5 text-left transition-colors hover:bg-muted", templateAst === t.ast && "border-primary bg-muted")}>
+                      <span className="flex items-center gap-1.5">
+                        <span className="rounded bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">{flowLabel(t.flow)}</span>
+                        <span className="text-xs font-medium">{tName}</span>
+                      </span>
+                      {tFormula && <span className="mt-0.5 block text-[11px] text-muted-foreground">{tFormula}</span>}
+                    </button>
+                  )
+                })
+              )}
+            </div>
           </div>
         )}
 
-        {(mode === "custom" || templateAst) && (
+        {/* ── 직접 만들기: 이름·구분 + 패턴 칩 ── */}
+        {mode === "custom" && (
           <>
             <div className="grid grid-cols-2 gap-2">
               <label className="flex flex-col gap-1 text-xs text-muted-foreground">
@@ -202,39 +265,79 @@ export function CalcTypeBuilder({ types, editType, onClose, onSaved }: { types: 
                 </select>
               </label>
             </div>
+            {!isEdit && (
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground">계산 방식 — 고르면 칸만 채우면 돼요</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {BUILDER_PATTERNS.map((p) => (
+                    <button key={p.id} onClick={() => pickPattern(p)} title={p.formula} className={cn(chip, patternId === p.id ? "border-primary bg-primary/10 font-medium text-primary" : "hover:bg-muted")}>
+                      {p.label}
+                    </button>
+                  ))}
+                  <button onClick={pickAdvanced} className={cn(chip, patternId === "custom" ? "border-primary bg-primary/10 font-medium text-primary" : "text-muted-foreground hover:bg-muted")}>
+                    직접 만들기(고급)
+                  </button>
+                </div>
+                {isPattern && <p className="text-[11px] text-muted-foreground">수식: {BUILDER_PATTERNS.find((p) => p.id === patternId)?.formula}</p>}
+              </div>
+            )}
+          </>
+        )}
 
-            {/* 필드 */}
+        {/* ── 상세: 이름·구분(템플릿) + 칸 + (고급)스텝 + 미리보기 ── */}
+        {showDetail && (
+          <>
+            {mode === "template" && (
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                  유형 이름
+                  <input value={name} onChange={(e) => setName(e.target.value)} className={cn(fieldClass)} placeholder="예: 우리 회사 매출" />
+                </label>
+                <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                  구분
+                  <select value={flow} onChange={(e) => setFlow(e.target.value as typeof flow)} className={cn(fieldClass)}>
+                    <option value="revenue">매출</option>
+                    <option value="expense">비용</option>
+                    <option value="reserve">보유금</option>
+                  </select>
+                </label>
+              </div>
+            )}
+
+            {/* 칸(필드) */}
             <div className="flex flex-col gap-1">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">입력 필드</span>
-                {mode === "custom" && (
+                <span className="text-xs text-muted-foreground">{isPattern ? "칸 이름 (값은 표에서 입력)" : "입력 칸"}</span>
+                {isAdvanced && (
                   <button onClick={addField} className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-muted">
-                    <Plus className="size-3" /> 필드
+                    <Plus className="size-3" /> 칸
                   </button>
                 )}
               </div>
               {fields.map((fld) => (
                 <div key={fld.key} className="flex items-center gap-2">
                   <input value={fld.label} onChange={(e) => updField(fld.key, { label: e.target.value })} className={cn(fieldClass, "flex-1")} />
-                  {mode === "custom" ? (
+                  {mode === "template" ? (
+                    <span className="w-12 shrink-0 text-center text-xs text-muted-foreground">{fld.kind === "percent" ? "%" : "숫자"}</span>
+                  ) : (
                     <>
                       <select value={fld.kind} onChange={(e) => updField(fld.key, { kind: e.target.value as "number" | "percent" })} className={selCls}>
                         <option value="number">숫자</option>
                         <option value="percent">%</option>
                       </select>
-                      <button onClick={() => delField(fld.key)} className="text-muted-foreground hover:text-destructive" aria-label="필드 삭제">
-                        <Trash2 className="size-3.5" />
-                      </button>
+                      {isAdvanced && (
+                        <button onClick={() => delField(fld.key)} className="text-muted-foreground hover:text-destructive" aria-label="칸 삭제">
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      )}
                     </>
-                  ) : (
-                    <span className="w-12 shrink-0 text-center text-xs text-muted-foreground">{fld.kind === "percent" ? "%" : "숫자"}</span>
                   )}
                 </div>
               ))}
             </div>
 
-            {/* 직접 만들기: 스텝 */}
-            {mode === "custom" && (
+            {/* 고급: 수식 스텝 */}
+            {isAdvanced && (
               <div className="flex flex-col gap-1">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">수식 스텝 (마지막 스텝 = 최종 금액)</span>
@@ -274,7 +377,7 @@ export function CalcTypeBuilder({ types, editType, onClose, onSaved }: { types: 
 
             <div className="flex justify-end">
               <Button size="sm" onClick={save} disabled={busy || !ready}>
-                {busy && <Loader2 className="size-3.5 animate-spin" />} 추가
+                {busy && <Loader2 className="size-3.5 animate-spin" />} {isEdit ? "수정" : "추가"}
               </Button>
             </div>
           </>
@@ -317,12 +420,12 @@ function OperandPicker({ value, onChange, fields, priorSteps, cls }: { value: Op
         }}
         className={cls}
       >
-        <optgroup label="필드">
+        <optgroup label="칸">
           {fields.map((f) => (
             <option key={f.key} value={`f:${f.key}`}>{f.label}</option>
           ))}
         </optgroup>
-        <optgroup label="(1−필드)">
+        <optgroup label="(1−칸)">
           {fields.map((f) => (
             <option key={f.key} value={`m:${f.key}`}>(1−{f.label})</option>
           ))}

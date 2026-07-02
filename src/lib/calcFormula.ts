@@ -102,6 +102,36 @@ export const CALC_TEMPLATES: CalcTemplate[] = [
   { id: "interest", label: "이자(단리) — 원금 × 이율 × 기간", flow: "revenue", fields: [{ key: "p", label: "원금", kind: "number" }, { key: "r", label: "연이율", kind: "percent" }, { key: "y", label: "기간(년)", kind: "number" }], ast: op("*", op("*", f("p"), f("r")), f("y")) },
 ]
 
+// ── 템플릿 업종 카테고리(탐색용 탭·검색). 템플릿 정의는 안 건드리고 id로 매핑. ──
+export const TEMPLATE_CATEGORIES = ["이커머스", "비용", "F&B", "제조", "마케팅", "서비스", "광고·금융"] as const
+const TEMPLATE_CATEGORY: Record<string, (typeof TEMPLATE_CATEGORIES)[number]> = {
+  channel: "이커머스", ecom_settle: "이커머스", ecom_var: "이커머스", margin: "이커머스", discount: "이커머스",
+  qty: "비용", labor: "비용", labor_ins: "비용", rent: "비용",
+  guest: "F&B", food_cost: "F&B",
+  mfg_mat: "제조", mfg_yield: "제조", cosmetic: "제조",
+  influencer: "마케팅", fulfill_out: "마케팅", inbound: "마케팅",
+  mm: "서비스", project: "서비스", saas_mrr: "서비스", saas_annual: "서비스",
+  cpc: "광고·금융", cpm: "광고·금융", ad_fee: "광고·금융", take_rate: "광고·금융", per_tx: "광고·금융", interest: "광고·금융",
+}
+export const templateCategory = (id: string): string => TEMPLATE_CATEGORY[id] ?? "기타"
+
+// ── 커스텀 빌더용 흔한 수식 패턴 — 스텝 조립 대신 패턴 고르고 칸(슬롯) 이름만 채우면 완성. ──
+export type BuilderPattern = {
+  id: string
+  label: string // 짧은 이름(칩)
+  formula: string // 표시용 수식
+  slots: { label: string; kind: "number" | "percent" }[]
+  build: (k: string[]) => CalcNode // 슬롯 순서대로 배정된 필드 키
+}
+export const BUILDER_PATTERNS: BuilderPattern[] = [
+  { id: "axb", label: "개수 × 단가", formula: "개수 × 단가", slots: [{ label: "개수", kind: "number" }, { label: "단가", kind: "number" }], build: (k) => op("*", f(k[0]), f(k[1])) },
+  { id: "axb_minus", label: "개수 × 단가 − 차감", formula: "개수 × 단가 − 차감액", slots: [{ label: "개수", kind: "number" }, { label: "단가", kind: "number" }, { label: "차감액", kind: "number" }], build: (k) => op("-", op("*", f(k[0]), f(k[1])), f(k[2])) },
+  { id: "fee", label: "판매 − 수수료%", formula: "개수 × 단가 × (1 − 수수료%)", slots: [{ label: "개수", kind: "number" }, { label: "단가", kind: "number" }, { label: "수수료", kind: "percent" }], build: (k) => op("*", op("*", f(k[0]), f(k[1])), op("-", c(1), f(k[2]))) },
+  { id: "vat", label: "부가세 포함", formula: "금액 × (1 + 부가세%)", slots: [{ label: "금액", kind: "number" }, { label: "부가세", kind: "percent" }], build: (k) => op("*", f(k[0]), op("+", c(1), f(k[1]))) },
+  { id: "margin", label: "마진 × 수량", formula: "(판매가 − 원가) × 수량", slots: [{ label: "판매가", kind: "number" }, { label: "원가", kind: "number" }, { label: "수량", kind: "number" }], build: (k) => op("*", op("-", f(k[0]), f(k[1])), f(k[2])) },
+  { id: "rate", label: "금액 × 비율%", formula: "금액 × 비율%", slots: [{ label: "금액", kind: "number" }, { label: "비율", kind: "percent" }], build: (k) => op("*", f(k[0]), f(k[1])) },
+]
+
 /** 계산 유형의 flow → cash_accounts.kind(롤업용). */
 export function flowToKind(flow: string): string {
   return flow === "revenue" ? "revenue_src" : flow === "reserve" ? "reserve" : "expense_dst"
