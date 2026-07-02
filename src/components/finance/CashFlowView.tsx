@@ -265,7 +265,7 @@ export function CashFlowView() {
       }
     })
     try {
-      await downloadPnlXlsx(`손익_${todayStamp()}.xlsx`, rows)
+      await downloadPnlXlsx(`손익_${todayStamp()}.xlsx`, rows, graph.summary)
     } catch {
       toast.error("엑셀 생성에 실패했어요.")
     }
