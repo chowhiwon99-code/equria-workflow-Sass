@@ -393,7 +393,7 @@ export function SettingsView() {
         <div className="overflow-hidden rounded-xl border text-sm">
           <div className="flex items-center justify-between border-b px-3.5 py-2.5">
             <span className="text-muted-foreground">이름</span>
-            <span className="font-medium">이큐리아 워크스페이스</span>
+            <span className="font-medium">Complow 워크스페이스</span>
           </div>
           <div className="flex items-center justify-between px-3.5 py-2.5">
             <span className="text-muted-foreground">로그인 계정</span>

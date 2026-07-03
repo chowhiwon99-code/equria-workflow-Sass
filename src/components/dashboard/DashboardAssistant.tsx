@@ -165,7 +165,7 @@ export function DashboardAssistant() {
               <Sparkles className="size-6" />
             </div>
             <p className="mt-4 text-xl font-semibold tracking-tight">무엇을 도와드릴까요?</p>
-            <p className="mt-1.5 text-sm text-muted-foreground">이큐리아 어시스턴트에게 무엇이든 물어보세요.</p>
+            <p className="mt-1.5 text-sm text-muted-foreground">Complow 어시스턴트에게 무엇이든 물어보세요.</p>
           </div>
         ) : (
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-5 [scrollbar-gutter:stable] [scrollbar-width:thin]">

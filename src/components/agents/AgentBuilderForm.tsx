@@ -298,7 +298,7 @@ export function AgentBuilderForm({
               className={cn(fieldClass, "min-h-[180px] resize-y rounded-xl font-mono text-[13px] leading-relaxed")}
               value={systemPrompt}
               onChange={(e) => setSystemPrompt(e.target.value)}
-              placeholder={"예: 당신은 이큐리아의 K-뷰티 브랜드 카피라이터입니다.\n- 밝고 트렌디한 말투\n- 인스타그램 캡션은 3줄 이내 + 해시태그 5개"}
+              placeholder={"예: 당신은 우리 회사의 K-뷰티 브랜드 카피라이터입니다.\n- 밝고 트렌디한 말투\n- 인스타그램 캡션은 3줄 이내 + 해시태그 5개"}
             />
           </div>
         ),
@@ -485,7 +485,7 @@ export function AgentBuilderForm({
           className={cn(fieldClass, "min-h-[180px] resize-y font-mono text-[13px] leading-relaxed")}
           value={systemPrompt}
           onChange={(e) => setSystemPrompt(e.target.value)}
-          placeholder={"예: 당신은 이큐리아의 K-뷰티 브랜드 카피라이터입니다.\n- 밝고 트렌디한 말투\n- 인스타그램 캡션은 3줄 이내 + 해시태그 5개"}
+          placeholder={"예: 당신은 우리 회사의 K-뷰티 브랜드 카피라이터입니다.\n- 밝고 트렌디한 말투\n- 인스타그램 캡션은 3줄 이내 + 해시태그 5개"}
         />
       </label>
 

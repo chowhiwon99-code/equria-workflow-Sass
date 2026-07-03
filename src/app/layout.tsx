@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "이큐리아 워크스페이스",
-  description: "이큐리아 직원 전용 워크스페이스",
+  title: "Complow 워크스페이스",
+  description: "Complow 직원 전용 워크스페이스",
 };
 
 export default function RootLayout({
