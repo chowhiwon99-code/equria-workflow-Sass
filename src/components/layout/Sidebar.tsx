@@ -126,7 +126,7 @@ export function Sidebar() {
       <Link href="/dashboard" className="flex h-[var(--header-height)] items-center border-b px-4">
         {/* 브랜드 워드마크 — Pretendard, 모노톤 그라데이션으로 느낌있게 */}
         <span className="bg-gradient-to-r from-foreground to-foreground/55 bg-clip-text font-pretendard text-lg font-semibold tracking-tight text-transparent">
-          Workspace
+          Complow
         </span>
       </Link>
 
