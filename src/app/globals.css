@@ -63,6 +63,30 @@
   --shadow-lg: 0 4px 8px oklch(0 0 0 / 0.05), 0 16px 40px oklch(0 0 0 / 0.1);
 }
 
+/* 공개 화면(랜딩·로그인·회원가입) 라이트 고정 — 시스템/앱이 다크여도 항상 라이트 */
+.force-light {
+  color-scheme: light;
+  --background: oklch(0.961 0.004 264);
+  --foreground: oklch(0.18 0.004 264);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.004 264);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.004 264);
+  --primary: oklch(0.205 0.003 264);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.965 0.004 264);
+  --secondary-foreground: oklch(0.205 0.004 264);
+  --muted: oklch(0.965 0.004 264);
+  --muted-foreground: oklch(0.52 0.006 264);
+  --accent: oklch(0.955 0.005 264);
+  --accent-foreground: oklch(0.205 0.004 264);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.92 0.004 264);
+  --input: oklch(0.92 0.004 264);
+  --ring: oklch(0.6 0.006 264);
+}
+
 .dark {
   --background: oklch(0.15 0.004 264);
   --foreground: oklch(0.985 0.002 264);
