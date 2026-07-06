@@ -87,7 +87,7 @@
 
 ### Phase B2 — 가입·초대·RBAC (계정 모델 전환)
 - **목표**: 회사를 만들고, 진짜 이메일로 초대하고, 역할로 권한 분리.
-- **작업**: 이름→가짜이메일 폐기→**진짜 이메일+매직링크/OTP**(Supabase Auth OTP 또는 Resend)(B4) · 워크스페이스 생성 폼(회사명·slug·플랜, 생성자=owner) · `invite_tokens` 테이블+`/join?token=` 1회성 소비→`workspace_members` 추가→공용 비번 폐기(B5) · 멤버십>1이면 워크스페이스 선택+헤더 스위처 · RBAC를 `workspace_members.role` 기반 RLS+API 권한체크(H9) · 신규 워크스페이스에 프리셋 에이전트 8개 복제 RPC(M8).
+- **작업**: 이름→가짜이메일 폐기→**진짜 이메일 계정 + 소셜 로그인(구글·애플·카카오)·매직링크/OTP**(Supabase Auth Providers; 구글·애플 내장, 카카오=커스텀 OIDC)(B4) — *세션26 결정: 소셜 로그인 우선, OAuth 콜백은 데스크톱(B6) 딥링크까지 고려해 설계* · 워크스페이스 생성 폼(회사명·slug·플랜, 생성자=owner) · `invite_tokens` 테이블+`/join?token=` 1회성 소비→`workspace_members` 추가→공용 비번 폐기(B5) · 멤버십>1이면 워크스페이스 선택+헤더 스위처 · RBAC를 `workspace_members.role` 기반 RLS+API 권한체크(H9) · 신규 워크스페이스에 프리셋 에이전트 8개 복제 RPC(M8).
 - **선행**: B1.
 - **규모**: **L~XL (3~4주)**.
 
@@ -107,6 +107,7 @@
 
 ### Phase B6 — 패키징·배포
 - **작업**: Electron(electron-builder, DMG/NSIS/AppImage, 자동업데이트, 코드사이닝) · 모바일 반응형 웹 · 커스텀 도메인/화이트라벨(Vercel 미들웨어 hostname 라우팅+`workspaces.custom_domain`).
+- **🆕 랜딩/마케팅 페이지**(세션26 추가): 공개 사이트 — 제품 소개·가격·기능 + CTA("앱 열기"=앱 딥링크, "데스크톱 다운로드"=Electron). **앱과 분리**(`complow.kr`=마케팅 / 앱=로그인 후 또는 `app.` 서브도메인). **멀티테넌시와 무관 → B1~B3 대기 없이 독립 착수 가능**. 격리는 랜딩이 아니라 "로그인→워크스페이스 진입" 시점부터.
 - **선행**: 웹앱 멀티테넌트 안정(B1~B3). **규모**: **L (Electron 2~4주+배포자동화 1~2주)**. *Next.js 16/Turbopack↔Electron 호환 사전확인.*
 
 ---

@@ -116,7 +116,7 @@
 
 > 목표: 회사별 데이터 완전 격리. **A단계(구조)=완료 · B1-a(읽기 격리)=완료 · B1-b(쓰기 강제)=차후.**
 
-- **확정 결정(대표)**: 격리=단일 Supabase 프로젝트+RLS · 과금=시트 고정요금(+비용추적 병행) · 인증=Supabase Auth+매직링크(SSO는 나중 WorkOS) · 시장=영업주도+수동셋업 · MCP=회사별 격리.
+- **확정 결정(대표)**: 격리=단일 Supabase 프로젝트+RLS · 과금=시트 고정요금(+비용추적 병행) · 인증=Supabase Auth **소셜 로그인(구글·애플·카카오)** + 매직링크 병행(카카오=커스텀 OIDC, SSO는 나중 WorkOS) · 시장=영업주도+수동셋업 · MCP=회사별 격리.
 - **A단계(마이그 030)**: `workspaces`·`workspace_members`(다대다) + 24개 테이블 `workspace_id`(NOT NULL DEFAULT=sentinel `00000000-0000-0000-0000-0000000000e1`=equria). 제외: `profiles`(전역)·`google_connections`(개인).
 - **B1-a 읽기 격리(마이그 033~043, 2026-06-09~10, DB 라이브·검증)**:
   - 헬퍼 3종(033) + 24테이블 RLS를 workspace 멤버십 격리로 재작성(034 profiles 동료한정·035 완전개방7·036 agents/workflows·037 사용자별·038 채팅·039 MCP·040 함수/RPC/트리거·041 하드닝) + **043 신규가입자 자동 멤버등록(회귀수정)** + 042 비용추적 컬럼.
@@ -124,6 +124,12 @@
   - 앱 코드 변경 없음(읽기는 멤버십 함수 기반).
 - **B1-b 알려진 한계(쓰기 강제 전까지)**: ① 앱이 INSERT에 workspace_id 미명시·sentinel DEFAULT 의존 → DEFAULT 제거 전 `useWorkspace()`+전 INSERT 배선 선행 필수 ② presence 채널 전역(비차단) ③ 채팅 라우트 MCP 로딩 workspace 미검증(`AGENTS-MCP-STRATEGY.md` §3) ④ 비용추적은 성공 호출 기준 추정 ⑤ 어드바이저 WARN(헬퍼 SECURITY DEFINER 실행가능=RLS 필요·무해).
 - **B1-b 남은 작업 + B2~B6 로드맵**: `PRODUCTIZATION.md`·`B1-DESIGN.md` 참조. 포장(Electron/모바일)은 같은 코드 래핑으로 후순위.
+- **🆕 세션26 정합(2026-07-06)** — *로드맵 SSOT는 PRODUCTIZATION.md, 아래는 이번 세션 결정만*:
+  - **브랜드 = Complow** 확정(코드·문서·로고·파비콘 반영 완료·배포).
+  - **개인정보처리방침·이용약관 초안 완료** = `docs/legal/{privacy,terms}.md` → PRODUCTIZATION §B5/MVP의 "TOS·Privacy(한국)" **착수분**. 남은 것: `[___]` 값·`/privacy`·`/terms` 페이지·가입 동의·변호사 검토·hard-delete·public 버킷 점검.
+  - **인증 방식 결정** = B2를 **소셜 로그인(구글·애플·카카오)** 우선으로(카카오=커스텀 OIDC). OAuth 콜백은 **데스크톱(B6 Electron) 딥링크까지 고려**해 설계.
+  - **🆕 랜딩/마케팅 페이지** = 신규 필요 트랙(공개 사이트: 소개·가격·CTA "앱 열기/데스크톱 다운로드"). **앱과 분리**(예: `complow.kr`=마케팅 / 앱=로그인 후). **멀티테넌시와 무관 → 독립 착수 가능**. 격리는 "로그인해 워크스페이스 진입 시점"부터(랜딩은 공개).
+  - **착수 우선순위 권장**: B1-b(쓰기 격리·선행 차단막) → B2(소셜로그인+초대+워크스페이스 관리) → B3(과금+rate limit). 랜딩페이지·AI 고도화(에이전트/워크플로우/MCP)는 병행 가능.
 
 ---
 
