@@ -121,6 +121,60 @@ export function toMailLabel(l: gmail_v1.Schema$Label): MailLabel {
   }
 }
 
+/**
+ * 스레드 metadata 일괄 조회 — Gmail batch 엔드포인트로 N개를 단일 HTTP 요청에 묶는다(N+1 제거).
+ * threads.get(format=metadata)를 하나씩 부르는 대신 multipart/mixed 배치 1회.
+ * 반환은 요청한 id 순서를 유지(파싱 실패/오류 항목은 제외).
+ */
+export async function batchGetThreadsMetadata(
+  accessToken: string,
+  ids: string[]
+): Promise<gmail_v1.Schema$Thread[]> {
+  if (ids.length === 0) return []
+  const boundary = "batch_" + randomBytes(8).toString("hex")
+  const metaQuery = "format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date"
+  const body =
+    ids
+      .map(
+        (id, i) =>
+          `--${boundary}\r\nContent-Type: application/http\r\nContent-ID: <item-${i}>\r\n\r\n` +
+          `GET /gmail/v1/users/me/threads/${id}?${metaQuery}\r\n`
+      )
+      .join("") + `--${boundary}--`
+
+  const res = await fetch("https://gmail.googleapis.com/batch/gmail/v1", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": `multipart/mixed; boundary=${boundary}`,
+    },
+    body,
+  })
+  if (!res.ok) throw new Error(`Gmail batch 실패 (${res.status})`)
+
+  const text = await res.text()
+  const respBoundary = (res.headers.get("content-type") ?? "")
+    .match(/boundary=([^;]+)/)?.[1]
+    ?.replace(/"/g, "")
+    .trim()
+  if (!respBoundary) return []
+
+  // 각 파트에서 JSON 본문(첫 '{' ~ 마지막 '}')만 추출. id로 매핑해 원래 순서 복원.
+  const byId = new Map<string, gmail_v1.Schema$Thread>()
+  for (const chunk of text.split(`--${respBoundary}`)) {
+    const start = chunk.indexOf("{")
+    const end = chunk.lastIndexOf("}")
+    if (start === -1 || end <= start) continue
+    try {
+      const obj = JSON.parse(chunk.slice(start, end + 1)) as gmail_v1.Schema$Thread
+      if (obj.id) byId.set(obj.id, obj)
+    } catch {
+      /* 파트 파싱 실패 무시 */
+    }
+  }
+  return ids.map((id) => byId.get(id)).filter((t): t is gmail_v1.Schema$Thread => Boolean(t))
+}
+
 // ---- 발신(RFC2822 → base64url) ----
 function encodeHeaderValue(s: string): string {
   // 비ASCII는 RFC2047 인코딩
