@@ -16,7 +16,8 @@ const ACTIONS = ["summarize", "actions", "polish"] as const
 type Action = (typeof ACTIONS)[number]
 
 const OUTPUT_RULE =
-  "결과 본문만 출력하세요. 설명·머리말·따옴표·코드블록으로 감싸지 말고, 인사말이나 군더더기를 붙이지 마세요."
+  "결과 본문만 출력하세요. 설명·머리말·따옴표·코드블록으로 감싸지 말고, 인사말이나 군더더기를 붙이지 마세요. " +
+  "이모지·이모티콘은 절대 쓰지 마세요. 사람이 쓴 것처럼 담백하고 자연스러운 실무 문체로 쓰되, 과한 강조(**굵게**)·불필요한 줄표(—)·장식성 나열은 피하세요."
 
 function systemFor(action: Action): string {
   switch (action) {
