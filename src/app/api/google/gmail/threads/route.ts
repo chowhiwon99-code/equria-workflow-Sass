@@ -25,7 +25,7 @@ export async function GET(req: Request) {
       userId: "me",
       labelIds: q ? undefined : [label], // 검색 시엔 라벨 제한 없이 전체 검색
       q,
-      maxResults: 25,
+      maxResults: 18,
       pageToken,
     })
     const ids = (list.data.threads ?? []).map((t) => t.id).filter((x): x is string => Boolean(x))

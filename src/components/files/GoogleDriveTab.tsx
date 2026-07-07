@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Folder, Download, ExternalLink, Search, RefreshCw, Loader2, File as FileIcon } from "lucide-react"
+import { Folder, Download, ExternalLink, Search, RefreshCw, File as FileIcon } from "lucide-react"
 import { formatBytes } from "@/lib/files"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -18,6 +18,9 @@ type DriveFile = {
 }
 type Crumb = { id: string | null; name: string }
 
+// 폴더/검색 결과 캐시(stale-while-revalidate) — 재방문 시 즉시 표시 후 백그라운드 갱신.
+const driveCache = new Map<string, DriveFile[]>()
+
 /** Files 섹션의 Google Drive 탭 — 연동한 구글 계정의 드라이브를 목록·검색·폴더탐색·다운로드(읽기 전용). */
 export default function GoogleDriveTab() {
   const [crumbs, setCrumbs] = useState<Crumb[]>([{ id: null, name: "내 드라이브" }])
@@ -31,9 +34,16 @@ export default function GoogleDriveTab() {
   const parentId = crumbs[crumbs.length - 1].id
 
   const load = useCallback(async () => {
-    setLoading(true)
+    const key = search.trim() ? `q:${search.trim()}` : `p:${parentId ?? "root"}`
+    const cached = driveCache.get(key)
     setError(null)
     setNotConnected(false)
+    if (cached) {
+      setFiles(cached) // 캐시 즉시 표시(뒤에서 갱신)
+      setLoading(false)
+    } else {
+      setLoading(true)
+    }
     const params = new URLSearchParams()
     if (search.trim()) params.set("q", search.trim())
     else if (parentId) params.set("parentId", parentId)
@@ -44,13 +54,14 @@ export default function GoogleDriveTab() {
         return
       }
       if (!res.ok) {
-        setError("드라이브를 불러오지 못했어요.")
+        if (!cached) setError("드라이브를 불러오지 못했어요.")
         return
       }
       const data = (await res.json()) as { files: DriveFile[] }
+      driveCache.set(key, data.files ?? [])
       setFiles(data.files ?? [])
     } catch {
-      setError("네트워크 오류가 발생했어요.")
+      if (!cached) setError("네트워크 오류가 발생했어요.")
     } finally {
       setLoading(false)
     }
@@ -124,7 +135,17 @@ export default function GoogleDriveTab() {
       )}
 
       {loading ? (
-        <div className="flex justify-center py-16"><Loader2 className="size-6 animate-spin text-muted-foreground" /></div>
+        <div className="overflow-hidden rounded-xl border">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 border-b px-3 py-2.5 last:border-b-0">
+              <div className="size-9 shrink-0 animate-pulse rounded-md bg-muted" />
+              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                <div className="h-3 w-1/3 animate-pulse rounded bg-muted" />
+                <div className="h-2.5 w-1/5 animate-pulse rounded bg-muted" />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : error ? (
         <p className="py-16 text-center text-sm text-destructive">{error}</p>
       ) : files.length === 0 ? (
