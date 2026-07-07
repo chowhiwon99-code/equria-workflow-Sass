@@ -11,7 +11,7 @@ export const runtime = "nodejs"
  * ⚠️ 규칙은 지금 하드코딩. 추후 "회사 메일 에이전트"(agent_versions.system_prompt)로 회사별 커스터마이징 예정.
  */
 
-const ACTIONS = ["formal", "polish", "concise", "translate"] as const
+const ACTIONS = ["formal", "casual", "concise", "translate"] as const
 type Action = (typeof ACTIONS)[number]
 const LANGS = { ko: "한국어", en: "영어", zh: "중국어(간체)", ja: "일본어" } as const
 type Lang = keyof typeof LANGS
@@ -38,10 +38,11 @@ function systemFor(action: Action, lang?: Lang): string {
         " " +
         OUTPUT_RULE
       )
-    case "polish":
+    case "casual":
       return (
-        "당신은 이메일 문장 다듬기 도우미입니다. 입력 메일의 의미는 그대로 두되 더 정중하고 명확한 " +
-        "비즈니스 톤으로 다듬으세요. 원문 언어를 유지합니다. " +
+        "당신은 이메일 톤 변환 도우미입니다. 입력된 초안이나 메일을 예의는 지키되 부드럽고 친근한 톤의 " +
+        "이메일로 작성하세요. 지나치게 딱딱한 격식은 덜고 따뜻하고 편안하게 하되, 존댓말과 기본 예의는 유지하고 " +
+        "반말·과한 구어체는 쓰지 마세요. 사실 관계는 바꾸지 말고 자연스러운 인사와 맺음말을 갖추세요. 원문 언어를 유지합니다. " +
         OUTPUT_RULE
       )
     case "concise":
@@ -83,7 +84,7 @@ export async function POST(req: Request) {
     return new Response("Bad Request: invalid targetLang", { status: 400 })
   }
 
-  const TEMP: Record<Action, number> = { formal: 0.4, polish: 0.4, concise: 0.3, translate: 0.3 }
+  const TEMP: Record<Action, number> = { formal: 0.4, casual: 0.5, concise: 0.3, translate: 0.3 }
 
   const result = streamText({
     model: anthropic(MODELS.default),

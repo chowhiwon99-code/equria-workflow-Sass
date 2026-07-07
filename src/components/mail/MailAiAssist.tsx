@@ -3,7 +3,7 @@
 import { useCallback, useRef, useState } from "react"
 import { toast } from "sonner"
 import type { Editor } from "@tiptap/react"
-import { Sparkles, Mail, Wand2, Scissors, Languages, Loader2, Check, X } from "lucide-react"
+import { Sparkles, Mail, MessageCircle, Scissors, Languages, Loader2, Check, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import type { JSONContent } from "@/lib/tiptap"
@@ -13,16 +13,16 @@ import type { JSONContent } from "@/lib/tiptap"
  * /api/google/gmail/assist 스트리밍 → 미리보기 카드 누적 → [적용] 시에만 본문 반영(원문 보존).
  */
 
-type AssistAction = "formal" | "polish" | "concise" | "translate"
+type AssistAction = "formal" | "casual" | "concise" | "translate"
 type Lang = "en" | "ja" | "zh"
 const LANG_LABEL: Record<Lang, string> = { en: "영어", ja: "일본어", zh: "중국어" }
 
 const MENU: Array<
-  | { kind: "formal" | "polish" | "concise"; label: string }
+  | { kind: "formal" | "casual" | "concise"; label: string }
   | { kind: "translate"; lang: Lang; label: string }
 > = [
-  { kind: "formal", label: "회사 격식 메일로" },
-  { kind: "polish", label: "정중하게 다듬기" },
+  { kind: "formal", label: "격식체" },
+  { kind: "casual", label: "친근체" },
   { kind: "concise", label: "간결하게" },
   ...(["en", "ja", "zh"] as Lang[]).map((lang) => ({ kind: "translate" as const, lang, label: `번역 · ${LANG_LABEL[lang]}` })),
 ]
@@ -39,8 +39,8 @@ function textToDoc(text: string): JSONContent {
 }
 
 function headerLabel(action: AssistAction, lang?: Lang): string {
-  if (action === "formal") return "회사 격식 메일로"
-  if (action === "polish") return "정중하게 다듬기"
+  if (action === "formal") return "격식체"
+  if (action === "casual") return "친근체"
   if (action === "concise") return "간결하게"
   return `번역 · ${LANG_LABEL[lang ?? "en"]}`
 }
@@ -141,8 +141,8 @@ export function MailAiAssist({ editor, disabled }: { editor: Editor | null; disa
                   ? Languages
                   : item.kind === "concise"
                     ? Scissors
-                    : item.kind === "polish"
-                      ? Wand2
+                    : item.kind === "casual"
+                      ? MessageCircle
                       : Mail
               const isFirstTranslate = item.kind === "translate" && MENU[i - 1]?.kind !== "translate"
               return (
