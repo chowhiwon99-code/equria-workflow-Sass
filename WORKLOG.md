@@ -5,6 +5,20 @@
 
 ---
 
+## 2026-07-07 · 세션27 — Google Drive 탭 + Gmail 리치 작성/AI 다듬기 + 로딩 최적화·배포 (사용자 요청)
+
+### Google Drive (`4c5754b`)
+- `drive.readonly` 스코프 · `lib/google/drive.ts`(목록·검색·폴더탐색·다운로드, 구글 문서류 export→pdf/xlsx) · `/api/google/drive/{files,download}` · FilesView **[내 파일 | Google Drive] 토글** + GoogleDriveTab(검색·브레드크럼·다운로드·미연결 시 "구글 연결하기"). E2E: 실제 연결→목록·폴더진입 200.
+
+### Gmail 리치 작성 + AI 다듬기 (`b68cf5c`·`5eeeb38`)
+- `buildRawMessage` HTML본문+첨부(multipart) · **MailCompose**(받는사람/참조/숨은참조·Tiptap 서식툴바·첨부·전송, **우측하단 도킹 + 여닫기 모션**) · **MailAiAssist** + `/api/google/gmail/assist`(**격식체·친근체·간결·번역**, 미리보기 후 적용, **AI 티 금지**).
+
+### 로딩 최적화 (`de5c60e`·`728f8cb`)
+- Drive/Mail 목록 **SWR 캐시 + 스켈레톤** · Gmail 첫 로딩 18개 · **Gmail 스레드 batch 조회로 N+1 제거**(개별 18회→배치 1회, ~1.5s→~0.5s대).
+
+### AI 톤·배포 정리 (`79b109e`·`46cc1de`)
+- 회의노트 다듬기 **이모지·줄표(—)·과한 강조 제거**(사람 문체, "AI 티 금지"). 초안 랜딩 비공개(`/`→대시보드) + 미연결 소셜로그인 UI 제거. 배포 `46cc1de`, 롤백 `676ddcd`. 문서: `docs/build/`·`docs/legal/` 추가.
+
 ## 2026-07-03 · 세션26 — 브랜드 Complow 확정 + 코드/문서 교체·배포 (사용자 요청)
 
 **무엇/왜:** 대표 — 예명 "EQURIA 워크스페이스"를 정식 브랜드로. 도메인 조사(브랜드급 exact `.com` 전멸 확인, 60+개 RDAP 조회 전부 taken)·상표(KIPRIS/글로벌 9·42·35류) 검토 끝에 **Complow(컴플로우)** 확정. 발음 깔끔·국내 "컴플로우" 무경합(38류 COMPLOW는 "포기"건이라 무관). 도메인 = `complow.kr`(국내 B2B 메인) + 방어용 `.ai`/`.io`/복합`.com`(`complow.com`은 1999 선점 → 후순위 매입). 근거: B2B는 도메인 아닌 영업·검색으로 유입 → .kr로 즉시 런칭, 글로벌 확장 시 `.ai` 승격.
