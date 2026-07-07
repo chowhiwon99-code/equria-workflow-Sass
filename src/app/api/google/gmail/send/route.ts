@@ -20,6 +20,9 @@ export async function POST(req: Request) {
     bcc?: string
     subject?: string
     body?: string
+    html?: string
+    text?: string
+    attachments?: { filename: string; mimeType: string; contentBase64: string }[]
     threadId?: string
     inReplyTo?: string
     references?: string
@@ -33,7 +36,9 @@ export async function POST(req: Request) {
       cc: body.cc?.trim() || undefined,
       bcc: body.bcc?.trim() || undefined,
       subject: body.subject ?? "",
-      body: body.body ?? "",
+      html: body.html,
+      text: body.text ?? body.body,
+      attachments: body.attachments,
       inReplyTo: body.inReplyTo ?? null,
       references: body.references ?? null,
     })

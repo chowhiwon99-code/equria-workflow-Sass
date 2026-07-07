@@ -15,14 +15,13 @@ import {
   Paperclip,
   RefreshCw,
   Search,
-  Loader2,
 } from "lucide-react"
 import { toast } from "sonner"
 import DOMPurify from "isomorphic-dompurify"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { Button } from "@/components/ui/button"
-import { Modal, fieldClass } from "@/components/shared/Modal"
+import MailCompose from "./MailCompose"
 import { Loading } from "@/components/shared/States"
 import { cn } from "@/lib/utils"
 import type { MailThreadSummary, MailThreadDetail } from "@/lib/google/gmail"
@@ -47,6 +46,9 @@ type Compose = {
   sending: boolean
 }
 const EMPTY_COMPOSE: Compose = { open: false, to: "", cc: "", subject: "", body: "", sending: false }
+
+// 라벨/검색별 스레드 목록 캐시(stale-while-revalidate) — 재방문 시 즉시 표시 후 백그라운드 갱신.
+const threadCache = new Map<string, { threads: MailThreadSummary[]; nextPageToken: string | null }>()
 
 function parseName(from: string): string {
   const m = from.match(/^\s*"?([^"<]*)"?\s*<([^>]+)>/)
@@ -120,7 +122,15 @@ export function MailShell() {
 
   const loadThreads = useCallback(
     async (label: string, q: string, pageToken?: string) => {
-      setLoadingList(true)
+      const key = `${label}::${q}`
+      const cached = pageToken ? undefined : threadCache.get(key)
+      if (cached) {
+        setThreads(cached.threads) // 캐시 즉시 표시(뒤에서 갱신)
+        setNextPageToken(cached.nextPageToken)
+        setLoadingList(false)
+      } else {
+        setLoadingList(true)
+      }
       try {
         const params = new URLSearchParams({ label })
         if (q) params.set("q", q)
@@ -132,10 +142,15 @@ export function MailShell() {
         }
         const json = await res.json()
         if (!res.ok) throw new Error(json.error ?? "목록을 불러오지 못했어요.")
-        setThreads((prev) => (pageToken ? [...prev, ...json.threads] : json.threads))
+        if (pageToken) {
+          setThreads((prev) => [...prev, ...json.threads])
+        } else {
+          setThreads(json.threads)
+          threadCache.set(key, { threads: json.threads, nextPageToken: json.nextPageToken ?? null })
+        }
         setNextPageToken(json.nextPageToken ?? null)
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : "목록 오류")
+        if (!cached) toast.error(e instanceof Error ? e.message : "목록 오류")
       } finally {
         setLoadingList(false)
       }
@@ -181,6 +196,7 @@ export function MailShell() {
         body: JSON.stringify({ add, remove }),
       })
       if (!res.ok) throw new Error("변경에 실패했어요.")
+      threadCache.clear() // 라벨/읽음/보관/삭제 변경 → 캐시 무효화(다음 방문 시 최신 재조회)
       if (opts?.dropFromList) {
         setThreads((prev) => prev.filter((t) => t.id !== id))
         setSelectedId(null)
@@ -205,38 +221,6 @@ export function MailShell() {
       inReplyTo: last.rfcMessageId ?? undefined,
       references: last.rfcMessageId ?? undefined,
     })
-  }
-
-  const sendMail = async () => {
-    if (!compose.to.trim()) {
-      toast.error("받는 사람을 입력하세요.")
-      return
-    }
-    setCompose((c) => ({ ...c, sending: true }))
-    try {
-      const res = await fetch("/api/google/gmail/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to: compose.to,
-          cc: compose.cc || undefined,
-          subject: compose.subject,
-          body: compose.body,
-          threadId: compose.threadId,
-          inReplyTo: compose.inReplyTo,
-          references: compose.references,
-        }),
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? "전송에 실패했어요.")
-      toast.success("메일을 보냈어요.")
-      setCompose(EMPTY_COMPOSE)
-      if (activeLabel === "SENT") loadThreads(activeLabel, appliedQ)
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "전송 오류")
-    } finally {
-      setCompose((c) => ({ ...c, sending: false }))
-    }
   }
 
   const disconnect = async () => {
@@ -478,43 +462,22 @@ export function MailShell() {
 
       {/* 작성/답장 모달 */}
       {compose.open && (
-        <Modal title={compose.threadId ? "답장" : "메일쓰기"} onClose={() => setCompose(EMPTY_COMPOSE)} className="max-w-lg">
-          <div className="flex flex-col gap-2">
-            <input
-              className={fieldClass}
-              placeholder="받는 사람 (이메일)"
-              value={compose.to}
-              onChange={(e) => setCompose((c) => ({ ...c, to: e.target.value }))}
-            />
-            <input
-              className={fieldClass}
-              placeholder="참조 (선택)"
-              value={compose.cc}
-              onChange={(e) => setCompose((c) => ({ ...c, cc: e.target.value }))}
-            />
-            <input
-              className={fieldClass}
-              placeholder="제목"
-              value={compose.subject}
-              onChange={(e) => setCompose((c) => ({ ...c, subject: e.target.value }))}
-            />
-            <textarea
-              className={cn(fieldClass, "min-h-[180px] resize-y py-2")}
-              placeholder="내용"
-              value={compose.body}
-              onChange={(e) => setCompose((c) => ({ ...c, body: e.target.value }))}
-            />
-            <div className="flex justify-end gap-2">
-              <Button size="sm" variant="ghost" onClick={() => setCompose(EMPTY_COMPOSE)}>
-                취소
-              </Button>
-              <Button size="sm" onClick={sendMail} disabled={compose.sending}>
-                {compose.sending ? <Loader2 className="animate-spin" /> : <Send />}
-                보내기
-              </Button>
-            </div>
-          </div>
-        </Modal>
+        <MailCompose
+          initial={{
+            to: compose.to,
+            cc: compose.cc,
+            subject: compose.subject,
+            threadId: compose.threadId,
+            inReplyTo: compose.inReplyTo,
+            references: compose.references,
+          }}
+          onClose={() => setCompose(EMPTY_COMPOSE)}
+          onSent={() => {
+            setCompose(EMPTY_COMPOSE)
+            threadCache.clear() // 발송 → 보낸편지함/스레드 갱신 위해 캐시 무효화
+            if (activeLabel === "SENT") loadThreads(activeLabel, appliedQ)
+          }}
+        />
       )}
     </div>
   )

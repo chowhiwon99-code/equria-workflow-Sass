@@ -1,5 +1,6 @@
 // Gmail 헬퍼 — MIME 파싱/디코딩, DTO 매핑, 발신 메시지(RFC2822) 빌더. 서버 전용.
 import type { gmail_v1 } from "googleapis"
+import { randomBytes } from "node:crypto"
 
 // ---- 우리 UX로 넘기는 DTO ----
 export type MailAttachment = {
@@ -127,26 +128,97 @@ function encodeHeaderValue(s: string): string {
   return `=?UTF-8?B?${Buffer.from(s, "utf8").toString("base64")}?=`
 }
 
+export type OutgoingAttachment = { filename: string; mimeType: string; contentBase64: string }
+
+// base64를 76자 줄바꿈(RFC 2045)로 접기.
+function foldBase64(b64: string): string {
+  return (b64.match(/.{1,76}/g) ?? [b64]).join("\r\n")
+}
+function b64utf8(s: string): string {
+  return Buffer.from(s, "utf8").toString("base64")
+}
+// html → 단순 plain 대체(멀티파트 alternative의 텍스트 파트용).
+function htmlToPlain(html: string): string {
+  return html
+    .replace(/<\s*br\s*\/?>/gi, "\n")
+    .replace(/<\/\s*(p|div|li|h[1-6])\s*>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+}
+
+/** 발신 메시지(RFC2822 → base64url). HTML 본문·첨부(multipart) 지원. */
 export function buildRawMessage(opts: {
   to: string
   cc?: string
   bcc?: string
   subject: string
-  body: string
+  html?: string
+  text?: string
+  attachments?: OutgoingAttachment[]
   inReplyTo?: string | null
   references?: string | null
 }): string {
-  const lines: string[] = []
-  lines.push(`To: ${opts.to}`)
-  if (opts.cc) lines.push(`Cc: ${opts.cc}`)
-  if (opts.bcc) lines.push(`Bcc: ${opts.bcc}`)
-  lines.push(`Subject: ${encodeHeaderValue(opts.subject)}`)
-  if (opts.inReplyTo) lines.push(`In-Reply-To: ${opts.inReplyTo}`)
-  if (opts.references) lines.push(`References: ${opts.references}`)
-  lines.push("MIME-Version: 1.0")
-  lines.push('Content-Type: text/plain; charset="UTF-8"')
-  lines.push("Content-Transfer-Encoding: base64")
-  lines.push("")
-  lines.push(Buffer.from(opts.body, "utf8").toString("base64"))
+  const { to, cc, bcc, subject, html, inReplyTo, references } = opts
+  const attachments = opts.attachments ?? []
+  const plain = opts.text ?? (html ? htmlToPlain(html) : "")
+
+  const head: string[] = [`To: ${to}`]
+  if (cc) head.push(`Cc: ${cc}`)
+  if (bcc) head.push(`Bcc: ${bcc}`)
+  head.push(`Subject: ${encodeHeaderValue(subject)}`)
+  if (inReplyTo) head.push(`In-Reply-To: ${inReplyTo}`)
+  if (references) head.push(`References: ${references}`)
+  head.push("MIME-Version: 1.0")
+
+  const altB = "alt_" + randomBytes(10).toString("hex")
+  const mixB = "mix_" + randomBytes(10).toString("hex")
+
+  // 본문 블록(자체 Content-Type 포함): html이면 text+html alternative, 아니면 text만.
+  const bodyBlock: string[] = html
+    ? [
+        `Content-Type: multipart/alternative; boundary="${altB}"`,
+        "",
+        `--${altB}`,
+        'Content-Type: text/plain; charset="UTF-8"',
+        "Content-Transfer-Encoding: base64",
+        "",
+        foldBase64(b64utf8(plain)),
+        `--${altB}`,
+        'Content-Type: text/html; charset="UTF-8"',
+        "Content-Transfer-Encoding: base64",
+        "",
+        foldBase64(b64utf8(html)),
+        `--${altB}--`,
+      ]
+    : [
+        'Content-Type: text/plain; charset="UTF-8"',
+        "Content-Transfer-Encoding: base64",
+        "",
+        foldBase64(b64utf8(plain)),
+      ]
+
+  let lines: string[]
+  if (attachments.length > 0) {
+    lines = [...head, `Content-Type: multipart/mixed; boundary="${mixB}"`, "", `--${mixB}`, ...bodyBlock]
+    for (const a of attachments) {
+      lines.push(
+        `--${mixB}`,
+        `Content-Type: ${a.mimeType}; name="${encodeHeaderValue(a.filename)}"`,
+        "Content-Transfer-Encoding: base64",
+        `Content-Disposition: attachment; filename="${encodeHeaderValue(a.filename)}"`,
+        "",
+        foldBase64(a.contentBase64)
+      )
+    }
+    lines.push(`--${mixB}--`)
+  } else {
+    lines = [...head, ...bodyBlock]
+  }
+
   return Buffer.from(lines.join("\r\n"), "utf8").toString("base64url")
 }
