@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { nameToEmail } from "@/lib/auth"
 import { signupAction } from "../actions"
-import SocialButtons from "@/components/auth/SocialButtons"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -72,12 +71,6 @@ export default function SignupPage() {
           {loading ? "가입 중..." : "계속"}
         </Button>
       </form>
-
-      <div className="my-7 flex items-center gap-3 text-[13px] text-muted-foreground">
-        <span className="h-px flex-1 bg-border" />또는 다음으로 계속하기<span className="h-px flex-1 bg-border" />
-      </div>
-
-      <SocialButtons />
 
       <p className="mt-8 text-center text-sm text-muted-foreground">
         이미 계정이 있으신가요?{" "}

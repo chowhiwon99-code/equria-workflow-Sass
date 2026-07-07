@@ -35,19 +35,17 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const { pathname } = request.nextUrl
-  const isRoot = pathname === "/" // 공개 랜딩(마케팅) 페이지
-  const isAuthPage = PUBLIC_PATHS.some((p) => pathname.startsWith(p))
-  const isPublic = isRoot || isAuthPage
+  const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p)) // 로그인·회원가입만 공개(랜딩은 아직 비공개)
 
-  // 미인증 사용자가 보호된 경로 접근 → 로그인으로 (랜딩 '/'·로그인·회원가입은 공개)
+  // 미인증 사용자가 보호된 경로 접근 → 로그인으로
   if (!user && !isPublic) {
     const url = request.nextUrl.clone()
     url.pathname = "/login"
     return NextResponse.redirect(url)
   }
 
-  // 인증된 사용자가 로그인/회원가입 페이지 접근 → 대시보드로 (랜딩 '/'은 그대로 노출)
-  if (user && isAuthPage) {
+  // 인증된 사용자가 로그인/회원가입 페이지 접근 → 대시보드로
+  if (user && isPublic) {
     const url = request.nextUrl.clone()
     url.pathname = "/dashboard"
     return NextResponse.redirect(url)
