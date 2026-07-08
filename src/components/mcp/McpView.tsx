@@ -203,7 +203,7 @@ export function McpView() {
           ).map((c) => {
             const connected = isConnected(c)
             return (
-              <div key={c.id} className="flex items-center gap-3 rounded-xl border p-3.5">
+              <div key={c.id} className="flex min-w-0 items-center gap-3 rounded-xl border p-3.5">
                 <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted/40">
                   <ConnectorLogo domain={c.domain} emoji={c.emoji} />
                 </span>
