@@ -1,4 +1,4 @@
-import { generateText, type ModelMessage } from "ai"
+import { generateText, stepCountIs, type ModelMessage, type ToolSet } from "ai"
 import { anthropic } from "@/lib/claude/client"
 import { createClient } from "@/lib/supabase/server"
 import { normalizeGraph, topoOrder } from "@/lib/workflows"
@@ -71,10 +71,28 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const agentIds = [...new Set(topo.order.filter((n) => n.kind !== "mcp_tool").map((n) => n.agent_id))]
   const { data: versions } = await supabase
     .from("agent_versions")
-    .select("agent_id, system_prompt, model, max_tokens, temperature")
+    .select("agent_id, system_prompt, model, max_tokens, temperature, mcp_servers")
     .in("agent_id", agentIds)
     .eq("is_current", true)
   const versionByAgent = new Map((versions ?? []).map((v) => [v.agent_id, v]))
+
+  // 에이전트 노드가 붙인 MCP 서버 + mcp_tool 노드가 참조하는 서버를 한 번에 로드(연결은 첫 사용 시 lazy).
+  const mcpIdsAll = [
+    ...new Set([
+      ...(versions ?? []).flatMap((v) => v.mcp_servers ?? []),
+      ...topo.order.filter((n) => n.kind === "mcp_tool").map((n) => n.mcp_server_id ?? "").filter(Boolean),
+    ]),
+  ]
+  let mcpServerRows: { id: string; name: string; type: string; url: string | null; auth_type: string; encrypted_token: string | null }[] = []
+  if (mcpIdsAll.length > 0) {
+    const { data } = await supabase
+      .from("mcp_servers")
+      .select("id, name, type, url, auth_type, encrypted_token")
+      .in("id", mcpIdsAll)
+      .eq("is_active", true)
+    mcpServerRows = data ?? []
+  }
+  const mcpServerById = new Map(mcpServerRows.map((s) => [s.id, s]))
 
   const startedAt = Date.now()
   const encoder = new TextEncoder()
@@ -119,6 +137,29 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
       let previousOutput = userInput
       let runCostUsd = 0 // 실행당 누적 AI 비용(USD) — PER_RUN_MAX_USD 초과 시 중단
+
+      // MCP 클라이언트 캐시 — 서버당 1회만 연결해 재사용(60s 예산 절약), 런 종료 시 finally에서 일괄 close.
+      const mcpClientCache = new Map<string, Awaited<ReturnType<typeof connectMcp>>>()
+      const mcpToolsCache = new Map<string, ToolSet>()
+      const mcpToolsFor = async (ids: string[]): Promise<ToolSet> => {
+        const merged: ToolSet = {}
+        for (const sid of ids) {
+          const srv = mcpServerById.get(sid)
+          if (!srv) continue
+          try {
+            if (!mcpToolsCache.has(sid)) {
+              const client = mcpClientCache.get(sid) ?? (await connectMcp(srv))
+              mcpClientCache.set(sid, client)
+              mcpToolsCache.set(sid, await client.tools())
+            }
+            Object.assign(merged, mcpToolsCache.get(sid))
+          } catch {
+            /* 연결 실패 MCP 서버는 건너뜀 — 도구 없이 진행 */
+          }
+        }
+        return merged
+      }
+
       try {
         for (let i = 0; i < topo.order.length; i++) {
           const node = topo.order[i]
@@ -127,33 +168,30 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           // ── MCP 도구 노드 — 에이전트 대신 MCP 서버의 특정 도구를 직접 호출 ──
           if (node.kind === "mcp_tool") {
             try {
-              const { data: server } = await supabase
-                .from("mcp_servers")
-                .select("id, name, type, url, auth_type, encrypted_token")
-                .eq("id", node.mcp_server_id ?? "")
-                .eq("is_active", true)
-                .maybeSingle()
-              if (!server) throw new Error("MCP 서버를 찾을 수 없습니다(비활성/삭제됨).")
-              const client = await connectMcp(server)
-              try {
-                const tools = await client.tools()
-                const tool = tools[node.mcp_tool_name ?? ""]
-                if (!tool?.execute) throw new Error(`MCP 도구 '${node.mcp_tool_name}'를 찾을 수 없습니다.`)
-                // 인자: mcp_args(JSON)에서 {{input}}을 앞 단계 출력으로 치환(JSON 이스케이프).
-                const injected = (node.mcp_args ?? "").replace(
-                  /\{\{\s*input\s*\}\}/g,
-                  JSON.stringify(previousOutput ?? "").slice(1, -1)
-                )
-                const args = injected.trim() ? JSON.parse(injected) : {}
-                const raw = await tool.execute(args, { toolCallId: node.id, messages: [] })
-                const out = typeof raw === "string" ? raw : JSON.stringify(raw, null, 2)
-                previousOutput = out
-                const label = node.agent_name || node.mcp_tool_name || "MCP"
-                nodeResults.push({ nodeId: node.id, agent_name: label, status: "done", output: out })
-                send({ type: "node", nodeId: node.id, status: "done", output: out, toolNote: `MCP: ${node.mcp_tool_name}` })
-              } finally {
-                await client.close()
+              const srv = mcpServerById.get(node.mcp_server_id ?? "")
+              if (!srv) throw new Error("MCP 서버를 찾을 수 없습니다(비활성/삭제됨).")
+              // 서버당 1회 연결 캐시 재사용 — 같은 서버를 쓰는 노드가 여러 개여도 재연결 없음(정리는 런 종료 finally).
+              let toolSet = mcpToolsCache.get(srv.id)
+              if (!toolSet) {
+                const client = mcpClientCache.get(srv.id) ?? (await connectMcp(srv))
+                mcpClientCache.set(srv.id, client)
+                toolSet = await client.tools()
+                mcpToolsCache.set(srv.id, toolSet)
               }
+              const tool = toolSet[node.mcp_tool_name ?? ""]
+              if (!tool?.execute) throw new Error(`MCP 도구 '${node.mcp_tool_name}'를 찾을 수 없습니다.`)
+              // 인자: mcp_args(JSON)에서 {{input}}을 앞 단계 출력으로 치환(JSON 이스케이프).
+              const injected = (node.mcp_args ?? "").replace(
+                /\{\{\s*input\s*\}\}/g,
+                JSON.stringify(previousOutput ?? "").slice(1, -1)
+              )
+              const args = injected.trim() ? JSON.parse(injected) : {}
+              const raw = await tool.execute(args, { toolCallId: node.id, messages: [] })
+              const out = typeof raw === "string" ? raw : JSON.stringify(raw, null, 2)
+              previousOutput = out
+              const label = node.agent_name || node.mcp_tool_name || "MCP"
+              nodeResults.push({ nodeId: node.id, agent_name: label, status: "done", output: out })
+              send({ type: "node", nodeId: node.id, status: "done", output: out, toolNote: `MCP: ${node.mcp_tool_name}` })
             } catch (err) {
               const msg = err instanceof Error ? err.message : "MCP 도구 호출 실패"
               const label = node.agent_name || node.mcp_tool_name || "MCP 노드"
@@ -190,13 +228,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           const messages: ModelMessage[] = [{ role: "user", content: parts.join("\n\n") }]
 
           try {
-            const { text, usage } = await generateText({
+            // 이 에이전트에 붙은 MCP 도구 로드(있으면) — 채팅과 동일하게 다단계 도구호출 허용.
+            const mcpTools = v.mcp_servers?.length ? await mcpToolsFor(v.mcp_servers) : {}
+            const hasTools = Object.keys(mcpTools).length > 0
+            const { text, usage, totalUsage } = await generateText({
               model: anthropic(v.model),
               system: v.system_prompt,
               messages,
               maxOutputTokens: v.max_tokens,
               temperature: Number(v.temperature),
+              ...(hasTools ? { tools: mcpTools, stopWhen: stepCountIs(5) } : {}),
             })
+            // 다단계(도구) 실행이면 totalUsage가 전체 합산 — 비용은 합산 기준.
+            const u = totalUsage ?? usage
             previousOutput = text
 
             // 도구(행동) 실행 — webhook(외부 POST) · save_file(파일 저장) · notify(내 알림).
@@ -265,13 +309,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             send({ type: "node", nodeId: node.id, status: "done", output: text, toolNote })
 
             // 사용량 로깅(best-effort, 실패 무시) + 실행당 누적 비용
-            const nodeCost = computeCostUsd(v.model, usage.inputTokens ?? 0, usage.outputTokens ?? 0)
+            const nodeCost = computeCostUsd(v.model, u.inputTokens ?? 0, u.outputTokens ?? 0)
             runCostUsd += nodeCost
             await supabase.from("agent_usage").insert({
               agent_id: node.agent_id,
               user_id: user.id,
-              tokens_input: usage.inputTokens ?? 0,
-              tokens_output: usage.outputTokens ?? 0,
+              tokens_input: u.inputTokens ?? 0,
+              tokens_output: u.outputTokens ?? 0,
               success: true,
               model: v.model,
               cost_usd: nodeCost,
@@ -317,7 +361,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         await finalizeRun("error", { error: msg })
         send({ type: "error", error: msg })
       } finally {
-        controller.close()
+        // MCP 클라이언트 일괄 정리 — 조기 return(노드 실패·상한 중단) 포함 모든 경로에서 실행됨.
+        await Promise.allSettled([...mcpClientCache.values()].map((c) => c.close()))
+        try {
+          controller.close()
+        } catch {
+          /* 조기 종료 경로에서 이미 close됨 — 중복 close는 무시(기존 잠재 더블클로즈 픽스) */
+        }
       }
     },
   })

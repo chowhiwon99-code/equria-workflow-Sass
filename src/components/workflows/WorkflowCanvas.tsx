@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils"
 import type { WorkflowNode, WorkflowEdge, WorkflowGraph } from "@/lib/workflows"
 import { genId, topoOrder, linearEdges } from "@/lib/workflows"
 import { toolEmoji } from "@/lib/workflowTools"
+import { Plug } from "lucide-react"
 import { renderAgentIcon, isLucideIcon } from "@/components/agents/AgentIcon"
 
 const NODE = 72 // 원 지름
@@ -270,12 +271,17 @@ export function WorkflowCanvas({
                   {toolEmoji(n.tool.type)}
                 </span>
               )}
-              <span className="text-2xl">
-                {renderAgentIcon(
-                  agentIcons[n.agent_id] || (isLucideIcon(n.agent_icon ?? "") ? (n.agent_icon as string) : "lucide:Bot"),
-                  "size-6"
-                )}
-              </span>
+              {n.kind === "mcp_tool" ? (
+                // MCP 도구 노드 — 플러그 아이콘으로 에이전트 노드와 구분
+                <Plug className="size-6 text-primary" />
+              ) : (
+                <span className="text-2xl">
+                  {renderAgentIcon(
+                    agentIcons[n.agent_id] || (isLucideIcon(n.agent_icon ?? "") ? (n.agent_icon as string) : "lucide:Bot"),
+                    "size-6"
+                  )}
+                </span>
+              )}
 
               {/* 입력 포트 */}
               <span
@@ -294,7 +300,9 @@ export function WorkflowCanvas({
 
             {/* 라벨: 이름 + 하는 일 */}
             <div className="mt-1.5 w-full text-center">
-              <p className="truncate text-xs font-semibold">{n.agent_name || "에이전트"}</p>
+              <p className="truncate text-xs font-semibold">
+                {n.agent_name || (n.kind === "mcp_tool" ? "MCP 도구" : "에이전트")}
+              </p>
               <p className="line-clamp-2 text-[10px] leading-tight text-muted-foreground">{subtitle}</p>
             </div>
           </div>

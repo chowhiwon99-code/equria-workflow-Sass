@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Plus, Play, Trash2, Loader2, ChevronDown } from "lucide-react"
+import { Plus, Play, Trash2, Loader2, ChevronDown, Plug } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { mustOk } from "@/lib/supabase/mustOk"
@@ -61,6 +61,11 @@ export function WorkflowEditor({ id }: { id: string }) {
   const [agents, setAgents] = useState<AgentOpt[]>([])
   const [pickAgent, setPickAgent] = useState("")
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  // MCP 도구 노드 — 연결된 MCP 서버·도구 목록(있을 때만 툴바 노출)
+  const [mcpServers, setMcpServers] = useState<{ id: string; name: string }[]>([])
+  const [mcpTools, setMcpTools] = useState<Record<string, { name: string; description: string | null }[]>>({})
+  const [pickMcpServer, setPickMcpServer] = useState("")
+  const [pickMcpTool, setPickMcpTool] = useState("")
 
   // 실행 상태
   const [running, setRunning] = useState(false)
@@ -120,6 +125,17 @@ export function WorkflowEditor({ id }: { id: string }) {
     loadRuns()
   }, [load, loadRuns])
 
+  // 연결된 MCP 서버·도구(캐시된 mcp_tools) — MCP 노드 픽커용. 실패해도 에디터는 정상.
+  useEffect(() => {
+    fetch("/api/mcp/servers")
+      .then((r) => (r.ok ? r.json() : { servers: [], tools: {} }))
+      .then((j: { servers?: { id: string; name: string; is_active: boolean }[]; tools?: Record<string, { name: string; description: string | null }[]> }) => {
+        setMcpServers((j.servers ?? []).filter((s) => s.is_active).map((s) => ({ id: s.id, name: s.name })))
+        setMcpTools(j.tools ?? {})
+      })
+      .catch(() => {})
+  }, [])
+
   const addNode = () => {
     const a = agents.find((x) => x.id === pickAgent)
     if (!a) return
@@ -142,6 +158,33 @@ export function WorkflowEditor({ id }: { id: string }) {
       return { nodes, edges: linearEdges(nodes) }
     })
     setPickAgent("")
+  }
+
+  // MCP 도구 노드 추가 — 에이전트 노드와 동일하게 맨 끝에 붙이고 선형 재연결.
+  const addMcpNode = () => {
+    const srv = mcpServers.find((s) => s.id === pickMcpServer)
+    if (!srv || !pickMcpTool) return
+    setGraph((g) => {
+      const cur = topoOrder(g)
+      const ordered = cur.ok ? [...cur.order] : [...g.nodes]
+      const last = g.nodes[g.nodes.length - 1]
+      const newNode = {
+        id: genId(),
+        kind: "mcp_tool" as const,
+        agent_id: "",
+        agent_name: pickMcpTool,
+        agent_desc: `MCP · ${srv.name}`,
+        note: "",
+        mcp_server_id: srv.id,
+        mcp_tool_name: pickMcpTool,
+        mcp_args: "",
+        x: last ? last.x + 180 : 40,
+        y: last ? last.y : 40,
+      }
+      const nodes = [...ordered, newNode]
+      return { nodes, edges: linearEdges(nodes) }
+    })
+    setPickMcpTool("")
   }
 
   const removeNode = (nodeId: string) => {
@@ -173,7 +216,22 @@ export function WorkflowEditor({ id }: { id: string }) {
       ),
     }))
 
+  const setNodeMcpArgs = (nodeId: string, mcp_args: string) =>
+    setGraph((g) => ({ ...g, nodes: g.nodes.map((n) => (n.id === nodeId ? { ...n, mcp_args } : n)) }))
+
   const selected = graph.nodes.find((n) => n.id === selectedId) ?? null
+  // MCP 인자 JSON 사전 검증 — {{input}}은 실행 시 이스케이프 치환되므로 검증에선 더미로 대체.
+  const mcpArgsInvalid = (() => {
+    if (selected?.kind !== "mcp_tool") return false
+    const rawArgs = (selected.mcp_args ?? "").trim()
+    if (!rawArgs) return false
+    try {
+      JSON.parse(rawArgs.replace(/\{\{\s*input\s*\}\}/g, "x"))
+      return false
+    } catch {
+      return true
+    }
+  })()
   // 노드 아이콘을 에이전트의 현재 아이콘(lucide)으로 통일(스냅샷 이모지 대신). 맵에 없으면 lucide:Bot.
   const agentIcons: Record<string, string> = {}
   for (const a of agents) agentIcons[a.id] = a.icon
@@ -376,6 +434,43 @@ export function WorkflowEditor({ id }: { id: string }) {
         <Button size="sm" variant="outline" onClick={addNode} disabled={!pickAgent}>
           <Plus /> 노드 추가
         </Button>
+        {/* MCP 도구 노드 — 연결된 MCP 서버가 있을 때만 */}
+        {mcpServers.length > 0 && (
+          <>
+            <span className="h-5 w-px bg-border" aria-hidden />
+            <select
+              className={cn(fieldClass, "max-w-[10rem]")}
+              value={pickMcpServer}
+              onChange={(e) => {
+                setPickMcpServer(e.target.value)
+                setPickMcpTool("")
+              }}
+            >
+              <option value="">MCP 서버…</option>
+              {mcpServers.map((s) => (
+                <option key={s.id} value={s.id}>
+                  🔌 {s.name}
+                </option>
+              ))}
+            </select>
+            <select
+              className={cn(fieldClass, "max-w-[12rem]")}
+              value={pickMcpTool}
+              onChange={(e) => setPickMcpTool(e.target.value)}
+              disabled={!pickMcpServer}
+            >
+              <option value="">도구 선택…</option>
+              {(mcpTools[pickMcpServer] ?? []).map((t) => (
+                <option key={t.name} value={t.name}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+            <Button size="sm" variant="outline" onClick={addMcpNode} disabled={!pickMcpServer || !pickMcpTool}>
+              <Plug /> MCP 노드
+            </Button>
+          </>
+        )}
         <span className="text-xs text-muted-foreground">
           노드를 드래그해 배치하고, 오른쪽 점을 끌어 다음 노드와 연결하세요.
         </span>
@@ -397,12 +492,35 @@ export function WorkflowEditor({ id }: { id: string }) {
         {selected && (
           <aside className="flex w-60 shrink-0 flex-col gap-2 rounded-xl border p-3">
             <div className="flex items-center gap-2">
-              <span className="text-lg">{renderAgentIcon(resolveNodeIcon(selected.agent_id, selected.agent_icon), "size-5")}</span>
+              <span className="text-lg">
+                {selected.kind === "mcp_tool" ? (
+                  <Plug className="size-5 text-primary" />
+                ) : (
+                  renderAgentIcon(resolveNodeIcon(selected.agent_id, selected.agent_icon), "size-5")
+                )}
+              </span>
               <span className="min-w-0 flex-1 truncate text-sm font-semibold">{selected.agent_name}</span>
             </div>
             {selected.agent_desc && (
               <p className="text-xs text-muted-foreground">{selected.agent_desc}</p>
             )}
+            {/* MCP 도구 노드 — 인자(JSON) 편집. 에이전트 노드 — 지시·완료 후 행동. */}
+            {selected.kind === "mcp_tool" && (
+              <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                도구 인자 (JSON)
+                <textarea
+                  className={cn(fieldClass, "min-h-[96px] resize-y py-1.5 font-mono text-[11px]")}
+                  value={selected.mcp_args ?? ""}
+                  onChange={(e) => setNodeMcpArgs(selected.id, e.target.value)}
+                  placeholder={'{"query": "{{input}}"}'}
+                />
+                <span className="text-[10px] text-muted-foreground/70">
+                  {"{{input}}"}은 앞 단계 출력으로 치환돼요. 빈칸이면 인자 없이 호출해요.
+                </span>
+                {mcpArgsInvalid && <span className="text-[10px] text-destructive">JSON 형식이 올바르지 않아요.</span>}
+              </label>
+            )}
+            {selected.kind !== "mcp_tool" && (
             <label className="flex flex-col gap-1 text-xs text-muted-foreground">
               이 단계 지시(선택)
               <textarea
@@ -412,8 +530,11 @@ export function WorkflowEditor({ id }: { id: string }) {
                 placeholder="예: 앞 단계 결과를 요약해서…"
               />
             </label>
+            )}
 
-            {/* 도구(행동) — 결과 생성 후 실제 동작 */}
+            {/* 도구(행동) — 결과 생성 후 실제 동작 (에이전트 노드 전용 — MCP 노드에선 실행되지 않아 숨김) */}
+            {selected.kind !== "mcp_tool" && (
+            <>
             <label className="flex flex-col gap-1 text-xs text-muted-foreground">
               완료 후 행동
               <select
@@ -449,6 +570,8 @@ export function WorkflowEditor({ id }: { id: string }) {
                   ? "이 단계 결과를 .md 파일로 ‘파일 관리’에 저장합니다."
                   : "이 단계 결과를 내 알림으로 보냅니다."}
               </p>
+            )}
+            </>
             )}
             {nodeToolNotes[selected.id] && (
               <p className="rounded-md bg-muted/40 px-2 py-1 text-[11px] text-muted-foreground">
