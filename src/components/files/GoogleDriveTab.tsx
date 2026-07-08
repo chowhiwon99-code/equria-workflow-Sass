@@ -19,7 +19,7 @@ type DriveFile = {
 type Crumb = { id: string | null; name: string }
 
 // 폴더/검색 결과 캐시(stale-while-revalidate) — 재방문 시 즉시 표시 후 백그라운드 갱신.
-const driveCache = new Map<string, DriveFile[]>()
+const driveCache = new Map<string, { files: DriveFile[]; nextPageToken: string | null }>()
 
 /** Files 섹션의 Google Drive 탭 — 연동한 구글 계정의 드라이브를 목록·검색·폴더탐색·다운로드(읽기 전용). */
 export default function GoogleDriveTab() {
@@ -30,6 +30,8 @@ export default function GoogleDriveTab() {
   const [loading, setLoading] = useState(true)
   const [notConnected, setNotConnected] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [nextPageToken, setNextPageToken] = useState<string | null>(null)
+  const [loadingMore, setLoadingMore] = useState(false)
 
   const parentId = crumbs[crumbs.length - 1].id
 
@@ -39,7 +41,8 @@ export default function GoogleDriveTab() {
     setError(null)
     setNotConnected(false)
     if (cached) {
-      setFiles(cached) // 캐시 즉시 표시(뒤에서 갱신)
+      setFiles(cached.files) // 캐시 즉시 표시(뒤에서 갱신)
+      setNextPageToken(cached.nextPageToken)
       setLoading(false)
     } else {
       setLoading(true)
@@ -57,9 +60,12 @@ export default function GoogleDriveTab() {
         if (!cached) setError("드라이브를 불러오지 못했어요.")
         return
       }
-      const data = (await res.json()) as { files: DriveFile[] }
-      driveCache.set(key, data.files ?? [])
-      setFiles(data.files ?? [])
+      const data = (await res.json()) as { files: DriveFile[]; nextPageToken: string | null }
+      const nextFiles = data.files ?? []
+      const token = data.nextPageToken ?? null
+      driveCache.set(key, { files: nextFiles, nextPageToken: token })
+      setFiles(nextFiles)
+      setNextPageToken(token)
     } catch {
       if (!cached) setError("네트워크 오류가 발생했어요.")
     } finally {
@@ -71,6 +77,27 @@ export default function GoogleDriveTab() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- 마운트/폴더변경 시 1회 드라이브 로드(외부 fetch)
     void load()
   }, [load])
+
+  // "더 보기" — nextPageToken으로 다음 페이지 append(폴더에 50개 초과 시 silent cap 방지).
+  const loadMore = useCallback(async () => {
+    if (!nextPageToken || loadingMore) return
+    setLoadingMore(true)
+    const params = new URLSearchParams()
+    if (search.trim()) params.set("q", search.trim())
+    else if (parentId) params.set("parentId", parentId)
+    params.set("pageToken", nextPageToken)
+    try {
+      const res = await fetch(`/api/google/drive/files?${params.toString()}`)
+      if (!res.ok) return
+      const data = (await res.json()) as { files: DriveFile[]; nextPageToken: string | null }
+      setFiles((prev) => [...prev, ...(data.files ?? [])])
+      setNextPageToken(data.nextPageToken ?? null)
+    } catch {
+      // 더 보기 실패는 조용히 무시(기존 목록 유지)
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [nextPageToken, loadingMore, parentId, search])
 
   function openFolder(f: DriveFile) {
     setSearch("")
@@ -190,6 +217,15 @@ export default function GoogleDriveTab() {
               </div>
             </div>
           ))}
+          {nextPageToken && (
+            <button
+              onClick={() => void loadMore()}
+              disabled={loadingMore}
+              className="w-full px-3 py-2.5 text-center text-xs font-medium text-muted-foreground hover:bg-muted/40 disabled:opacity-60"
+            >
+              {loadingMore ? "불러오는 중…" : "더 보기"}
+            </button>
+          )}
         </div>
       )}
     </div>
