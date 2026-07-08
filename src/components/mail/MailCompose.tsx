@@ -34,7 +34,9 @@ export type ComposeInitial = {
 }
 type Attachment = { filename: string; mimeType: string; contentBase64: string; size: number }
 
-const MAX_TOTAL = 20 * 1024 * 1024 // 첨부 합계 가드(Gmail 한도 여유)
+// Vercel 서버리스 요청 본문 4.5MB 제한 + base64 팽창(×1.33) 감안 → 합계 3MB 가드.
+// (더 큰 첨부는 Gmail 미디어 업로드 직접 경로 필요 — known-issues 참고)
+const MAX_TOTAL = 3 * 1024 * 1024
 
 /** 서식 툴바 버튼 — onMouseDown preventDefault로 에디터 선택 유지. */
 function Tool({ on, active, label, children }: { on: () => void; active?: boolean; label: string; children: ReactNode }) {
@@ -112,7 +114,7 @@ export default function MailCompose({
     let total = attachments.reduce((s, a) => s + a.size, 0)
     for (const f of incoming) {
       if (total + f.size > MAX_TOTAL) {
-        toast.error("첨부 용량이 너무 커요(합계 20MB 이하).")
+        toast.error("첨부가 너무 커요(현재 합계 3MB 이하만 전송 가능).")
         break
       }
       try {

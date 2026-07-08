@@ -177,9 +177,15 @@ export async function batchGetThreadsMetadata(
 
 // ---- 발신(RFC2822 → base64url) ----
 function encodeHeaderValue(s: string): string {
+  const clean = s.replace(/[\r\n]+/g, " ") // 헤더 인젝션 방지: CR/LF 제거
   // 비ASCII는 RFC2047 인코딩
-  if (/^[\x00-\x7F]*$/.test(s)) return s
-  return `=?UTF-8?B?${Buffer.from(s, "utf8").toString("base64")}?=`
+  if (/^[\x00-\x7F]*$/.test(clean)) return clean
+  return `=?UTF-8?B?${Buffer.from(clean, "utf8").toString("base64")}?=`
+}
+
+// 주소/헤더 값에서 CR·LF 제거(헤더 인젝션 방지).
+function oneLine(s: string): string {
+  return s.replace(/[\r\n]+/g, " ").trim()
 }
 
 export type OutgoingAttachment = { filename: string; mimeType: string; contentBase64: string }
@@ -221,12 +227,12 @@ export function buildRawMessage(opts: {
   const attachments = opts.attachments ?? []
   const plain = opts.text ?? (html ? htmlToPlain(html) : "")
 
-  const head: string[] = [`To: ${to}`]
-  if (cc) head.push(`Cc: ${cc}`)
-  if (bcc) head.push(`Bcc: ${bcc}`)
+  const head: string[] = [`To: ${oneLine(to)}`]
+  if (cc) head.push(`Cc: ${oneLine(cc)}`)
+  if (bcc) head.push(`Bcc: ${oneLine(bcc)}`)
   head.push(`Subject: ${encodeHeaderValue(subject)}`)
-  if (inReplyTo) head.push(`In-Reply-To: ${inReplyTo}`)
-  if (references) head.push(`References: ${references}`)
+  if (inReplyTo) head.push(`In-Reply-To: ${oneLine(inReplyTo)}`)
+  if (references) head.push(`References: ${oneLine(references)}`)
   head.push("MIME-Version: 1.0")
 
   const altB = "alt_" + randomBytes(10).toString("hex")
@@ -262,11 +268,11 @@ export function buildRawMessage(opts: {
     for (const a of attachments) {
       lines.push(
         `--${mixB}`,
-        `Content-Type: ${a.mimeType}; name="${encodeHeaderValue(a.filename)}"`,
+        `Content-Type: ${oneLine(a.mimeType)}; name="${encodeHeaderValue(a.filename.replace(/"/g, ""))}"`,
         "Content-Transfer-Encoding: base64",
-        `Content-Disposition: attachment; filename="${encodeHeaderValue(a.filename)}"`,
+        `Content-Disposition: attachment; filename="${encodeHeaderValue(a.filename.replace(/"/g, ""))}"`,
         "",
-        foldBase64(a.contentBase64)
+        foldBase64(a.contentBase64.replace(/[^A-Za-z0-9+/=]/g, "")) // base64 이외 문자 제거(주입 방지)
       )
     }
     lines.push(`--${mixB}--`)
