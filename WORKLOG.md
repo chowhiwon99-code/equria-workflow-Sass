@@ -21,8 +21,16 @@
 ### 권한 픽스
 - 대표(조휘원)가 워크스페이스 owner인데 `role=member`라 MCP "연결" 버튼(admin 전용) 안 보임 → **role admin 승격**(owner 본인 승인, `guard_profile_role` 통과 위해 auth 컨텍스트=owner id). 확인: 실제 연결된 MCP 서버 0개(기능만 라이브).
 
+### A — MCP 사용 흐름 명확화 (`9af4751`, 배포)
+- 대표 혼란("연결하고 뭐?") 해소: /mcp 상단 **3단계 사용법 스트립** + 연결된 서버 행 **"에이전트 만들기"**(`/agents/new?mcp=<id>`) → NewAgentPage가 searchParams로 AgentWizard→AgentBuilderForm `prefill.mcp_servers` 체인(위저드 힌트 칩 포함) · 채팅 말풍선에 **🔧 도구 사용 칩**(버려지던 tool-*/dynamic-tool parts 렌더).
+
+### B — 워크플로우 에이전트+MCP 융합 (`75d5944`, 배포)
+- **에이전트 노드 MCP 사용**: run 라우트가 agent_versions.mcp_servers 로드→`tools`+`stopWhen(5)`(채팅 동일 패턴)·비용 totalUsage 합산→per-run 상한 반영. **서버당 1회 연결 캐시**(mcp_tool 노드 재연결 제거 통합)+finally 일괄 close.
+- **캔버스 MCP 노드 UI**: 툴바 MCP 서버·도구 픽커+"MCP 노드" 버튼(연결 서버 있을 때만) · mcp_tool 노드 플러그 아이콘 · 사이드패널 인자(JSON) 편집({{input}} 안내+실시간 검증, 에이전트 전용 섹션 숨김).
+- **잠재버그 픽스**: 조기 return 경로 controller 더블클로즈 TypeError 가드. 적대 셀프리뷰: {{input}} JSON 이스케이프 안전·RLS 프리페치로 타 워크스페이스 서버 차단 확인.
+
 ### 다음(대표 논의)
-- MCP "어떻게 쓰나" 혼란 → **A**(사용 흐름 명확화: /mcp→에이전트 연결 바로가기·3단계·도구 사용 표시) / **B**(워크플로우 캔버스 MCP 노드 UI — 백엔드 있음) / **C**(자동 트리거·스케줄/웹훅). n8n식 에이전트+MCP 융합 자동화 = 엔진 있고 조종석(UI) 부족.
+- **C**(자동 트리거 — 스케줄/웹훅으로 사람 없이 실행) = n8n식 자동화 완성 조각. 그 외 개선 후보: 테스트 안 된 MCP 서버는 도구 캐시 비어 픽커에 안 뜸(테스트 1회 필요).
 
 ## 2026-07-07 · 세션27 — Google Drive 탭 + Gmail 리치 작성/AI 다듬기 + 로딩 최적화·배포 (사용자 요청)
 
