@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { ArrowUp, ArrowLeft, X, Plus, Maximize2, Minimize2, Copy, Check, Sparkles, SlidersHorizontal } from "lucide-react"
+import { ArrowUp, ArrowLeft, X, Plus, Maximize2, Minimize2, Copy, Check, Sparkles, SlidersHorizontal, Wrench } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { renderAgentIcon } from "@/components/agents/AgentIcon"
 import { useAgentChat, type Agent, type WidgetPosition } from "./AgentChatContext"
@@ -700,6 +700,16 @@ function Bubble({ message, agentIcon }: { message: UIMessage; agentIcon: string 
   const text = message.parts
     .map((p) => (p.type === "text" ? p.text : ""))
     .join("")
+  // MCP 등 도구 호출 parts(tool-*/dynamic-tool)에서 도구명 추출 — "🔧 사용" 칩으로 가시화
+  const toolNames = [
+    ...new Set(
+      message.parts
+        .map((p) =>
+          p.type === "dynamic-tool" ? p.toolName : p.type.startsWith("tool-") ? p.type.slice(5) : null
+        )
+        .filter((n): n is string => !!n)
+    ),
+  ]
   const isUser = message.role === "user"
   const [copied, setCopied] = useState(false)
 
@@ -728,6 +738,18 @@ function Bubble({ message, agentIcon }: { message: UIMessage; agentIcon: string 
             : "bg-muted text-foreground"
         )}
       >
+        {!isUser && toolNames.length > 0 && (
+          <div className="mb-1.5 flex flex-wrap gap-1">
+            {toolNames.map((n) => (
+              <span
+                key={n}
+                className="inline-flex items-center gap-1 rounded-full bg-background/70 px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+              >
+                <Wrench className="size-3" /> {n}
+              </span>
+            ))}
+          </div>
+        )}
         {isUser ? (
           <p className="whitespace-pre-wrap break-words">{text}</p>
         ) : (

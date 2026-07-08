@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import Link from "next/link"
 import { Plug, Plus, RefreshCw, Trash2, ChevronDown, Loader2, Wrench, Search } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
@@ -228,6 +229,18 @@ export function McpView() {
         </div>
       </div>
 
+      {/* 사용법 — 커넥터는 연결만으로 끝이 아니라 "에이전트에 붙여야" 실제로 쓰인다 */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border bg-muted/30 px-3.5 py-2.5 text-xs text-muted-foreground">
+        <span className="font-semibold text-foreground">사용법</span>
+        <span>① 커넥터 연결</span>
+        <span aria-hidden>→</span>
+        <span>
+          ② 연결된 서버의 <b className="text-foreground">에이전트 만들기</b>로 에이전트에 붙이기
+        </span>
+        <span aria-hidden>→</span>
+        <span>③ 그 에이전트와 채팅하면 도구를 자동으로 써요</span>
+      </div>
+
       {/* 커넥터 디렉터리 — 검색·필터·정렬·추천·전체 그리드 */}
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center gap-2">
@@ -322,6 +335,14 @@ export function McpView() {
                       <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} />
                     </button>
                   )}
+
+                  {/* 이 커넥터가 미리 연결된 에이전트 만들기 (전 직원) */}
+                  <Link
+                    href={`/agents/new?mcp=${s.id}`}
+                    className="shrink-0 rounded-lg border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  >
+                    에이전트 만들기
+                  </Link>
 
                   {isAdmin && (
                     <>

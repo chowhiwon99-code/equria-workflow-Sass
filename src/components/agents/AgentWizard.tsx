@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Sparkles, Check, ArrowLeft, PenLine } from "lucide-react"
+import { Sparkles, Check, ArrowLeft, PenLine, Plug } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/shared/Modal"
@@ -19,7 +19,7 @@ type Phase = "input" | "result"
 // 한 화면에 한 질문씩 — 아이폰 초기 설정처럼 가로 슬라이드로 진행.
 const QUESTIONS = WIZARD_FIELDS
 
-export function AgentWizard() {
+export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
   const [mode, setMode] = useState<Mode>("wizard")
   const [phase, setPhase] = useState<Phase>("input")
   const [index, setIndex] = useState(0)
@@ -100,7 +100,7 @@ export function AgentWizard() {
         >
           <Sparkles className="size-3.5" /> 가이드 마법사로 돌아가기
         </button>
-        <AgentBuilderForm slides />
+        <AgentBuilderForm slides prefill={mcpPrefill?.length ? { mcp_servers: mcpPrefill } : undefined} />
       </div>
     )
   }
@@ -148,6 +148,7 @@ export function AgentWizard() {
                 description: (inputs.purpose as string) || null,
                 category: inferCategory(inputs),
                 system_prompt: generated,
+                ...(mcpPrefill?.length ? { mcp_servers: mcpPrefill } : {}),
               }}
               onBack={() => setPhase("input")}
             />
@@ -168,6 +169,13 @@ export function AgentWizard() {
       >
         <PenLine className="size-3.5" /> 직접 작성으로 전환
       </button>
+
+      {/* /mcp 바로가기로 진입 — MCP 도구가 미리 연결된 채 만들어진다는 안내 */}
+      {(mcpPrefill?.length ?? 0) > 0 && (
+        <p className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-medium text-foreground">
+          <Plug className="size-3.5" /> 선택한 MCP 커넥터가 이 에이전트에 미리 연결돼요.
+        </p>
+      )}
 
       {/* 진행바 */}
       <div className="flex w-full flex-col gap-2">
