@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { anthropic, MODELS } from "@/lib/claude/client"
 import { cashCoachSchema } from "@/lib/claude/schemas"
 import { computeCostUsd } from "@/lib/pricing"
+import { checkBudget, BUDGET_EXCEEDED_MSG } from "@/lib/budget"
 import { buildCoachPrompt, type CoachPayload } from "@/lib/cashCoach"
 
 export const runtime = "nodejs"
@@ -37,6 +38,9 @@ export async function POST(req: Request) {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const budget = await checkBudget(user.id)
+  if (!budget.ok) return NextResponse.json({ error: BUDGET_EXCEEDED_MSG }, { status: 429 })
 
   const body = (await req.json().catch(() => null)) as { payload?: CoachPayload } | null
   const payload = body?.payload

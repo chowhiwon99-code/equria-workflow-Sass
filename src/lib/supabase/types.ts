@@ -2737,6 +2737,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          monthly_budget_usd: number | null
           name: string
           owner_id: string | null
           plan: string
@@ -2745,6 +2746,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          monthly_budget_usd?: number | null
           name: string
           owner_id?: string | null
           plan?: string
@@ -2753,6 +2755,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          monthly_budget_usd?: number | null
           name?: string
           owner_id?: string | null
           plan?: string

@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/shared/Modal"
 import { MANUAL_STATUSES } from "@/components/chat/StatusDot"
 import { Loading, ErrorState } from "@/components/shared/States"
+import { formatUsd } from "@/lib/pricing"
 
 const THEMES = [
   { value: "light", label: "라이트" },
@@ -149,6 +150,10 @@ export function SettingsView() {
     work_phone: "all",
     mobile: "private",
   })
+  // AI 비용 예산(이번 달 사용액·월 한도)
+  const [budget, setBudget] = useState<{ spent: number; limit: number | null; isAdmin: boolean } | null>(null)
+  const [budgetInput, setBudgetInput] = useState("")
+  const [savingBudget, setSavingBudget] = useState(false)
 
   // 테마는 클라이언트에서만 확정(hydration mismatch 방지)
   useEffect(() => setMounted(true), [])
@@ -191,6 +196,17 @@ export function SettingsView() {
         const { data: mem } = await supabase.from("profiles").select("id, name, department, position").order("name")
         setMemberList((mem as { id: string; name: string; department: string | null; position: string | null }[]) ?? [])
       }
+      // AI 비용 예산 — 이번 달 사용액·월 한도(조회 실패는 무시)
+      try {
+        const bRes = await fetch("/api/budget")
+        if (bRes.ok) {
+          const b = (await bRes.json()) as { spent: number; limit: number | null; isAdmin: boolean }
+          setBudget(b)
+          setBudgetInput(b.limit == null ? "" : String(b.limit))
+        }
+      } catch {
+        /* 예산 조회 실패는 설정 로드를 막지 않음 */
+      }
       setError(null)
     } catch {
       setError("설정을 불러오지 못했어요. 다시 시도해 주세요.")
@@ -229,6 +245,28 @@ export function SettingsView() {
       toast.error("저장에 실패했어요. 다시 시도해 주세요.")
     } finally {
       setSaving(false)
+    }
+  }
+
+  const saveBudget = async () => {
+    setSavingBudget(true)
+    try {
+      const raw = budgetInput.trim()
+      const monthly_budget_usd = raw === "" ? null : Number(raw)
+      const res = await fetch("/api/budget", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ monthly_budget_usd }),
+      })
+      const j = await res.json()
+      if (!res.ok) throw new Error(j.error ?? "저장 실패")
+      setBudget((b) => (b ? { ...b, limit: j.limit ?? null } : b))
+      setBudgetInput(j.limit == null ? "" : String(j.limit))
+      toast.success("AI 예산 한도를 저장했어요.")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "저장에 실패했어요.")
+    } finally {
+      setSavingBudget(false)
     }
   }
 
@@ -400,6 +438,45 @@ export function SettingsView() {
             <span className="font-medium">{name || email}</span>
           </div>
         </div>
+      </Card>
+
+      {/* AI 비용 예산 */}
+      <Card>
+        <SectionTitle
+          title="AI 비용 예산"
+          desc="에이전트·워크플로우가 쓰는 Claude 비용의 월 한도예요. 초과하면 관리자 외에는 AI 실행이 차단돼요."
+        />
+        {budget && (
+          <div className="overflow-hidden rounded-xl border text-sm">
+            <div className="flex items-center justify-between border-b px-3.5 py-2.5">
+              <span className="text-muted-foreground">이번 달 사용액</span>
+              <span className="font-medium">{formatUsd(budget.spent)}</span>
+            </div>
+            <div className="flex items-center justify-between px-3.5 py-2.5">
+              <span className="text-muted-foreground">월 한도</span>
+              <span className="font-medium">{budget.limit == null ? "무제한" : formatUsd(budget.limit)}</span>
+            </div>
+          </div>
+        )}
+        {role === "admin" && (
+          <div className="flex items-end gap-2">
+            <label className="flex flex-1 flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">월 한도 (USD · 0 또는 빈칸 = 무제한)</span>
+              <input
+                type="number"
+                min={0}
+                step="1"
+                className={fieldClass}
+                value={budgetInput}
+                onChange={(e) => setBudgetInput(e.target.value)}
+                placeholder="예: 100"
+              />
+            </label>
+            <Button size="sm" onClick={saveBudget} disabled={savingBudget}>
+              {savingBudget ? "저장 중…" : "저장"}
+            </Button>
+          </div>
+        )}
       </Card>
 
       {/* 계정 */}

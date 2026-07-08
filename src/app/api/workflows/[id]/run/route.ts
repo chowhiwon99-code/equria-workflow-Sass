@@ -5,6 +5,7 @@ import { normalizeGraph, topoOrder } from "@/lib/workflows"
 import { isSafeWebhookUrl, MAX_RUN_NODES } from "@/lib/workflowTools"
 import { connectMcp } from "@/lib/mcp/connect"
 import { computeCostUsd } from "@/lib/pricing"
+import { checkBudget, PER_RUN_MAX_USD, BUDGET_EXCEEDED_MSG } from "@/lib/budget"
 import type { Json } from "@/lib/supabase/types"
 
 export const maxDuration = 60
@@ -34,6 +35,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return new Response("Unauthorized", { status: 401 })
+
+  const budget = await checkBudget(user.id)
+  if (!budget.ok) return new Response(BUDGET_EXCEEDED_MSG, { status: 429 })
 
   const body = (await req.json().catch(() => ({}))) as { input?: string }
   const userInput = (body.input ?? "").trim()
@@ -114,6 +118,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       }
 
       let previousOutput = userInput
+      let runCostUsd = 0 // 실행당 누적 AI 비용(USD) — PER_RUN_MAX_USD 초과 시 중단
       try {
         for (let i = 0; i < topo.order.length; i++) {
           const node = topo.order[i]
@@ -259,7 +264,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             nodeResults.push({ nodeId: node.id, agent_name: node.agent_name, status: "done", output: text, toolNote })
             send({ type: "node", nodeId: node.id, status: "done", output: text, toolNote })
 
-            // 사용량 로깅(best-effort, 실패 무시)
+            // 사용량 로깅(best-effort, 실패 무시) + 실행당 누적 비용
+            const nodeCost = computeCostUsd(v.model, usage.inputTokens ?? 0, usage.outputTokens ?? 0)
+            runCostUsd += nodeCost
             await supabase.from("agent_usage").insert({
               agent_id: node.agent_id,
               user_id: user.id,
@@ -267,8 +274,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
               tokens_output: usage.outputTokens ?? 0,
               success: true,
               model: v.model,
-              cost_usd: computeCostUsd(v.model, usage.inputTokens ?? 0, usage.outputTokens ?? 0),
+              cost_usd: nodeCost,
             })
+
+            // 실행당 비용 상한 — 누적이 상한을 넘으면 즉시 중단(폭주 방지).
+            if (runCostUsd > PER_RUN_MAX_USD) {
+              const stop = `실행당 비용 상한($${PER_RUN_MAX_USD})을 넘어 워크플로우를 중단했어요.`
+              await finalizeRun("error", { error: stop })
+              send({ type: "error", error: stop })
+              controller.close()
+              return
+            }
           } catch (err) {
             const msg = err instanceof Error ? err.message : "에이전트 호출 실패"
             nodeResults.push({ nodeId: node.id, agent_name: node.agent_name, status: "error", error: msg })

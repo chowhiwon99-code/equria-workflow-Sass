@@ -3,6 +3,7 @@ import { anthropic } from "@/lib/claude/client"
 import { createClient } from "@/lib/supabase/server"
 import { connectMcp } from "@/lib/mcp/connect"
 import { computeCostUsd } from "@/lib/pricing"
+import { checkBudget, BUDGET_EXCEEDED_MSG } from "@/lib/budget"
 
 export const maxDuration = 60
 export const runtime = "nodejs"
@@ -20,6 +21,9 @@ export async function POST(
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return new Response("Unauthorized", { status: 401 })
+
+  const budget = await checkBudget(user.id)
+  if (!budget.ok) return new Response(BUDGET_EXCEEDED_MSG, { status: 429 })
 
   const body = (await req.json()) as {
     messages: UIMessage[]
