@@ -24,6 +24,18 @@ export type Connector = {
   }
 }
 
+/** 알려진 MCP 도구의 한국어 설명(도구 이름 기준). 목록에 없으면 서버가 준 원문 설명을 그대로 노출. */
+export const MCP_TOOL_KO: Record<string, string> = {
+  // DeepWiki
+  read_wiki_structure: "GitHub 저장소 문서의 목차(주제 목록)를 가져와요 · 인자: repoName(owner/repo)",
+  read_wiki_contents: "GitHub 저장소의 문서 내용을 읽어와요 · 인자: repoName(owner/repo)",
+  ask_question: "GitHub 저장소에 대해 질문하면 저장소 내용을 근거로 답해요 · 인자: repoName, question",
+  // Context7
+  "resolve-library-id": "라이브러리 이름으로 Context7 문서 ID를 찾아요 · 인자: libraryName",
+  "get-library-docs": "라이브러리 최신 공식 문서에서 필요한 부분을 가져와요 · 인자: 라이브러리 ID, topic",
+  "query-docs": "라이브러리 최신 문서에 질문해 관련 내용을 가져와요 · 인자: libraryId, query",
+}
+
 export const MCP_CONNECTORS: Connector[] = [
   // 읽기 전용·무인증 — 안전한 첫 커넥터(원클릭 연결)
   {

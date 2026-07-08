@@ -11,7 +11,7 @@ import { Modal, fieldClass } from "@/components/shared/Modal"
 import { Loading, ErrorState } from "@/components/shared/States"
 import { cn } from "@/lib/utils"
 import { Select } from "@/components/shared/Select"
-import { MCP_CONNECTORS, CONNECTOR_CATEGORIES, type Connector } from "@/lib/mcp"
+import { MCP_CONNECTORS, CONNECTOR_CATEGORIES, MCP_TOOL_KO, type Connector } from "@/lib/mcp"
 
 type Server = {
   id: string
@@ -361,13 +361,14 @@ export function McpView() {
                 </div>
 
                 {open && t.length > 0 && (
-                  <div className="flex flex-col gap-1 border-t bg-muted/20 px-4 py-2">
+                  <div className="flex flex-col gap-1.5 border-t bg-muted/20 px-4 py-2.5">
                     {t.map((tool) => (
-                      <div key={tool.name} className="flex flex-col">
-                        <span className="text-xs font-medium">{tool.name}</span>
-                        {tool.description && (
-                          <span className="text-[11px] text-muted-foreground">{tool.description}</span>
-                        )}
+                      // 알려진 도구는 한국어 설명(원문은 호버 title), 모르는 도구는 서버 원문 그대로.
+                      <div key={tool.name} className="flex flex-col gap-0.5 rounded-lg border bg-card px-2.5 py-1.5">
+                        <span className="font-mono text-xs font-medium">{tool.name}</span>
+                        <span className="text-[11px] text-muted-foreground" title={tool.description ?? undefined}>
+                          {MCP_TOOL_KO[tool.name] ?? tool.description ?? "설명 없음"}
+                        </span>
                       </div>
                     ))}
                   </div>

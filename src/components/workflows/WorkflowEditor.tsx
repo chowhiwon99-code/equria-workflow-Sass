@@ -23,6 +23,7 @@ import {
   type WorkflowToolType,
 } from "@/lib/workflows"
 import { WORKFLOW_TOOLS } from "@/lib/workflowTools"
+import { MCP_TOOL_KO } from "@/lib/mcp"
 
 type AgentOpt = { id: string; name: string; icon: string; description: string | null }
 
@@ -469,6 +470,10 @@ export function WorkflowEditor({ id }: { id: string }) {
             <Button size="sm" variant="outline" onClick={addMcpNode} disabled={!pickMcpServer || !pickMcpTool}>
               <Plug /> MCP 노드
             </Button>
+            {/* 고른 도구가 뭘 하는지 한 줄 설명(알려진 도구만) */}
+            {pickMcpTool && MCP_TOOL_KO[pickMcpTool] && (
+              <span className="w-full text-[11px] text-muted-foreground">💡 {MCP_TOOL_KO[pickMcpTool]}</span>
+            )}
           </>
         )}
         <span className="text-xs text-muted-foreground">
