@@ -16,10 +16,14 @@ export type WorkflowTool = {
   url?: string
 }
 
+/** 노드 종류 — 없거나 "agent"면 에이전트 노드(레거시 호환), "mcp_tool"이면 MCP 도구 직접 실행. */
+export type WorkflowNodeKind = "agent" | "mcp_tool"
+
 export type WorkflowNode = {
   id: string
-  agent_id: string
-  agent_name: string
+  kind?: WorkflowNodeKind
+  agent_id: string // agent 노드용 (mcp_tool 노드는 "")
+  agent_name: string // 노드 라벨(에이전트명 또는 MCP 도구명)
   agent_icon?: string
   /** 이 에이전트가 하는 일 한 줄 — 노드에 표시 (agents.description 스냅샷) */
   agent_desc?: string
@@ -27,6 +31,11 @@ export type WorkflowNode = {
   note?: string
   /** 이 노드가 텍스트 생성 후 수행할 행동(선택) */
   tool?: WorkflowTool
+  // ---- mcp_tool 노드 전용 ----
+  mcp_server_id?: string
+  mcp_tool_name?: string
+  /** MCP 도구 인자(JSON 문자열). `{{input}}`은 앞 단계 출력으로 치환. 빈 값이면 {} */
+  mcp_args?: string
   x: number
   y: number
 }
@@ -91,16 +100,28 @@ export function normalizeGraph(raw: unknown): WorkflowGraph {
       .map((item, i): WorkflowNode | null => {
         const o = asObj(item)
         if (!o) return null
-        const agent_id = asStr(o.agent_id)
-        if (!agent_id) return null
+        const kind: WorkflowNodeKind = asStr(o.kind) === "mcp_tool" ? "mcp_tool" : "agent"
+        const agent_id = asStr(o.agent_id) ?? ""
+        const mcp_server_id = asStr(o.mcp_server_id)
+        const mcp_tool_name = asStr(o.mcp_tool_name)
+        // 유효성: agent 노드는 agent_id, mcp_tool 노드는 서버+도구 필수
+        if (kind === "mcp_tool") {
+          if (!mcp_server_id || !mcp_tool_name) return null
+        } else if (!agent_id) {
+          return null
+        }
         return {
           id: asStr(o.id) ?? genId(),
+          kind,
           agent_id,
           agent_name: asStr(o.agent_name) ?? "",
           agent_icon: asStr(o.agent_icon),
           agent_desc: asStr(o.agent_desc),
           note: asStr(o.note) || undefined,
           tool: asTool(o.tool),
+          mcp_server_id,
+          mcp_tool_name,
+          mcp_args: asStr(o.mcp_args),
           x: asNum(o.x) ?? 40 + (i % 5) * 180,
           y: asNum(o.y) ?? 40 + Math.floor(i / 5) * 130,
         }

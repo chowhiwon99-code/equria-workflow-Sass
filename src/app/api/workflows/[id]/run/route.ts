@@ -3,6 +3,7 @@ import { anthropic } from "@/lib/claude/client"
 import { createClient } from "@/lib/supabase/server"
 import { normalizeGraph, topoOrder } from "@/lib/workflows"
 import { isSafeWebhookUrl, MAX_RUN_NODES } from "@/lib/workflowTools"
+import { connectMcp } from "@/lib/mcp/connect"
 import { computeCostUsd } from "@/lib/pricing"
 import type { Json } from "@/lib/supabase/types"
 
@@ -63,7 +64,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   // 실행 순서의 각 노드에 필요한 에이전트 버전(시스템 프롬프트/모델 등)을 미리 로드.
-  const agentIds = [...new Set(topo.order.map((n) => n.agent_id))]
+  const agentIds = [...new Set(topo.order.filter((n) => n.kind !== "mcp_tool").map((n) => n.agent_id))]
   const { data: versions } = await supabase
     .from("agent_versions")
     .select("agent_id, system_prompt, model, max_tokens, temperature")
@@ -117,6 +118,49 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         for (let i = 0; i < topo.order.length; i++) {
           const node = topo.order[i]
           send({ type: "node", nodeId: node.id, status: "running", index: i })
+
+          // ── MCP 도구 노드 — 에이전트 대신 MCP 서버의 특정 도구를 직접 호출 ──
+          if (node.kind === "mcp_tool") {
+            try {
+              const { data: server } = await supabase
+                .from("mcp_servers")
+                .select("id, name, type, url, auth_type")
+                .eq("id", node.mcp_server_id ?? "")
+                .eq("is_active", true)
+                .maybeSingle()
+              if (!server) throw new Error("MCP 서버를 찾을 수 없습니다(비활성/삭제됨).")
+              const client = await connectMcp(server)
+              try {
+                const tools = await client.tools()
+                const tool = tools[node.mcp_tool_name ?? ""]
+                if (!tool?.execute) throw new Error(`MCP 도구 '${node.mcp_tool_name}'를 찾을 수 없습니다.`)
+                // 인자: mcp_args(JSON)에서 {{input}}을 앞 단계 출력으로 치환(JSON 이스케이프).
+                const injected = (node.mcp_args ?? "").replace(
+                  /\{\{\s*input\s*\}\}/g,
+                  JSON.stringify(previousOutput ?? "").slice(1, -1)
+                )
+                const args = injected.trim() ? JSON.parse(injected) : {}
+                const raw = await tool.execute(args, { toolCallId: node.id, messages: [] })
+                const out = typeof raw === "string" ? raw : JSON.stringify(raw, null, 2)
+                previousOutput = out
+                const label = node.agent_name || node.mcp_tool_name || "MCP"
+                nodeResults.push({ nodeId: node.id, agent_name: label, status: "done", output: out })
+                send({ type: "node", nodeId: node.id, status: "done", output: out, toolNote: `MCP: ${node.mcp_tool_name}` })
+              } finally {
+                await client.close()
+              }
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : "MCP 도구 호출 실패"
+              const label = node.agent_name || node.mcp_tool_name || "MCP 노드"
+              nodeResults.push({ nodeId: node.id, agent_name: label, status: "error", error: msg })
+              await finalizeRun("error", { error: `${label}에서 중단됨: ${msg}` })
+              send({ type: "node", nodeId: node.id, status: "error", error: msg })
+              send({ type: "error", error: `${label}에서 중단됨: ${msg}` })
+              controller.close()
+              return
+            }
+            continue
+          }
 
           const v = versionByAgent.get(node.agent_id)
           if (!v) {

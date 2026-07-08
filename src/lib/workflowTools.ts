@@ -35,10 +35,7 @@ export const WORKFLOW_TOOLS: ToolCatalogItem[] = [
     desc: "결과를 외부 URL로 POST (Make·Zapier·Slack·n8n → 유튜브 업로드 등으로 분기)",
     enabled: true,
   },
-  // 고도화 예정 — 외부 연동(자리만 노출)
-  { type: "none", label: "유튜브 업로드", emoji: "▶️", desc: "Google OAuth 연결 후 (준비 중)", enabled: false },
-  { type: "none", label: "Higgsfield 제작", emoji: "🎬", desc: "이미지·영상 생성 (준비 중)", enabled: false },
-  { type: "none", label: "Figma 제작", emoji: "🎨", desc: "디자인 생성 (준비 중)", enabled: false },
+  // 외부 연동(유튜브·이미지생성·디자인 등)은 웹훅 또는 곧 추가될 MCP 도구 노드로 처리 — 껍데기 항목 제거(세션28).
 ]
 
 export function toolLabel(type: WorkflowToolType | undefined): string {
