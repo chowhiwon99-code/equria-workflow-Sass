@@ -481,8 +481,8 @@ export function WorkflowEditor({ id }: { id: string }) {
         </span>
       </div>
 
-      {/* 캔버스 + 선택 노드 패널 */}
-      <div className="flex gap-3">
+      {/* 캔버스 + 선택 노드 패널 — 모바일에선 아래로 쌓임(md+ 나란히) */}
+      <div className="flex flex-col gap-3 md:flex-row">
         <div className="min-w-0 flex-1">
           <WorkflowCanvas
             graph={graph}
@@ -495,7 +495,7 @@ export function WorkflowEditor({ id }: { id: string }) {
           />
         </div>
         {selected && (
-          <aside className="flex w-60 shrink-0 flex-col gap-2 rounded-xl border p-3">
+          <aside className="flex w-full shrink-0 flex-col gap-2 rounded-xl border p-3 md:w-60">
             <div className="flex items-center gap-2">
               <span className="text-lg">
                 {selected.kind === "mcp_tool" ? (

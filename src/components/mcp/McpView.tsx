@@ -305,9 +305,10 @@ export function McpView() {
             const open = expanded === s.id
             return (
               <div key={s.id} className="flex flex-col">
-                <div className="flex items-center gap-3 px-4 py-3">
+                {/* 모바일: 정보 줄(basis-full)과 버튼 줄로 자동 줄바꿈 · sm+: 기존 한 줄 */}
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
                   <Plug className="size-4 shrink-0 text-muted-foreground" />
-                  <div className="flex min-w-0 flex-1 flex-col">
+                  <div className="flex min-w-0 flex-1 basis-full flex-col sm:basis-0">
                     <div className="flex items-center gap-2">
                       <span className="truncate text-sm font-medium">{s.name}</span>
                       <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
