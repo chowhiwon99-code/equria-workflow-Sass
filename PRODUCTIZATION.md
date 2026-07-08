@@ -54,6 +54,7 @@
 | H8 | **레이트리밋/남용방지 없음** | 한 테넌트 폭주가 전체 성능·비용 타격(noisy neighbor). OCR=Claude Vision이라 더 비쌈 | 모든 `api/*/route.ts`에 미들웨어 부재 | M |
 | H9 | **RBAC 미적용** | `workspace_members.role`(owner/admin/member) 칸은 있으나 앱이 안 씀. 누구나 동급 권한 | `030`·`api/mcp/servers` | M |
 | H10 | **Google OAuth 반쪽** | UI·스키마는 있으나 콜백에 워크스페이스 컨텍스트 없음, JIT 프로비저닝 없음 | `auth/callback/route.ts`·`lib/google/oauth.ts` | M |
+| H11 | **외부 판매 시 구글 OAuth 인증(CASA) 필요** | Drive/Gmail=제한 스코프 → 앱 게시+구글 인증+CASA 보안심사 없이는 **테스트 사용자 100명 초과·타 고객 계정 연결 불가**(그 외 `403 access_denied`) | 구글 정책(코드 아님)·`google/oauth.ts`(`drive.readonly`·`gmail.modify`) → 상세=아래 §CASA 블록 | XL |
 
 ### 🟡 MEDIUM — 성장 단계
 
@@ -72,6 +73,60 @@
 
 ### ⚪ LOW
 - L1 일부 라우트 CSRF state 누락(`google/connect`만 있음) · L2 OAuth state 쿠키 dev secure=false · L3 자유텍스트 길이/새니타이즈 미흡 · L4 소프트삭제 필터 일관성(031/032 회귀 이력) · L5 `agent_versions` 테넌트 무관.
+
+---
+
+## 🔵 외부 판매(멀티 고객) 관문 — 구글 OAuth 인증 / CASA (2026-07-08 추가)
+
+Drive/Gmail 연동은 **제한(Restricted) 스코프**(`drive.readonly`·`gmail.modify`)를 쓴다. 이 때문에 구글 정책상 단계가 있다.
+
+- **현재(테스트 모드)**: 구글 콘솔 OAuth 동의화면 = "Testing". **등록한 테스트 사용자(최대 100명)만** 연결. 그 외 계정은 `403 access_denied`("개발자가 승인한 테스터만"). → 사내(≤100명)는 **테스트 사용자 추가**로 충분.
+- **100명 초과 / 외부 판매 시**: OAuth 앱을 **게시(In Production) + 구글 verification + CASA 보안심사** 통과해야 함(제한 스코프라 필수).
+- **CASA 비용(2026 기준, 웹 확인)**:
+  - **구글 자체 수수료 = $0** (verification 무료).
+  - **제3자 보안심사(CASA Tier 2) = 연 수백~수천 달러.** 대략 **DAST 스캔 ~$540 ↔ 펜테스트 $5,000+** (심사 방식·업체 협상. 구글이 TAC Security와 할인 계약). **Tier 2 자가스캔은 폐지 → 독립 심사기관 필수.**
+  - **12개월마다 재심사**(LOA 승인일 기준). = **연 단위 반복 비용**.
+  - 숨은 비용: 준비(개인정보처리방침 페이지·앱 로고·**데모 영상**·발견된 취약점 수정) = 엔지니어링 시간.
+- **준비물**: 인증된 **도메인**(complow.kr)·**개인정보처리방침 URL**(초안=`docs/legal/privacy`)·앱 로고·데모 영상.
+- **부담 축소 옵션**:
+  1. Drive `drive.readonly`(제한) → **`drive.file`(제한 아님)** 으로 낮추면 심사 경량화. 단 "기존 드라이브 전체 탐색" → "앱이 만든/고른 파일만"으로 축소(트레이드오프). Gmail(`gmail.modify`)은 대체 불가.
+  2. **엔터프라이즈 고객**(구글 Workspace 보유): 자기 조직에 **Internal** 또는 **BYO-OAuth**(자기 client id/secret 연결) → **우리 쪽 심사 불필요**.
+- **타임라인**: 심사 **수 주~수 개월** → **본격 판매 몇 달 전 착수** 필수.
+
+**액션 순서:** ① 지금 테스트 사용자 5명 추가(사내) → ② 초기 소수 고객은 테스트 사용자 또는 엔터프라이즈 BYO-OAuth → ③ 본격 판매 전 CASA 인증 착수(도메인·개인정보처리방침 페이지 선행).
+
+> **출처**: [Google 제한 스코프 인증 문서](https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification) · [CASA FAQ(구글)](https://support.google.com/cloud/answer/13463817?hl=en) · [DeepStrike CASA 2025](https://deepstrike.io/blog/google-casa-security-assessment-2025)
+
+### CASA 회피 설계 상세 (2026-07-08) — 판매 전 적용
+
+> **대전제**: **로그인(구글/카톡/네이버)은 CASA 무관**(기본 정보=openid/email/profile, 비제한). CASA는 오직 **드라이브·Gmail 내용 접근(제한 스코프)** 때문. 아래는 그 둘을 각각 CASA 없이 가는 설계.
+
+#### ① Drive: `drive.readonly` → `drive.file` + Google Picker (CASA 회피)
+- **현재(제한 스코프)**: `drive.readonly` + 우리 `GoogleDriveTab`이 **드라이브 전체를 우리 UI로 나열/탐색** → 제한 스코프 → CASA 대상.
+- **목표(비제한)**: **`drive.file`**(비제한) + **Google Picker**(구글이 제공하는 파일 선택 팝업). 사용자가 **피커로 고른 파일** + 앱이 만든 파일만 접근.
+- **코드 변경 지점**:
+  - `src/lib/google/oauth.ts`: `GOOGLE_SCOPES`에서 `drive.readonly` 제거 → `drive.file` 추가.
+  - UI(`src/components/files/GoogleDriveTab.tsx`): "전체 목록 브라우징" → **Google Picker**(`google.picker` JS API) **"드라이브에서 선택" 버튼**으로 교체. (전체 목록/폴더 탐색은 `drive.file`에서 불가.)
+  - `src/lib/google/drive.ts`: `getDriveFile`·`downloadDriveFile`(fileId 기반)은 **피커로 고른 파일에 그대로 동작**. `listDriveFiles`(전체 나열)만 폐기 or 엔터프라이즈 전용.
+  - 라우트: `download/[id]` 유지, `files`(목록)는 피커 방식엔 불필요.
+- **트레이드오프**: "우리 화면에서 드라이브 전체 탐색" ❌ → "구글 피커로 특정 파일 선택" ✅. **슬랙·노션 등 대부분 이 방식** = 그래서 CASA 안 냄.
+- **적용 시점**: 셀프서브(개인 @gmail 고객) 공개 판매 **전**. 사내(테스트 사용자)는 지금 `drive.readonly` 그대로 OK.
+
+#### ② Gmail: 엔터프라이즈(Workspace) 제공으로 CASA 회피
+- **왜 가능**: CASA/verification은 **일반 소비자(@gmail)** 보호가 목적. 앱이 **한 조직(Workspace) 내부에서만** 쓰이면 그 조직 **관리자(admin)** 가 신뢰 주체 → 구글이 외부 심사 안 요구. → **"Internal" 유형 OAuth 앱은 제한 스코프도 심사 없이** 사용(단 **그 조직 계정만**).
+- **두 모델**:
+  - **A. BYO-OAuth**: 고객사가 **자기 Google Cloud 프로젝트 + OAuth 클라이언트(자기 조직 Internal)** 만들어 client id/secret를 우리 앱 설정에 입력 → OAuth 앱이 **고객사 소유·Internal** → 우리 심사 0. (구현: 워크스페이스 설정에 "구글 OAuth 자격증명" 입력란 + 그걸 `google_connections`/워크스페이스 설정에서 사용.)
+  - **B. 도메인 설치(admin consent)**: 고객사 Workspace **관리자**가 우리 앱을 조직 전체에 승인(도메인 전체 위임 or Google Workspace Marketplace).
+- **전제/한계**: 고객이 **Google Workspace(유료·회사 도메인 계정)** 사용해야 함. 개인 @gmail만 쓰는 고객은 이 방식 불가 → 그런 고객껜 **Gmail 미제공 or CASA**.
+- **정리**: **Workspace 고객 = Gmail도 CASA 없이** · **개인/셀프서브 고객 = Gmail은 CASA 필요 or 미제공.**
+
+#### 최종 판매 전략(스코프 관점)
+| 기능 | 셀프서브(개인 @gmail) | 엔터프라이즈(Workspace) |
+|---|---|---|
+| 로그인(구글/카톡/네이버) | ✅ 무료·심사 무관 | ✅ 무료 |
+| 드라이브 | ✅ `drive.file`+피커(CASA 회피) | ✅ 동일 or 전체탐색(Internal이면 심사 무관) |
+| Gmail | ⚠️ CASA 필요 or 미제공 | ✅ BYO-OAuth/도메인설치(CASA 회피) |
+→ **결론: "수천 달러 CASA"는 필수가 아님.** 드라이브는 설계 전환으로, Gmail은 엔터프라이즈로 회피 가능. CASA는 "개인 고객에게도 Gmail 풀 기능을 셀프서브로 판다"는 특정 선택을 할 때만.
 
 ---
 
