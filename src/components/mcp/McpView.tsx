@@ -7,8 +7,9 @@ import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { Button } from "@/components/ui/button"
 import { Modal, fieldClass } from "@/components/shared/Modal"
-import { Loading, EmptyState, ErrorState } from "@/components/shared/States"
+import { Loading, ErrorState } from "@/components/shared/States"
 import { cn } from "@/lib/utils"
+import { MCP_CONNECTORS, type Connector } from "@/lib/mcp"
 
 type Server = {
   id: string
@@ -41,6 +42,8 @@ export function McpView() {
   const [addOpen, setAddOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ name: "", type: "http", url: "", auth_type: "none" })
+  const [connectingId, setConnectingId] = useState<string | null>(null)
+  const [filter, setFilter] = useState<"all" | "connected" | "disconnected">("all")
 
   const load = useCallback(async () => {
     try {
@@ -118,6 +121,30 @@ export function McpView() {
     load()
   }
 
+  const isConnected = (c: Connector) => Boolean(c.preset && servers.some((s) => s.url === c.preset!.url))
+
+  // 프리셋 커넥터 원클릭 연결 = mcp_servers 등록 + 자동 테스트(도구 발견).
+  const connectPreset = async (c: Connector) => {
+    if (!c.preset || isConnected(c)) return
+    setConnectingId(c.id)
+    try {
+      const res = await fetch("/api/mcp/servers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: c.name, type: c.preset.type, url: c.preset.url, auth_type: c.preset.auth }),
+      })
+      const j = await res.json()
+      if (!res.ok) throw new Error(j.error ?? "연결에 실패했어요.")
+      if (j.id) await fetch(`/api/mcp/servers/${j.id}/test`, { method: "POST" }) // 자동 테스트
+      toast.success(`${c.name} 연결됨`)
+      await load()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "연결 오류")
+    } finally {
+      setConnectingId(null)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -139,18 +166,66 @@ export function McpView() {
         </div>
       </div>
 
+      {/* 커넥터 갤러리 — 큐레이션 카탈로그 + 원클릭 연결 */}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center gap-1 text-sm">
+          {([["all", "전체"], ["connected", "연결됨"], ["disconnected", "연결 안됨"]] as const).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setFilter(key)}
+              className={cn(
+                "rounded-lg px-2.5 py-1 font-medium transition-colors",
+                filter === key ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {MCP_CONNECTORS.filter((c) =>
+            filter === "all" ? true : filter === "connected" ? isConnected(c) : !isConnected(c)
+          ).map((c) => {
+            const connected = isConnected(c)
+            return (
+              <div key={c.id} className="flex items-center gap-3 rounded-xl border p-3.5">
+                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted/40 text-lg">{c.emoji}</span>
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-sm font-medium">{c.name}</span>
+                  <span className="truncate text-[11px] text-muted-foreground">{c.description}</span>
+                </div>
+                {connected ? (
+                  <span className="shrink-0 text-[11px] font-medium text-success">연결됨 ✓</span>
+                ) : c.status === "coming_soon" ? (
+                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">준비 중</span>
+                ) : isAdmin ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0"
+                    onClick={() => connectPreset(c)}
+                    disabled={connectingId === c.id}
+                  >
+                    {connectingId === c.id ? <Loader2 className="size-3.5 animate-spin" /> : "연결"}
+                  </Button>
+                ) : (
+                  <span className="shrink-0 text-[11px] text-muted-foreground">관리자 연결</span>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* 연결된 서버 상세 — 도구 목록·테스트·삭제 */}
       {loading ? (
-        <Loading rows={5} />
+        <Loading rows={3} />
       ) : error ? (
         <ErrorState message={error} onRetry={() => { setError(null); load() }} />
-      ) : servers.length === 0 ? (
-        <EmptyState
-          icon={Plug}
-          title="연결된 MCP 서버가 없어요"
-          description={isAdmin ? "‘서버 추가’로 원격 MCP(HTTP) 서버를 등록하세요." : "관리자가 서버를 등록하면 여기에 표시돼요."}
-        />
-      ) : (
-        <div className="flex flex-col divide-y rounded-xl border">
+      ) : servers.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          <h2 className="text-sm font-semibold text-muted-foreground">연결된 서버 · 도구</h2>
+          <div className="flex flex-col divide-y rounded-xl border">
           {servers.map((s) => {
             const t = tools[s.id] ?? []
             const open = expanded === s.id
@@ -224,8 +299,9 @@ export function McpView() {
               </div>
             )
           })}
+          </div>
         </div>
-      )}
+      ) : null}
 
       {/* 서버 추가 모달 (관리자) */}
       {addOpen && (
