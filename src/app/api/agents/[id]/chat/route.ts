@@ -85,7 +85,7 @@ export async function POST(
   if (mcpIds.length > 0) {
     const { data: mcpServers } = await supabase
       .from("mcp_servers")
-      .select("id, name, type, url, auth_type, is_active")
+      .select("id, name, type, url, auth_type, is_active, encrypted_token")
       .in("id", mcpIds)
       .eq("is_active", true)
     for (const srv of mcpServers ?? []) {

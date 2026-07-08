@@ -1820,6 +1820,7 @@ export type Database = {
           auth_type: string
           command: string | null
           created_at: string
+          encrypted_token: string | null
           env_vars: Json
           id: string
           is_active: boolean
@@ -1836,6 +1837,7 @@ export type Database = {
           auth_type?: string
           command?: string | null
           created_at?: string
+          encrypted_token?: string | null
           env_vars?: Json
           id?: string
           is_active?: boolean
@@ -1852,6 +1854,7 @@ export type Database = {
           auth_type?: string
           command?: string | null
           created_at?: string
+          encrypted_token?: string | null
           env_vars?: Json
           id?: string
           is_active?: boolean

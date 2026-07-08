@@ -23,7 +23,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   const admin = createAdminClient()
   const { data: server } = await admin
     .from("mcp_servers")
-    .select("id, name, type, url, auth_type")
+    .select("id, name, type, url, auth_type, encrypted_token")
     .eq("id", id)
     .maybeSingle()
   if (!server) return NextResponse.json({ error: "서버를 찾을 수 없어요." }, { status: 404 })

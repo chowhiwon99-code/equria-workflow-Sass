@@ -25,11 +25,6 @@ type Server = {
 }
 type Tool = { name: string; description: string | null }
 
-/** 베어러 토큰 env 키 미리보기(서버 connect.ts와 동일 규칙). 표시용. */
-function envKeyPreview(name: string): string {
-  return "MCP_" + name.toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_|_$/g, "") + "_TOKEN"
-}
-
 /** 커넥터 로고 — 도메인 파비콘(64px). 실패 시 emoji 폴백. */
 function ConnectorLogo({ domain, emoji }: { domain?: string; emoji: string }) {
   const [failed, setFailed] = useState(false)
@@ -57,7 +52,7 @@ export function McpView() {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ name: "", type: "http", url: "", auth_type: "none" })
+  const [form, setForm] = useState({ name: "", type: "http", url: "", auth_type: "none", token: "" })
   const [connectingId, setConnectingId] = useState<string | null>(null)
   const [q, setQ] = useState("")
   const [category, setCategory] = useState("")
@@ -104,7 +99,7 @@ export function McpView() {
       if (!res.ok) throw new Error(j.error ?? "등록에 실패했어요.")
       toast.success("MCP 서버를 등록했어요.")
       setAddOpen(false)
-      setForm({ name: "", type: "http", url: "", auth_type: "none" })
+      setForm({ name: "", type: "http", url: "", auth_type: "none", token: "" })
       load()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "오류")
@@ -414,11 +409,20 @@ export function McpView() {
               </select>
             </label>
             {form.auth_type === "bearer" && (
-              <p className="rounded-md bg-muted/40 px-2 py-1.5 text-[10px] leading-relaxed text-muted-foreground">
-                토큰은 보안을 위해 DB가 아니라 환경변수에 저장합니다. 아래 키로 Vercel/.env에 넣어주세요:
-                <br />
-                <code className="text-[10px] text-foreground">{envKeyPreview(form.name || "서버이름")}</code>
-              </p>
+              <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                Bearer 토큰
+                <input
+                  type="password"
+                  className={fieldClass}
+                  value={form.token}
+                  onChange={(e) => setForm((f) => ({ ...f, token: e.target.value }))}
+                  placeholder="토큰 붙여넣기"
+                  autoComplete="off"
+                />
+                <span className="text-[10px] text-muted-foreground/70">
+                  DB에 AES-256 암호화 저장돼요(평문 X). 저장 후엔 다시 표시되지 않아요.
+                </span>
+              </label>
             )}
             <div className="mt-1 flex justify-end gap-2">
               <Button size="sm" variant="ghost" onClick={() => setAddOpen(false)}>

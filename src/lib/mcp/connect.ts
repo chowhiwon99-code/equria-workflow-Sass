@@ -2,6 +2,7 @@
 // stdio는 서버리스(Vercel)에서 자식 프로세스 불가라 미지원(http/sse만). 호출측은 반드시 close().
 import { experimental_createMCPClient as createMCPClient } from "@ai-sdk/mcp"
 import { isSafeWebhookUrl } from "@/lib/workflowTools"
+import { decryptToken } from "@/lib/google/crypto"
 
 export type McpServerConfig = {
   id: string
@@ -9,6 +10,7 @@ export type McpServerConfig = {
   type: string // 'http' | 'sse'
   url: string | null
   auth_type: string // 'none' | 'bearer'
+  encrypted_token?: string | null // DB 암호화 저장 토큰(있으면 env보다 우선)
 }
 
 /** 글로벌 MCP 서버의 베어러 토큰을 읽을 env 키(평문 DB 저장 회피). 예: "Supabase MCP" → MCP_SUPABASE_MCP_TOKEN */
@@ -24,7 +26,16 @@ export async function connectMcp(server: McpServerConfig) {
 
   const headers: Record<string, string> = {}
   if (server.auth_type === "bearer") {
-    const token = process.env[mcpEnvTokenKey(server.name)]
+    // DB에 암호화 저장된 토큰 우선, 없으면 env 폴백(레거시).
+    let token: string | undefined
+    if (server.encrypted_token) {
+      try {
+        token = decryptToken(server.encrypted_token)
+      } catch {
+        /* 손상된 토큰은 무시하고 env로 폴백 */
+      }
+    }
+    if (!token) token = process.env[mcpEnvTokenKey(server.name)] ?? undefined
     if (token) headers.Authorization = `Bearer ${token}`
   }
 

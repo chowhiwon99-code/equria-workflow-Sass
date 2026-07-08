@@ -124,7 +124,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             try {
               const { data: server } = await supabase
                 .from("mcp_servers")
-                .select("id, name, type, url, auth_type")
+                .select("id, name, type, url, auth_type, encrypted_token")
                 .eq("id", node.mcp_server_id ?? "")
                 .eq("is_active", true)
                 .maybeSingle()

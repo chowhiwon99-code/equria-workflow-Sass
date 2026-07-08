@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import type { Database } from "@/lib/supabase/types"
+import { encryptToken } from "@/lib/google/crypto"
 
 export const runtime = "nodejs"
 
@@ -32,6 +33,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     url?: string
     auth_type?: string
     is_active?: boolean
+    token?: string
   }
   const patch: McpUpdate = {}
   if (typeof body.name === "string") patch.name = body.name.trim()
@@ -39,6 +41,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (typeof body.url === "string") patch.url = body.url.trim()
   if (body.auth_type === "none" || body.auth_type === "bearer") patch.auth_type = body.auth_type
   if (typeof body.is_active === "boolean") patch.is_active = body.is_active
+  // 토큰이 오면 암호화해 갱신(빈 값은 무시 — 기존 토큰 유지).
+  if (typeof body.token === "string" && body.token.trim()) patch.encrypted_token = encryptToken(body.token.trim())
 
   const { data, error } = await gate.db
     .from("mcp_servers")
