@@ -5,6 +5,25 @@
 
 ---
 
+## 2026-07-08 · 세션28 — MCP 커넥터 디렉터리 + MCP 토큰 DB 암호화(Phase A) + AI 비용 예산 한도·배포 (사용자 요청)
+
+**무엇/왜:** 대표 — ① MCP를 Claude식 "커넥터 둘러보기" 디렉터리로 ② 커넥터 실연동(토큰) 준비 ③ AI 토큰 비용 무제한(H1)을 예산으로 통제.
+
+### 커넥터 디렉터리 (`29750b2`)
+- `/mcp`를 Claude 디렉터리식으로: `lib/mcp` category(6종)·featured + 커넥터 13개(Context7·DeepWiki=available, GitHub/Notion/Slack 등=coming_soon; Gmail/Drive는 네이티브라 제외). McpView 검색 + 카테고리/정렬 Select(`shared/Select`) + 추천 섹션 + 리치 카드(로고·배지·설명·액션). 검증 tsc0·lint30/0·build0.
+
+### MCP 토큰 DB 암호화 저장 — Phase A (`08e6d30`, 배포)
+- 전역 env(`MCP_<NAME>_TOKEN`) → DB 암호화. 마이그 086 `mcp_servers.encrypted_token`(원격 적용). `connect.ts` bearer 시 `decryptToken` 우선·env 폴백. servers POST/PATCH `token?`→`encryptToken` 저장(admin). 호출부(test·chat·workflow MCP노드) select에 `encrypted_token`. McpView bearer 토큰 password 입력칸. `crypto.ts`(GOOGLE_TOKEN_ENC_KEY) 재사용.
+
+### AI 비용 예산 한도 (`4d6b215`, 배포)
+- 결정(대표): 월 예산+실행당 상한·초과 시 hard block·admin 예외. 마이그 087 `workspaces.monthly_budget_usd`(null=무제한). `lib/budget.ts checkBudget`(월 SUM(cost_usd) vs 한도, admin 통과) + `PER_RUN_MAX_USD=$2`. AI 라우트 **9개**(agent chat·workflow run·assistant·cashflow-coach·meeting research 5) 프리플라이트 429. 워크플로우 노드 누적 cost>$2 중단. `/api/budget` GET/PATCH + 설정 "AI 비용 예산" 섹션. 롤백 `08e6d30`.
+
+### 권한 픽스
+- 대표(조휘원)가 워크스페이스 owner인데 `role=member`라 MCP "연결" 버튼(admin 전용) 안 보임 → **role admin 승격**(owner 본인 승인, `guard_profile_role` 통과 위해 auth 컨텍스트=owner id). 확인: 실제 연결된 MCP 서버 0개(기능만 라이브).
+
+### 다음(대표 논의)
+- MCP "어떻게 쓰나" 혼란 → **A**(사용 흐름 명확화: /mcp→에이전트 연결 바로가기·3단계·도구 사용 표시) / **B**(워크플로우 캔버스 MCP 노드 UI — 백엔드 있음) / **C**(자동 트리거·스케줄/웹훅). n8n식 에이전트+MCP 융합 자동화 = 엔진 있고 조종석(UI) 부족.
+
 ## 2026-07-07 · 세션27 — Google Drive 탭 + Gmail 리치 작성/AI 다듬기 + 로딩 최적화·배포 (사용자 요청)
 
 ### Google Drive (`4c5754b`)
