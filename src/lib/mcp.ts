@@ -1,5 +1,9 @@
-// MCP 커넥터 큐레이션 카탈로그 (SSOT). 갤러리에 카드로 노출.
-// status "available" = 프리셋으로 원클릭 연결 가능. "coming_soon" = 토큰/설정 필요, 준비 중.
+// MCP 커넥터 큐레이션 카탈로그 (SSOT). 디렉터리(둘러보기)에 카드로 노출.
+// status "available" = 프리셋으로 원클릭 연결 가능. "coming_soon" = 인증(토큰/OAuth) 구현 필요, 준비 중.
+
+export type ConnectorCategory = "문서" | "개발" | "생산성" | "디자인" | "커뮤니케이션" | "데이터"
+
+export const CONNECTOR_CATEGORIES: ConnectorCategory[] = ["문서", "개발", "생산성", "디자인", "커뮤니케이션", "데이터"]
 
 export type Connector = {
   id: string
@@ -8,6 +12,9 @@ export type Connector = {
   emoji: string
   /** 로고용 도메인(파비콘 서비스로 렌더). 없으면 emoji 폴백. */
   domain?: string
+  category: ConnectorCategory
+  /** 상단 "추천" 섹션 노출 */
+  featured?: boolean
   status: "available" | "coming_soon"
   /** available 프리셋 — "연결" 원클릭 등록에 쓰는 접속 정보. */
   preset?: {
@@ -25,6 +32,8 @@ export const MCP_CONNECTORS: Connector[] = [
     description: "라이브러리 최신 문서 조회 (읽기 전용·무인증)",
     emoji: "📚",
     domain: "context7.com",
+    category: "문서",
+    featured: true,
     status: "available",
     preset: { type: "http", url: "https://mcp.context7.com/mcp", auth: "none" },
   },
@@ -34,12 +43,21 @@ export const MCP_CONNECTORS: Connector[] = [
     description: "GitHub 저장소 질문·문서 (읽기 전용·무인증)",
     emoji: "📖",
     domain: "deepwiki.com",
+    category: "개발",
+    featured: true,
     status: "available",
     preset: { type: "http", url: "https://mcp.deepwiki.com/mcp", auth: "none" },
   },
-  // 토큰/설정 필요 — 준비 중
-  { id: "github", name: "GitHub", description: "이슈·PR·코드 (토큰 필요)", emoji: "🐙", domain: "github.com", status: "coming_soon" },
-  { id: "notion", name: "Notion", description: "페이지·DB (토큰 필요)", emoji: "📝", domain: "notion.so", status: "coming_soon" },
-  { id: "supabase", name: "Supabase", description: "데이터 조회 (토큰 필요)", emoji: "🟢", domain: "supabase.com", status: "coming_soon" },
-  { id: "figma", name: "Figma", description: "디자인 파일·코드 커넥트 (토큰 필요)", emoji: "🎨", domain: "figma.com", status: "coming_soon" },
+  // 인증(토큰/OAuth) 구현 필요 — 준비 중
+  { id: "github", name: "GitHub", description: "이슈·PR·코드 검색 (토큰 필요)", emoji: "🐙", domain: "github.com", category: "개발", featured: true, status: "coming_soon" },
+  { id: "notion", name: "Notion", description: "페이지·데이터베이스 검색·수정 (OAuth 필요)", emoji: "📝", domain: "notion.so", category: "생산성", featured: true, status: "coming_soon" },
+  { id: "slack", name: "Slack", description: "메시지·채널 조회·전송 (OAuth 필요)", emoji: "💬", domain: "slack.com", category: "커뮤니케이션", status: "coming_soon" },
+  { id: "linear", name: "Linear", description: "이슈·프로젝트 관리 (토큰 필요)", emoji: "📐", domain: "linear.app", category: "개발", status: "coming_soon" },
+  { id: "atlassian", name: "Atlassian", description: "Jira·Confluence 이슈·문서 (OAuth 필요)", emoji: "🧩", domain: "atlassian.com", category: "개발", status: "coming_soon" },
+  { id: "sentry", name: "Sentry", description: "에러·이슈 모니터링 (토큰 필요)", emoji: "🛡️", domain: "sentry.io", category: "개발", status: "coming_soon" },
+  { id: "figma", name: "Figma", description: "디자인 파일·코드 커넥트 (토큰 필요)", emoji: "🎨", domain: "figma.com", category: "디자인", status: "coming_soon" },
+  { id: "canva", name: "Canva", description: "디자인 검색·생성·내보내기 (OAuth 필요)", emoji: "🖼️", domain: "canva.com", category: "디자인", status: "coming_soon" },
+  { id: "supabase", name: "Supabase", description: "데이터·스키마 조회 (토큰 필요)", emoji: "🟢", domain: "supabase.com", category: "데이터", status: "coming_soon" },
+  { id: "stripe", name: "Stripe", description: "결제·고객 데이터 조회 (키 필요)", emoji: "💳", domain: "stripe.com", category: "데이터", status: "coming_soon" },
+  { id: "huggingface", name: "Hugging Face", description: "모델·데이터셋 검색 (토큰 선택)", emoji: "🤗", domain: "huggingface.co", category: "개발", status: "coming_soon" },
 ]

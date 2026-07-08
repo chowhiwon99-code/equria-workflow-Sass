@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Plug, Plus, RefreshCw, Trash2, ChevronDown, Loader2, Wrench } from "lucide-react"
+import { Plug, Plus, RefreshCw, Trash2, ChevronDown, Loader2, Wrench, Search } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button"
 import { Modal, fieldClass } from "@/components/shared/Modal"
 import { Loading, ErrorState } from "@/components/shared/States"
 import { cn } from "@/lib/utils"
-import { MCP_CONNECTORS, type Connector } from "@/lib/mcp"
+import { Select } from "@/components/shared/Select"
+import { MCP_CONNECTORS, CONNECTOR_CATEGORIES, type Connector } from "@/lib/mcp"
 
 type Server = {
   id: string
@@ -58,7 +59,9 @@ export function McpView() {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ name: "", type: "http", url: "", auth_type: "none" })
   const [connectingId, setConnectingId] = useState<string | null>(null)
-  const [filter, setFilter] = useState<"all" | "connected" | "disconnected">("all")
+  const [q, setQ] = useState("")
+  const [category, setCategory] = useState("")
+  const [sort, setSort] = useState<"featured" | "name">("featured")
 
   const load = useCallback(async () => {
     try {
@@ -160,6 +163,55 @@ export function McpView() {
     }
   }
 
+  // 검색·카테고리 필터 + 정렬(추천순=featured 먼저 / 이름순).
+  const visibleConnectors = MCP_CONNECTORS.filter((c) => {
+    if (category && c.category !== category) return false
+    if (q.trim()) {
+      const s = q.trim().toLowerCase()
+      if (!c.name.toLowerCase().includes(s) && !c.description.toLowerCase().includes(s)) return false
+    }
+    return true
+  }).sort((a, b) =>
+    sort === "name"
+      ? a.name.localeCompare(b.name)
+      : (b.featured ? 1 : 0) - (a.featured ? 1 : 0) || a.name.localeCompare(b.name)
+  )
+
+  const renderCard = (c: Connector) => {
+    const connected = isConnected(c)
+    return (
+      <div key={c.id} className="flex min-w-0 flex-col gap-2 rounded-xl border bg-card p-4">
+        <div className="flex items-center gap-2.5">
+          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted/40">
+            <ConnectorLogo domain={c.domain} emoji={c.emoji} />
+          </span>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <span className="truncate text-sm font-semibold">{c.name}</span>
+            <span className="text-[10px] text-muted-foreground">{c.category}</span>
+          </div>
+          {connected ? (
+            <span className="shrink-0 text-[11px] font-medium text-success">연결됨 ✓</span>
+          ) : c.status === "coming_soon" ? (
+            <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">준비 중</span>
+          ) : isAdmin ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="shrink-0"
+              onClick={() => connectPreset(c)}
+              disabled={connectingId === c.id}
+            >
+              {connectingId === c.id ? <Loader2 className="size-3.5 animate-spin" /> : "연결"}
+            </Button>
+          ) : (
+            <span className="shrink-0 text-[11px] text-muted-foreground">관리자 연결</span>
+          )}
+        </div>
+        <p className="line-clamp-2 text-xs text-muted-foreground">{c.description}</p>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -181,56 +233,53 @@ export function McpView() {
         </div>
       </div>
 
-      {/* 커넥터 갤러리 — 큐레이션 카탈로그 + 원클릭 연결 */}
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center gap-1 text-sm">
-          {([["all", "전체"], ["connected", "연결됨"], ["disconnected", "연결 안됨"]] as const).map(([key, label]) => (
-            <button
-              key={key}
-              onClick={() => setFilter(key)}
-              className={cn(
-                "rounded-lg px-2.5 py-1 font-medium transition-colors",
-                filter === key ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {label}
-            </button>
-          ))}
+      {/* 커넥터 디렉터리 — 검색·필터·정렬·추천·전체 그리드 */}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="커넥터 검색…"
+              className="h-8 w-full rounded-lg border border-border bg-card pl-8 pr-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            />
+          </div>
+          <Select
+            value={category}
+            onChange={setCategory}
+            align="end"
+            options={[{ value: "", label: "카테고리: 전체" }, ...CONNECTOR_CATEGORIES.map((c) => ({ value: c, label: c }))]}
+          />
+          <Select
+            value={sort}
+            onChange={(v) => setSort(v as "featured" | "name")}
+            align="end"
+            options={[
+              { value: "featured", label: "추천순" },
+              { value: "name", label: "이름순" },
+            ]}
+          />
         </div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {MCP_CONNECTORS.filter((c) =>
-            filter === "all" ? true : filter === "connected" ? isConnected(c) : !isConnected(c)
-          ).map((c) => {
-            const connected = isConnected(c)
-            return (
-              <div key={c.id} className="flex min-w-0 items-center gap-3 rounded-xl border p-3.5">
-                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted/40">
-                  <ConnectorLogo domain={c.domain} emoji={c.emoji} />
-                </span>
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-sm font-medium">{c.name}</span>
-                  <span className="truncate text-[11px] text-muted-foreground">{c.description}</span>
-                </div>
-                {connected ? (
-                  <span className="shrink-0 text-[11px] font-medium text-success">연결됨 ✓</span>
-                ) : c.status === "coming_soon" ? (
-                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">준비 중</span>
-                ) : isAdmin ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="shrink-0"
-                    onClick={() => connectPreset(c)}
-                    disabled={connectingId === c.id}
-                  >
-                    {connectingId === c.id ? <Loader2 className="size-3.5 animate-spin" /> : "연결"}
-                  </Button>
-                ) : (
-                  <span className="shrink-0 text-[11px] text-muted-foreground">관리자 연결</span>
-                )}
-              </div>
-            )
-          })}
+
+        {/* 추천 — 검색·필터 없을 때만 */}
+        {!q.trim() && !category && (
+          <div className="flex flex-col gap-2">
+            <h2 className="text-xs font-semibold text-muted-foreground">추천</h2>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {MCP_CONNECTORS.filter((c) => c.featured).map(renderCard)}
+            </div>
+          </div>
+        )}
+
+        {/* 전체 커넥터 */}
+        <div className="flex flex-col gap-2">
+          <h2 className="text-xs font-semibold text-muted-foreground">{q.trim() || category ? "검색 결과" : "전체 커넥터"}</h2>
+          {visibleConnectors.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">검색 결과가 없어요.</p>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">{visibleConnectors.map(renderCard)}</div>
+          )}
         </div>
       </div>
 
