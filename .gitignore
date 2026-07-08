@@ -30,3 +30,7 @@ yarn-debug.log*
 yarn-error.log*
 .vercel
 *.tsbuildinfo
+
+# 대표 전달용 PDF 산출물(레포 추적 제외 — 파일은 로컬 보존)
+/Complow-구글연동-인증전략-소개서.pdf
+/Complow-제품소개서.pdf
