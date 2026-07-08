@@ -12,13 +12,13 @@
 | # | 스펙 | 요약 | B1-b 의존 |
 |---|---|---|---|
 | 1 | [`google-drive.md`](./google-drive.md) | ✅ **완료(커밋 `4c5754b`)** — Files에 Google Drive 탭(목록·폴더·검색·다운로드) | ❌ 무관 |
-| 2 | [`mcp.md`](./mcp.md) | 에이전트↔MCP 바인딩 UI + 채팅 검증 + 첫 커넥터 실연결 | ⚠️ 일부(회사별 시크릿)는 B1-b 후 |
-| 3 | [`workflows.md`](./workflows.md) | 도구 정리 + MCP 노드 + 상태 UI | ❌ 무관 |
-| 4 | [`agents.md`](./agents.md) | 빌더 고도화(MCP-attach·커스텀 아이콘·프리뷰) | ❌ 무관 |
-| 5 | [`mail.md`](./mail.md) | 메일 작성창을 Gmail 수준으로(참조/숨은참조·리치본문·첨부·전송) | ❌ 무관 |
+| 2 | [`mcp.md`](./mcp.md) | ✅ **대부분 완료(세션28)** — 디렉터리·토큰 암호화·바인딩·실연결(Context7/DeepWiki)·사용 흐름. 남음: 커넥터별 실연동(GitHub 토큰=Phase B·OAuth=Phase C) | ⚠️ 회사별 시크릿은 B1-b 후 |
+| 3 | [`workflows.md`](./workflows.md) | ✅ **대부분 완료(세션28 `75d5944`)** — MCP 노드 UI·에이전트 노드 MCP 사용. 남음: 자동 트리거(스케줄·웹훅)=C | ❌ 무관 |
+| 4 | [`agents.md`](./agents.md) | 빌더 고도화(커스텀 아이콘·프리뷰 — MCP-attach는 완료) | ❌ 무관 |
+| 5 | [`mail.md`](./mail.md) | ✅ **완료(세션27)** — 리치 작성창·AI 다듬기·배치 최적화 | ❌ 무관 |
+| 6 | [`mobile-responsive.md`](./mobile-responsive.md) | 🔴 **다음 세션 최우선** — 모바일 전 화면 안 깨지게(1차 사이드바 드로어 골격) | ❌ 무관 |
 
-**추천 순서: 1 Drive → 4 Agents(빌더) → 2 MCP → 3 Workflows.**
-(2·3은 4의 MCP-attach UI가 있으면 더 매끄러움. Drive는 완전 독립이라 먼저 눈에 보이는 성과.)
+**추천 순서(현재): 6 모바일 골격 → C 자동 트리거(workflows 잔여) → MCP Phase B(GitHub 실연동) → 4 Agents 잔여.**
 
 ## 공통 전제 (모든 스펙)
 - **멀티테넌트 강화**(등록 시 workspace_id·회사별 시크릿·채팅 워크스페이스 검증)의 **완전판은 B1-b(쓰기 격리) 선행.** 지금은 **단일 워크스페이스(equria) 기준**으로 만들고, B1-b 시 격리 강화. 각 스펙의 "🔴 블로커" 참고.
