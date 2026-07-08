@@ -6,6 +6,8 @@ export type Connector = {
   name: string
   description: string
   emoji: string
+  /** 로고용 도메인(파비콘 서비스로 렌더). 없으면 emoji 폴백. */
+  domain?: string
   status: "available" | "coming_soon"
   /** available 프리셋 — "연결" 원클릭 등록에 쓰는 접속 정보. */
   preset?: {
@@ -22,6 +24,7 @@ export const MCP_CONNECTORS: Connector[] = [
     name: "Context7",
     description: "라이브러리 최신 문서 조회 (읽기 전용·무인증)",
     emoji: "📚",
+    domain: "context7.com",
     status: "available",
     preset: { type: "http", url: "https://mcp.context7.com/mcp", auth: "none" },
   },
@@ -30,12 +33,13 @@ export const MCP_CONNECTORS: Connector[] = [
     name: "DeepWiki",
     description: "GitHub 저장소 질문·문서 (읽기 전용·무인증)",
     emoji: "📖",
+    domain: "deepwiki.com",
     status: "available",
     preset: { type: "http", url: "https://mcp.deepwiki.com/mcp", auth: "none" },
   },
   // 토큰/설정 필요 — 준비 중
-  { id: "github", name: "GitHub", description: "이슈·PR·코드 (토큰 필요)", emoji: "🐙", status: "coming_soon" },
-  { id: "notion", name: "Notion", description: "페이지·DB (토큰 필요)", emoji: "📝", status: "coming_soon" },
-  { id: "supabase", name: "Supabase", description: "데이터 조회 (토큰 필요)", emoji: "🟢", status: "coming_soon" },
-  { id: "figma", name: "Figma", description: "디자인 파일·코드 커넥트 (토큰 필요)", emoji: "🎨", status: "coming_soon" },
+  { id: "github", name: "GitHub", description: "이슈·PR·코드 (토큰 필요)", emoji: "🐙", domain: "github.com", status: "coming_soon" },
+  { id: "notion", name: "Notion", description: "페이지·DB (토큰 필요)", emoji: "📝", domain: "notion.so", status: "coming_soon" },
+  { id: "supabase", name: "Supabase", description: "데이터 조회 (토큰 필요)", emoji: "🟢", domain: "supabase.com", status: "coming_soon" },
+  { id: "figma", name: "Figma", description: "디자인 파일·코드 커넥트 (토큰 필요)", emoji: "🎨", domain: "figma.com", status: "coming_soon" },
 ]

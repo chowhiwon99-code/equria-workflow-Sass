@@ -29,6 +29,21 @@ function envKeyPreview(name: string): string {
   return "MCP_" + name.toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_|_$/g, "") + "_TOKEN"
 }
 
+/** 커넥터 로고 — 도메인 파비콘(64px). 실패 시 emoji 폴백. */
+function ConnectorLogo({ domain, emoji }: { domain?: string; emoji: string }) {
+  const [failed, setFailed] = useState(false)
+  if (!domain || failed) return <span className="text-lg">{emoji}</span>
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
+      alt=""
+      className="size-6"
+      onError={() => setFailed(true)}
+    />
+  )
+}
+
 export function McpView() {
   const supabase = createClient()
   const me = useCurrentUserId()
@@ -189,7 +204,9 @@ export function McpView() {
             const connected = isConnected(c)
             return (
               <div key={c.id} className="flex items-center gap-3 rounded-xl border p-3.5">
-                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted/40 text-lg">{c.emoji}</span>
+                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted/40">
+                  <ConnectorLogo domain={c.domain} emoji={c.emoji} />
+                </span>
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-sm font-medium">{c.name}</span>
                   <span className="truncate text-[11px] text-muted-foreground">{c.description}</span>
