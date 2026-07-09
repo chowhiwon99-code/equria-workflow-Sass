@@ -30,6 +30,9 @@
 - **깨짐 7건 수정**: 캘린더 헤더(~416px 한 줄) flex-wrap · 구성원 긴 이메일/프로젝트 긴 파일명 `min-w-0` truncate 미발동 · 명함 헤더 wrap · 명함 이미지 `max-w-full` · 세금계산서 7열 표 `overflow-x-auto`+`min-w-[640px]` · 재무 입력 모달 날짜줄 wrap.
 - **이상 없음 판정**: 대시보드·에이전트 전체·회의노트(표는 이미 overflow-x-auto)·결재·업무·설정·마이페이지·알림·배너. 3단계 잔여 = 메일/직원채팅 pane·채팅 위젯 클램프·캔버스류.
 
+### 현금흐름 캔버스 폰 숨김 (`a8e7407`) — 대표 결정("모바일에서 확인 어려움, 표만")
+- `<md`에서 CashFlowCanvas 숨김(`hidden md:contents` — PC 레이아웃 무영향) + "PC에서 볼 수 있어요" 안내. 손익 요약 칩·AI 코칭·설정·CashGrid 표(이미 overflow-x-auto+min-w-900)는 유지. 스펙 3단계 "캔버스 가로 스크롤" 계획 대체.
+
 ### 예상이슈 체크(수행)
 - twMerge flex↔hidden display 충돌 정상 해소 확인 · md 경계(`width<768px` ↔ `md:`=≥768) 정확 일치 · ESC setState는 이벤트 콜백이라 `set-state-in-effect` 린트 비대상 · 드로어 열린 채 데스크톱 폭 확장 시 오버레이 `md:hidden`으로 자동 소거.
 - 검증: tsc 0 · lint 30/0(신규 0) · build 0. **375px 브라우저 실확인은 미완**(Claude Chrome 확장 미연결) — 대표 확인 필요: 크롬 디바이스 모드 375×812에서 ①드로어 열림/바깥탭/링크클릭/ESC ②FAB가 딤 아래 ③가로 스크롤 없음 ④PC 무변화.
