@@ -3,7 +3,7 @@ import { anthropic } from "@/lib/claude/client"
 import { createClient } from "@/lib/supabase/server"
 import { normalizeGraph, topoOrder } from "@/lib/workflows"
 import { isSafeWebhookUrl, MAX_RUN_NODES } from "@/lib/workflowTools"
-import { connectMcp } from "@/lib/mcp/connect"
+import { connectMcp, resolveUserConnectionConfig } from "@/lib/mcp/connect"
 import { computeCostUsd } from "@/lib/pricing"
 import { checkBudget, PER_RUN_MAX_USD, BUDGET_EXCEEDED_MSG } from "@/lib/budget"
 import type { Json } from "@/lib/supabase/types"
@@ -141,6 +141,26 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       // MCP 클라이언트 캐시 — 서버당 1회만 연결해 재사용(60s 예산 절약), 런 종료 시 finally에서 일괄 close.
       const mcpClientCache = new Map<string, Awaited<ReturnType<typeof connectMcp>>>()
       const mcpToolsCache = new Map<string, ToolSet>()
+
+      // 내(요청자) 개인 MCP 연결(GitHub 등) — 런 전체에서 1회 로드해 모든 에이전트 노드에 병합(내가 가져온 도구).
+      const myMcpTools: ToolSet = {}
+      {
+        const { data: myConnections } = await supabase
+          .from("mcp_user_connections")
+          .select("id, connector_id, auth_method, encrypted_token, encrypted_refresh_token")
+          .eq("user_id", user.id)
+        for (const row of myConnections ?? []) {
+          const cfg = resolveUserConnectionConfig(row, user.id)
+          if (!cfg) continue
+          try {
+            const client = await connectMcp(cfg)
+            mcpClientCache.set(row.id, client)
+            Object.assign(myMcpTools, await client.tools())
+          } catch {
+            /* 연결 실패한 개인 커넥터는 건너뜀 */
+          }
+        }
+      }
       const mcpToolsFor = async (ids: string[]): Promise<ToolSet> => {
         const merged: ToolSet = {}
         for (const sid of ids) {
@@ -228,8 +248,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           const messages: ModelMessage[] = [{ role: "user", content: parts.join("\n\n") }]
 
           try {
-            // 이 에이전트에 붙은 MCP 도구 로드(있으면) — 채팅과 동일하게 다단계 도구호출 허용.
-            const mcpTools = v.mcp_servers?.length ? await mcpToolsFor(v.mcp_servers) : {}
+            // 이 에이전트에 붙은 MCP 도구 + 내 개인 연결 도구(GitHub 등) 병합 — 채팅과 동일하게 다단계 도구호출 허용.
+            const mcpTools: ToolSet = { ...myMcpTools, ...(v.mcp_servers?.length ? await mcpToolsFor(v.mcp_servers) : {}) }
             const hasTools = Object.keys(mcpTools).length > 0
             const { text, usage, totalUsage } = await generateText({
               model: anthropic(v.model),

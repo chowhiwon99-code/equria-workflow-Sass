@@ -1,7 +1,7 @@
 import { streamText, convertToModelMessages, stepCountIs, type UIMessage, type ToolSet } from "ai"
 import { anthropic } from "@/lib/claude/client"
 import { createClient } from "@/lib/supabase/server"
-import { connectMcp } from "@/lib/mcp/connect"
+import { connectMcp, resolveUserConnectionConfig } from "@/lib/mcp/connect"
 import { computeCostUsd } from "@/lib/pricing"
 import { checkBudget, BUDGET_EXCEEDED_MSG } from "@/lib/budget"
 
@@ -98,6 +98,20 @@ export async function POST(
       } catch {
         /* 연결 실패 MCP 서버는 건너뜀 */
       }
+    }
+  }
+  // 내(요청자) 개인 MCP 연결(GitHub 등) — 에이전트 설정과 무관하게 항상 함께 사용 가능(내가 가져온 도구).
+  const { data: myConnections } = await supabase
+    .from("mcp_user_connections")
+    .select("id, connector_id, auth_method, encrypted_token, encrypted_refresh_token")
+    .eq("user_id", user.id)
+  for (const row of myConnections ?? []) {
+    const cfg = resolveUserConnectionConfig(row, user.id)
+    if (!cfg) continue
+    try {
+      mcpClients.push(await connectMcp(cfg))
+    } catch {
+      /* 연결 실패한 개인 커넥터는 건너뜀 */
     }
   }
   const toolSets = await Promise.all(mcpClients.map((c) => c.tools()))
