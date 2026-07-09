@@ -569,10 +569,24 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "attendance_viewers_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "attendance_viewers_viewer_user_id_fkey"
             columns: ["viewer_user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_viewers_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
         ]
@@ -733,87 +747,101 @@ export type Database = {
       }
       cash_accounts: {
         Row: {
-          note: string | null
-          calc_type_id: string | null
-          field_values: Json
-          extra: number
-          item_type: string
-          rate: number
-          unit_price: number
-          units: number
-          category_id: string | null
           amount: number
+          calc_type_id: string | null
+          category_id: string | null
           color: string
           created_at: string
           created_by: string | null
           currency: string
           deleted_at: string | null
+          extra: number
+          field_values: Json
           id: string
+          item_type: string
           kind: string
           name: string
+          note: string | null
           opening_balance: number
           parent_id: string | null
+          rate: number
           sort_order: number
+          unit_price: number
+          units: number
           updated_at: string
           workspace_id: string
           x: number | null
           y: number | null
         }
         Insert: {
-          note?: string | null
-          calc_type_id?: string | null
-          field_values?: Json
-          extra?: number
-          item_type?: string
-          rate?: number
-          unit_price?: number
-          units?: number
-          category_id?: string | null
           amount?: number
+          calc_type_id?: string | null
+          category_id?: string | null
           color?: string
           created_at?: string
           created_by?: string | null
           currency?: string
           deleted_at?: string | null
+          extra?: number
+          field_values?: Json
           id?: string
+          item_type?: string
           kind?: string
           name: string
+          note?: string | null
           opening_balance?: number
           parent_id?: string | null
+          rate?: number
           sort_order?: number
+          unit_price?: number
+          units?: number
           updated_at?: string
           workspace_id?: string
           x?: number | null
           y?: number | null
         }
         Update: {
-          note?: string | null
-          calc_type_id?: string | null
-          field_values?: Json
-          extra?: number
-          item_type?: string
-          rate?: number
-          unit_price?: number
-          units?: number
-          category_id?: string | null
           amount?: number
+          calc_type_id?: string | null
+          category_id?: string | null
           color?: string
           created_at?: string
           created_by?: string | null
           currency?: string
           deleted_at?: string | null
+          extra?: number
+          field_values?: Json
           id?: string
+          item_type?: string
           kind?: string
           name?: string
+          note?: string | null
           opening_balance?: number
           parent_id?: string | null
+          rate?: number
           sort_order?: number
+          unit_price?: number
+          units?: number
           updated_at?: string
           workspace_id?: string
           x?: number | null
           y?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "cash_accounts_calc_type_id_fkey"
+            columns: ["calc_type_id"]
+            isOneToOne: false
+            referencedRelation: "cash_calc_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_accounts_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "cash_categories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "cash_accounts_created_by_fkey"
             columns: ["created_by"]
@@ -891,8 +919,6 @@ export type Database = {
       cash_categories: {
         Row: {
           collapsed: boolean
-          x: number | null
-          y: number | null
           color: string
           created_at: string
           created_by: string | null
@@ -901,11 +927,11 @@ export type Database = {
           name: string
           sort_order: number
           workspace_id: string
+          x: number | null
+          y: number | null
         }
         Insert: {
           collapsed?: boolean
-          x?: number | null
-          y?: number | null
           color?: string
           created_at?: string
           created_by?: string | null
@@ -914,11 +940,11 @@ export type Database = {
           name: string
           sort_order?: number
           workspace_id?: string
+          x?: number | null
+          y?: number | null
         }
         Update: {
           collapsed?: boolean
-          x?: number | null
-          y?: number | null
           color?: string
           created_at?: string
           created_by?: string | null
@@ -927,6 +953,8 @@ export type Database = {
           name?: string
           sort_order?: number
           workspace_id?: string
+          x?: number | null
+          y?: number | null
         }
         Relationships: [
           {
@@ -1022,32 +1050,39 @@ export type Database = {
       cashflow_settings: {
         Row: {
           default_calc_type_id: string | null
-          pool_pos: Json | null
           default_currency: string
           opening_cash: Json
+          pool_pos: Json | null
           updated_at: string
           updated_by: string | null
           workspace_id: string
         }
         Insert: {
           default_calc_type_id?: string | null
-          pool_pos?: Json | null
           default_currency?: string
           opening_cash?: Json
+          pool_pos?: Json | null
           updated_at?: string
           updated_by?: string | null
           workspace_id?: string
         }
         Update: {
           default_calc_type_id?: string | null
-          pool_pos?: Json | null
           default_currency?: string
           opening_cash?: Json
+          pool_pos?: Json | null
           updated_at?: string
           updated_by?: string | null
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "cashflow_settings_default_calc_type_id_fkey"
+            columns: ["default_calc_type_id"]
+            isOneToOne: false
+            referencedRelation: "cash_calc_types"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "cashflow_settings_updated_by_fkey"
             columns: ["updated_by"]
@@ -1336,7 +1371,22 @@ export type Database = {
           sort?: number
           workspace_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "file_folders_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "file_folders_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       files: {
         Row: {
@@ -1395,6 +1445,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "files_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "file_folders"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "files_owner_id_fkey"
             columns: ["owner_id"]
             isOneToOne: false
@@ -1413,13 +1470,6 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "files_folder_id_fkey"
-            columns: ["folder_id"]
-            isOneToOne: false
-            referencedRelation: "file_folders"
             referencedColumns: ["id"]
           },
         ]
@@ -1505,6 +1555,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "finance_entries_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "cash_accounts"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "finance_entries_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
@@ -1551,156 +1608,6 @@ export type Database = {
           id?: string
           krw_per_unit?: number
           source?: string
-        }
-        Relationships: []
-      }
-      group_rooms: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          id: string
-          is_default: boolean
-          last_message_at: string | null
-          name: string
-          workspace_id: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          is_default?: boolean
-          last_message_at?: string | null
-          name?: string
-          workspace_id?: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          is_default?: boolean
-          last_message_at?: string | null
-          name?: string
-          workspace_id?: string
-        }
-        Relationships: []
-      }
-      group_messages: {
-        Row: {
-          body_json: Json | null
-          content: string
-          created_at: string
-          deleted_at: string | null
-          edited_at: string | null
-          id: string
-          parent_id: string | null
-          room_id: string
-          root_id: string | null
-          sender_id: string
-          workspace_id: string
-        }
-        Insert: {
-          body_json?: Json | null
-          content: string
-          created_at?: string
-          deleted_at?: string | null
-          edited_at?: string | null
-          id?: string
-          parent_id?: string | null
-          room_id: string
-          root_id?: string | null
-          sender_id: string
-          workspace_id?: string
-        }
-        Update: {
-          body_json?: Json | null
-          content?: string
-          created_at?: string
-          deleted_at?: string | null
-          edited_at?: string | null
-          id?: string
-          parent_id?: string | null
-          room_id?: string
-          root_id?: string | null
-          sender_id?: string
-          workspace_id?: string
-        }
-        Relationships: []
-      }
-      group_message_attachments: {
-        Row: {
-          created_at: string
-          id: string
-          message_id: string
-          mime_type: string | null
-          name: string | null
-          size: number | null
-          storage_path: string
-          workspace_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          message_id: string
-          mime_type?: string | null
-          name?: string | null
-          size?: number | null
-          storage_path: string
-          workspace_id?: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          message_id?: string
-          mime_type?: string | null
-          name?: string | null
-          size?: number | null
-          storage_path?: string
-          workspace_id?: string
-        }
-        Relationships: []
-      }
-      group_message_reactions: {
-        Row: {
-          created_at: string
-          emoji: string
-          id: string
-          message_id: string
-          user_id: string
-          workspace_id: string
-        }
-        Insert: {
-          created_at?: string
-          emoji: string
-          id?: string
-          message_id: string
-          user_id: string
-          workspace_id?: string
-        }
-        Update: {
-          created_at?: string
-          emoji?: string
-          id?: string
-          message_id?: string
-          user_id?: string
-          workspace_id?: string
-        }
-        Relationships: []
-      }
-      group_read_state: {
-        Row: {
-          last_read_at: string
-          room_id: string
-          user_id: string
-        }
-        Insert: {
-          last_read_at?: string
-          room_id: string
-          user_id: string
-        }
-        Update: {
-          last_read_at?: string
-          room_id?: string
-          user_id?: string
         }
         Relationships: []
       }
@@ -1753,6 +1660,252 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: true
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_message_attachments: {
+        Row: {
+          created_at: string
+          id: string
+          message_id: string
+          mime_type: string | null
+          name: string | null
+          size: number | null
+          storage_path: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message_id: string
+          mime_type?: string | null
+          name?: string | null
+          size?: number | null
+          storage_path: string
+          workspace_id?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message_id?: string
+          mime_type?: string | null
+          name?: string | null
+          size?: number | null
+          storage_path?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_message_attachments_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "group_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_message_attachments_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_message_reactions: {
+        Row: {
+          created_at: string
+          emoji: string
+          id: string
+          message_id: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          emoji: string
+          id?: string
+          message_id: string
+          user_id: string
+          workspace_id?: string
+        }
+        Update: {
+          created_at?: string
+          emoji?: string
+          id?: string
+          message_id?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_message_reactions_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "group_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_message_reactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_message_reactions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_messages: {
+        Row: {
+          body_json: Json | null
+          content: string
+          created_at: string
+          deleted_at: string | null
+          edited_at: string | null
+          id: string
+          parent_id: string | null
+          room_id: string
+          root_id: string | null
+          sender_id: string
+          workspace_id: string
+        }
+        Insert: {
+          body_json?: Json | null
+          content: string
+          created_at?: string
+          deleted_at?: string | null
+          edited_at?: string | null
+          id?: string
+          parent_id?: string | null
+          room_id: string
+          root_id?: string | null
+          sender_id: string
+          workspace_id?: string
+        }
+        Update: {
+          body_json?: Json | null
+          content?: string
+          created_at?: string
+          deleted_at?: string | null
+          edited_at?: string | null
+          id?: string
+          parent_id?: string | null
+          room_id?: string
+          root_id?: string | null
+          sender_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_messages_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "group_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_messages_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "group_rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_messages_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_read_state: {
+        Row: {
+          last_read_at: string
+          room_id: string
+          user_id: string
+        }
+        Insert: {
+          last_read_at?: string
+          room_id: string
+          user_id: string
+        }
+        Update: {
+          last_read_at?: string
+          room_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_read_state_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "group_rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_read_state_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_rooms: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_default: boolean
+          last_message_at: string | null
+          name: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_default?: boolean
+          last_message_at?: string | null
+          name?: string
+          workspace_id?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_default?: boolean
+          last_message_at?: string | null
+          name?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_rooms_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_rooms_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
         ]
@@ -1813,6 +1966,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      mcp_oauth_clients: {
+        Row: {
+          client_id: string
+          client_secret: string | null
+          connector_id: string
+          created_at: string
+        }
+        Insert: {
+          client_id: string
+          client_secret?: string | null
+          connector_id: string
+          created_at?: string
+        }
+        Update: {
+          client_id?: string
+          client_secret?: string | null
+          connector_id?: string
+          created_at?: string
+        }
+        Relationships: []
       }
       mcp_servers: {
         Row: {
@@ -1924,6 +2098,62 @@ export type Database = {
           },
         ]
       }
+      mcp_user_connections: {
+        Row: {
+          auth_method: string
+          connector_id: string
+          created_at: string
+          encrypted_refresh_token: string | null
+          encrypted_token: string
+          expires_at: string | null
+          id: string
+          last_test_error: string | null
+          last_test_ok: boolean | null
+          last_tested_at: string | null
+          tools: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auth_method?: string
+          connector_id: string
+          created_at?: string
+          encrypted_refresh_token?: string | null
+          encrypted_token: string
+          expires_at?: string | null
+          id?: string
+          last_test_error?: string | null
+          last_test_ok?: boolean | null
+          last_tested_at?: string | null
+          tools?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auth_method?: string
+          connector_id?: string
+          created_at?: string
+          encrypted_refresh_token?: string | null
+          encrypted_token?: string
+          expires_at?: string | null
+          id?: string
+          last_test_error?: string | null
+          last_test_ok?: boolean | null
+          last_tested_at?: string | null
+          tools?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mcp_user_connections_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meeting_categories: {
         Row: {
           color: string
@@ -1987,7 +2217,22 @@ export type Database = {
           sort?: number
           workspace_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "meeting_note_folders_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_note_folders_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       meeting_notes: {
         Row: {
@@ -2014,12 +2259,12 @@ export type Database = {
           attachment_path?: string | null
           attachment_size?: number | null
           attendees?: string | null
+          category_id?: string | null
           content?: string
           created_at?: string
           folder_id?: string | null
           graph?: Json | null
           id?: string
-          category_id?: string | null
           importance?: number
           meeting_date?: string | null
           meeting_time?: string | null
@@ -2033,12 +2278,12 @@ export type Database = {
           attachment_path?: string | null
           attachment_size?: number | null
           attendees?: string | null
+          category_id?: string | null
           content?: string
           created_at?: string
           folder_id?: string | null
           graph?: Json | null
           id?: string
-          category_id?: string | null
           importance?: number
           meeting_date?: string | null
           meeting_time?: string | null
@@ -2049,10 +2294,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "meeting_notes_user_id_fkey"
-            columns: ["user_id"]
+            foreignKeyName: "meeting_notes_category_id_fkey"
+            columns: ["category_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "meeting_categories"
             referencedColumns: ["id"]
           },
           {
@@ -2060,6 +2305,13 @@ export type Database = {
             columns: ["folder_id"]
             isOneToOne: false
             referencedRelation: "meeting_note_folders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_notes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -2360,27 +2612,6 @@ export type Database = {
           },
         ]
       }
-      room_members: {
-        Row: {
-          joined_at: string
-          role: string
-          room_id: string
-          user_id: string
-        }
-        Insert: {
-          joined_at?: string
-          role?: string
-          room_id: string
-          user_id: string
-        }
-        Update: {
-          joined_at?: string
-          role?: string
-          room_id?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       projects: {
         Row: {
           created_at: string
@@ -2444,6 +2675,42 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      room_members: {
+        Row: {
+          joined_at: string
+          role: string
+          room_id: string
+          user_id: string
+        }
+        Insert: {
+          joined_at?: string
+          role?: string
+          room_id: string
+          user_id: string
+        }
+        Update: {
+          joined_at?: string
+          role?: string
+          room_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_members_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "group_rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -2776,13 +3043,23 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      act_on_approval: { Args: { p_action: string; p_comment?: string; p_document_id: string }; Returns: undefined }
+      act_on_approval: {
+        Args: { p_action: string; p_comment?: string; p_document_id: string }
+        Returns: undefined
+      }
+      add_room_members: {
+        Args: { p_members: string[]; p_room: string }
+        Returns: undefined
+      }
       auth_is_admin: { Args: never; Returns: boolean }
+      auth_is_workspace_owner: { Args: { ws_id: string }; Returns: boolean }
       auth_user_department: { Args: never; Returns: string }
       auth_user_workspace_ids: { Args: never; Returns: string[] }
       can_view_attendance: { Args: { ws: string }; Returns: boolean }
-      grant_attendance_viewer: { Args: { target: string }; Returns: undefined }
-      revoke_attendance_viewer: { Args: { target: string }; Returns: undefined }
+      create_group_room: {
+        Args: { p_members: string[]; p_name: string }
+        Returns: string
+      }
       current_workspace_id: { Args: never; Returns: string }
       directory_contact: {
         Args: { target: string }
@@ -2796,21 +3073,43 @@ export type Database = {
         Args: { other_user: string }
         Returns: string
       }
-      create_group_room: { Args: { p_name: string; p_members: string[] }; Returns: string }
-      add_room_members: { Args: { p_room: string; p_members: string[] }; Returns: undefined }
-      leave_group_room: { Args: { p_room: string }; Returns: undefined }
+      grant_attendance_viewer: { Args: { target: string }; Returns: undefined }
       is_approval_participant: { Args: { doc_id: string }; Returns: boolean }
       is_room_member: { Args: { p_room: string }; Returns: boolean }
       is_workspace_member: { Args: { ws_id: string }; Returns: boolean }
+      leave_group_room: { Args: { p_room: string }; Returns: undefined }
       mark_dm_read: { Args: { conv_id: string }; Returns: number }
       mark_room_read: { Args: { p_room: string }; Returns: undefined }
+      owner_can_set_role: { Args: { target: string }; Returns: boolean }
       recall_document: { Args: { doc_id: string }; Returns: undefined }
       revise_document: { Args: { doc_id: string }; Returns: undefined }
-      set_file_folder: { Args: { p_file: string; p_folder: string | null }; Returns: undefined }
-      set_meeting_meta: { Args: { p_category: string | null; p_date: string | null; p_importance: number; p_note: string; p_time: string | null }; Returns: undefined }
-      set_meeting_note_folder: { Args: { new_folder: string | null; note_id: string }; Returns: undefined }
-      set_member_position: { Args: { new_position: string; target: string }; Returns: undefined }
-      set_member_role: { Args: { new_role: string; target: string }; Returns: undefined }
+      revoke_attendance_viewer: { Args: { target: string }; Returns: undefined }
+      set_file_folder: {
+        Args: { p_file: string; p_folder: string }
+        Returns: undefined
+      }
+      set_meeting_meta: {
+        Args: {
+          p_category: string
+          p_date: string
+          p_importance: number
+          p_note: string
+          p_time: string
+        }
+        Returns: undefined
+      }
+      set_meeting_note_folder: {
+        Args: { new_folder: string; note_id: string }
+        Returns: undefined
+      }
+      set_member_position: {
+        Args: { new_position: string; target: string }
+        Returns: undefined
+      }
+      set_member_role: {
+        Args: { new_role: string; target: string }
+        Returns: undefined
+      }
       shares_workspace_with: { Args: { other_user: string }; Returns: boolean }
       submit_document: { Args: { doc_id: string }; Returns: string }
     }

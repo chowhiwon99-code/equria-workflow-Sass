@@ -121,7 +121,10 @@ export function MeetingsView() {
   // 여러 회의록을 한 번에 폴더로 이동(노트 폴더 이동은 멤버 누구나 — set_meeting_note_folder).
   const moveNotes = async (ids: string[], folderId: string | null) => {
     if (ids.length === 0) return
-    const results = await Promise.all(ids.map((id) => supabase.rpc("set_meeting_note_folder", { note_id: id, new_folder: folderId })))
+    // new_folder는 uuid(nullable) — SQL 함수가 NULL을 "미분류로" 명시 처리(non-STRICT). 생성 타입이 이를 반영 못 해 캐스팅.
+    const results = await Promise.all(
+      ids.map((id) => supabase.rpc("set_meeting_note_folder", { note_id: id, new_folder: folderId as string }))
+    )
     const failed = results.filter((r) => r.error).length
     if (failed) toast.error(`${failed}개는 옮기지 못했어요.`)
     if (failed < ids.length) toast.success(`${ids.length - failed}개 옮겼어요.`)

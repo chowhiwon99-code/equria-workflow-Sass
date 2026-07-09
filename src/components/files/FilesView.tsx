@@ -285,7 +285,10 @@ export function FilesView() {
   // 여러 파일을 한 번에 폴더로 이동(드래그 묶음·이동 바·드롭다운 공용).
   const moveFiles = async (ids: string[], folderId: string | null) => {
     if (ids.length === 0) return
-    const results = await Promise.all(ids.map((id) => supabase.rpc("set_file_folder", { p_file: id, p_folder: folderId })))
+    // p_folder는 uuid(nullable) — SQL 함수가 NULL을 "미분류로" 명시 처리(non-STRICT). 생성 타입이 이를 반영 못 해 캐스팅.
+    const results = await Promise.all(
+      ids.map((id) => supabase.rpc("set_file_folder", { p_file: id, p_folder: folderId as string }))
+    )
     const failed = results.filter((r) => r.error).length
     if (failed) toast.error(`${failed}개는 옮기지 못했어요. (소유자·대표·관리자만 가능)`)
     if (failed < ids.length) toast.success(`${ids.length - failed}개 옮겼어요.`)

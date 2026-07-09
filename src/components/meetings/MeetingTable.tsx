@@ -66,12 +66,14 @@ export function MeetingTable({
 
   const setMeta = async (n: Note, patch: MetaPatch) => {
     const next = { ...n, ...patch }
+    // p_category/p_date/p_time은 nullable(값 지우기 허용) — SQL 함수가 NULL을 그대로 저장(non-STRICT).
+    // 생성 타입이 이를 반영 못 해 캐스팅.
     const { error } = await supabase.rpc("set_meeting_meta", {
       p_note: n.id,
-      p_category: next.category_id,
+      p_category: next.category_id as string,
       p_importance: next.importance,
-      p_date: next.meeting_date,
-      p_time: next.meeting_time,
+      p_date: next.meeting_date as string,
+      p_time: next.meeting_time as string,
     })
     if (error) return toast.error(error.message)
     onReload()
