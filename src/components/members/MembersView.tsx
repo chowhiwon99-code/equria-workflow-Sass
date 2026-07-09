@@ -265,11 +265,11 @@ function ContactRow({
       <span className="w-16 shrink-0 text-xs text-muted-foreground">{label}</span>
       {value ? (
         href ? (
-          <a href={href} className="truncate text-primary underline-offset-2 hover:underline">
+          <a href={href} className="min-w-0 flex-1 truncate text-primary underline-offset-2 hover:underline">
             {value}
           </a>
         ) : (
-          <span className="truncate">{value}</span>
+          <span className="min-w-0 flex-1 truncate">{value}</span>
         )
       ) : (
         <span className="text-xs text-muted-foreground/60">비공개 또는 미등록</span>

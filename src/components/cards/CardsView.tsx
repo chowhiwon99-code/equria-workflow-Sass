@@ -157,9 +157,10 @@ export function CardsView() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">명함 관리</h1>
-        <div className="flex items-center gap-2">
+      {/* 헤더 — 모바일에선 버튼들이 제목 아래로 줄바꿈(제목 짜부 방지, FinanceView 동일 패턴) */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="shrink-0 text-lg font-semibold">명함 관리</h1>
+        <div className="flex flex-wrap items-center gap-2">
         <Button size="sm" variant="outline" onClick={exportCsv} disabled={cards.length === 0}>
           <Download /> 엑셀
         </Button>

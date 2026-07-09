@@ -103,7 +103,7 @@ export function CardDetail({ cardId }: { cardId: string }) {
 
       {imageUrl && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={imageUrl} alt="명함" className="max-h-56 w-fit rounded-lg border object-contain" />
+        <img src={imageUrl} alt="명함" className="max-h-56 w-fit max-w-full rounded-lg border object-contain" />
       )}
 
       <div className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">

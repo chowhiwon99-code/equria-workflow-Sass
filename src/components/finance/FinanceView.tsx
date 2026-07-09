@@ -723,8 +723,9 @@ export function FinanceView() {
         ) : (
           <div className="flex flex-col gap-2">
             <p className="text-xs text-muted-foreground">전체 초안 (기간 무관)</p>
-            <div className="overflow-hidden rounded-lg border">
-              <table className="w-full text-sm tabular-nums [&_td]:align-middle [&_th]:align-middle">
+            {/* 모바일 = 가로 스크롤(7열 표 짜부 방지 — 내역 탭 표와 동일 패턴) */}
+            <div className="overflow-x-auto rounded-lg border">
+              <table className="w-full min-w-[640px] text-sm tabular-nums [&_td]:align-middle [&_th]:align-middle">
                 <thead className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
                   <tr>
                     <th className="px-3 py-2 font-medium">발행일</th>

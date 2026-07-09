@@ -218,9 +218,9 @@ export function CalendarView() {
 
   return (
     <div className="flex h-full flex-col gap-4">
-      {/* 헤더 */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      {/* 헤더 — 모바일에선 줄바꿈 허용(월 이동+점프+버튼이 한 줄 ~416px라 375px에서 넘침) */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="icon-sm" onClick={() => setViewDate(addMonths(viewDate, -1))}>
             <ChevronLeft />
           </Button>

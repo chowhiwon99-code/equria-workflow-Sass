@@ -148,8 +148,9 @@ export function FinanceEntryModal({
           ))}
         </div>
 
-        <div className="flex gap-2">
-          <label className="flex-1 text-xs text-muted-foreground">
+        {/* 좁은 모달에서 date 인풋 고유 최소폭이 3열을 밀 수 있어 줄바꿈 허용 */}
+        <div className="flex flex-wrap gap-2">
+          <label className="min-w-0 flex-1 text-xs text-muted-foreground">
             날짜
             <input type="date" className={fieldClass} value={entryDate} onChange={(e) => setEntryDate(e.target.value)} />
           </label>
