@@ -32,7 +32,8 @@ export default async function AppLayout({
     <CurrentUserProvider userId={user.id}>
       <UndoProvider>
       <AgentChatProvider>
-        <div className="flex h-screen overflow-hidden">
+        {/* dvh: iOS 사파리 주소창이 가리는 만큼 실시간 보정(데스크톱은 vh와 동일) */}
+        <div className="flex h-dvh overflow-hidden">
           {/* 모바일(<md)에선 숨김 — 대신 Header의 MobileNav 드로어로 진입 */}
           <Sidebar className="hidden md:flex" />
           <div className="flex flex-1 flex-col overflow-hidden">
