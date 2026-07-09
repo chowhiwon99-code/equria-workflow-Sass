@@ -39,6 +39,12 @@
 - **기각 3**: 새폴더 입력 잔존(언마운트로 불가능) · useId 대안(특수문자가 채널명에 위험) · hidden md:* 뿌리기(코드베이스 관례 적정).
 - **수용 리스크 1**: FolderGrid 이중 렌더에서 640px 경계 회전 중 이름변경 포커스 유실 — SSR 안전성(첫 페인트 무점프)과 맞바꾼 트레이드오프, 발생 조건 극히 드묾.
 
+### 3단계 복잡 화면 (`921d7b7`) — 대표 지시(모바일 마감)
+- **채팅 위젯**: PANEL_SIZE(440×620·720×720)를 `window` 크기에 `min()` 클램프 → 폰에서 화면 밖 넘침 해소, 거의 풀스크린. 내부 flex라 자동 적응(하드코딩 px 없음). SSR 안전(패널은 열렸을 때만 렌더=클라).
+- **메일**: 폰 3-pane→단일 pane 스택. 폴더=가로 칩 줄(`max-md:flex-row overflow-x-auto`), `selectedId`로 목록↔상세 토글(`max-md:hidden`), 상세 헤더에 `md:hidden` 뒤로가기(setSelectedId(null)). PC `md:grid-cols-[…]` 그대로.
+- **직원 채팅**: 조사 결과 이미 라우트 분리(`/chat`↔`/chat/[userId]`·group)+ArrowLeft 뒤로가기 존재 → 구조 전환 불필요. GroupChat 높이만 `max-md:--app-content-height`(8rem 오프셋이 모바일 축소 패딩과 어긋나던 것).
+- 검증 tsc0·lint30/0·build0. **다음 = 4단계 터치 UX(워크플로우 캔버스 터치·히트영역 44px·hover 대체) — 후순위.**
+
 ### 예상이슈 체크(수행)
 - twMerge flex↔hidden display 충돌 정상 해소 확인 · md 경계(`width<768px` ↔ `md:`=≥768) 정확 일치 · ESC setState는 이벤트 콜백이라 `set-state-in-effect` 린트 비대상 · 드로어 열린 채 데스크톱 폭 확장 시 오버레이 `md:hidden`으로 자동 소거.
 - 검증: tsc 0 · lint 30/0(신규 0) · build 0. **375px 브라우저 실확인은 미완**(Claude Chrome 확장 미연결) — 대표 확인 필요: 크롬 디바이스 모드 375×812에서 ①드로어 열림/바깥탭/링크클릭/ESC ②FAB가 딤 아래 ③가로 스크롤 없음 ④PC 무변화.
