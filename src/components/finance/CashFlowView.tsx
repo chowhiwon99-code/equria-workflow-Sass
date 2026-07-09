@@ -397,24 +397,30 @@ export function CashFlowView() {
         {showCoach && slots.length > 0 && (
           <CashCoachPanel slots={slots} summaries={graph.summary} groups={groups} onClose={() => setShowCoach(false)} />
         )}
-        <CashFlowCanvas
-          slots={slots}
-          groups={groups}
-          pool={graph.pool}
-          poolPos={poolPos}
-          calcTypes={calcTypes}
-          defaultCalcTypeId={defaultCalcTypeId}
-          onUpdateSlot={updateSlot}
-          onDeleteSlot={deleteSlot}
-          onAddSlot={addSlot}
-          onAddGroup={addGroup}
-          onMoveGroup={moveGroup}
-          onUpdateGroup={updateGroup}
-          onDeleteGroup={deleteGroup}
-          onMoveAccount={moveAccount}
-          onMovePool={movePool}
-          onSetOpening={setOpeningFor}
-        />
+        {/* 폰(<md)에선 캔버스 숨김 — 휠 확대·드래그 등 마우스 전제 UI라 표만 사용(대표 확정) */}
+        <p className="rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground md:hidden">
+          흐름도(캔버스)는 PC에서 볼 수 있어요. 폰에서는 아래 표로 입력·확인하세요.
+        </p>
+        <div className="hidden md:contents">
+          <CashFlowCanvas
+            slots={slots}
+            groups={groups}
+            pool={graph.pool}
+            poolPos={poolPos}
+            calcTypes={calcTypes}
+            defaultCalcTypeId={defaultCalcTypeId}
+            onUpdateSlot={updateSlot}
+            onDeleteSlot={deleteSlot}
+            onAddSlot={addSlot}
+            onAddGroup={addGroup}
+            onMoveGroup={moveGroup}
+            onUpdateGroup={updateGroup}
+            onDeleteGroup={deleteGroup}
+            onMoveAccount={moveAccount}
+            onMovePool={movePool}
+            onSetOpening={setOpeningFor}
+          />
+        </div>
       </div>
 
       {/* 슬롯 표 — 금액 직접 입력 */}
