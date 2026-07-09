@@ -437,7 +437,7 @@ export function FinanceView() {
                     기준환율 {fxConverted.asOf ?? "—"} · 참고{fxConverted.skippedBtc ? " · BTC 제외" : ""}
                   </span>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <SummaryCard label="총 매출" value={won(Math.round(fxConverted.revenue))} className="text-success" />
                   <SummaryCard label="총 지출" value={won(Math.round(fxConverted.expense))} className="text-destructive" />
                   <SummaryCard label="순수익" value={won(Math.round(fxConverted.net))} className={fxConverted.net >= 0 ? "text-foreground" : "text-destructive"} />
@@ -458,7 +458,7 @@ export function FinanceView() {
                         {CURRENCIES.find((c) => c.code === cur)?.label ?? cur}
                       </span>
                     )}
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                       <SummaryCard
                         label="총 매출"
                         value={money(v.revenue, cur)}
