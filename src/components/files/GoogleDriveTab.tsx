@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { Folder, Download, ExternalLink, Search, RefreshCw, File as FileIcon } from "lucide-react"
 import { formatBytes } from "@/lib/files"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
 type DriveFile = {
@@ -120,6 +120,12 @@ export default function GoogleDriveTab() {
     )
   }
 
+  // 현재 폴더를 Drive에서 그대로 열기 — 폰은 유니버설 링크로 앱 연결(설치 시), PC는 새 탭
+  const currentFolderId = crumbs[crumbs.length - 1]?.id
+  const driveOpenUrl = currentFolderId
+    ? `https://drive.google.com/drive/folders/${currentFolderId}`
+    : "https://drive.google.com/drive/my-drive"
+
   return (
     <div className="flex flex-col gap-3">
       <form onSubmit={(e) => { e.preventDefault(); setSearch(q) }} className="flex items-center gap-2">
@@ -140,6 +146,15 @@ export default function GoogleDriveTab() {
         <Button type="button" variant="outline" size="sm" className="h-9" onClick={() => void load()} aria-label="새로고침">
           <RefreshCw className="size-4" />
         </Button>
+        <a
+          href={driveOpenUrl}
+          target="_blank"
+          rel="noreferrer"
+          title="Google Drive에서 현재 폴더 열기"
+          className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9")}
+        >
+          <ExternalLink className="size-4" /> <span className="hidden sm:inline">Drive로 이동</span>
+        </a>
       </form>
 
       {!search && (
