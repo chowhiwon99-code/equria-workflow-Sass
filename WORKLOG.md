@@ -5,6 +5,34 @@
 
 ---
 
+## 2026-07-09 · 세션29(연속) — MCP UI 간소화 + 직원별 개인 연결 + OAuth 커넥터 (사용자 지적)
+
+**무엇/왜:** 대표 지적 2건 — ① "서버 추가" 기술 모달(전송방식·URL·인증)이 GitHub 연결하려는 사람에겐 어려움 ② "다 각자 계정 써야 하는거 아님?" — GitHub·Supabase·Stripe가 회사 전체 토큰 공유 구조였는데, 개인 계정 성격이라 직원별 연결이 맞음. + "다른 MCP도 연동해줘"(Notion·Linear·Sentry 등 OAuth 커넥터).
+
+### 간편 연결 모달 (`de038b0`→UI 부분)
+- bearer 프리셋 "연결" → 전용 모달(로고+토큰 발급 링크+토큰 입력 1칸만, 이름·URL·전송방식 숨김). 기존 "서버 추가"(고급)는 그대로 유지.
+
+### 직원별 개인 연결 — bearer(`2956bda`·`789d7c4`)
+- **아키텍처**: `google_connections`(Gmail 개인별 OAuth) 선례 그대로 재사용 — `mcp_user_connections`(user_id RLS 본인만, 관리자 게이트 없음). GitHub·Supabase·Stripe를 워크스페이스 공용 `mcp_servers`에서 분리, 각자 자기 PAT로 연결(scope="user" 신설, Context7·DeepWiki·HuggingFace는 무인증이라 scope="workspace" 유지).
+- API `/api/mcp/user-connections`(GET·POST) + `/[connectorId]`(DELETE) + `/test`(POST) — 본인 것만, RLS로 격리.
+- McpView: "회사 전체 연결"(기존)/"내 연결"(신규) 섹션 분리 + "개인 vs 공용" 안내 문구.
+
+### 채팅·워크플로우 자동 병합(`b090dba`)
+- 에이전트 설정과 무관하게, 요청자 본인의 개인 연결 도구를 모든 채팅·워크플로우 실행에 항상 병합("내가 가져온 도구"). agent_versions 스키마 변경 없이 최소 침습으로 구현.
+
+### OAuth(DCR) 커넥터 — Notion·Linear·Sentry(`789d7c4`)
+- **조사**: `@ai-sdk/mcp` 설치 소스를 직접 읽어 확인 — `auth()`/`OAuthClientProvider`가 DCR·PKCE·401 자동 refresh를 이미 내장(추측 아닌 코드 검증). Notion·Linear·Sentry는 사전등록(개발자 포털 앱 등록) 없이 "연결" 클릭만으로 인가 가능. Slack·Figma는 대표가 직접 앱 등록/승인받아야 함(코드로 우회 불가) — coming_soon 유지. Atlassian·Canva는 문서 상충이라 재확인 필요.
+- 공식 엔드포인트 웹검색 재확인(추측 금지): `mcp.notion.com/mcp` · `mcp.linear.app/mcp` · `mcp.sentry.dev/mcp`.
+- `McpOAuthFlowProvider`(연결/콜백 라우트, PKCE는 httpOnly 쿠키 왕복 — Google OAuth와 동일 패턴) / `McpOAuthRuntimeProvider`(실사용, 401 시 자동 refresh, redirectToAuthorization no-op 안전성 라이브러리 소스로 확인) 2종.
+- `mcp_oauth_clients`(DCR 발급 client_id, 커넥터별 앱 전체 공유, service_role 전용).
+
+### 검증(계속 재확인)
+- tsc 0 · lint 30/0 — **git stash로 진짜 베이스라인 재확인**(McpView 두 번째 useEffect 추가가 캐스케이딩 렌더 감지를 유발해 첫 번째 effect까지 새로 flag됨 → 둘 다 기존 관례대로 suppress, 30/0 복원) · build 0.
+- 토큰 노출 경로 재검수(암호화·클라이언트 미노출·에러 메시지 무토큰) · 보안 어드바이저 신규 테이블 경고 0건.
+- **한계**: OAuth 실제 브라우저 인가 왕복은 라이브 테스트 불가(대표가 직접 클릭해 첫 확인 필요) · 동일 커넥터 동시 첫 연결 시 DCR 등록 레이스(낮은 확률, 실패해도 재시도로 해결).
+
+---
+
 ## 2026-07-09 · 세션29 — 모바일 반응형 1단계: 레이아웃 골격(사이드바 드로어화) (사용자 요청)
 
 **무엇/왜:** 폰에서 앱 전체가 짜부(스샷 #47) — 근본 원인 = 사이드바 반응형 0줄 + 쉘이 항상 나란히 배치. 스펙 `docs/build/mobile-responsive.md`의 **작업 1(골격)만** 수행(화면 감사·터치 UX는 다음 세션).
