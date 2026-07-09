@@ -219,7 +219,8 @@ export function CashGrid({
           <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="항목 검색…" className="h-8 w-44 rounded-lg border bg-background pl-7 pr-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
         </div>
-        <button onClick={onEditColumns} className="inline-flex h-8 items-center gap-1 rounded-lg border px-2.5 text-sm font-medium text-muted-foreground hover:bg-muted" title="계산 칸·수식 편집(부가세 등 추가)">
+        {/* 칸 편집은 폰에서 숨김(대표 확정 — 구조 편집은 PC에서) */}
+        <button onClick={onEditColumns} className="hidden h-8 items-center gap-1 rounded-lg border px-2.5 text-sm font-medium text-muted-foreground hover:bg-muted md:inline-flex" title="계산 칸·수식 편집(부가세 등 추가)">
           <SlidersHorizontal className="size-3.5" /> 칸 편집
         </button>
         {/* 항목 추가는 폰에서 숨김(대표 확정 — 구조 편집은 PC에서) */}

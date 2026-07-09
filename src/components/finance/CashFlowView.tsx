@@ -339,14 +339,14 @@ export function CashFlowView() {
             <Button size="sm" variant={showSettings ? "default" : "outline"} onClick={() => setShowSettings((v) => !v)}>
               <Settings className="size-3.5" /> 설정
             </Button>
-            <Button size="sm" variant="outline" onClick={exportXlsx} disabled={slots.length === 0}>
+            {/* 내보내기(엑셀·CSV·PDF)는 폰에서 숨김(대표 확정 — 모바일은 조회 위주) */}
+            <Button size="sm" variant="outline" onClick={exportXlsx} disabled={slots.length === 0} className="hidden md:inline-flex">
               <Sheet className="size-3.5" /> 엑셀
             </Button>
-            {/* CSV는 폰에서 숨김(대표 확정 — 모바일은 조회 위주) */}
             <Button size="sm" variant="outline" onClick={exportCsv} disabled={slots.length === 0} className="hidden md:inline-flex">
               <Download className="size-3.5" /> CSV
             </Button>
-            <Button size="sm" variant="outline" onClick={exportPdf} disabled={slots.length === 0}>
+            <Button size="sm" variant="outline" onClick={exportPdf} disabled={slots.length === 0} className="hidden md:inline-flex">
               <FileDown className="size-3.5" /> PDF
             </Button>
           </div>
