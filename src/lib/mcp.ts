@@ -16,11 +16,19 @@ export type Connector = {
   /** 상단 "추천" 섹션 노출 */
   featured?: boolean
   status: "available" | "coming_soon"
+  /**
+   * "workspace" = 회사 전체가 공유하는 자원(관리자가 1회 연결, 전 직원이 그 도구를 씀).
+   * "user" = 개인 계정 성격(직원 각자 자기 토큰으로 연결 — 회사 대신 "나"로 접근·감사·회수 가능해야 함).
+   * 무인증(auth:"none")은 개인 식별 개념이 없어 workspace, 그 외(bearer/oauth)는 원칙적으로 user.
+   */
+  scope: "workspace" | "user"
   /** available 프리셋 — "연결" 원클릭 등록에 쓰는 접속 정보. */
   preset?: {
     type: "http" | "sse"
     url: string
-    auth: "none" | "bearer"
+    auth: "none" | "bearer" | "oauth"
+    /** bearer일 때 "토큰 발급받기" 링크 — 해당 서비스의 토큰 발급 페이지로 안내(연결 모달에 노출) */
+    tokenHelpUrl?: string
   }
 }
 
@@ -47,6 +55,7 @@ export const MCP_CONNECTORS: Connector[] = [
     category: "문서",
     featured: true,
     status: "available",
+    scope: "workspace",
     preset: { type: "http", url: "https://mcp.context7.com/mcp", auth: "none" },
   },
   {
@@ -58,20 +67,23 @@ export const MCP_CONNECTORS: Connector[] = [
     category: "개발",
     featured: true,
     status: "available",
+    scope: "workspace",
     preset: { type: "http", url: "https://mcp.deepwiki.com/mcp", auth: "none" },
   },
-  // Bearer 토큰 — "연결" 시 토큰 입력 모달(프리셋 URL·이름 프리필, AES 암호화 저장). PAT/API 키만 붙여넣으면 됨.
-  { id: "github", name: "GitHub", description: "이슈·PR·코드 검색 (PAT 토큰)", emoji: "🐙", domain: "github.com", category: "개발", featured: true, status: "available", preset: { type: "http", url: "https://api.githubcopilot.com/mcp/", auth: "bearer" } },
-  { id: "supabase", name: "Supabase", description: "데이터·스키마 조회 (PAT 토큰)", emoji: "🟢", domain: "supabase.com", category: "데이터", status: "available", preset: { type: "http", url: "https://mcp.supabase.com/mcp", auth: "bearer" } },
-  { id: "stripe", name: "Stripe", description: "결제·고객 데이터 조회 (API 키)", emoji: "💳", domain: "stripe.com", category: "데이터", status: "available", preset: { type: "http", url: "https://mcp.stripe.com", auth: "bearer" } },
-  // 무인증 읽기 전용 — 원클릭 연결(토큰 없이 익명 접근)
-  { id: "huggingface", name: "Hugging Face", description: "모델·데이터셋 검색 (읽기 전용·무인증)", emoji: "🤗", domain: "huggingface.co", category: "개발", status: "available", preset: { type: "http", url: "https://huggingface.co/mcp", auth: "none" } },
-  // OAuth 인가 플로우 구현 필요 — 준비 중(토큰만으론 연결 불가)
-  { id: "notion", name: "Notion", description: "페이지·데이터베이스 검색·수정 (OAuth 필요)", emoji: "📝", domain: "notion.so", category: "생산성", featured: true, status: "coming_soon" },
-  { id: "slack", name: "Slack", description: "메시지·채널 조회·전송 (OAuth 필요)", emoji: "💬", domain: "slack.com", category: "커뮤니케이션", status: "coming_soon" },
-  { id: "linear", name: "Linear", description: "이슈·프로젝트 관리 (OAuth 필요)", emoji: "📐", domain: "linear.app", category: "개발", status: "coming_soon" },
-  { id: "atlassian", name: "Atlassian", description: "Jira·Confluence 이슈·문서 (OAuth 필요)", emoji: "🧩", domain: "atlassian.com", category: "개발", status: "coming_soon" },
-  { id: "sentry", name: "Sentry", description: "에러·이슈 모니터링 (OAuth 필요)", emoji: "🛡️", domain: "sentry.io", category: "개발", status: "coming_soon" },
-  { id: "figma", name: "Figma", description: "디자인 파일·코드 커넥트 (OAuth 필요)", emoji: "🎨", domain: "figma.com", category: "디자인", status: "coming_soon" },
-  { id: "canva", name: "Canva", description: "디자인 검색·생성·내보내기 (OAuth 필요)", emoji: "🖼️", domain: "canva.com", category: "디자인", status: "coming_soon" },
+  // 개인 계정 연결(Bearer) — 직원 각자 자기 토큰으로. "연결"은 누구나(관리자 게이트 없음), 나만 보고 나만 지움.
+  { id: "github", name: "GitHub", description: "이슈·PR·코드 검색 (내 PAT 토큰)", emoji: "🐙", domain: "github.com", category: "개발", featured: true, status: "available", scope: "user", preset: { type: "http", url: "https://api.githubcopilot.com/mcp/", auth: "bearer", tokenHelpUrl: "https://github.com/settings/personal-access-tokens/new" } },
+  { id: "supabase", name: "Supabase", description: "데이터·스키마 조회 (내 PAT 토큰)", emoji: "🟢", domain: "supabase.com", category: "데이터", status: "available", scope: "user", preset: { type: "http", url: "https://mcp.supabase.com/mcp", auth: "bearer", tokenHelpUrl: "https://supabase.com/dashboard/account/tokens" } },
+  { id: "stripe", name: "Stripe", description: "결제·고객 데이터 조회 (내 API 키)", emoji: "💳", domain: "stripe.com", category: "데이터", status: "available", scope: "user", preset: { type: "http", url: "https://mcp.stripe.com", auth: "bearer", tokenHelpUrl: "https://dashboard.stripe.com/apikeys" } },
+  // 무인증 읽기 전용 — 원클릭 연결(토큰 없이 익명 접근, 개인 식별 없음 → 회사 공용)
+  { id: "huggingface", name: "Hugging Face", description: "모델·데이터셋 검색 (읽기 전용·무인증)", emoji: "🤗", domain: "huggingface.co", category: "개발", status: "available", scope: "workspace", preset: { type: "http", url: "https://huggingface.co/mcp", auth: "none" } },
+  // OAuth(DCR) — 사전등록 없이 "연결" 클릭만으로 인가·토큰 발급까지 자동(직원 개인 계정). 조사 확인(2026-07-09).
+  { id: "notion", name: "Notion", description: "페이지·데이터베이스 검색·수정 (내 계정, OAuth)", emoji: "📝", domain: "notion.so", category: "생산성", featured: true, status: "available", scope: "user", preset: { type: "http", url: "https://mcp.notion.com/mcp", auth: "oauth" } },
+  { id: "linear", name: "Linear", description: "이슈·프로젝트 관리 (내 계정, OAuth)", emoji: "📐", domain: "linear.app", category: "개발", status: "available", scope: "user", preset: { type: "http", url: "https://mcp.linear.app/mcp", auth: "oauth" } },
+  { id: "sentry", name: "Sentry", description: "에러·이슈 모니터링 (내 계정, OAuth)", emoji: "🛡️", domain: "sentry.io", category: "개발", status: "available", scope: "user", preset: { type: "http", url: "https://mcp.sentry.dev/mcp", auth: "oauth" } },
+  // 대표가 각 서비스 개발자 포털에서 앱 등록·승인을 직접 받아야 함(코드로 우회 불가) — 준비 중
+  { id: "slack", name: "Slack", description: "메시지·채널 조회·전송 (OAuth·내 계정, 앱 승인 대기)", emoji: "💬", domain: "slack.com", category: "커뮤니케이션", status: "coming_soon", scope: "user" },
+  { id: "figma", name: "Figma", description: "디자인 파일·코드 커넥트 (OAuth·내 계정, 앱 승인 대기)", emoji: "🎨", domain: "figma.com", category: "디자인", status: "coming_soon", scope: "user" },
+  // 지원 여부 재확인 필요(문서 상충) — 준비 중
+  { id: "atlassian", name: "Atlassian", description: "Jira·Confluence 이슈·문서 (OAuth·내 계정, 확인 중)", emoji: "🧩", domain: "atlassian.com", category: "개발", status: "coming_soon", scope: "user" },
+  { id: "canva", name: "Canva", description: "디자인 검색·생성·내보내기 (OAuth·내 계정, 확인 중)", emoji: "🖼️", domain: "canva.com", category: "디자인", status: "coming_soon", scope: "user" },
 ]
