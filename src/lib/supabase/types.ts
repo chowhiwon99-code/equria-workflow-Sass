@@ -2619,6 +2619,7 @@ export type Database = {
           description: string | null
           due_date: string | null
           id: string
+          importance: number
           metadata: Json
           name: string
           owner_id: string | null
@@ -2633,6 +2634,7 @@ export type Database = {
           description?: string | null
           due_date?: string | null
           id?: string
+          importance?: number
           metadata?: Json
           name: string
           owner_id?: string | null
@@ -2647,6 +2649,7 @@ export type Database = {
           description?: string | null
           due_date?: string | null
           id?: string
+          importance?: number
           metadata?: Json
           name?: string
           owner_id?: string | null

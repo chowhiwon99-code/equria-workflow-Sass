@@ -13,6 +13,7 @@ import { Loading, ErrorState } from "@/components/shared/States"
 import { useUndo } from "@/components/undo/UndoProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { PROJECT_STATUS, PROJECT_STATUS_ORDER } from "@/lib/projects"
+import { IMPORTANCE, importanceLabel, importanceColor, tagBg } from "@/lib/meetingMeta"
 import { isFigmaUrl, toFigmaDesktopUrl } from "@/lib/figma"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import type { Project, ProjectStatus, Profile, DriveFile } from "@/types"
@@ -81,6 +82,24 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
     }
   }
 
+  const changeImportance = async (importance: number) => {
+    const prev = project?.importance ?? 0
+    if (prev === importance) return
+    await supabase.from("projects").update({ importance }).eq("id", projectId)
+    load()
+    push({
+      label: "프로젝트 중요도 변경",
+      undo: async () => {
+        await mustOk(supabase.from("projects").update({ importance: prev }).eq("id", projectId))
+        load()
+      },
+      redo: async () => {
+        await mustOk(supabase.from("projects").update({ importance }).eq("id", projectId))
+        load()
+      },
+    })
+  }
+
   const addMember = async (userId: string) => {
     if (!userId) return
     const { data: inserted } = await supabase
@@ -138,6 +157,14 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
         <BackLink href="/projects" label="프로젝트 목록" />
         <div className="mt-3 flex flex-wrap items-center gap-2.5">
           <h1 className="text-2xl font-semibold tracking-tight">{project.name}</h1>
+          {(project.importance ?? 0) > 0 && (
+            <span
+              className="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium"
+              style={{ backgroundColor: tagBg(importanceColor(project.importance ?? 0)) }}
+            >
+              {importanceLabel(project.importance ?? 0)}
+            </span>
+          )}
           <span className={cn("inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium", st.badge)}>
             <span className="size-1.5 rounded-full" style={{ backgroundColor: st.dot }} />
             {st.label}
@@ -154,6 +181,14 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
               value={project.status}
               onChange={(v) => changeStatus(v as ProjectStatus)}
               options={PROJECT_STATUS_ORDER.map((s) => ({ value: s, label: PROJECT_STATUS[s].label }))}
+              className="h-9 w-full"
+            />
+          </MetaItem>
+          <MetaItem label="중요도">
+            <Select
+              value={String(project.importance ?? 0)}
+              onChange={(v) => changeImportance(Number(v))}
+              options={IMPORTANCE.map((lv) => ({ value: String(lv.value), label: lv.label }))}
               className="h-9 w-full"
             />
           </MetaItem>

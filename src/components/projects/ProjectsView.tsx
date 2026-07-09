@@ -13,6 +13,7 @@ import { Modal, fieldClass } from "@/components/shared/Modal"
 import { Loading, EmptyState, ErrorState } from "@/components/shared/States"
 import { useUndo } from "@/components/undo/UndoProvider"
 import { PROJECT_STATUS, PROJECT_STATUS_ORDER } from "@/lib/projects"
+import { IMPORTANCE, importanceLabel, importanceColor, tagBg } from "@/lib/meetingMeta"
 import type { Project, ProjectStatus, Profile } from "@/types"
 
 type ProjectRow = Project
@@ -41,6 +42,19 @@ function projectProgress(p: ProjectRow): number {
 }
 function fmtDate(d: string): string {
   return d.length >= 10 ? d.slice(5).replace("-", ".") : d
+}
+
+// 중요도 배지(없음=0이면 숨김) — 회의노트 meetingMeta 패턴 재사용.
+function ImportanceBadge({ value }: { value: number }) {
+  if (!value) return null
+  return (
+    <span
+      className="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium"
+      style={{ backgroundColor: tagBg(importanceColor(value)) }}
+    >
+      {importanceLabel(value)}
+    </span>
+  )
 }
 
 export function ProjectsView() {
@@ -218,10 +232,13 @@ function ProjectCard({ project: p, members }: { project: ProjectRow; members: Me
         <h3 className={cn("min-w-0 flex-1 truncate font-semibold", canceled && "text-muted-foreground line-through")}>
           {p.name}
         </h3>
-        <span className={cn("inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs", st.badge)}>
-          <span className="size-1.5 rounded-full" style={{ backgroundColor: st.dot }} />
-          {st.label}
-        </span>
+        <div className="flex shrink-0 items-center gap-1">
+          <ImportanceBadge value={p.importance ?? 0} />
+          <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs", st.badge)}>
+            <span className="size-1.5 rounded-full" style={{ backgroundColor: st.dot }} />
+            {st.label}
+          </span>
+        </div>
       </div>
       {p.description && <p className="line-clamp-2 text-xs text-muted-foreground">{p.description}</p>}
       <div className="flex flex-col gap-1">
@@ -284,6 +301,7 @@ function CreateProjectModal({
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [status, setStatus] = useState<ProjectStatus>("planned")
+  const [importance, setImportance] = useState(0)
   const [ownerId, setOwnerId] = useState("")
   const [startDate, setStartDate] = useState("")
   const [dueDate, setDueDate] = useState("")
@@ -308,6 +326,7 @@ function CreateProjectModal({
         name: name.trim(),
         description: description.trim() || null,
         status,
+        importance,
         owner_id: ownerId || null,
         start_date: startDate || null,
         due_date: dueDate || null,
@@ -355,6 +374,18 @@ function CreateProjectModal({
               ))}
             </select>
           </label>
+          <label className="flex-1 text-xs text-muted-foreground">
+            중요도
+            <select className={fieldClass} value={importance} onChange={(e) => setImportance(Number(e.target.value))}>
+              {IMPORTANCE.map((lv) => (
+                <option key={lv.value} value={lv.value}>
+                  {lv.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="flex gap-2">
           <label className="flex-1 text-xs text-muted-foreground">
             담당자
             <select className={fieldClass} value={ownerId} onChange={(e) => setOwnerId(e.target.value)}>
