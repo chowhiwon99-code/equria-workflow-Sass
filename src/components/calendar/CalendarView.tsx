@@ -331,7 +331,8 @@ export function CalendarView() {
                         setSelected(e)
                       }}
                       className={cn(
-                        "relative truncate py-0.5 text-[11px] leading-[1.2] text-white",
+                        // 폰(<sm)에선 칸이 좁아 글자를 숨기고 색 막대만(탭하면 상세) — 제목은 sm+에서
+                        "relative truncate py-0.5 text-[11px] leading-[1.2] text-transparent sm:text-white",
                         roundLeft ? "rounded-l" : "rounded-l-none",
                         roundRight ? "rounded-r" : "rounded-r-none",
                         showLabel ? "pl-1.5 pr-1" : "px-1",

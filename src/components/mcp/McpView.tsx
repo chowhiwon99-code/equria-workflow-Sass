@@ -190,10 +190,11 @@ export function McpView() {
           ) : c.status === "coming_soon" ? (
             <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">준비 중</span>
           ) : isAdmin ? (
+            /* 연결은 폰에서 숨김 — 모바일 /mcp는 보기 전용(대표 확정) */
             <Button
               size="sm"
               variant="outline"
-              className="shrink-0"
+              className="hidden shrink-0 md:inline-flex"
               onClick={() => connectPreset(c)}
               disabled={connectingId === c.id}
             >
@@ -222,7 +223,7 @@ export function McpView() {
             <RefreshCw className="size-4" />
           </Button>
           {isAdmin && (
-            <Button size="sm" onClick={() => setAddOpen(true)}>
+            <Button size="sm" onClick={() => setAddOpen(true)} className="hidden md:inline-flex">
               <Plus /> 서버 추가
             </Button>
           )}
@@ -347,12 +348,13 @@ export function McpView() {
 
                   {isAdmin && (
                     <>
-                      <Button size="sm" variant="outline" onClick={() => test(s.id)} disabled={testing === s.id}>
+                      {/* 관리 액션(테스트·삭제)은 폰에서 숨김 — 보기 전용 */}
+                      <Button size="sm" variant="outline" onClick={() => test(s.id)} disabled={testing === s.id} className="hidden md:inline-flex">
                         {testing === s.id ? <Loader2 className="size-3.5 animate-spin" /> : "테스트"}
                       </Button>
                       <button
                         onClick={() => remove(s.id)}
-                        className="text-muted-foreground hover:text-destructive"
+                        className="hidden text-muted-foreground hover:text-destructive md:block"
                         title="삭제"
                       >
                         <Trash2 className="size-4" />
