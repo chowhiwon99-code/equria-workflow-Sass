@@ -337,10 +337,10 @@ export function FinanceView() {
 
   return (
     <div className="flex flex-col gap-5">
-      {/* 헤더 */}
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-lg font-semibold">비용·매출</h1>
-        <div className="flex items-center gap-2">
+      {/* 헤더 — 모바일에선 버튼들이 제목 아래로 줄바꿈(제목 짜부 방지) */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="shrink-0 text-lg font-semibold">비용·매출</h1>
+        <div className="flex flex-wrap items-center gap-2">
           {tab === "ledger" && selected.size > 0 && (
             <>
               <Button size="sm" variant="outline" onClick={createInvoice}>

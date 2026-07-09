@@ -457,7 +457,8 @@ export function FilesView() {
         <div>
           <h1 className="text-lg font-semibold">파일 관리</h1>
           <p className="text-sm text-muted-foreground">
-            폴더를 더블클릭해 열고, 파일을 폴더에 끌어다 놓아 정리하세요. (여러 개 선택 후 한 번에 이동 가능)
+            <span className="sm:hidden">폴더를 탭해 열어보세요.</span>
+            <span className="hidden sm:inline">폴더를 더블클릭해 열고, 파일을 폴더에 끌어다 놓아 정리하세요. (여러 개 선택 후 한 번에 이동 가능)</span>
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -571,7 +572,10 @@ export function FilesView() {
         />
       ) : visible.length === 0 ? (
         currentFolder === null && folders.length > 0 ? (
-          <p className="px-1 py-6 text-center text-sm text-muted-foreground">폴더를 더블클릭해 열거나, 파일을 폴더로 끌어다 놓으세요.</p>
+          <p className="px-1 py-6 text-center text-sm text-muted-foreground">
+            <span className="sm:hidden">폴더를 탭해 열어보세요.</span>
+            <span className="hidden sm:inline">폴더를 더블클릭해 열거나, 파일을 폴더로 끌어다 놓으세요.</span>
+          </p>
         ) : (
           <EmptyState
             icon={FileText}

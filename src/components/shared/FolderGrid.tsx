@@ -9,6 +9,7 @@ export type FolderGridItem = { id: string; name: string; count: number }
 /**
  * macOS Finder식 폴더 그리드 — 라운드 사각 타일(테두리 없음·중립색), 더블클릭 진입,
  * 드래그 드롭 대상(여러 항목 한 번에), hover 이름변경/삭제.
+ * 모바일(<sm)은 리스트형으로 전환 — 탭 한 번에 열림, 이름변경/삭제 상시 노출(터치엔 더블클릭·hover·DnD 없음).
  * 도메인 무관(데이터+콜백만) → 파일·회의노트·명함 공용.
  * 드롭 페이로드 = dataTransfer "text/plain" 에 항목 id를 콤마로 이어 싣는다(다중 이동).
  */
@@ -45,7 +46,76 @@ export function FolderGrid({
   }
 
   return (
-    <div className="flex flex-wrap gap-3">
+    <>
+      {/* 모바일(<sm): 리스트형 — 탭 한 번에 열림(터치엔 더블클릭·hover 없음), 액션 상시 노출 */}
+      <div className="divide-y overflow-hidden rounded-2xl border bg-card sm:hidden">
+        {folders.map((f) =>
+          renaming?.id === f.id ? (
+            <div key={f.id} className="flex items-center gap-3 px-3 py-3">
+              <Folder className="size-5 shrink-0 fill-muted-foreground/20 text-muted-foreground" strokeWidth={1.5} />
+              <input
+                autoFocus
+                value={renaming.name}
+                onChange={(e) => setRenaming({ id: f.id, name: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") submitRename()
+                  if (e.key === "Escape") setRenaming(null)
+                }}
+                onBlur={submitRename}
+                className="min-w-0 flex-1 rounded border bg-background px-1.5 py-1 text-sm outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+          ) : (
+            <div key={f.id} className="flex items-center gap-1 px-3 py-1.5">
+              <button onClick={() => onOpen(f.id)} className="flex min-w-0 flex-1 items-center gap-3 py-1.5 text-left">
+                <Folder className="size-5 shrink-0 fill-muted-foreground/20 text-muted-foreground" strokeWidth={1.5} />
+                <span className="min-w-0 flex-1 truncate text-sm font-medium">{f.name}</span>
+                <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{f.count}</span>
+              </button>
+              <button
+                onClick={() => setRenaming({ id: f.id, name: f.name })}
+                className="shrink-0 rounded-md p-2 text-muted-foreground"
+                aria-label={`${f.name} 이름 변경`}
+              >
+                <Pencil className="size-3.5" />
+              </button>
+              <button onClick={() => onDelete(f.id)} className="shrink-0 rounded-md p-2 text-muted-foreground" aria-label={`${f.name} 삭제`}>
+                <Trash2 className="size-3.5" />
+              </button>
+            </div>
+          )
+        )}
+        {adding ? (
+          <div className="flex items-center gap-3 px-3 py-3">
+            <FolderPlus className="size-5 shrink-0 text-muted-foreground/60" strokeWidth={1.5} />
+            <input
+              autoFocus
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") submitNew()
+                if (e.key === "Escape") {
+                  setAdding(false)
+                  setNewName("")
+                }
+              }}
+              onBlur={() => {
+                if (!newName.trim()) setAdding(false)
+              }}
+              placeholder="폴더 이름"
+              className="min-w-0 flex-1 rounded border bg-background px-1.5 py-1 text-sm outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+        ) : (
+          <button onClick={() => setAdding(true)} className="flex w-full items-center gap-3 px-3 py-3 text-left text-muted-foreground">
+            <FolderPlus className="size-5 shrink-0" strokeWidth={1.5} />
+            <span className="text-sm font-medium">새 폴더</span>
+          </button>
+        )}
+      </div>
+
+      {/* 데스크톱(sm+): 기존 Finder식 그리드 그대로 */}
+      <div className="hidden flex-wrap gap-3 sm:flex">
       {folders.map((f) => (
         <FolderTile
           key={f.id}
@@ -95,7 +165,8 @@ export function FolderGrid({
           </button>
         )}
       </div>
-    </div>
+      </div>
+    </>
   )
 }
 
