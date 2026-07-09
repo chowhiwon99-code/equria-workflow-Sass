@@ -17,6 +17,7 @@ import { evalFormula, flowToKind, BUILTIN_FIELDS, QTY_AST, CHANNEL_AST, type Cal
 import { cn } from "@/lib/utils"
 import type { CashAccount, CashCalcType, CashCategory } from "@/types"
 import { buildSlotGraph } from "@/lib/cashflowGraph"
+import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { CashGrid } from "./CashGrid"
 import { CashFlowCanvas } from "./CashFlowCanvas"
 import { CalcTypeBuilder } from "./CalcTypeBuilder"
@@ -35,6 +36,7 @@ export function CashFlowView() {
   const supabase = createClient()
   const me = useCurrentUserId()
   const { push } = useUndo()
+  const isDesktop = useMediaQuery("(min-width: 768px)") // 캔버스는 md+에서만 마운트
   const [slots, setSlots] = useState<CashAccount[]>([])
   const [calcTypes, setCalcTypes] = useState<CashCalcType[]>([])
   const [groups, setGroups] = useState<CashCategory[]>([])
@@ -399,11 +401,12 @@ export function CashFlowView() {
         {showCoach && slots.length > 0 && (
           <CashCoachPanel slots={slots} summaries={graph.summary} groups={groups} onClose={() => setShowCoach(false)} />
         )}
-        {/* 폰(<md)에선 캔버스 숨김 — 휠 확대·드래그 등 마우스 전제 UI라 표만 사용(대표 확정) */}
+        {/* 폰(<md)에선 캔버스 미마운트 — 마우스 전제 UI인데 숨김(display:none)만 하면 보이지 않는
+            노드 트리가 slots 변경마다 재렌더돼 저사양 폰에서 낭비(적대 리뷰 확정 건) */}
         <p className="rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground md:hidden">
           흐름도(캔버스)는 PC에서 볼 수 있어요. 폰에서는 아래 표로 입력·확인하세요.
         </p>
-        <div className="hidden md:contents">
+        {isDesktop && (
           <CashFlowCanvas
             slots={slots}
             groups={groups}
@@ -422,7 +425,7 @@ export function CashFlowView() {
             onMovePool={movePool}
             onSetOpening={setOpeningFor}
           />
-        </div>
+        )}
       </div>
 
       {/* 슬롯 표 — 금액 직접 입력 */}

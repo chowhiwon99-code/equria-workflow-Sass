@@ -6,6 +6,46 @@ import { cn } from "@/lib/utils"
 
 export type FolderGridItem = { id: string; name: string; count: number }
 
+/** 폴더 이름 입력(추가/이름변경 공용) — Enter=커밋, Escape=취소, blur는 submitOnBlur(이름변경) 또는 비었을 때만 닫기(추가). */
+function FolderNameInput({
+  value,
+  onChange,
+  onSubmit,
+  onCancel,
+  submitOnBlur = false,
+  placeholder,
+  className,
+  onDoubleClick,
+}: {
+  value: string
+  onChange: (v: string) => void
+  onSubmit: () => void
+  onCancel: () => void
+  submitOnBlur?: boolean
+  placeholder?: string
+  className?: string
+  onDoubleClick?: (e: React.MouseEvent) => void
+}) {
+  return (
+    <input
+      autoFocus
+      value={value}
+      placeholder={placeholder}
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") onSubmit()
+        if (e.key === "Escape") onCancel()
+      }}
+      onBlur={() => {
+        if (submitOnBlur) onSubmit()
+        else if (!value.trim()) onCancel()
+      }}
+      onDoubleClick={onDoubleClick}
+      className={className}
+    />
+  )
+}
+
 /**
  * macOS Finder식 폴더 그리드 — 라운드 사각 타일(테두리 없음·중립색), 더블클릭 진입,
  * 드래그 드롭 대상(여러 항목 한 번에), hover 이름변경/삭제.
@@ -38,6 +78,10 @@ export function FolderGrid({
     setNewName("")
     setAdding(false)
   }
+  const cancelNew = () => {
+    setAdding(false)
+    setNewName("")
+  }
   const submitRename = () => {
     if (!renaming) return
     const n = renaming.name.trim()
@@ -53,15 +97,12 @@ export function FolderGrid({
           renaming?.id === f.id ? (
             <div key={f.id} className="flex items-center gap-3 px-3 py-3">
               <Folder className="size-5 shrink-0 fill-muted-foreground/20 text-muted-foreground" strokeWidth={1.5} />
-              <input
-                autoFocus
+              <FolderNameInput
                 value={renaming.name}
-                onChange={(e) => setRenaming({ id: f.id, name: e.target.value })}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") submitRename()
-                  if (e.key === "Escape") setRenaming(null)
-                }}
-                onBlur={submitRename}
+                onChange={(v) => setRenaming({ id: f.id, name: v })}
+                onSubmit={submitRename}
+                onCancel={() => setRenaming(null)}
+                submitOnBlur
                 className="min-w-0 flex-1 rounded border bg-background px-1.5 py-1 text-sm outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
@@ -88,20 +129,11 @@ export function FolderGrid({
         {adding ? (
           <div className="flex items-center gap-3 px-3 py-3">
             <FolderPlus className="size-5 shrink-0 text-muted-foreground/60" strokeWidth={1.5} />
-            <input
-              autoFocus
+            <FolderNameInput
               value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") submitNew()
-                if (e.key === "Escape") {
-                  setAdding(false)
-                  setNewName("")
-                }
-              }}
-              onBlur={() => {
-                if (!newName.trim()) setAdding(false)
-              }}
+              onChange={setNewName}
+              onSubmit={submitNew}
+              onCancel={cancelNew}
               placeholder="폴더 이름"
               className="min-w-0 flex-1 rounded border bg-background px-1.5 py-1 text-sm outline-none focus:ring-2 focus:ring-ring"
             />
@@ -138,20 +170,11 @@ export function FolderGrid({
             <div className="flex aspect-square w-full items-center justify-center rounded-2xl border border-dashed bg-muted/30">
               <Folder className="size-9 fill-muted text-muted-foreground/40" strokeWidth={1.5} />
             </div>
-            <input
-              autoFocus
+            <FolderNameInput
               value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") submitNew()
-                if (e.key === "Escape") {
-                  setAdding(false)
-                  setNewName("")
-                }
-              }}
-              onBlur={() => {
-                if (!newName.trim()) setAdding(false)
-              }}
+              onChange={setNewName}
+              onSubmit={submitNew}
+              onCancel={cancelNew}
               placeholder="폴더 이름"
               className="mt-1 w-full rounded border bg-background px-1.5 py-0.5 text-center text-xs outline-none focus:ring-2 focus:ring-ring"
             />
@@ -220,15 +243,12 @@ function FolderTile({
       </div>
 
       {renaming !== null ? (
-        <input
-          autoFocus
+        <FolderNameInput
           value={renaming}
-          onChange={(e) => onRenameChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") onRenameSubmit()
-            if (e.key === "Escape") onRenameCancel()
-          }}
-          onBlur={onRenameSubmit}
+          onChange={onRenameChange}
+          onSubmit={onRenameSubmit}
+          onCancel={onRenameCancel}
+          submitOnBlur
           onDoubleClick={(e) => e.stopPropagation()}
           className="mt-1 w-full rounded border bg-background px-1 py-0.5 text-center text-xs outline-none focus:ring-2 focus:ring-ring"
         />

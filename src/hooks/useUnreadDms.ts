@@ -14,14 +14,15 @@ import { onChat } from "@/lib/chatBus"
 // 마운트별 고유 채널명 — 데스크톱 사이드바+모바일 드로어 동시 마운트 시 동일 topic 이중 구독 방지
 let channelSeq = 0
 
-export function useUnreadDms(): number {
+/** @param enabled false면 쿼리·realtime 구독을 모두 쉬어간다(예: 모바일에서 숨겨진 데스크톱 사이드바). */
+export function useUnreadDms(enabled = true): number {
   const supabase = createClient()
   const me = useCurrentUserId()
   const [count, setCount] = useState(0)
   const [channelName] = useState(() => `dm-unread-sidebar-${++channelSeq}`)
 
   const load = useCallback(async () => {
-    if (!me) {
+    if (!me || !enabled) {
       setCount(0)
       return
     }
@@ -32,7 +33,7 @@ export function useUnreadDms(): number {
       .is("read_at", null)
       .is("deleted_at", null)
     setCount(count ?? 0)
-  }, [supabase, me])
+  }, [supabase, me, enabled])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -40,7 +41,7 @@ export function useUnreadDms(): number {
   }, [load])
 
   useEffect(() => {
-    if (!me) return
+    if (!me || !enabled) return
     const channel = supabase
       .channel(channelName)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "direct_messages" }, () => load())
@@ -49,7 +50,7 @@ export function useUnreadDms(): number {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [supabase, me, load, channelName])
+  }, [supabase, me, enabled, load, channelName])
 
   // 다른 창/탭의 채팅 변경 즉시 반영(BroadcastChannel)
   useEffect(() => onChat(() => load()), [load])

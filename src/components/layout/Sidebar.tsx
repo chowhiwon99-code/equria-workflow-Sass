@@ -7,6 +7,7 @@ import { Check, SlidersHorizontal, ChevronDown } from "lucide-react"
 import { FEATURES, FEATURE_GROUPS } from "@/lib/config/features"
 import { cn } from "@/lib/utils"
 import { useUnreadDms } from "@/hooks/useUnreadDms"
+import { useMediaQuery } from "@/hooks/useMediaQuery"
 
 // 사이드바에서 숨긴 메뉴(href 목록) — 기기별 저장. (B2B 전환 시 프로필 DB로 승격 가능)
 const LS_KEY = "equria:sidebar-hidden"
@@ -51,14 +52,22 @@ function Switch({ on }: { on: boolean }) {
   )
 }
 
-export function Sidebar({ className }: { className?: string }) {
+export function Sidebar({
+  className,
+  badgeDesktopOnly = false,
+}: {
+  className?: string
+  /** true면 미읽음 DM 구독을 md+에서만 — 모바일에서 hidden 처리된 데스크톱 인스턴스의 헛구독 방지 */
+  badgeDesktopOnly?: boolean
+}) {
   const pathname = usePathname()
+  const isDesktop = useMediaQuery("(min-width: 768px)")
   const [hidden, setHidden] = useState<string[]>([])
   const [collapsed, setCollapsed] = useState<string[]>([]) // 접은 폴더(그룹 id)
   const [editing, setEditing] = useState(false)
   // 첫 페인트에선 transition을 끄고(정확한 초기 상태) 이후 토글만 애니메이션 — 하이드레이션 깜빡임 방지
   const [mounted, setMounted] = useState(false)
-  const unreadDms = useUnreadDms() // "직원 채팅" 빨간 배지
+  const unreadDms = useUnreadDms(badgeDesktopOnly ? isDesktop : true) // "직원 채팅" 빨간 배지
 
   // localStorage는 클라이언트에서만 — 마운트 후 로드(하이드레이션 불일치 방지)
   useEffect(() => {
