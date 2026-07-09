@@ -98,7 +98,14 @@ export function McpView() {
       })
       const j = await res.json()
       if (!res.ok) throw new Error(j.error ?? "등록에 실패했어요.")
-      toast.success("MCP 서버를 등록했어요.")
+      // 등록 직후 자동 테스트 — 토큰/URL이 맞는지 바로 확인(연결 성공·도구 개수 또는 실패 사유)
+      if (j.id) {
+        const t = await fetch(`/api/mcp/servers/${j.id}/test`, { method: "POST" }).then((r) => r.json()).catch(() => null)
+        if (t?.ok) toast.success(`등록·연결됨 — 도구 ${t.tools?.length ?? 0}개`)
+        else toast.error(`등록됐지만 연결 실패: ${t?.error ?? "테스트에서 확인하세요"}`)
+      } else {
+        toast.success("MCP 서버를 등록했어요.")
+      }
       setAddOpen(false)
       setForm({ name: "", type: "http", url: "", auth_type: "none", token: "" })
       load()
@@ -137,9 +144,15 @@ export function McpView() {
 
   const isConnected = (c: Connector) => Boolean(c.preset && servers.some((s) => s.url === c.preset!.url))
 
-  // 프리셋 커넥터 원클릭 연결 = mcp_servers 등록 + 자동 테스트(도구 발견).
+  // 프리셋 커넥터 연결. bearer = 토큰 입력 모달 프리필(관리자가 PAT/키 붙여넣기), none = 원클릭 등록+자동 테스트.
   const connectPreset = async (c: Connector) => {
     if (!c.preset || isConnected(c)) return
+    if (c.preset.auth === "bearer") {
+      // 서버 추가 모달 재사용 — 이름·URL·인증 프리필, URL은 필요 시 수정 가능(프로젝트 스코프 등)
+      setForm({ name: c.name, type: c.preset.type, url: c.preset.url, auth_type: "bearer", token: "" })
+      setAddOpen(true)
+      return
+    }
     setConnectingId(c.id)
     try {
       const res = await fetch("/api/mcp/servers", {
@@ -223,7 +236,15 @@ export function McpView() {
             <RefreshCw className="size-4" />
           </Button>
           {isAdmin && (
-            <Button size="sm" onClick={() => setAddOpen(true)} className="hidden md:inline-flex">
+            <Button
+              size="sm"
+              onClick={() => {
+                // 빈 폼으로 초기화(bearer 프리셋 프리필 잔류 방지)
+                setForm({ name: "", type: "http", url: "", auth_type: "none", token: "" })
+                setAddOpen(true)
+              }}
+              className="hidden md:inline-flex"
+            >
               <Plus /> 서버 추가
             </Button>
           )}

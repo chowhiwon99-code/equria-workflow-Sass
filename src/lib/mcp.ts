@@ -60,16 +60,18 @@ export const MCP_CONNECTORS: Connector[] = [
     status: "available",
     preset: { type: "http", url: "https://mcp.deepwiki.com/mcp", auth: "none" },
   },
-  // 인증(토큰/OAuth) 구현 필요 — 준비 중
-  { id: "github", name: "GitHub", description: "이슈·PR·코드 검색 (토큰 필요)", emoji: "🐙", domain: "github.com", category: "개발", featured: true, status: "coming_soon" },
+  // Bearer 토큰 — "연결" 시 토큰 입력 모달(프리셋 URL·이름 프리필, AES 암호화 저장). PAT/API 키만 붙여넣으면 됨.
+  { id: "github", name: "GitHub", description: "이슈·PR·코드 검색 (PAT 토큰)", emoji: "🐙", domain: "github.com", category: "개발", featured: true, status: "available", preset: { type: "http", url: "https://api.githubcopilot.com/mcp/", auth: "bearer" } },
+  { id: "supabase", name: "Supabase", description: "데이터·스키마 조회 (PAT 토큰)", emoji: "🟢", domain: "supabase.com", category: "데이터", status: "available", preset: { type: "http", url: "https://mcp.supabase.com/mcp", auth: "bearer" } },
+  { id: "stripe", name: "Stripe", description: "결제·고객 데이터 조회 (API 키)", emoji: "💳", domain: "stripe.com", category: "데이터", status: "available", preset: { type: "http", url: "https://mcp.stripe.com", auth: "bearer" } },
+  // 무인증 읽기 전용 — 원클릭 연결(토큰 없이 익명 접근)
+  { id: "huggingface", name: "Hugging Face", description: "모델·데이터셋 검색 (읽기 전용·무인증)", emoji: "🤗", domain: "huggingface.co", category: "개발", status: "available", preset: { type: "http", url: "https://huggingface.co/mcp", auth: "none" } },
+  // OAuth 인가 플로우 구현 필요 — 준비 중(토큰만으론 연결 불가)
   { id: "notion", name: "Notion", description: "페이지·데이터베이스 검색·수정 (OAuth 필요)", emoji: "📝", domain: "notion.so", category: "생산성", featured: true, status: "coming_soon" },
   { id: "slack", name: "Slack", description: "메시지·채널 조회·전송 (OAuth 필요)", emoji: "💬", domain: "slack.com", category: "커뮤니케이션", status: "coming_soon" },
-  { id: "linear", name: "Linear", description: "이슈·프로젝트 관리 (토큰 필요)", emoji: "📐", domain: "linear.app", category: "개발", status: "coming_soon" },
+  { id: "linear", name: "Linear", description: "이슈·프로젝트 관리 (OAuth 필요)", emoji: "📐", domain: "linear.app", category: "개발", status: "coming_soon" },
   { id: "atlassian", name: "Atlassian", description: "Jira·Confluence 이슈·문서 (OAuth 필요)", emoji: "🧩", domain: "atlassian.com", category: "개발", status: "coming_soon" },
-  { id: "sentry", name: "Sentry", description: "에러·이슈 모니터링 (토큰 필요)", emoji: "🛡️", domain: "sentry.io", category: "개발", status: "coming_soon" },
-  { id: "figma", name: "Figma", description: "디자인 파일·코드 커넥트 (토큰 필요)", emoji: "🎨", domain: "figma.com", category: "디자인", status: "coming_soon" },
+  { id: "sentry", name: "Sentry", description: "에러·이슈 모니터링 (OAuth 필요)", emoji: "🛡️", domain: "sentry.io", category: "개발", status: "coming_soon" },
+  { id: "figma", name: "Figma", description: "디자인 파일·코드 커넥트 (OAuth 필요)", emoji: "🎨", domain: "figma.com", category: "디자인", status: "coming_soon" },
   { id: "canva", name: "Canva", description: "디자인 검색·생성·내보내기 (OAuth 필요)", emoji: "🖼️", domain: "canva.com", category: "디자인", status: "coming_soon" },
-  { id: "supabase", name: "Supabase", description: "데이터·스키마 조회 (토큰 필요)", emoji: "🟢", domain: "supabase.com", category: "데이터", status: "coming_soon" },
-  { id: "stripe", name: "Stripe", description: "결제·고객 데이터 조회 (키 필요)", emoji: "💳", domain: "stripe.com", category: "데이터", status: "coming_soon" },
-  { id: "huggingface", name: "Hugging Face", description: "모델·데이터셋 검색 (토큰 선택)", emoji: "🤗", domain: "huggingface.co", category: "개발", status: "coming_soon" },
 ]
