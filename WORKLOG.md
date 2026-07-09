@@ -5,6 +5,28 @@
 
 ---
 
+## 2026-07-09 · 세션29 — 모바일 반응형 1단계: 레이아웃 골격(사이드바 드로어화) (사용자 요청)
+
+**무엇/왜:** 폰에서 앱 전체가 짜부(스샷 #47) — 근본 원인 = 사이드바 반응형 0줄 + 쉘이 항상 나란히 배치. 스펙 `docs/build/mobile-responsive.md`의 **작업 1(골격)만** 수행(화면 감사·터치 UX는 다음 세션).
+
+**대표 확정 결정 3건(질문으로 확인):** ① dvh 전환 포함(별도 커밋·단독 롤백) ② 드로어가 채팅 FAB 위(z-[60] 신설 — 앱 최초 z-50 초과 레이어) ③ 모바일 패딩 0.75rem(CSS 변수 미디어쿼리).
+
+### 골격 (`237ab82`)
+- `(app)/layout`: `<Sidebar className="hidden md:flex" />` — 폰에서 콘텐츠 전폭. Sidebar에 `className?` prop(twMerge 병합, 호출부 무변경 시 시각 변화 0).
+- **`MobileNav.tsx` 신규**: `md:hidden` 햄버거(Header 드롭다운 트리거 톤) + open 시만 마운트되는 `z-[60]` 오버레이 — 스크림(`bg-black/30 backdrop-blur-sm`, Modal 딤 패턴) 탭·링크(`closest("a[href]")`) 클릭·ESC로 닫힘, 패널은 `slide-in-from-left`(tw-animate-css) 안에 기존 `<Sidebar/>` 재사용.
+- Header: 좌측 h1을 flex 래퍼로 감싸 MobileNav 삽입(데스크톱 display:none이라 gap 미발생 → 픽셀 무변화).
+- globals.css: `:root` 중첩 `@media (width<768px){ --app-pad: .75rem }` — `--app-content-height` calc이 변수라 자동 정합(클래스 방식이면 대시보드 하단 데드스페이스).
+- `useUnreadDms`: 채널명 고정("dm-unread-sidebar") → 드로어+사이드바 동시 마운트 시 이중 구독 → 모듈 카운터 suffix로 방어(useId는 React19 특수문자라 배제).
+
+### dvh 전환 (`3169071`, 별도 커밋)
+- 쉘 `h-screen`→`h-dvh` + calc `100vh`→`100dvh` — iOS 사파리 주소창 하단 잘림 대응. 데스크톱 픽셀 동일. 메일 쪽 100vh(MailCompose 등)는 3단계 스코프라 무수정.
+
+### 예상이슈 체크(수행)
+- twMerge flex↔hidden display 충돌 정상 해소 확인 · md 경계(`width<768px` ↔ `md:`=≥768) 정확 일치 · ESC setState는 이벤트 콜백이라 `set-state-in-effect` 린트 비대상 · 드로어 열린 채 데스크톱 폭 확장 시 오버레이 `md:hidden`으로 자동 소거.
+- 검증: tsc 0 · lint 30/0(신규 0) · build 0. **375px 브라우저 실확인은 미완**(Claude Chrome 확장 미연결) — 대표 확인 필요: 크롬 디바이스 모드 375×812에서 ①드로어 열림/바깥탭/링크클릭/ESC ②FAB가 딤 아래 ③가로 스크롤 없음 ④PC 무변화.
+
+---
+
 ## 2026-07-08 · 세션28 — MCP 커넥터 디렉터리 + MCP 토큰 DB 암호화(Phase A) + AI 비용 예산 한도·배포 (사용자 요청)
 
 **무엇/왜:** 대표 — ① MCP를 Claude식 "커넥터 둘러보기" 디렉터리로 ② 커넥터 실연동(토큰) 준비 ③ AI 토큰 비용 무제한(H1)을 예산으로 통제.
