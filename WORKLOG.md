@@ -45,6 +45,13 @@
 - **직원 채팅**: 조사 결과 이미 라우트 분리(`/chat`↔`/chat/[userId]`·group)+ArrowLeft 뒤로가기 존재 → 구조 전환 불필요. GroupChat 높이만 `max-md:--app-content-height`(8rem 오프셋이 모바일 축소 패딩과 어긋나던 것).
 - 검증 tsc0·lint30/0·build0. **다음 = 4단계 터치 UX(워크플로우 캔버스 터치·히트영역 44px·hover 대체) — 후순위.**
 
+### MCP bearer 커넥터 열기 (`de038b0`) — 대표 지시("MCP 손보자" → 토큰 커넥터 열기)
+- **조사**: available 2종(Context7·DeepWiki)뿐, 11종 coming_soon. 인프라(토큰 AES 암호화·RLS 격리·SSRF·런당 캐시)는 이미 견고, TODO 0건. 막힌 이유 = 프리셋 URL 없음 + OAuth 미구현.
+- **웹 검색으로 공식 원격 MCP 엔드포인트 확인**(추측 금지) → bearer 확실 3종 + 무인증 1종만 개방. 조사에서 "bearer"로 분류됐던 **Linear·Sentry·Figma는 실제 OAuth 우선이라 제외**(설명 "OAuth 필요"로 정정).
+- **개방 4종**: GitHub(`api.githubcopilot.com/mcp`)·Supabase(`mcp.supabase.com/mcp`)·Stripe(`mcp.stripe.com`)=bearer, HuggingFace(`huggingface.co/mcp`)=무인증 원클릭.
+- **UX**: bearer "연결" → 기존 서버 추가 모달 프리필(이름·URL·인증 bearer) 재사용, 관리자가 토큰만 붙여넣기. URL 수정 가능(스코프 파라미터). 등록 직후 자동 테스트로 토큰 유효성 즉시 피드백. 빈 추가 버튼 폼 리셋.
+- 검증 tsc0·lint30/0·build0. **미배포.** 남은 = OAuth 4종(Notion·Slack·Atlassian·Canva)+Linear·Sentry·Figma = 별도 대형 작업.
+
 ### 예상이슈 체크(수행)
 - twMerge flex↔hidden display 충돌 정상 해소 확인 · md 경계(`width<768px` ↔ `md:`=≥768) 정확 일치 · ESC setState는 이벤트 콜백이라 `set-state-in-effect` 린트 비대상 · 드로어 열린 채 데스크톱 폭 확장 시 오버레이 `md:hidden`으로 자동 소거.
 - 검증: tsc 0 · lint 30/0(신규 0) · build 0. **375px 브라우저 실확인은 미완**(Claude Chrome 확장 미연결) — 대표 확인 필요: 크롬 디바이스 모드 375×812에서 ①드로어 열림/바깥탭/링크클릭/ESC ②FAB가 딤 아래 ③가로 스크롤 없음 ④PC 무변화.
