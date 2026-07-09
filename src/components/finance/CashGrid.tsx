@@ -106,7 +106,8 @@ export function CashGrid({
     const editor = (f: CalcField) => (f.kind === "percent" ? <InlinePercent value={getVal(f.key)} onCommit={(v) => setVal(f.key, v)} onLive={(v) => setLiveVal(f.key, v)} /> : <InlineNumber width="w-20" value={getVal(f.key)} onCommit={(v) => setVal(f.key, v)} onLive={(v) => setLiveVal(f.key, v)} />)
     return (
       <tr key={s.id} className="group hover:bg-muted/20">
-        <td className="px-2 py-1">
+        {/* min-w: 항목명 열이 자동 배분에서 쪼그라들어 이름이 잘리는 것 방지(입력칸이 w-full이라 고유폭 0) */}
+        <td className="min-w-36 px-2 py-1">
           <div className="relative flex items-center gap-1.5">
             <button onClick={() => setColorFor(colorFor === s.id ? null : s.id)} className="size-3.5 shrink-0 rounded-full ring-1 ring-border transition-transform hover:scale-110" style={{ backgroundColor: swatch(s.color) }} title="색 변경" />
             {colorFor === s.id && (
