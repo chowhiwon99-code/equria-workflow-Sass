@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { Plus, FolderKanban } from "lucide-react"
+import { Plus, FolderKanban, Check } from "lucide-react"
 import { Select } from "@/components/shared/Select"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { createClient } from "@/lib/supabase/client"
@@ -303,10 +303,14 @@ function CreateProjectModal({
   const [status, setStatus] = useState<ProjectStatus>("planned")
   const [importance, setImportance] = useState(0)
   const [ownerId, setOwnerId] = useState("")
+  const [memberIds, setMemberIds] = useState<string[]>([])
   const [startDate, setStartDate] = useState("")
   const [dueDate, setDueDate] = useState("")
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const toggleMember = (id: string) =>
+    setMemberIds((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]))
 
   const submit = async () => {
     if (!name.trim()) {
@@ -334,12 +338,25 @@ function CreateProjectModal({
       })
       .select()
       .single()
-    setSaving(false)
     if (insErr) {
+      setSaving(false)
       setError(insErr.message)
       return
     }
+    // 참여 인원 등록(선택된 멤버 → project_members). 생성자가 created_by라 pm_insert RLS 통과.
+    if (inserted && memberIds.length) {
+      const { error: memErr } = await supabase
+        .from("project_members")
+        .insert(memberIds.map((uid) => ({ project_id: inserted.id, user_id: uid })))
+      if (memErr) {
+        setSaving(false)
+        setError("프로젝트는 만들었지만 참여 인원 등록에 실패했어요: " + memErr.message)
+        return
+      }
+    }
+    setSaving(false)
     if (inserted) {
+      // Undo=프로젝트 delete → project_members는 on delete cascade로 함께 제거(정합성 유지).
       push({
         label: "프로젝트 생성",
         undo: async () => {
@@ -347,6 +364,11 @@ function CreateProjectModal({
         },
         redo: async () => {
           await supabase.from("projects").insert(inserted)
+          if (memberIds.length) {
+            await supabase
+              .from("project_members")
+              .insert(memberIds.map((uid) => ({ project_id: inserted.id, user_id: uid })))
+          }
         },
       })
     }
@@ -397,6 +419,33 @@ function CreateProjectModal({
               ))}
             </select>
           </label>
+        </div>
+        {/* 참여 인원 — 생성 시 바로 지정(생성 후 상세에서도 추가/제거 가능) */}
+        <div className="text-xs text-muted-foreground">
+          참여 인원 {memberIds.length > 0 && <span className="text-foreground">· {memberIds.length}명</span>}
+          {profiles.length === 0 ? (
+            <p className="mt-1 text-muted-foreground">등록된 구성원이 없습니다.</p>
+          ) : (
+            <div className="mt-1 flex max-h-32 flex-wrap gap-1.5 overflow-y-auto rounded-lg border bg-card p-2">
+              {profiles.map((p) => {
+                const on = memberIds.includes(p.id)
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => toggleMember(p.id)}
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors",
+                      on ? "border-primary bg-primary/10 text-foreground" : "text-muted-foreground hover:bg-muted"
+                    )}
+                  >
+                    {on && <Check className="size-3" />}
+                    {p.name}
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
         <div className="flex gap-2">
           <label className="flex-1 text-xs text-muted-foreground">
