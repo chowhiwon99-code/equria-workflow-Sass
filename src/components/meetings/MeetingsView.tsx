@@ -170,7 +170,9 @@ export function MeetingsView() {
         <div>
           <h1 className="text-lg font-semibold">회의 노트</h1>
           <p className="text-sm text-muted-foreground">
-            회의록을 작성하고 팀과 공유하세요. 폴더를 더블클릭해 열고, 회의록을 끌어다 정리하세요.
+            회의록을 작성하고 팀과 공유하세요.{" "}
+            <span className="sm:hidden">폴더를 탭해 열어보세요.</span>
+            <span className="hidden sm:inline">폴더를 더블클릭해 열고, 회의록을 끌어다 정리하세요.</span>
           </p>
         </div>
         <Button size="sm" onClick={() => openNote(null)}>
@@ -273,7 +275,12 @@ export function MeetingsView() {
       ) : visible.length === 0 ? (
         <p className="px-1 py-6 text-center text-sm text-muted-foreground">
           {currentFolder === null && folders.length > 0
-            ? "폴더를 더블클릭해 열거나, 회의록을 폴더로 끌어다 놓으세요."
+            ? (
+                <>
+                  <span className="sm:hidden">폴더를 탭해 열어보세요.</span>
+                  <span className="hidden sm:inline">폴더를 더블클릭해 열거나, 회의록을 폴더로 끌어다 놓으세요.</span>
+                </>
+              )
             : currentFolder === null
               ? "낱개(미분류) 회의록이 없어요."
               : "이 폴더에 회의록이 없어요."}

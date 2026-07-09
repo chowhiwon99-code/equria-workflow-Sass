@@ -272,7 +272,7 @@ export function MailShell() {
 
   // ---- 연결됨: 3분할 ----
   return (
-    <div className="flex h-[calc(100vh-9rem)] flex-col gap-3">
+    <div className="flex h-[calc(100dvh-9rem)] flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-lg font-semibold">메일</h1>

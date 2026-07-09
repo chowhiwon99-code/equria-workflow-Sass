@@ -331,8 +331,7 @@ export function CalendarView() {
                         setSelected(e)
                       }}
                       className={cn(
-                        // 폰(<sm)에선 칸이 좁아 글자를 숨기고 색 막대만(탭하면 상세) — 제목은 sm+에서
-                        "relative truncate py-0.5 text-[11px] leading-[1.2] text-transparent sm:text-white",
+                        "relative truncate py-0.5 text-[11px] leading-[1.2] text-white",
                         roundLeft ? "rounded-l" : "rounded-l-none",
                         roundRight ? "rounded-r" : "rounded-r-none",
                         showLabel ? "pl-1.5 pr-1" : "px-1",
@@ -345,7 +344,15 @@ export function CalendarView() {
                         marginRight: roundRight ? undefined : "-7px",
                       }}
                     >
-                      {showLabel ? e.title : " "}
+                      {/* 폰(<sm)은 칸이 좁아 제목의 첫 단어만(대표 확정) — sm+는 전체 제목 */}
+                      {showLabel ? (
+                        <>
+                          <span className="sm:hidden">{e.title.trim().split(/\s+/)[0]}</span>
+                          <span className="hidden sm:inline">{e.title}</span>
+                        </>
+                      ) : (
+                        " "
+                      )}
                     </span>
                   )
                 })}
