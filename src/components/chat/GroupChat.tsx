@@ -350,7 +350,8 @@ export function GroupChat({ roomId: roomIdProp }: { roomId?: string }) {
   if (error) return <ErrorState message={error} />
 
   return (
-    <div className="flex h-[calc(100dvh-8rem)] flex-col">
+    // 모바일은 --app-content-height로 정확 채움(8rem 오프셋은 PC 패딩 기준)
+    <div className="flex h-[calc(100dvh-8rem)] flex-col max-md:h-[var(--app-content-height)]">
       {/* 헤더 */}
       <div className="flex items-center gap-2 border-b pb-3">
         <button onClick={() => router.push("/chat")} className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="목록">

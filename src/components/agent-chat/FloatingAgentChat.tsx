@@ -472,7 +472,12 @@ function ChatPanel({
   // 닫힘 morph 진행 상태 — "back"=목록으로 / "close"=위젯 닫기. 애니 종료 후 실제 전환 실행.
   const [exit, setExit] = useState<null | "back" | "close">(null)
 
-  const panelSize = isExpanded ? PANEL_SIZE_EXPANDED : PANEL_SIZE_NORMAL
+  // 좁은 화면(폰)에선 뷰포트에 맞춰 축소 — 375px 폰에서 359×(화면-16) ≈ 풀스크린. PC는 기존 크기.
+  const basePanelSize = isExpanded ? PANEL_SIZE_EXPANDED : PANEL_SIZE_NORMAL
+  const panelSize = {
+    width: Math.min(basePanelSize.width, window.innerWidth - EDGE_PADDING * 2),
+    height: Math.min(basePanelSize.height, window.innerHeight - EDGE_PADDING * 2),
+  }
   const widget = widgetTopLeft(position)
   const panel = panelTopLeft(widget, panelSize)
 

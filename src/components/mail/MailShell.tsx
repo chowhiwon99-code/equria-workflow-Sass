@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import {
+  ArrowLeft,
   Mail,
   PenSquare,
   Inbox,
@@ -272,7 +273,8 @@ export function MailShell() {
 
   // ---- 연결됨: 3분할 ----
   return (
-    <div className="flex h-[calc(100dvh-9rem)] flex-col gap-3">
+    // 모바일은 --app-content-height로 정확 채움(9rem 오프셋은 PC 기준)
+    <div className="flex h-[calc(100dvh-9rem)] flex-col gap-3 max-md:h-[var(--app-content-height)]">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-lg font-semibold">메일</h1>
@@ -291,9 +293,20 @@ export function MailShell() {
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[160px_minmax(260px,340px)_1fr] gap-3">
-        {/* 좌측 폴더 */}
-        <div className="flex flex-col gap-1 overflow-y-auto rounded-xl border p-2">
+      {/* 모바일(<md) = 단일 pane 스택: 목록 모드(폴더 칩 줄+목록) ↔ 상세 모드(상세만, 뒤로가기) */}
+      <div
+        className={cn(
+          "grid min-h-0 flex-1 gap-3 md:grid-cols-[160px_minmax(260px,340px)_1fr]",
+          selectedId ? "max-md:grid-rows-[minmax(0,1fr)]" : "max-md:grid-rows-[auto_minmax(0,1fr)]"
+        )}
+      >
+        {/* 좌측 폴더 — 모바일에선 가로 칩 줄 */}
+        <div
+          className={cn(
+            "flex flex-col gap-1 overflow-y-auto rounded-xl border p-2 max-md:flex-row max-md:overflow-x-auto",
+            selectedId && "max-md:hidden"
+          )}
+        >
           {FOLDERS.map((f) => (
             <button
               key={f.id}
@@ -303,7 +316,7 @@ export function MailShell() {
                 setAppliedQ("")
               }}
               className={cn(
-                "flex items-center gap-2 rounded-md px-3 py-2 text-left text-sm",
+                "flex items-center gap-2 rounded-md px-3 py-2 text-left text-sm max-md:shrink-0",
                 activeLabel === f.id ? "bg-muted font-medium" : "text-muted-foreground hover:bg-muted/50"
               )}
             >
@@ -312,8 +325,8 @@ export function MailShell() {
           ))}
         </div>
 
-        {/* 중앙 목록 */}
-        <div className="flex min-h-0 flex-col rounded-xl border">
+        {/* 중앙 목록 — 모바일 상세 모드에선 숨김 */}
+        <div className={cn("flex min-h-0 flex-col rounded-xl border", selectedId && "max-md:hidden")}>
           <form
             onSubmit={(e) => {
               e.preventDefault()
@@ -374,7 +387,7 @@ export function MailShell() {
         </div>
 
         {/* 우측 상세 */}
-        <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border">
+        <div className={cn("flex min-h-0 flex-col overflow-hidden rounded-xl border", !selectedId && "max-md:hidden")}>
           {!selectedId ? (
             <div className="grid flex-1 place-items-center text-sm text-muted-foreground">
               메일을 선택하세요.
@@ -384,6 +397,19 @@ export function MailShell() {
           ) : (
             <>
               <div className="flex items-center gap-1 border-b p-2.5">
+                {/* 모바일 전용 뒤로가기 — 목록으로 */}
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  title="목록으로"
+                  className="md:hidden"
+                  onClick={() => {
+                    setSelectedId(null)
+                    setDetail(null)
+                  }}
+                >
+                  <ArrowLeft className="size-4" />
+                </Button>
                 <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">{detail.subject}</h2>
                 <Button size="icon-sm" variant="ghost" title="답장" onClick={openReply}>
                   <Reply className="size-4" />
