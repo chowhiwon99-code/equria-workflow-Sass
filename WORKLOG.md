@@ -5,6 +5,34 @@
 
 ---
 
+## 2026-07-09 · 세션30 — 1차 기능묶음(프로젝트·전자결재·오늘할일) 배포 (대표 요청 7종 중)
+
+**무엇/왜:** 대표가 실사용 관점 7종 요청. 조사(멀티에이전트 3) 결과 대부분 기존 패턴 재사용 가능 → "가벼운 것 먼저, 무거운 것(카톡·카드 실연동) 백로그". 세션 시작 시 **전체 코드리뷰**(보안/원칙·세션29 MCP)도 수행 — 이상無(any0·키노출0·인증누락0·MCP user_id격리·OAuth PKCE·토큰암호화 정상), 마이너 몇 건은 HANDOFF 기록.
+
+### A. 프로젝트 중요도 (`0a3aafd`, 마이그 091)
+- `projects.importance int default 0`(추가형). 회의노트(070) importance 패턴 이식 — `lib/meetingMeta`의 `IMPORTANCE`/`importanceColor`/`tagBg` **그대로 재사용**(신규 RPC 불필요, projects UPDATE RLS(035)가 created_by/owner_id 허용).
+- 생성폼 중요도 select·카드/상세 배지·상세 메타카드 인라인 변경(Undo 연동).
+
+### B. 생성 시 참여 인원 (`548aac2`, 스키마 무변경)
+- `CreateProjectModal`에 구성원 칩 다중선택 → insert 후 `project_members` 일괄 insert(생성자=created_by라 pm_insert(035) 통과). Undo=프로젝트 delete 시 cascade로 멤버 동반 제거.
+
+### C. 전자결재 사용법 안내 (`73a7092`, **로직 0**)
+- 대표 "쓸 줄 모르겠다" → 기능은 완성, 안내 부재가 원인. `ApprovalView` 접이식 "이렇게 써요" 3단계 배너(localStorage 유지)+`DocumentList` 빈상태 "새 기안" CTA(EmptyState action/description 활용)+`NewDocumentModal` 결재선 설명 1줄. RPC/스키마 무변경.
+
+### D. 오늘 할 일 위젯 (`e2930ef`, 마이그 092)
+- `personal_tasks`(본인전용 RLS=`mcp_user_connections` 패턴, workspace 컬럼 불필요) + `TodayTasks` 대시보드 위젯(`AnnouncementsBoard` 구조 복제 — load+realtime+run). 추가(기한 선택)·완료 토글·삭제·기한 지남 강조. dashboard/page.tsx 상단 shrink-0 카드. **시각 알림은 2차(pg_cron)로 분리**(대표는 "시각 알림까지" 원함).
+
+### 인프라·검증·배포
+- eslint `.claude/worktrees/**` globalIgnores 추가(`7917c52`) — 백그라운드 격리 워크트리가 메인 밑에 중첩돼 루트 lint가 src를 이중 스캔하던 문제 해결(30→60/90 오탐).
+- 검증: tsc 0 · lint 30/0(베이스라인) · `next build` 성공 · Vercel 프리뷰+프로덕션 **READY**.
+- 배포: 프리뷰(feat/toss-ui-refresh) 확인 후 대표 승인 → main-first 프로덕션 `e2930ef`(롤백 `d4f4508`). 마이그 091·092 원격 적용(추가형, 코드 전 안전).
+
+### 다음
+- **2차**: 프로젝트 세분화 체크리스트(`project_tasks`, 워크스페이스 RLS) + 진행률을 실제 완료율로 승격 · 오늘할일 시각알림(`personal_tasks.remind_at` + notifications 'reminder' + pg_cron).
+- **백로그(무거움)**: 회사 카드/금융 실연동(오픈뱅킹/카드사 API, "담당자만"=`064` 위임패턴) · 카톡(카카오) 연결.
+
+---
+
 ## 2026-07-09 · 세션29(연속) — MCP UI 간소화 + 직원별 개인 연결 + OAuth 커넥터 (사용자 지적)
 
 **무엇/왜:** 대표 지적 2건 — ① "서버 추가" 기술 모달(전송방식·URL·인증)이 GitHub 연결하려는 사람에겐 어려움 ② "다 각자 계정 써야 하는거 아님?" — GitHub·Supabase·Stripe가 회사 전체 토큰 공유 구조였는데, 개인 계정 성격이라 직원별 연결이 맞음. + "다른 MCP도 연동해줘"(Notion·Linear·Sentry 등 OAuth 커넥터).
