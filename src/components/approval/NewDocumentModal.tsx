@@ -201,7 +201,10 @@ export function NewDocumentModal({
 
         {/* 결재선 */}
         <div className="rounded-lg border bg-muted/20 p-3">
-          <p className="mb-2 text-xs font-medium text-muted-foreground">결재선</p>
+          <p className="mb-1 text-xs font-medium text-muted-foreground">결재선</p>
+          <p className="mb-2 text-[11px] leading-relaxed text-muted-foreground/70">
+            승인할 사람을 순서대로 추가하세요. 위에서부터 차례로 결재가 넘어가요. 각 사람의 <b className="font-medium">결재</b>(승인 권한) ↔ <b className="font-medium">참조</b>(열람만)는 배지를 눌러 바꿔요.
+          </p>
           {line.length === 0 ? (
             <p className="mb-2 text-xs text-muted-foreground/70">결재자를 추가해 주세요.</p>
           ) : (

@@ -1,7 +1,8 @@
 "use client"
 
-import { FileText } from "lucide-react"
+import { FileText, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/shared/States"
 import { DOC_STATUS_BADGE } from "./status"
 import { docSummary } from "./templates"
@@ -14,6 +15,7 @@ export function DocumentList({
   posById,
   emptyLabel,
   onOpen,
+  onNew,
 }: {
   docs: Doc[]
   me: string
@@ -21,8 +23,23 @@ export function DocumentList({
   posById: Record<string, string | null>
   emptyLabel: string
   onOpen: (id: string) => void
+  onNew?: () => void
 }) {
-  if (docs.length === 0) return <EmptyState icon={FileText} title={emptyLabel} />
+  if (docs.length === 0)
+    return (
+      <EmptyState
+        icon={FileText}
+        title={emptyLabel}
+        description={onNew ? "‘새 기안’으로 결재 문서를 만들어 상신해보세요." : undefined}
+        action={
+          onNew ? (
+            <Button size="sm" variant="outline" onClick={onNew}>
+              <Plus className="size-3.5" /> 새 기안 작성
+            </Button>
+          ) : undefined
+        }
+      />
+    )
   return (
     <div className="flex flex-col divide-y rounded-xl border">
       {docs.map((d) => (
