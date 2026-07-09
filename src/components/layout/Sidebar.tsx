@@ -51,7 +51,7 @@ function Switch({ on }: { on: boolean }) {
   )
 }
 
-export function Sidebar() {
+export function Sidebar({ className }: { className?: string }) {
   const pathname = usePathname()
   const [hidden, setHidden] = useState<string[]>([])
   const [collapsed, setCollapsed] = useState<string[]>([]) // 접은 폴더(그룹 id)
@@ -122,7 +122,12 @@ export function Sidebar() {
     )
 
   return (
-    <aside className="flex h-full w-[var(--sidebar-width)] shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground">
+    <aside
+      className={cn(
+        "flex h-full w-[var(--sidebar-width)] shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground",
+        className
+      )}
+    >
       <Link href="/dashboard" className="flex h-[var(--header-height)] items-center border-b px-4">
         {/* 브랜드 워드마크 — Pretendard, 모노톤 그라데이션으로 느낌있게 */}
         <span className="bg-gradient-to-r from-foreground to-foreground/55 bg-clip-text font-pretendard text-lg font-semibold tracking-tight text-transparent">

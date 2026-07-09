@@ -33,7 +33,8 @@ export default async function AppLayout({
       <UndoProvider>
       <AgentChatProvider>
         <div className="flex h-screen overflow-hidden">
-          <Sidebar />
+          {/* 모바일(<md)에선 숨김 — 대신 Header의 MobileNav 드로어로 진입 */}
+          <Sidebar className="hidden md:flex" />
           <div className="flex flex-1 flex-col overflow-hidden">
             <Header userName={profile?.name ?? "직원"} userId={user.id} />
             <AnnouncementBanner />

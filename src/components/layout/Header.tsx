@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { ChevronDown } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { findFeatureByPath } from "@/lib/config/features"
+import { MobileNav } from "@/components/layout/MobileNav"
 import { NotificationBell } from "@/components/layout/NotificationBell"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
@@ -27,7 +28,11 @@ export function Header({ userName, userId }: { userName: string; userId: string 
 
   return (
     <header className="flex h-[var(--header-height)] shrink-0 items-center justify-between border-b px-6">
-      <h1 className="text-sm font-semibold">{feature?.label ?? "Complow 워크스페이스"}</h1>
+      <div className="flex items-center gap-2">
+        {/* 모바일 전용 햄버거+드로어 — 데스크톱(md+)에선 display:none이라 h1 위치 무변화 */}
+        <MobileNav />
+        <h1 className="text-sm font-semibold">{feature?.label ?? "Complow 워크스페이스"}</h1>
+      </div>
 
       <div className="flex items-center gap-1">
         <NotificationBell userId={userId} />
