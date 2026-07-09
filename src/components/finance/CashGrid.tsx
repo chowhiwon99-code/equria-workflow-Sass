@@ -221,7 +221,8 @@ export function CashGrid({
         <button onClick={onEditColumns} className="inline-flex h-8 items-center gap-1 rounded-lg border px-2.5 text-sm font-medium text-muted-foreground hover:bg-muted" title="계산 칸·수식 편집(부가세 등 추가)">
           <SlidersHorizontal className="size-3.5" /> 칸 편집
         </button>
-        <button onClick={onAddSlot} className="inline-flex h-8 items-center gap-1 rounded-lg bg-foreground px-2.5 text-sm font-medium text-background transition-opacity hover:opacity-90">
+        {/* 항목 추가는 폰에서 숨김(대표 확정 — 구조 편집은 PC에서) */}
+        <button onClick={onAddSlot} className="hidden h-8 items-center gap-1 rounded-lg bg-foreground px-2.5 text-sm font-medium text-background transition-opacity hover:opacity-90 md:inline-flex">
           <Plus className="size-3.5" /> 항목 추가
         </button>
       </div>

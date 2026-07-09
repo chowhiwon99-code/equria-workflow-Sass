@@ -328,7 +328,8 @@ export function CashFlowView() {
               순이익 {money(graph.pool.netProfit, graph.pool.currency)}
             </span>
           </div>
-          <div className="flex items-center gap-1.5">
+          {/* 모바일: 줄바꿈 허용(버튼 줄 화면 밖 삐짐 방지) */}
+          <div className="flex flex-wrap items-center gap-1.5">
             <Button size="sm" variant={showCoach ? "default" : "outline"} onClick={() => setShowCoach((v) => !v)} disabled={slots.length === 0}>
               <Sparkles className="size-3.5" /> AI 코칭
             </Button>
@@ -341,7 +342,8 @@ export function CashFlowView() {
             <Button size="sm" variant="outline" onClick={exportXlsx} disabled={slots.length === 0}>
               <Sheet className="size-3.5" /> 엑셀
             </Button>
-            <Button size="sm" variant="outline" onClick={exportCsv} disabled={slots.length === 0}>
+            {/* CSV는 폰에서 숨김(대표 확정 — 모바일은 조회 위주) */}
+            <Button size="sm" variant="outline" onClick={exportCsv} disabled={slots.length === 0} className="hidden md:inline-flex">
               <Download className="size-3.5" /> CSV
             </Button>
             <Button size="sm" variant="outline" onClick={exportPdf} disabled={slots.length === 0}>
