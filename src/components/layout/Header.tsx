@@ -27,7 +27,7 @@ export function Header({ userName, userId }: { userName: string; userId: string 
   }
 
   return (
-    <header className="flex h-[var(--header-height)] shrink-0 items-center justify-between border-b px-6">
+    <header className="glass-panel flex h-[var(--header-height)] shrink-0 items-center justify-between border-b border-[var(--glass-border)] px-6">
       <div className="flex items-center gap-2">
         {/* 모바일 전용 햄버거+드로어 — 데스크톱(md+)에선 display:none이라 h1 위치 무변화 */}
         <MobileNav />

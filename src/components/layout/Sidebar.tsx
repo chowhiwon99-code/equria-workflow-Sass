@@ -133,7 +133,7 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        "flex h-full w-[var(--sidebar-width)] shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground",
+        "glass-panel flex h-full w-[var(--sidebar-width)] shrink-0 flex-col border-r border-[var(--glass-border)] text-sidebar-foreground",
         className
       )}
     >
@@ -201,7 +201,7 @@ export function Sidebar({
                           aria-hidden={editing}
                           tabIndex={editing ? -1 : undefined}
                           className={cn(
-                            "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-[opacity,background-color,color] duration-200 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sidebar-ring",
+                            "flex items-center gap-3 rounded-full px-3 py-2 text-sm font-medium transition-[opacity,background-color,color] duration-200 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sidebar-ring",
                             active
                               ? "bg-sidebar-accent text-sidebar-accent-foreground"
                               : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
@@ -229,7 +229,7 @@ export function Sidebar({
                           aria-pressed={!isHidden}
                           title={isHidden ? "메뉴 켜기" : "메뉴 끄기"}
                           className={cn(
-                            "absolute inset-0 flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-opacity duration-200 motion-reduce:transition-none hover:bg-sidebar-accent/40",
+                            "absolute inset-0 flex items-center gap-3 rounded-full px-3 py-2 text-sm font-medium transition-opacity duration-200 motion-reduce:transition-none hover:bg-sidebar-accent/40",
                             editing ? "opacity-100" : "pointer-events-none opacity-0"
                           )}
                         >
@@ -266,7 +266,7 @@ export function Sidebar({
         <button
           onClick={() => setEditing((e) => !e)}
           className={cn(
-            "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sidebar-ring",
+            "flex w-full items-center gap-3 rounded-full px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sidebar-ring",
             editing
               ? "bg-sidebar-accent text-sidebar-accent-foreground"
               : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"

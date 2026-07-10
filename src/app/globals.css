@@ -273,9 +273,15 @@ body {
     border: 1px solid var(--glass-border);
     box-shadow: var(--shadow-lg);
   }
+  /* 셸 패널(사이드바·헤더)용 — bg+sheen만, 테두리/그림자는 호출부가 지정(border-r/border-b) */
+  .glass-panel {
+    background-color: var(--glass-bg);
+    background-image: var(--glass-sheen);
+  }
 }
 @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .glass,
+  .glass-panel,
   [data-slot="dropdown-menu-content"],
   [data-slot="dropdown-menu-sub-content"] {
     -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
@@ -283,13 +289,15 @@ body {
   }
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .glass {
+  .glass,
+  .glass-panel {
     background-color: var(--card);
     background-image: none;
   }
 }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   .glass,
+  .glass-panel,
   [data-slot="dropdown-menu-content"],
   [data-slot="dropdown-menu-sub-content"] {
     background-color: var(--card);
