@@ -61,10 +61,19 @@
   --sidebar-accent-foreground: oklch(0.205 0.004 264);
   --sidebar-border: oklch(0.92 0.004 264);
   --sidebar-ring: oklch(0.6 0.006 264);
-  /* elevation — 애플식 저투명 다층(데이터-slot/컴포넌트에서 box-shadow로 소비) */
+  /* elevation — 애플식 저투명 다층(데이터-slot/컴포넌트에서 box-shadow로 소비). md/lg를 더 넓고 부드럽게(글래스 깊이) */
   --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.04), 0 1px 1px oklch(0 0 0 / 0.04);
-  --shadow-md: 0 1px 2px oklch(0 0 0 / 0.04), 0 6px 16px oklch(0 0 0 / 0.06);
-  --shadow-lg: 0 4px 8px oklch(0 0 0 / 0.05), 0 16px 40px oklch(0 0 0 / 0.1);
+  --shadow-md: 0 1px 2px oklch(0 0 0 / 0.04), 0 8px 24px oklch(0 0 0 / 0.06);
+  --shadow-lg: 0 2px 6px oklch(0 0 0 / 0.05), 0 24px 60px oklch(0 0 0 / 0.1);
+  /* 글래스모피즘 토큰 — 프로스트 표면(Surface glass·셸·오버레이가 소비). 알파 하한 높게=본문 대비 확보(a11y) */
+  --glass-bg: oklch(1 0 0 / 0.6);
+  --glass-border: oklch(1 0 0 / 0.55);
+  --glass-hairline: oklch(0.55 0.006 264 / 0.14);
+  --glass-blur: 16px;
+  --glass-saturate: 1.4;
+  --glass-sheen: linear-gradient(180deg, oklch(1 0 0 / 0.35), oklch(1 0 0 / 0) 40%);
+  /* 강조점 1개 — 모노크롬 유지, 활성/라이브 점에만 절제 사용 */
+  --accent-dot: oklch(0.72 0.16 350);
 }
 
 /* 공개 화면(랜딩·로그인·회원가입) 라이트 고정 — 시스템/앱이 다크여도 항상 라이트 */
@@ -89,6 +98,14 @@
   --border: oklch(0.92 0.004 264);
   --input: oklch(0.92 0.004 264);
   --ring: oklch(0.6 0.006 264);
+  /* 글래스 옵트아웃 — 공개 화면은 항상 불투명(블러 0) */
+  --glass-bg: var(--card);
+  --glass-border: var(--border);
+  --glass-hairline: var(--border);
+  --glass-blur: 0px;
+  --glass-saturate: 1;
+  --glass-sheen: none;
+  --accent-dot: oklch(0.72 0.16 350);
 }
 
 .dark {
@@ -135,8 +152,16 @@
   --sidebar-border: oklch(1 0 0 / 14%);
   --sidebar-ring: oklch(0.55 0.006 264);
   --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.3);
-  --shadow-md: 0 1px 2px oklch(0 0 0 / 0.3), 0 6px 16px oklch(0 0 0 / 0.4);
-  --shadow-lg: 0 4px 8px oklch(0 0 0 / 0.4), 0 16px 40px oklch(0 0 0 / 0.5);
+  --shadow-md: 0 1px 2px oklch(0 0 0 / 0.3), 0 8px 24px oklch(0 0 0 / 0.4);
+  --shadow-lg: 0 2px 6px oklch(0 0 0 / 0.4), 0 24px 60px oklch(0 0 0 / 0.5);
+  /* 글래스 토큰(다크) — 카드보다 약간 어두운 반투명 + 얇은 흰 테두리 */
+  --glass-bg: oklch(0.26 0.006 264 / 0.55);
+  --glass-border: oklch(1 0 0 / 0.1);
+  --glass-hairline: oklch(1 0 0 / 0.08);
+  --glass-blur: 18px;
+  --glass-saturate: 1.3;
+  --glass-sheen: linear-gradient(180deg, oklch(1 0 0 / 0.06), oklch(1 0 0 / 0) 45%);
+  --accent-dot: oklch(0.75 0.15 350);
 }
 
 @theme inline {
@@ -173,6 +198,7 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-accent-dot: var(--accent-dot);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -200,6 +226,25 @@ body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-pretendard);
+}
+
+/*
+ * 앱 앰비언트 배경 — 프로스트 글래스가 블러할 은은한 실크 그라데이션(셸 layout에서만 fixed -z-10로 마운트).
+ * body의 --background 위에 얹히고 모든 앱 콘텐츠 아래에 깔림. 미지원 렌더러/공개 화면은 flat --background 폴백.
+ */
+.app-ambient {
+  background:
+    radial-gradient(60% 55% at 15% 10%, oklch(0.75 0.05 320 / 0.1), transparent 60%),
+    radial-gradient(50% 50% at 85% 20%, oklch(0.72 0.05 240 / 0.1), transparent 55%),
+    radial-gradient(70% 60% at 50% 100%, oklch(0.8 0.03 264 / 0.1), transparent 60%),
+    var(--background);
+}
+.dark .app-ambient {
+  background:
+    radial-gradient(60% 55% at 15% 10%, oklch(0.45 0.06 320 / 0.18), transparent 60%),
+    radial-gradient(50% 50% at 85% 20%, oklch(0.42 0.06 240 / 0.18), transparent 55%),
+    radial-gradient(70% 60% at 50% 100%, oklch(0.3 0.03 264 / 0.2), transparent 60%),
+    var(--background);
 }
 
 /*

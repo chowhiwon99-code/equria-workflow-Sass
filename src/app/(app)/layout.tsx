@@ -34,6 +34,8 @@ export default async function AppLayout({
       <AgentChatProvider>
         {/* dvh: iOS 사파리 주소창이 가리는 만큼 실시간 보정(데스크톱은 vh와 동일) */}
         <div className="flex h-dvh overflow-hidden">
+          {/* 앰비언트 배경 — 프로스트 글래스가 블러할 은은한 그라데이션. fixed·-z-10라 flex 흐름 불참(레이아웃 무영향) */}
+          <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 app-ambient" />
           {/* 모바일(<md)에선 숨김 — 대신 Header의 MobileNav 드로어로 진입. 배지 구독도 md+에서만 */}
           <Sidebar className="hidden md:flex" badgeDesktopOnly />
           <div className="flex flex-1 flex-col overflow-hidden">
