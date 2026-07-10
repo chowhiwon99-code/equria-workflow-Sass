@@ -5,6 +5,26 @@
 
 ---
 
+## 2026-07-10 · 세션31 — 프로젝트 체크리스트(세부 할 일) 배포 (글래스 리디자인 Phase 0)
+
+**무엇/왜:** "2차" 후보였던 프로젝트 세분화 체크리스트 구현. 이어질 **글래스모피즘 전면 리디자인**과 관심사 분리를 위해 먼저 단독 배포(리디자인 Phase 0). ※ Ultraplan 클라우드가 같은 작업을 시도했으나 조직정책 403으로 push 차단 → 로컬에서 실행.
+
+### project_tasks (마이그 094, 커밋 `c87e091`)
+- **마이그 094 project_tasks**: 프로젝트별 세부 할 일. 부모 `projects`(035 워크스페이스 격리)를 **EXISTS로 상속** → 별도 `workspace_id` 비정규화·센티넬 default 안 만듦(B1-b 부채 회피). 같은 워크스페이스에서 프로젝트를 볼 수 있는 멤버=협업 CRUD. 정책 4종.
+- **UI(ProjectDetail)**: 멤버 카드 아래 체크리스트 섹션 — 추가(한글 IME 이중발동 방지: `isComposing` 무시 + `submitting` ref)·완료 체크·삭제·**진행률 바(doneCount/total·%)**, 전 변경 ⌘Z Undo(FilesSection 패턴).
+- **공용 `lib/tasks.ts`**: `dueBadge`·`todayStr` 추출 → `TodayTasks`가 로컬 복붙 대신 재사용(safe-changes §6 중복 제거).
+- **types.ts**: project_tasks Row/Insert/Update + FK 관계 수동 반영.
+
+**예상이슈 체크:**
+- RLS 시뮬(롤백 트랜잭션): 멤버 insert 성공+select 1건 / **anon 0건** → 격리 확인. advisor(security) project_tasks 신규 경고 없음.
+- wCTE 스냅샷 아티팩트(같은 statement 삽입행 비가시)로 1차 sim이 오해 소지 → insert/select **별도 statement**로 재검증(member_can_see:1).
+- lint: 신규 load effect 1건이 set-state-in-effect(+1) → `TodayTasks`와 동일하게 eslint-disable로 베이스라인(30) 유지.
+- tsc 0 · lint 30/0 · build 성공 · 마이그 094 원격 등록·drift 없음.
+
+**배포:** feat→**main-first**(`d44afc1..c87e091`) → Vercel 프로덕션(icn1). 롤백 후보=`d44afc1`.
+
+---
+
 ## 2026-07-09 · 세션30 — 1차 기능묶음(프로젝트·전자결재·오늘할일) 배포 (대표 요청 7종 중)
 
 **무엇/왜:** 대표가 실사용 관점 7종 요청. 조사(멀티에이전트 3) 결과 대부분 기존 패턴 재사용 가능 → "가벼운 것 먼저, 무거운 것(카톡·카드 실연동) 백로그". 세션 시작 시 **전체 코드리뷰**(보안/원칙·세션29 MCP)도 수행 — 이상無(any0·키노출0·인증누락0·MCP user_id격리·OAuth PKCE·토큰암호화 정상), 마이너 몇 건은 HANDOFF 기록.
