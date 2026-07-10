@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { ListTodo, Plus, Trash2, Loader2, Check } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
@@ -37,6 +37,7 @@ export function TodayTasks() {
   const [busy, setBusy] = useState(false)
   const [title, setTitle] = useState("")
   const [due, setDue] = useState("")
+  const submitting = useRef(false) // 중복 추가 방지(한글 IME Enter 두 번·연타)
 
   const load = useCallback(async () => {
     if (!me) return setLoading(false)
@@ -83,13 +84,18 @@ export function TodayTasks() {
   }
 
   const add = () => {
-    if (!me) return
+    if (!me || submitting.current) return
     const t = title.trim()
     if (!t) return
+    submitting.current = true
     run(async () => {
-      await mustOk(supabase.from("personal_tasks").insert({ user_id: me, title: t, due_date: due || null }))
-      setTitle("")
-      setDue("")
+      try {
+        await mustOk(supabase.from("personal_tasks").insert({ user_id: me, title: t, due_date: due || null }))
+        setTitle("")
+        setDue("")
+      } finally {
+        submitting.current = false
+      }
     })
   }
 
@@ -129,7 +135,8 @@ export function TodayTasks() {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") add()
+            // 한글 IME 조합 확정용 Enter는 무시(중복 추가 방지)
+            if (e.key === "Enter" && !e.nativeEvent.isComposing) add()
           }}
         />
         <input
