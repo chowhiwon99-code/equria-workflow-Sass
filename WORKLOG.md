@@ -27,6 +27,12 @@
 - 검증: tsc 0 · lint 30/0(베이스라인) · `next build` 성공 · Vercel 프리뷰+프로덕션 **READY**.
 - 배포: 프리뷰(feat/toss-ui-refresh) 확인 후 대표 승인 → main-first 프로덕션 `e2930ef`(롤백 `d4f4508`). 마이그 091·092 원격 적용(추가형, 코드 전 안전).
 
+### 후속 (같은 세션 — 대표 실사용 피드백 + 도메인)
+- **오늘 할 일 중복 버그 픽스** (`3edb385`): 대표가 "추가하면 2개씩 생긴다" → DB 확인 결과 실제 중복 저장은 없고 **한글 IME Enter 이중발동**(조합 확정 Enter + 실제 Enter)으로 `add()` 2회 호출이 원인. `onKeyDown`에 `!e.nativeEvent.isComposing` + `submitting` ref 재진입 잠금.
+- **대표가 구성원 부서 부여** (마이그 093, `43552ec`): department는 원래 본인만 자가입력(profiles_update=본인 RLS)이라 대표가 못 바꿨음. `set_member_department`(security definer, 오너 전용, 063 `set_member_position` 패턴 복제) 추가. 설정 "구성원 직급"→**"구성원 부서·직급"**: 각 행에 부서·직급 입력칸 2개 + 변경분만 각 RPC 저장. guard 트리거는 무변경(department 자가입력 유지 — role/position만 오너 전용).
+- **도메인 complow.kr 연결 (대표 가비아 구매)**: Vercel Domains에 `complow.kr`(메인, Production)+`www.complow.kr`(→complow.kr 307 redirect) 추가. 가비아 DNS: A `@`→`216.198.79.1`(신규 IP, 옛 76.76.21.21 대체) + CNAME `www`→`cname.vercel-dns.com.`. SSL 자동. env `NEXT_PUBLIC_APP_URL`·`GOOGLE_OAUTH_REDIRECT_URI`=`https://complow.kr`로 바꾸고 빈커밋 재배포(`9152ded`, 빌드타임 env). 구글 콘솔 OAuth 클라이언트("워크스페이스 웹", 프로젝트 influencer-automation)에 JS원본·리디렉션 URI(complow.kr) 추가(대표 완료). **Vercel team/project id·프로덕션 도메인 = memory `vercel-project.md`.**
+- 배포: 프리뷰→프로덕션 순으로 검증(대표 확인 후). 프로덕션 SHA `43552ec`(1차+후속 전부), 롤백 `9152ded`.
+
 ### 다음
 - **2차**: 프로젝트 세분화 체크리스트(`project_tasks`, 워크스페이스 RLS) + 진행률을 실제 완료율로 승격 · 오늘할일 시각알림(`personal_tasks.remind_at` + notifications 'reminder' + pg_cron).
 - **백로그(무거움)**: 회사 카드/금융 실연동(오픈뱅킹/카드사 API, "담당자만"=`064` 위임패턴) · 카톡(카카오) 연결.
