@@ -156,12 +156,19 @@ export function FinanceEntryModal({
           </label>
           <label className="flex-1 text-xs text-muted-foreground">
             분류
-            <select className={fieldClass} value={category} onChange={(e) => setCategory(e.target.value)}>
-              <option value="">선택…</option>
+            {/* 자유 입력 + 제안(datalist) — 업종별 커스텀 가능(통신판매 채널 전제 제거) */}
+            <input
+              className={fieldClass}
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              list="finance-category-suggestions"
+              placeholder="선택 또는 직접 입력"
+            />
+            <datalist id="finance-category-suggestions">
               {cats.map((c) => (
-                <option key={c} value={c}>{c}</option>
+                <option key={c} value={c} />
               ))}
-            </select>
+            </datalist>
           </label>
           <label className="flex-1 text-xs text-muted-foreground">
             통화

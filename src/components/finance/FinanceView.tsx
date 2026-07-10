@@ -483,48 +483,51 @@ export function FinanceView() {
               })}
             </div>
 
-            {/* 월간 추세 */}
-            <div className="rounded-lg border p-4">
-              <div className="mb-1 flex items-center justify-between">
-                <h2 className="text-sm font-semibold">
-                  월간 추세 <span className="font-normal text-muted-foreground">· 최근 6개월</span>
-                </h2>
-                {trendCurrencies.length > 1 && (
-                  <div className="flex items-center gap-1">
-                    {trendCurrencies.map((c) => (
-                      <button
-                        key={c}
-                        onClick={() => setTrendCur(c)}
-                        className={cn(
-                          "rounded px-2 py-0.5 text-xs",
-                          effTrendCur === c ? "bg-primary/10 font-medium text-primary" : "text-muted-foreground hover:bg-muted/50",
-                        )}
-                      >
-                        {c}
-                      </button>
-                    ))}
-                  </div>
-                )}
+            {/* 월간 추세(작게·좌 2/5) + 분류 분해(우 3/5) — 한눈에 */}
+            <div className="grid gap-4 lg:grid-cols-5">
+              {/* 월간 추세 — 좌측, 작게 */}
+              <div className="rounded-lg border p-4 lg:col-span-2">
+                <div className="mb-1 flex items-center justify-between">
+                  <h2 className="text-sm font-semibold">
+                    월간 추세 <span className="font-normal text-muted-foreground">· 최근 6개월</span>
+                  </h2>
+                  {trendCurrencies.length > 1 && (
+                    <div className="flex items-center gap-1">
+                      {trendCurrencies.map((c) => (
+                        <button
+                          key={c}
+                          onClick={() => setTrendCur(c)}
+                          className={cn(
+                            "rounded px-2 py-0.5 text-xs",
+                            effTrendCur === c ? "bg-primary/10 font-medium text-primary" : "text-muted-foreground hover:bg-muted/50",
+                          )}
+                        >
+                          {c}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <p className="mb-2 text-xs text-muted-foreground">
+                  {CURRENCIES.find((c) => c.code === effTrendCur)?.label ?? effTrendCur} 기준 · <span className="text-success">매출</span> / <span className="text-destructive">지출</span>
+                </p>
+                <TrendBars months={trendMonths} format={(n) => money(n, effTrendCur)} />
               </div>
-              <p className="mb-2 text-xs text-muted-foreground">
-                {CURRENCIES.find((c) => c.code === effTrendCur)?.label ?? effTrendCur} 기준 · <span className="text-success">매출</span> / <span className="text-destructive">지출</span>
-              </p>
-              <TrendBars months={trendMonths} format={(n) => money(n, effTrendCur)} />
-            </div>
 
-            {/* 분류 분해 2열 (KRW) */}
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-lg border p-4">
-                <h2 className="mb-3 text-sm font-semibold">
-                  지출 분류 <span className="font-normal text-muted-foreground">· 원화(KRW) 기준</span>
-                </h2>
-                <BreakdownBars items={expenseBreakdown} format={won} />
-              </div>
-              <div className="rounded-lg border p-4">
-                <h2 className="mb-3 text-sm font-semibold">
-                  매출 채널 <span className="font-normal text-muted-foreground">· 원화(KRW) 기준</span>
-                </h2>
-                <BreakdownBars items={revenueBreakdown} format={won} />
+              {/* 분류 분해 — 우측, 지출/매출 나란히(KRW) */}
+              <div className="grid gap-4 sm:grid-cols-2 lg:col-span-3">
+                <div className="rounded-lg border p-4">
+                  <h2 className="mb-3 text-sm font-semibold">
+                    지출 분류 <span className="font-normal text-muted-foreground">· 원화(KRW) 기준</span>
+                  </h2>
+                  <BreakdownBars items={expenseBreakdown} format={won} />
+                </div>
+                <div className="rounded-lg border p-4">
+                  <h2 className="mb-3 text-sm font-semibold">
+                    매출 분류 <span className="font-normal text-muted-foreground">· 원화(KRW) 기준</span>
+                  </h2>
+                  <BreakdownBars items={revenueBreakdown} format={won} />
+                </div>
               </div>
             </div>
           </div>

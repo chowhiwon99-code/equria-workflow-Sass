@@ -15,7 +15,7 @@ export const EXPENSE_CATEGORIES = [
   "기타",
 ] as const
 
-/** 매출 분류 — 주로 판매 플랫폼 */
+/** 매출 분류 — 입력창의 '제안'일 뿐(자유 입력 가능). 업종별로 채널·거래처·서비스 등 자유롭게 작성 */
 export const REVENUE_CATEGORIES = [
   "네이버스마트",
   "컬리",
