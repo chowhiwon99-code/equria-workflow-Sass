@@ -22,7 +22,7 @@ export function Modal({
       onClick={onClose}
     >
       <div
-        className={cn("w-full max-w-md rounded-xl border bg-card p-5 shadow-[var(--shadow-lg)]", className)}
+        className={cn("glass w-full max-w-md rounded-xl p-5", className)}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
