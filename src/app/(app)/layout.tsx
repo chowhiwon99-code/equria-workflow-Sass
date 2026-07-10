@@ -7,6 +7,7 @@ import { AgentChatProvider } from "@/components/agent-chat/AgentChatContext"
 import { FloatingAgentChat } from "@/components/agent-chat/FloatingAgentChat"
 import { UndoProvider } from "@/components/undo/UndoProvider"
 import { CurrentUserProvider } from "@/components/auth/CurrentUserProvider"
+import { PageTransition } from "@/components/layout/PageTransition"
 import { Toaster } from "@/components/ui/sonner"
 
 export default async function AppLayout({
@@ -41,7 +42,9 @@ export default async function AppLayout({
           <div className="flex flex-1 flex-col overflow-hidden">
             <Header userName={profile?.name ?? "직원"} userId={user.id} />
             <AnnouncementBanner />
-            <main className="flex-1 overflow-y-auto p-[var(--app-pad)]">{children}</main>
+            <main className="flex-1 overflow-y-auto p-[var(--app-pad)]">
+              <PageTransition>{children}</PageTransition>
+            </main>
           </div>
         </div>
         <FloatingAgentChat />

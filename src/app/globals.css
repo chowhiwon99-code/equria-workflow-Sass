@@ -332,6 +332,15 @@ body {
   .animate-fade-up {
     animation: equria-fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
+  /* 라우트 진입 전환 — 더 빠르게(0.4s), backwards fill(애니 후 transform 미잔류 → position:fixed 안전) */
+  .animate-page-in {
+    animation: equria-fade-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .animate-page-in {
+      animation: none;
+    }
+  }
   /* 배경 오라 — 느리게 부풀고 가라앉는 빛 무리 */
   .animate-aura {
     animation: equria-aura 9s ease-in-out infinite;
