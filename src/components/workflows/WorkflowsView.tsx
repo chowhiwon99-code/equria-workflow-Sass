@@ -139,7 +139,7 @@ export function WorkflowsView() {
               <div key={w.id} className="group relative transition-transform hover:-translate-y-0.5">
                 <button
                   onClick={() => router.push(`/workflows/${w.id}`)}
-                  className="flex w-full flex-col gap-3 rounded-2xl glass p-4 text-left shadow-[var(--shadow-sm)] transition-shadow hover:shadow-[var(--shadow-md)]"
+                  className="hover-grow flex w-full flex-col gap-3 rounded-2xl glass p-4 text-left"
                 >
                   <div className="flex items-center gap-2.5">
                     <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/8 text-primary">
