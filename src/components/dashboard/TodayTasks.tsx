@@ -10,6 +10,7 @@ import { dueBadge } from "@/lib/tasks"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/shared/Modal"
+import { Surface } from "@/components/shared/Surface"
 import type { Tables } from "@/lib/supabase/types"
 
 type Task = Tables<"personal_tasks">
@@ -108,7 +109,7 @@ export function TodayTasks() {
   const remaining = tasks.filter((t) => !t.done).length
 
   return (
-    <div className="shrink-0 rounded-xl border bg-card p-4 shadow-[var(--shadow-sm)]">
+    <Surface variant="glass" padding="sm" className="shrink-0 rounded-xl">
       <div className="mb-2 flex items-center justify-between">
         <h2 className="inline-flex items-center gap-2 text-sm font-semibold">
           <ListTodo className="size-4 text-primary" /> 오늘 할 일
@@ -186,6 +187,6 @@ export function TodayTasks() {
           })}
         </div>
       )}
-    </div>
+    </Surface>
   )
 }

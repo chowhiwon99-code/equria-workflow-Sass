@@ -9,6 +9,7 @@ import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/shared/Modal"
+import { Surface } from "@/components/shared/Surface"
 import type { Tables } from "@/lib/supabase/types"
 
 type Ann = Tables<"announcements">
@@ -120,7 +121,7 @@ export function AnnouncementsBoard() {
   const shown = expanded ? list : list.slice(0, 2)
 
   return (
-    <div className="shrink-0 rounded-xl border bg-card p-4 shadow-[var(--shadow-sm)]">
+    <Surface variant="glass" padding="sm" className="shrink-0 rounded-xl">
       <div className="mb-2 flex items-center justify-between">
         <h2 className="inline-flex items-center gap-2 text-sm font-semibold">
           <Megaphone className="size-4 text-primary" /> 공지사항
@@ -208,6 +209,6 @@ export function AnnouncementsBoard() {
           {expanded ? "접기" : `전체 ${list.length}개 보기`}
         </button>
       )}
-    </div>
+    </Surface>
   )
 }
