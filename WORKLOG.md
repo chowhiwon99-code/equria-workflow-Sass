@@ -5,6 +5,29 @@
 
 ---
 
+## 2026-07-10 · 세션31 — 글래스모피즘 전면 리디자인 (Phase 1~5, 토큰 우선·구조 보존)
+
+**무엇/왜:** 대표가 참고 이미지(ElevenLabs·프로스트 글래스 대시보드/사이드바) 기반 "미래지향+부드러운 플로우" 전면 리프레시 요청. 하드 제약 = 구조 안 깨짐+검증 반복. → **토큰 우선 리스타일**(globals.css `@theme`+`data-slot`+신규 `Surface`/`.glass`, shadcn `ui/` 무편집). 계획 = `~/.claude/plans/imperative-sprouting-crayon.md`. 조사(Explore 3)+설계(Plan 1)로 "테마가 globals.css 한 파일에 집약" 확인 후 착수. 확정 범위 = 대시보드 리스타일만(KPI 재구성 제외)·뚜렷한 프로스트(블러16~18/카드60%)·모노크롬+강조점 1개.
+
+**단계(각 커밋 = tsc0·lint30/0·build0):**
+- **P1 토큰+앰비언트**(`d4ff0e9`): 그림자 소프트닝 + `--glass-*`(:root/.dark/.force-light 3곳, force-light는 불투명 옵트아웃) + `--accent-dot` + `.app-ambient` 실크 그라데이션 배경(`(app)/layout` fixed -z-10 마운트, flex 흐름 불참).
+- **P2 오버레이 글래스**(`a026319`): `.glass` @layer(+`@supports`/`prefers-reduced-transparency`/`contrast-more` 불투명 폴백) · 드롭다운 메뉴 data-slot 프로스트 · Modal 글래스.
+- **P3-A 대시보드**(`aa6ce48`): `shared/Surface`(solid|glass) 신설 + 공지·오늘할일·어시스턴트 컨테이너 글래스(어시스턴트 내부는 solid).
+- **P4 셸**(`f7124c5`): `.glass-panel`(셸용) + 사이드바/헤더 프로스트 + 네비 rounded-full 필 활성. MobileNav 자동 상속.
+- **P3-B/C 전 섹션**(`acfec44`): `.glass` 그림자 lg→md(카드 적정), Modal은 lg 유지. 섹션 카드 관용구 일괄 스왑(projects·settings·work·approval·agents 13곳) + 캘린더 모달·워크플로우·MCP·위저드·메일 도크 5곳. 캔버스/그리드/채팅/에디터/입력은 solid.
+- **P5 모션**(`4515be5`): `.animate-page-in`(fade-up 0.4s, backwards fill로 fixed 안전) + `PageTransition`(key=pathname) 라우트 진입 페이드업. reduced-motion 정지. framer-motion 미도입.
+
+**예상이슈 체크:**
+- shadcn `ui/` "수정 금지" 준수 — 전부 토큰/`data-slot`/공용 컴포넌트 경유. `.glass` box-shadow는 카드용 md(모달만 lg 명시).
+- 앰비언트 fixed -z-10 → 셸 flex/overflow·`--app-content-height` 모델 무손상. `PageTransition` transform은 backwards fill이라 애니 후 미잔류 → MailCompose 등 `position:fixed` 안전.
+- 3테마(light/dark/**force-light** 공개화면 불투명) 정합 — 토큰 3곳 정의. a11y = 알파 하한 0.60/0.55 + reduced-transparency/contrast 폴백.
+- 클래스 스왑은 exact-idiom(`border bg-card p-N shadow-[var(--shadow-sm)]`→`glass p-N`)만, twMerge 충돌 없음. 매 배치 tsc0·lint30/0·build0.
+- **미검증(대표 확인 필요):** 실제 3테마 육안·macOS Safari 블러 성능·모바일 드로어. 디테일(강도/톤/강조색)은 대표 요청대로 **전 작업 후 일괄 조정** 예정.
+
+**배포:** feat→main-first 일괄. (SHA·롤백은 HANDOFF 갱신 참조.)
+
+---
+
 ## 2026-07-10 · 세션31 — 프로젝트 체크리스트(세부 할 일) 배포 (글래스 리디자인 Phase 0)
 
 **무엇/왜:** "2차" 후보였던 프로젝트 세분화 체크리스트 구현. 이어질 **글래스모피즘 전면 리디자인**과 관심사 분리를 위해 먼저 단독 배포(리디자인 Phase 0). ※ Ultraplan 클라우드가 같은 작업을 시도했으나 조직정책 403으로 push 차단 → 로컬에서 실행.
