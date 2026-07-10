@@ -277,15 +277,22 @@ export function SettingsView() {
     toast.success("상태를 변경했어요.")
   }
 
-  const saveMemberPosition = async (id: string, value: string) => {
+  const saveMemberInfo = async (id: string, dept: string, position: string) => {
+    const m = memberList.find((x) => x.id === id)
     setBusyId(id)
     try {
-      const { error } = await supabase.rpc("set_member_position", { target: id, new_position: value })
-      if (error) throw new Error(error.message)
-      toast.success("직급을 저장했어요.")
+      if (m && dept !== (m.department ?? "")) {
+        const { error } = await supabase.rpc("set_member_department", { target: id, new_department: dept })
+        if (error) throw new Error(error.message)
+      }
+      if (m && position !== (m.position ?? "")) {
+        const { error } = await supabase.rpc("set_member_position", { target: id, new_position: position })
+        if (error) throw new Error(error.message)
+      }
+      toast.success("저장했어요.")
       await load()
     } catch {
-      toast.error("직급 변경에 실패했어요.")
+      toast.error("변경에 실패했어요.")
     } finally {
       setBusyId(null)
     }
@@ -398,16 +405,16 @@ export function SettingsView() {
         </div>
       </Card>
 
-      {/* 대표: 구성원 직급 일괄 관리 */}
+      {/* 대표: 구성원 부서·직급 일괄 관리 */}
       {isOwner && (
         <Card>
-          <SectionTitle title="구성원 직급" desc="대표가 직원별 직급을 지정해요. 직원 본인은 변경할 수 없어요." />
+          <SectionTitle title="구성원 부서·직급" desc="대표가 직원별 부서·직급을 지정해요. (직원 본인은 자기 프로필에서 부서만 바꿀 수 있어요.)" />
           {memberList.length === 0 ? (
             <p className="text-sm text-muted-foreground">구성원이 없어요.</p>
           ) : (
             <div className="flex flex-col divide-y overflow-hidden rounded-xl border">
               {memberList.map((m) => (
-                <MemberPositionRow key={m.id} member={m} isMe={m.id === meId} busy={busyId === m.id} onSave={(v) => saveMemberPosition(m.id, v)} />
+                <MemberInfoRow key={m.id} member={m} isMe={m.id === meId} busy={busyId === m.id} onSave={(dept, pos) => saveMemberInfo(m.id, dept, pos)} />
               ))}
             </div>
           )}
@@ -492,8 +499,8 @@ export function SettingsView() {
   )
 }
 
-/** 대표용 구성원 직급 한 줄 — 자유 입력 + 저장(set_member_position RPC). */
-function MemberPositionRow({
+/** 대표용 구성원 부서·직급 한 줄 — 자유 입력 + 저장(set_member_department / set_member_position RPC). */
+function MemberInfoRow({
   member,
   isMe,
   busy,
@@ -502,31 +509,35 @@ function MemberPositionRow({
   member: { id: string; name: string; department: string | null; position: string | null }
   isMe: boolean
   busy: boolean
-  onSave: (value: string) => void
+  onSave: (dept: string, position: string) => void
 }) {
-  const [val, setVal] = useState(member.position ?? "")
-  const dirty = val.trim() !== (member.position ?? "")
+  const [dept, setDept] = useState(member.department ?? "")
+  const [pos, setPos] = useState(member.position ?? "")
+  const dirty = dept.trim() !== (member.department ?? "") || pos.trim() !== (member.position ?? "")
   return (
-    <div className="flex items-center gap-3 px-3.5 py-2.5">
-      <div className="flex min-w-0 flex-col">
-        <span className="text-sm font-medium">
-          {member.name}
-          {isMe && <span className="ml-1 text-xs font-normal text-muted-foreground">(나)</span>}
-        </span>
-        <span className="truncate text-xs text-muted-foreground">{member.department || "부서 미지정"}</span>
-      </div>
+    <div className="flex flex-wrap items-center gap-2 px-3.5 py-2.5">
+      <span className="min-w-0 text-sm font-medium">
+        {member.name}
+        {isMe && <span className="ml-1 text-xs font-normal text-muted-foreground">(나)</span>}
+      </span>
       <form
         onSubmit={(e) => {
           e.preventDefault()
-          onSave(val.trim())
+          onSave(dept.trim(), pos.trim())
         }}
-        className="ml-auto flex items-center gap-1.5"
+        className="ml-auto flex flex-wrap items-center gap-1.5"
       >
         <input
-          value={val}
-          onChange={(e) => setVal(e.target.value)}
+          value={dept}
+          onChange={(e) => setDept(e.target.value)}
+          placeholder="부서"
+          className="h-8 w-24 rounded-lg border bg-background px-2.5 text-xs outline-none focus:ring-2 focus:ring-ring"
+        />
+        <input
+          value={pos}
+          onChange={(e) => setPos(e.target.value)}
           placeholder="직급"
-          className="h-8 w-28 rounded-lg border bg-background px-2.5 text-xs outline-none focus:ring-2 focus:ring-ring"
+          className="h-8 w-24 rounded-lg border bg-background px-2.5 text-xs outline-none focus:ring-2 focus:ring-ring"
         />
         <Button size="sm" className="h-8" type="submit" disabled={busy || !dirty}>
           저장

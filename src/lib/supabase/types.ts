@@ -3146,6 +3146,10 @@ export type Database = {
         Args: { new_folder: string; note_id: string }
         Returns: undefined
       }
+      set_member_department: {
+        Args: { new_department: string; target: string }
+        Returns: undefined
+      }
       set_member_position: {
         Args: { new_position: string; target: string }
         Returns: undefined
