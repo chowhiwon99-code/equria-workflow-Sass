@@ -6,24 +6,13 @@ import { ListTodo, Plus, Trash2, Loader2, Check } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
+import { dueBadge } from "@/lib/tasks"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/shared/Modal"
 import type { Tables } from "@/lib/supabase/types"
 
 type Task = Tables<"personal_tasks">
-
-function todayStr(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
-}
-
-function dueLabel(due: string): { text: string; overdue: boolean } {
-  const today = todayStr()
-  const overdue = due < today
-  const text = due === today ? "오늘" : due.slice(5).replace("-", ".")
-  return { text, overdue }
-}
 
 /**
  * 대시보드 "오늘 할 일" — 직원 각자의 개인 체크리스트(본인만 열람·편집, personal_tasks 본인전용 RLS).
@@ -157,7 +146,7 @@ export function TodayTasks() {
       ) : (
         <div className="flex max-h-56 flex-col divide-y overflow-y-auto">
           {tasks.map((t) => {
-            const d = t.due_date ? dueLabel(t.due_date) : null
+            const d = t.due_date ? dueBadge(t.due_date) : null
             return (
               <div key={t.id} className="flex items-center gap-2 py-2 first:pt-0">
                 <button

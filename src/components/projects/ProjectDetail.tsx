@@ -1,7 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-import { X, Plus, ExternalLink, Frame, FileText, Trash2, CalendarClock, Receipt, TrendingUp, type LucideIcon } from "lucide-react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { X, Plus, ExternalLink, Frame, FileText, Trash2, CalendarClock, Receipt, TrendingUp, ListChecks, Check, Loader2, type LucideIcon } from "lucide-react"
+import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -12,11 +13,15 @@ import { BackLink } from "@/components/shared/BackLink"
 import { Loading, ErrorState } from "@/components/shared/States"
 import { useUndo } from "@/components/undo/UndoProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
+import { dueBadge } from "@/lib/tasks"
 import { PROJECT_STATUS, PROJECT_STATUS_ORDER } from "@/lib/projects"
 import { IMPORTANCE, importanceLabel, importanceColor, tagBg } from "@/lib/meetingMeta"
 import { isFigmaUrl, toFigmaDesktopUrl } from "@/lib/figma"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
+import type { Tables } from "@/lib/supabase/types"
 import type { Project, ProjectStatus, Profile, DriveFile } from "@/types"
+
+type ProjectTask = Tables<"project_tasks">
 
 type MemberRow = { id: string; user_id: string; role: string; member: { name: string; position: string | null } | null }
 
@@ -247,9 +252,197 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
         </div>
       </section>
 
+      {/* 체크리스트 — 프로젝트를 세부 할 일로 쪼갠다(팀 협업) */}
+      <ChecklistSection projectId={projectId} />
+
       {/* 파일/링크 현황 */}
       <FilesSection projectId={projectId} />
     </div>
+  )
+}
+
+/**
+ * 프로젝트 체크리스트(project_tasks) — 프로젝트를 세부 할 일로 쪼개 진행률을 본다.
+ * 같은 워크스페이스 멤버가 협업으로 추가/체크/삭제(094 EXISTS 격리). TodayTasks 시각 패턴 + FilesSection의 Undo 패턴 재사용.
+ */
+function ChecklistSection({ projectId }: { projectId: string }) {
+  const supabase = createClient()
+  const me = useCurrentUserId()
+  const { push } = useUndo()
+  const [tasks, setTasks] = useState<ProjectTask[]>([])
+  const [title, setTitle] = useState("")
+  const [due, setDue] = useState("")
+  const [busy, setBusy] = useState(false)
+  const submitting = useRef(false) // 한글 IME Enter 이중발동·연타 방지
+
+  const load = useCallback(async () => {
+    const { data } = await supabase
+      .from("project_tasks")
+      .select("*")
+      .eq("project_id", projectId)
+      .order("done", { ascending: true })
+      .order("due_date", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: true })
+    setTasks((data as ProjectTask[]) ?? [])
+  }, [supabase, projectId])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load()
+  }, [load])
+
+  const add = async () => {
+    if (submitting.current) return
+    const t = title.trim()
+    if (!t) return
+    submitting.current = true
+    setBusy(true)
+    try {
+      const { data: inserted } = await supabase
+        .from("project_tasks")
+        .insert({ project_id: projectId, title: t, due_date: due || null, created_by: me })
+        .select()
+        .single()
+      setTitle("")
+      setDue("")
+      await load()
+      if (inserted) {
+        push({
+          label: "체크리스트 추가",
+          undo: async () => {
+            await mustOk(supabase.from("project_tasks").delete().eq("id", inserted.id))
+            load()
+          },
+          redo: async () => {
+            await mustOk(supabase.from("project_tasks").insert(inserted))
+            load()
+          },
+        })
+      }
+    } catch {
+      toast.error("추가에 실패했어요.")
+    } finally {
+      setBusy(false)
+      submitting.current = false
+    }
+  }
+
+  const toggle = async (task: ProjectTask) => {
+    await supabase.from("project_tasks").update({ done: !task.done, updated_at: new Date().toISOString() }).eq("id", task.id)
+    load()
+    push({
+      label: task.done ? "완료 취소" : "완료 체크",
+      undo: async () => {
+        await mustOk(supabase.from("project_tasks").update({ done: task.done }).eq("id", task.id))
+        load()
+      },
+      redo: async () => {
+        await mustOk(supabase.from("project_tasks").update({ done: !task.done }).eq("id", task.id))
+        load()
+      },
+    })
+  }
+
+  const remove = async (id: string) => {
+    const row = tasks.find((t) => t.id === id)
+    await supabase.from("project_tasks").delete().eq("id", id)
+    load()
+    if (row) {
+      push({
+        label: "체크리스트 삭제",
+        undo: async () => {
+          await mustOk(supabase.from("project_tasks").insert(row))
+          load()
+        },
+        redo: async () => {
+          await mustOk(supabase.from("project_tasks").delete().eq("id", id))
+          load()
+        },
+      })
+    }
+  }
+
+  const doneCount = tasks.filter((t) => t.done).length
+  const pct = tasks.length ? Math.round((doneCount / tasks.length) * 100) : 0
+
+  return (
+    <section className="rounded-2xl border bg-card p-5 shadow-[var(--shadow-sm)]">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="inline-flex items-center gap-2 text-sm font-semibold">
+          <ListChecks className="size-4 text-primary" /> 체크리스트
+          {tasks.length > 0 && <span className="tabular-nums text-muted-foreground">{doneCount}/{tasks.length}</span>}
+        </h2>
+        {tasks.length > 0 && (
+          <div className="flex items-center gap-2">
+            <div className="h-1.5 w-24 overflow-hidden rounded-full bg-muted">
+              <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
+            </div>
+            <span className="text-xs tabular-nums text-muted-foreground">{pct}%</span>
+          </div>
+        )}
+      </div>
+
+      {/* 추가 입력 */}
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        <input
+          className={cn(fieldClass, "min-w-40 flex-1")}
+          placeholder="세부 할 일을 입력하고 Enter"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => {
+            // 한글 IME 조합 확정 Enter는 무시(중복 추가 방지)
+            if (e.key === "Enter" && !e.nativeEvent.isComposing) add()
+          }}
+        />
+        <input type="date" className={cn(fieldClass, "w-36")} value={due} onChange={(e) => setDue(e.target.value)} title="기한(선택)" />
+        <Button size="sm" onClick={add} disabled={busy || !title.trim()}>
+          {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />} 추가
+        </Button>
+      </div>
+
+      {/* 목록 */}
+      {tasks.length === 0 ? (
+        <p className="mt-3 text-sm text-muted-foreground">프로젝트를 세부 할 일로 쪼개 진행 상황을 관리하세요.</p>
+      ) : (
+        <div className="mt-2 flex flex-col divide-y">
+          {tasks.map((t) => {
+            const d = t.due_date ? dueBadge(t.due_date) : null
+            return (
+              <div key={t.id} className="flex items-center gap-2 py-2">
+                <button
+                  onClick={() => toggle(t)}
+                  aria-label={t.done ? "완료 취소" : "완료"}
+                  className={cn(
+                    "grid size-5 shrink-0 place-items-center rounded-md border transition-colors",
+                    t.done ? "border-primary bg-primary text-primary-foreground" : "border-input hover:border-primary"
+                  )}
+                >
+                  {t.done && <Check className="size-3.5" />}
+                </button>
+                <span className={cn("min-w-0 flex-1 truncate text-sm", t.done && "text-muted-foreground line-through")}>{t.title}</span>
+                {d && !t.done && (
+                  <span
+                    className={cn(
+                      "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums",
+                      d.overdue ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground"
+                    )}
+                  >
+                    {d.text}
+                  </span>
+                )}
+                <button
+                  onClick={() => remove(t.id)}
+                  className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-destructive"
+                  aria-label="삭제"
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </section>
   )
 }
 
