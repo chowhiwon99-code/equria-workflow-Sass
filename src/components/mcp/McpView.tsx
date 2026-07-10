@@ -313,7 +313,7 @@ export function McpView() {
   const renderCard = (c: Connector) => {
     const connected = isConnected(c)
     return (
-      <div key={c.id} className="flex min-w-0 flex-col gap-2 rounded-xl border bg-card p-4">
+      <div key={c.id} className="flex min-w-0 flex-col gap-2 rounded-xl glass p-4">
         <div className="flex items-center gap-2.5">
           <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted/40">
             <ConnectorLogo domain={c.domain} emoji={c.emoji} />

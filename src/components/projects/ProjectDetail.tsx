@@ -179,7 +179,7 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
       </div>
 
       {/* 메타 카드 — 상태/담당자/일정 */}
-      <div className="rounded-2xl border bg-card p-5 shadow-[var(--shadow-sm)]">
+      <div className="rounded-2xl glass p-5">
         <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4">
           <MetaItem label="상태">
             <Select
@@ -213,7 +213,7 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
       </div>
 
       {/* 멤버 카드 */}
-      <section className="rounded-2xl border bg-card p-5 shadow-[var(--shadow-sm)]">
+      <section className="rounded-2xl glass p-5">
         <h2 className="text-sm font-semibold">
           참여 멤버 <span className="ml-0.5 text-muted-foreground tabular-nums">{members.length}</span>
         </h2>
@@ -366,7 +366,7 @@ function ChecklistSection({ projectId }: { projectId: string }) {
   const pct = tasks.length ? Math.round((doneCount / tasks.length) * 100) : 0
 
   return (
-    <section className="rounded-2xl border bg-card p-5 shadow-[var(--shadow-sm)]">
+    <section className="rounded-2xl glass p-5">
       <div className="flex items-center justify-between gap-3">
         <h2 className="inline-flex items-center gap-2 text-sm font-semibold">
           <ListChecks className="size-4 text-primary" /> 체크리스트
@@ -485,7 +485,7 @@ function FilesSection({ projectId }: { projectId: string }) {
   }
 
   return (
-    <section className="rounded-2xl border bg-card p-5 shadow-[var(--shadow-sm)]">
+    <section className="rounded-2xl glass p-5">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold">파일 / 링크 현황</h2>
         <Button size="sm" variant="outline" onClick={() => setShowAdd(true)}>
@@ -630,7 +630,7 @@ function MetaItem({ label, children }: { label: string; children: React.ReactNod
 
 function SummaryCard({ icon: Icon, label, value, accent }: { icon: LucideIcon; label: string; value: string; accent: string }) {
   return (
-    <div className="rounded-2xl border bg-card p-4 shadow-[var(--shadow-sm)]">
+    <div className="rounded-2xl glass p-4">
       <div className="flex items-center gap-2">
         <span className={cn("grid size-7 shrink-0 place-items-center rounded-lg", accent)}>
           <Icon className="size-4" />

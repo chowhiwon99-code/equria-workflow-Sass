@@ -42,7 +42,7 @@ function applyThemeSmooth(apply: () => void) {
 /** 섹션 카드 — 떠 있는 흰 카드(토스/애플) */
 function Card({ children }: { children: ReactNode }) {
   return (
-    <section className="flex flex-col gap-4 rounded-2xl border bg-card p-5 shadow-[var(--shadow-sm)]">
+    <section className="flex flex-col gap-4 rounded-2xl glass p-5">
       {children}
     </section>
   )

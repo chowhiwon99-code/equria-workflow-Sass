@@ -183,7 +183,7 @@ export default function MailCompose({
   return (
     <div
       className={cn(
-        "fixed bottom-4 right-4 z-50 flex max-h-[calc(100dvh-2rem)] w-[460px] max-w-[calc(100vw-2rem)] origin-bottom-right flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl duration-200",
+        "fixed bottom-4 right-4 z-50 flex max-h-[calc(100dvh-2rem)] w-[460px] max-w-[calc(100vw-2rem)] origin-bottom-right flex-col overflow-hidden rounded-2xl glass shadow-2xl duration-200",
         closing
           ? "animate-out fade-out-0 zoom-out-95 slide-out-to-bottom-4"
           : "animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-4"

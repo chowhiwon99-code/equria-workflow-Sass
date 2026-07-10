@@ -226,7 +226,7 @@ function ProjectCard({ project: p, members }: { project: ProjectRow; members: Me
   return (
     <Link
       href={`/projects/${p.id}`}
-      className="group flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-[var(--shadow-sm)] transition-shadow hover:shadow-[var(--shadow-md)]"
+      className="group flex flex-col gap-3 rounded-xl glass p-4 transition-shadow hover:shadow-[var(--shadow-md)]"
     >
       <div className="flex items-start justify-between gap-2">
         <h3 className={cn("min-w-0 flex-1 truncate font-semibold", canceled && "text-muted-foreground line-through")}>

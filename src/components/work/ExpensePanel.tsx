@@ -137,7 +137,7 @@ export function ExpensePanel() {
       )}
 
       {/* 제출 폼 */}
-      <div className="rounded-2xl border bg-card p-5 shadow-[var(--shadow-sm)]">
+      <div className="rounded-2xl glass p-5">
         <h2 className="mb-3 text-sm font-semibold">새 지출결의서</h2>
         <div className="flex flex-col gap-2">
           <input className={fieldClass} placeholder="제목 (예: 거래처 점심)" value={title} onChange={(e) => setTitle(e.target.value)} />

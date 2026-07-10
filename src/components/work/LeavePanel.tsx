@@ -116,7 +116,7 @@ export function LeavePanel() {
   return (
     <div className="flex flex-col gap-5">
       {/* 신청 폼 */}
-      <div className="rounded-2xl border bg-card p-5 shadow-[var(--shadow-sm)]">
+      <div className="rounded-2xl glass p-5">
         <h2 className="mb-3 text-sm font-semibold">휴가 신청</h2>
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">

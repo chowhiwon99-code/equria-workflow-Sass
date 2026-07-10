@@ -170,7 +170,7 @@ function AgentCard({
   return (
     <Link
       href={`/agents/${agent.id}`}
-      className="group flex flex-col gap-2 rounded-xl border bg-card p-4 shadow-[var(--shadow-sm)] transition-shadow hover:shadow-[var(--shadow-md)]"
+      className="group flex flex-col gap-2 rounded-xl glass p-4 transition-shadow hover:shadow-[var(--shadow-md)]"
     >
       <div className="flex items-start justify-between gap-2">
         <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted text-foreground">

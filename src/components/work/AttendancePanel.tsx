@@ -132,7 +132,7 @@ export function AttendancePanel() {
   return (
     <div className="flex flex-col gap-5">
       {/* 오늘 카드 */}
-      <div className="rounded-2xl border bg-card p-5 shadow-[var(--shadow-sm)]">
+      <div className="rounded-2xl glass p-5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold">오늘 ({fmtDate(todayStr())})</span>

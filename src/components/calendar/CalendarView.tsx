@@ -431,7 +431,7 @@ function ModalShell({ title, onClose, children }: { title: string; onClose: () =
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-md rounded-xl border bg-card p-5 shadow-[var(--shadow-lg)]"
+        className="w-full max-w-md rounded-xl glass p-5 shadow-[var(--shadow-lg)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">

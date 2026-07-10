@@ -59,7 +59,7 @@ function HowToBanner() {
   }
 
   return (
-    <div className="rounded-xl border bg-card p-4 shadow-[var(--shadow-sm)]">
+    <div className="rounded-xl glass p-4">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="inline-flex items-center gap-2 text-sm font-semibold">
           <Lightbulb className="size-4 text-primary" /> 전자결재 이렇게 써요

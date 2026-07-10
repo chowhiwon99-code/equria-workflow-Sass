@@ -160,7 +160,7 @@ export function DocumentDetail({ docId }: { docId: string }) {
       </button>
 
       {/* 헤더 */}
-      <div className="flex flex-col gap-2 rounded-xl border bg-card p-5 shadow-[var(--shadow-sm)]">
+      <div className="flex flex-col gap-2 rounded-xl glass p-5">
         <div className="flex items-center gap-2">
           <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{doc.doc_type}</span>
           <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", DOC_STATUS_BADGE[doc.status])}>{doc.status}</span>

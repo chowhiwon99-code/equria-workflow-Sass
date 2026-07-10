@@ -110,7 +110,7 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
     return (
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
         {generating || genError || !generated ? (
-          <div className="flex flex-col gap-3 rounded-xl border bg-card p-4">
+          <div className="flex flex-col gap-3 rounded-xl glass p-4">
             {generating && (
               <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
                 <Sparkles className="size-3.5" /> AI가 시스템 프롬프트를 작성하는 중…
