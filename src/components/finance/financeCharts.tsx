@@ -56,16 +56,27 @@ export function TrendBars({ months, format }: { months: TrendMonth[]; format: (n
   const barW = Math.min(13, groupW / 3)
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="월간 매출·지출 추세">
+      {/* 막대 세로 그라데이션 — 위(진함)→아래(연함). 테마색(success/destructive) 참조라 다크/라이트 자동 대응 */}
+      <defs>
+        <linearGradient id="fin-grad-revenue" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" style={{ stopColor: "var(--success)", stopOpacity: 1 }} />
+          <stop offset="100%" style={{ stopColor: "var(--success)", stopOpacity: 0.3 }} />
+        </linearGradient>
+        <linearGradient id="fin-grad-expense" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" style={{ stopColor: "var(--destructive)", stopOpacity: 1 }} />
+          <stop offset="100%" style={{ stopColor: "var(--destructive)", stopOpacity: 0.3 }} />
+        </linearGradient>
+      </defs>
       {months.map((mo, i) => {
         const cx = pad + groupW * i + groupW / 2
         const rh = (mo.revenue / max) * chartH
         const eh = (mo.expense / max) * chartH
         return (
           <g key={`${mo.ym.y}-${mo.ym.m}`}>
-            <rect x={cx - barW - 1} y={pad + chartH - rh} width={barW} height={rh} rx={1.5} className="fill-current text-success">
+            <rect x={cx - barW - 1} y={pad + chartH - rh} width={barW} height={rh} rx={1.5} fill="url(#fin-grad-revenue)">
               <title>{`${mo.label} 매출 ${format(mo.revenue)}`}</title>
             </rect>
-            <rect x={cx + 1} y={pad + chartH - eh} width={barW} height={eh} rx={1.5} className="fill-current text-destructive">
+            <rect x={cx + 1} y={pad + chartH - eh} width={barW} height={eh} rx={1.5} fill="url(#fin-grad-expense)">
               <title>{`${mo.label} 지출 ${format(mo.expense)}`}</title>
             </rect>
             <text x={cx} y={H - 4} textAnchor="middle" className="fill-current text-[9px] text-muted-foreground">

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
@@ -128,7 +128,32 @@ export function FinanceEntryModal({
     onSaved()
   }
 
-  const cats = categoriesFor(kind)
+  // 이 워크스페이스에서 실제 쓰인 분류를 제안으로 수집 → 업종별 커스텀 분류가 datalist에 쌓인다(자유 입력과 함께).
+  const [usedCats, setUsedCats] = useState<{ expense: string[]; revenue: string[] }>({ expense: [], revenue: [] })
+  useEffect(() => {
+    let alive = true
+    supabase
+      .from("finance_entries")
+      .select("category, kind")
+      .is("deleted_at", null)
+      .not("category", "is", null)
+      .then(({ data }) => {
+        if (!alive) return
+        const e = new Set<string>()
+        const r = new Set<string>()
+        for (const row of data ?? []) {
+          if (!row.category) continue
+          if (row.kind === "revenue") r.add(row.category)
+          else e.add(row.category)
+        }
+        setUsedCats({ expense: [...e], revenue: [...r] })
+      })
+    return () => {
+      alive = false
+    }
+  }, [supabase])
+  // 내 분류(사용 이력) 먼저 + 기본 제안 뒤, 중복 제거
+  const cats = [...new Set([...(kind === "revenue" ? usedCats.revenue : usedCats.expense), ...categoriesFor(kind)])]
 
   return (
     <Modal title={entry ? "항목 수정" : "직접 입력"} onClose={onClose}>
