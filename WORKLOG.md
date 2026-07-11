@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-07-11 · 세션32 — 오늘할일 시각알림(pg_cron) + 그라데이션 완화 + 모바일 3픽스
+
+**무엇/왜:** "바로 착수 가능한 것" 진행 + 대표 모바일 피드백 즉시 반영.
+- **오늘 할 일 시각 알림(마이그 095)**: 세션30에서 분리 보류했던 2차. `personal_tasks.reminded_at`(중복방지) + `remind_due_personal_tasks()`(security definer, KST 기준 기한 판정) + **매일 09:00 KST pg_cron 잡**(006 패턴 재사용). 기한(due_date) 오늘 이하·미완료·미알림 → `notifications`(type=system) 1건 생성 → 이미 realtime이라 기존 NotificationBell이 실시간 표시. `due_date` 변경 시 트리거가 `reminded_at` 리셋(재알림). 원격 적용·크론active·멱등성·오류0 검증.
+- **앰비언트 그라데이션 완화**(`.app-ambient`): 대표 "다크에서 그라데이션 심함" → 다크 alpha 0.18~0.2→0.10~0.11, 라이트 0.1→0.06(≈절반). 토큰만 수정(즉시 되돌림 가능).
+- **모바일 3픽스**:
+  1. **채팅 확대 버그**(가장 심각): iOS는 입력 폰트<16px면 포커스 시 자동확대 → 전송버튼이 화면 밖. root layout `viewport{maximumScale:1}`로 자동확대 전역 차단(최신 iOS 수동 핀치줌 유지) + 채팅 컴포저(Tiptap) `text-sm`→`text-base md:text-sm`(모바일 16px).
+  2. **사이드바 드로어 안 됨**: iOS Safari가 transform(slide-in)된 컨테이너 안 `backdrop-filter`를 투명 렌더 → 글래스 사이드바가 비쳐 깨져 보임. 드로어에 불투명 `bg-sidebar` 배경 + 스크림 중첩 blur 제거로 원천 차단(Sidebar 무수정).
+  3. 워크플로우 등 기타 화면의 작은 입력(순서배지 등) 확대도 viewport 픽스로 함께 해결.
+- **검증**: tsc0 · next build 성공. **⚠️ 실기기 육안 확인 필요**(대표 폰).
+
+---
+
 ## 2026-07-10 · 세션31 — 리디자인 디테일 튜닝 + 비용·매출 개선 (배포 4e501d3)
 
 **무엇/왜:** 리디자인 첫 배포 후 대표 피드백 즉시 반영.

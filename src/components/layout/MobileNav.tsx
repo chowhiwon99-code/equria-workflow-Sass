@@ -35,14 +35,16 @@ export function MobileNav() {
 
       {open && (
         <div className="fixed inset-0 z-[60] md:hidden">
-          {/* 스크림 — 바깥 탭으로 닫기 (shared/Modal 딤 패턴) */}
+          {/* 스크림 — 바깥 탭으로 닫기. iOS: 드로어 글래스와 backdrop-filter가 중첩되면 렌더 버그 → 여긴 단순 딤만. */}
           <div
-            className="absolute inset-0 bg-black/30 backdrop-blur-sm animate-in fade-in-0 duration-200"
+            className="absolute inset-0 bg-black/50 animate-in fade-in-0 duration-200"
             onClick={() => setOpen(false)}
           />
-          {/* 드로어 패널 — 링크(a[href]) 클릭 시 닫기 (Sidebar 무수정 재사용) */}
+          {/* 드로어 패널 — 불투명 배경(bg-sidebar) 위에 사이드바. 링크 클릭 시 닫기.
+              iOS Safari는 transform(slide-in)된 컨테이너 안의 backdrop-filter를 투명하게 렌더하는 버그가 있어,
+              글래스 사이드바가 비쳐 보이던 문제를 solid 배경으로 원천 차단(Sidebar는 무수정 재사용). */}
           <div
-            className="absolute inset-y-0 left-0 shadow-xl animate-in slide-in-from-left duration-200"
+            className="absolute inset-y-0 left-0 bg-sidebar shadow-xl animate-in slide-in-from-left duration-200"
             onClick={(e) => {
               if ((e.target as HTMLElement).closest("a[href]")) setOpen(false)
             }}

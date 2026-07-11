@@ -74,7 +74,8 @@ export function RichComposer({
     editorProps: {
       attributes: {
         spellcheck: "true", // 네이티브 맞춤법 빨간 밑줄
-        class: "tiptap-input max-h-40 overflow-y-auto py-1 text-sm focus:outline-none",
+        // 모바일 text-base(16px): iOS 입력 포커스 자동확대 방지(<16px면 확대). md+는 text-sm(14px) 유지.
+        class: "tiptap-input max-h-40 overflow-y-auto py-1 text-base md:text-sm focus:outline-none",
         "aria-label": "메시지 입력",
       },
       handleKeyDown: (_view, event) => {
