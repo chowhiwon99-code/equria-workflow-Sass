@@ -235,16 +235,16 @@ body {
  */
 .app-ambient {
   background:
-    radial-gradient(60% 55% at 15% 10%, oklch(0.75 0.05 320 / 0.1), transparent 60%),
-    radial-gradient(50% 50% at 85% 20%, oklch(0.72 0.05 240 / 0.1), transparent 55%),
-    radial-gradient(70% 60% at 50% 100%, oklch(0.8 0.03 264 / 0.1), transparent 60%),
+    radial-gradient(60% 55% at 15% 10%, oklch(0.75 0.05 320 / 0.06), transparent 60%),
+    radial-gradient(50% 50% at 85% 20%, oklch(0.72 0.05 240 / 0.06), transparent 55%),
+    radial-gradient(70% 60% at 50% 100%, oklch(0.8 0.03 264 / 0.06), transparent 60%),
     var(--background);
 }
 .dark .app-ambient {
   background:
-    radial-gradient(60% 55% at 15% 10%, oklch(0.45 0.06 320 / 0.18), transparent 60%),
-    radial-gradient(50% 50% at 85% 20%, oklch(0.42 0.06 240 / 0.18), transparent 55%),
-    radial-gradient(70% 60% at 50% 100%, oklch(0.3 0.03 264 / 0.2), transparent 60%),
+    radial-gradient(60% 55% at 15% 10%, oklch(0.45 0.06 320 / 0.10), transparent 60%),
+    radial-gradient(50% 50% at 85% 20%, oklch(0.42 0.06 240 / 0.10), transparent 55%),
+    radial-gradient(70% 60% at 50% 100%, oklch(0.3 0.03 264 / 0.11), transparent 60%),
     var(--background);
 }
 
