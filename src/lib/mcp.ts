@@ -80,10 +80,24 @@ export const MCP_CONNECTORS: Connector[] = [
   { id: "notion", name: "Notion", description: "페이지·데이터베이스 검색·수정 (내 계정, OAuth)", emoji: "📝", domain: "notion.so", category: "생산성", featured: true, status: "available", scope: "user", preset: { type: "http", url: "https://mcp.notion.com/mcp", auth: "oauth" } },
   { id: "linear", name: "Linear", description: "이슈·프로젝트 관리 (내 계정, OAuth)", emoji: "📐", domain: "linear.app", category: "개발", status: "available", scope: "user", preset: { type: "http", url: "https://mcp.linear.app/mcp", auth: "oauth" } },
   { id: "sentry", name: "Sentry", description: "에러·이슈 모니터링 (내 계정, OAuth)", emoji: "🛡️", domain: "sentry.io", category: "개발", status: "available", scope: "user", preset: { type: "http", url: "https://mcp.sentry.dev/mcp", auth: "oauth" } },
-  // 대표가 각 서비스 개발자 포털에서 앱 등록·승인을 직접 받아야 함(코드로 우회 불가) — 준비 중
-  { id: "slack", name: "Slack", description: "메시지·채널 조회·전송 (OAuth·내 계정, 앱 승인 대기)", emoji: "💬", domain: "slack.com", category: "커뮤니케이션", status: "coming_soon", scope: "user" },
-  { id: "figma", name: "Figma", description: "디자인 파일·코드 커넥트 (OAuth·내 계정, 앱 승인 대기)", emoji: "🎨", domain: "figma.com", category: "디자인", status: "coming_soon", scope: "user" },
-  // 지원 여부 재확인 필요(문서 상충) — 준비 중
-  { id: "atlassian", name: "Atlassian", description: "Jira·Confluence 이슈·문서 (OAuth·내 계정, 확인 중)", emoji: "🧩", domain: "atlassian.com", category: "개발", status: "coming_soon", scope: "user" },
-  { id: "canva", name: "Canva", description: "디자인 검색·생성·내보내기 (OAuth·내 계정, 확인 중)", emoji: "🖼️", domain: "canva.com", category: "디자인", status: "coming_soon", scope: "user" },
+  // 🆕 무인증 읽기 전용 추가(원클릭·회사 공용) — 공식 문서 검증 2026-07-13
+  { id: "cloudflare", name: "Cloudflare Docs", description: "Cloudflare 공식 문서 검색 (읽기 전용·무인증)", emoji: "☁️", domain: "cloudflare.com", category: "개발", status: "available", scope: "workspace", preset: { type: "http", url: "https://docs.mcp.cloudflare.com/mcp", auth: "none" } },
+  { id: "globalping", name: "Globalping", description: "전 세계 노드에서 ping·traceroute·DNS 측정 (무인증)", emoji: "🌐", domain: "globalping.io", category: "개발", status: "available", scope: "workspace", preset: { type: "http", url: "https://mcp.globalping.dev/mcp", auth: "none" } },
+  // 🆕 OAuth(DCR 개방) 추가 — 원클릭 자동 인가(직원 개인 계정). 공식 문서 검증 2026-07-13
+  { id: "neon", name: "Neon", description: "서버리스 Postgres 조회·관리 (내 계정, OAuth)", emoji: "🐘", domain: "neon.tech", category: "데이터", status: "available", scope: "user", preset: { type: "http", url: "https://mcp.neon.tech/mcp", auth: "oauth" } },
+  { id: "asana", name: "Asana", description: "업무·프로젝트 관리 (내 계정, OAuth)", emoji: "🅰️", domain: "asana.com", category: "생산성", featured: true, status: "available", scope: "user", preset: { type: "http", url: "https://mcp.asana.com/v2/mcp", auth: "oauth" } },
+  { id: "atlassian", name: "Atlassian", description: "Jira·Confluence 이슈·문서 (내 계정, OAuth)", emoji: "🧩", domain: "atlassian.com", category: "개발", status: "available", scope: "user", preset: { type: "http", url: "https://mcp.atlassian.com/v1/mcp", auth: "oauth" } },
+  { id: "intercom", name: "Intercom", description: "고객 대화·헬프데스크 (내 계정, OAuth·US 워크스페이스)", emoji: "🎧", domain: "intercom.com", category: "커뮤니케이션", status: "available", scope: "user", preset: { type: "http", url: "https://mcp.intercom.com/mcp", auth: "oauth" } },
+  { id: "square", name: "Square", description: "결제·주문·고객 데이터 (내 계정, OAuth)", emoji: "⬛", domain: "squareup.com", category: "데이터", status: "available", scope: "user", preset: { type: "sse", url: "https://mcp.squareup.com/sse", auth: "oauth" } },
+  { id: "webflow", name: "Webflow", description: "사이트·CMS 콘텐츠 관리 (내 계정, OAuth)", emoji: "🌊", domain: "webflow.com", category: "디자인", status: "available", scope: "user", preset: { type: "http", url: "https://mcp.webflow.com/mcp", auth: "oauth" } },
+  { id: "wix", name: "Wix", description: "사이트·비즈니스 데이터 관리 (내 계정, OAuth)", emoji: "🔷", domain: "wix.com", category: "디자인", status: "available", scope: "user", preset: { type: "http", url: "https://mcp.wix.com/mcp", auth: "oauth" } },
+  { id: "canva", name: "Canva", description: "디자인 검색·생성·내보내기 (내 계정, OAuth)", emoji: "🖼️", domain: "canva.com", category: "디자인", featured: true, status: "available", scope: "user", preset: { type: "http", url: "https://mcp.canva.com/mcp", auth: "oauth" } },
+  { id: "prisma", name: "Prisma", description: "Prisma Postgres 데이터·스키마 (내 계정, OAuth)", emoji: "△", domain: "prisma.io", category: "데이터", status: "available", scope: "user", preset: { type: "http", url: "https://mcp.prisma.io/mcp", auth: "oauth" } },
+  // 준비 중 — DCR 미지원(대표가 개발자앱 등록) / 화이트리스트 게이트 / 인증 방식이 프리셋과 불일치. 무리한 연결 대신 카드만 노출.
+  { id: "slack", name: "Slack", description: "메시지·채널 조회·전송 (OAuth·앱 사전등록 필요)", emoji: "💬", domain: "slack.com", category: "커뮤니케이션", status: "coming_soon", scope: "user" },
+  { id: "figma", name: "Figma", description: "디자인 파일·코드 커넥트 (OAuth·승인된 클라이언트 전용)", emoji: "🎨", domain: "figma.com", category: "디자인", status: "coming_soon", scope: "user" },
+  { id: "vercel", name: "Vercel", description: "배포·프로젝트 관리 (OAuth·승인된 클라이언트 전용)", emoji: "▲", domain: "vercel.com", category: "개발", status: "coming_soon", scope: "user" },
+  { id: "exa", name: "Exa", description: "AI 웹 검색 (API 키 헤더 방식이 프리셋과 상이)", emoji: "🔎", domain: "exa.ai", category: "데이터", status: "coming_soon", scope: "user" },
+  { id: "zapier", name: "Zapier", description: "6천+ 앱 자동화 (계정별 전용 URL 필요)", emoji: "⚡", domain: "zapier.com", category: "생산성", status: "coming_soon", scope: "user" },
+  { id: "paypal", name: "PayPal", description: "결제·거래 조회 (OAuth·DCR 미확인)", emoji: "🅿️", domain: "paypal.com", category: "데이터", status: "coming_soon", scope: "user" },
 ]
