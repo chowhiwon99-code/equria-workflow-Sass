@@ -109,8 +109,8 @@ export function TodayTasks() {
   const remaining = tasks.filter((t) => !t.done).length
 
   return (
-    <Surface variant="glass" padding="sm" className="shrink-0 rounded-xl">
-      <div className="mb-2 flex items-center justify-between">
+    <Surface variant="glass" padding="none" className="shrink-0 rounded-xl p-3">
+      <div className="mb-1.5 flex items-center justify-between">
         <h2 className="inline-flex items-center gap-2 text-sm font-semibold">
           <ListTodo className="size-4 text-primary" /> 오늘 할 일
           {remaining > 0 && <span className="text-xs font-normal text-muted-foreground">· {remaining}개 남음</span>}
@@ -118,7 +118,7 @@ export function TodayTasks() {
       </div>
 
       {/* 추가 입력 */}
-      <div className="mb-2 flex flex-wrap gap-1.5">
+      <div className="mb-1.5 flex flex-wrap gap-1.5">
         <input
           className={cn(fieldClass, "min-w-40 flex-1")}
           placeholder="할 일을 입력하고 Enter"
