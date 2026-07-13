@@ -16,6 +16,13 @@
   3. 워크플로우 등 기타 화면의 작은 입력(순서배지 등) 확대도 viewport 픽스로 함께 해결.
 - **검증**: tsc0 · next build 성공. **⚠️ 실기기 육안 확인 필요**(대표 폰).
 
+**후속(같은 세션32) — 사이드바 "뒤로 빠짐" 진짜 원인 + 모바일 오버레이 하드닝:**
+- **근본원인(글래스 리디자인 회귀)**: `MobileNav` 드로어가 **헤더(glass-panel=backdrop-filter) 안에서** 렌더됨. CSS에서 `backdrop-filter` 요소는 `position:fixed` 자식의 **containing block**이 되므로, 드로어의 `fixed inset-0`이 뷰포트가 아니라 **56px 헤더 기준**으로 잡혀 사이드바가 헤더에 끼여 "뒤로 빠진" 것처럼 보였음(glass 미지원 브라우저에선 헤더 solid라 정상 → 특정 상황만 깨짐). 세션32 1차의 불투명 배경은 *투명 증상*만 가림, 위치 트랩은 안 고침.
+- **수정**: 드로어를 **`createPortal(document.body)`** 로 렌더해 헤더 containing block 탈출(뷰포트 기준 fixed 보장). 햄버거 버튼은 헤더 유지.
+- **공용 `shared/Modal`도 동일 함정 예방**: body로 portal(glass 카드/transform 조상 안에서 열려도 위치 안 깨짐). 둘 다 `typeof document` 가드로 SSR/하이드레이션 안전(`mounted` 이펙트 대신 → lint `set-state-in-effect` 회귀 회피).
+- 기타 `fixed` 오버레이(FilePreview·MailCompose 등)는 각 뷰 루트에서 렌더돼 glass 조상에 안 갇힘(구조상 헤더 안 사이드바만 문제였음).
+- **검증**: tsc0 · lint 30/0(베이스라인) · build 성공.
+
 ---
 
 ## 2026-07-10 · 세션31 — 리디자인 디테일 튜닝 + 비용·매출 개선 (배포 4e501d3)

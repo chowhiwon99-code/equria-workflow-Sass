@@ -1,10 +1,15 @@
 "use client"
 
+import { createPortal } from "react-dom"
 import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
-/** 가벼운 공용 모달 (외부 dialog 라이브러리 없이 자작). 배경 클릭 시 닫힘. */
+/**
+ * 가벼운 공용 모달 (외부 dialog 라이브러리 없이 자작). 배경 클릭 시 닫힘.
+ * ⚠️ document.body로 portal한다: 모달이 glass 카드(backdrop-filter)나 transform 조상 안에서 열리면
+ * fixed 기준이 그 조상으로 바뀌어 위치가 깨진다(특히 모바일). portal로 항상 뷰포트 기준을 보장.
+ */
 export function Modal({
   title,
   onClose,
@@ -16,7 +21,10 @@ export function Modal({
   children: React.ReactNode
   className?: string
 }) {
-  return (
+  // 모달은 부모의 클라이언트 상태로만 열려 SSR엔 안 나타남 → document 가드로 안전(하이드레이션 불일치 없음)
+  if (typeof document === "undefined") return null
+
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm"
       onClick={onClose}
@@ -33,7 +41,8 @@ export function Modal({
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
