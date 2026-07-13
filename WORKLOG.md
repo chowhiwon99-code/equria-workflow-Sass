@@ -22,6 +22,7 @@
 - **공용 `shared/Modal`도 동일 함정 예방**: body로 portal(glass 카드/transform 조상 안에서 열려도 위치 안 깨짐). 둘 다 `typeof document` 가드로 SSR/하이드레이션 안전(`mounted` 이펙트 대신 → lint `set-state-in-effect` 회귀 회피).
 - 기타 `fixed` 오버레이(FilePreview·MailCompose 등)는 각 뷰 루트에서 렌더돼 glass 조상에 안 갇힘(구조상 헤더 안 사이드바만 문제였음).
 - **검증**: tsc0 · lint 30/0(베이스라인) · build 성공.
+- ⚠️ **배포 사건(교훈 재확인)**: portal 커밋(`1ae1554`)을 main→feat 연달아 push했더니 Vercel이 중복제거해 **프로덕션 승격 스킵**(prod가 `c954435`에 머묾). → 고유 SHA로 main 먼저 push하고 **프로덕션 빌드 생성 확인 후** feat push로 복구. HANDOFF §배포팁대로 *간격 두기*가 핵심.
 
 ---
 
