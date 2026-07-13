@@ -15,16 +15,24 @@ export type CoachSlot = {
   group: string | null
 }
 
+export type CoachTrendMonth = { label: string; revenue: number; expense: number }
+export type CoachTrend = {
+  currency: string // 추세를 집계한 단일 통화(혼합 금지)
+  months: CoachTrendMonth[] // 과거→현재 순, 보통 최근 6개월
+}
+
 export type CoachPayload = {
   summaries: CashSummary[] // 통화별 손익 요약(buildSlotGraph의 summary)
   slots: CoachSlot[]
+  trend?: CoachTrend // 실제 장부(finance_entries) 기준 최근 월별 추세(선택). 스냅샷과 별개 참고.
 }
 
 /** 현재 슬롯 + 통화별 요약 → 코칭 페이로드(클라이언트). */
 export function buildCoachPayload(
   slots: CashAccount[],
   summaries: CashSummary[],
-  groups: CashCategory[]
+  groups: CashCategory[],
+  trend?: CoachTrend
 ): CoachPayload {
   const gname = (id: string | null | undefined) =>
     id ? groups.find((g) => g.id === id)?.name ?? null : null
@@ -38,6 +46,7 @@ export function buildCoachPayload(
       currency: s.currency,
       group: gname(s.category_id),
     })),
+    ...(trend && trend.months.length > 0 ? { trend } : {}),
   }
 }
 
@@ -81,5 +90,37 @@ export function buildCoachPrompt(p: CoachPayload): string {
     lines.push(`- (${sl.type}) ${sl.name}${grp}: ${money(sl.amount, sl.currency)}${share}`)
   }
 
+  // 실제 장부(finance_entries) 최근 월별 추세 — 위 손익 모델과 별개의 실적 자료.
+  // 전월대비 변화율을 미리 계산해 모델의 산술 오류를 줄인다.
+  const t = p.trend
+  if (t && t.months.some((m) => m.revenue !== 0 || m.expense !== 0)) {
+    lines.push("")
+    lines.push(`실제 회계 내역(장부) 기준 최근 월별 추세 [통화 ${t.currency}] — 위 손익 모델과 별개의 실적 자료입니다:`)
+    let prev: CoachTrendMonth | null = null
+    for (const m of t.months) {
+      const profit = m.revenue - m.expense
+      const parts = [
+        `매출 ${money(m.revenue, t.currency)}`,
+        `비용 ${money(m.expense, t.currency)}`,
+        `순이익 ${money(profit, t.currency)}`,
+      ]
+      if (prev) {
+        const dRev = mom(m.revenue, prev.revenue)
+        const dExp = mom(m.expense, prev.expense)
+        const deltas = [dRev != null ? `매출 ${dRev}` : null, dExp != null ? `비용 ${dExp}` : null].filter(Boolean)
+        if (deltas.length) parts.push(`전월대비 ${deltas.join(", ")}`)
+      }
+      lines.push(`- ${m.label}: ${parts.join(" · ")}`)
+      prev = m
+    }
+  }
+
   return lines.join("\n")
+}
+
+/** 전월대비 변화율 문자열(+12% / −8%). 이전이 0이면 계산 불가로 null. */
+function mom(cur: number, prev: number): string | null {
+  if (prev <= 0) return null
+  const d = Math.round(((cur - prev) / prev) * 100)
+  return `${d >= 0 ? "+" : "−"}${Math.abs(d)}%`
 }

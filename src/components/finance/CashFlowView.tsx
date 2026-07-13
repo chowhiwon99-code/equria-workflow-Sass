@@ -399,7 +399,7 @@ export function CashFlowView() {
           </div>
         )}
         {showCoach && slots.length > 0 && (
-          <CashCoachPanel slots={slots} summaries={graph.summary} groups={groups} onClose={() => setShowCoach(false)} />
+          <CashCoachPanel slots={slots} summaries={graph.summary} groups={groups} defaultCurrency={defaultCurrency} onClose={() => setShowCoach(false)} />
         )}
         {/* 폰(<md)에선 캔버스 미마운트 — 마우스 전제 UI인데 숨김(display:none)만 하면 보이지 않는
             노드 트리가 slots 변경마다 재렌더돼 저사양 폰에서 낭비(적대 리뷰 확정 건) */}

@@ -55,5 +55,15 @@ export const cashCoachSchema = z.object({
       })
     )
     .describe("이상 신호 0~4개. 비용>매출·특정 비용 과다·순이익 마이너스·통화 편중·가용현금 부족 등. 없으면 빈 배열."),
+  trends: z
+    .array(
+      z.object({
+        direction: z.enum(["up", "down", "flat"]).describe("추세 방향: up=증가, down=감소, flat=횡보"),
+        metric: z.enum(["revenue", "expense", "profit"]).describe("대상 지표: revenue=매출, expense=비용, profit=순이익"),
+        title: z.string().describe("추세 요약 제목 (예: 매출 3개월 연속 감소)"),
+        detail: z.string().describe("월별 수치나 전월대비 변화율 근거를 포함. 1~2문장."),
+      })
+    )
+    .describe("실제 회계 내역(장부) 기준 최근 월별 추세에서 발견한 신호 0~3개. 추세 데이터가 없으면 빈 배열."),
 })
 export type CashCoachResult = z.infer<typeof cashCoachSchema>
