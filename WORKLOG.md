@@ -5,6 +5,24 @@
 
 ---
 
+## 2026-07-13 · 세션33 — MCP 커넥터 대량 추가 + AI 코칭 추세 인식 + 위젯 축소
+
+**무엇/왜:** 대표 요청 — "있으면 좋은 MCP 더 추가·다 연동" + 오늘할일 위젯 축소 + (앞서) 코칭 추세.
+
+- **MCP 커넥터 11종 추가·2종 승격 (`lib/mcp.ts`, 커넥터별 코드 0줄)**: 연결 흐름(`connectPreset`)이 `preset.auth`로 **데이터 주도**(none 원클릭 / bearer 토큰모달 / oauth DCR 리다이렉트) + OAuth 연결 라우트 제네릭 → **카탈로그 추가만으로 자동 연동**.
+  - 리서치 에이전트로 후보 20개 hosted MCP의 엔드포인트·auth·DCR **공식문서 실검증**.
+  - **available(11)**: Cloudflare Docs·Globalping(무인증·회사공용) / Neon·Asana·Atlassian·Intercom·Square·Webflow·Wix·Canva·Prisma(OAuth+DCR 개방·개인). Atlassian·Canva는 기존 coming_soon→승격.
+  - **coming_soon(연결 실패 방지 위해 카드만)**: Slack(DCR없음·앱필요)·Figma/Vercel(client_name 화이트리스트 게이트)·Exa(x-api-key 헤더 불일치)·Zapier(계정별 URL)·PayPal(DCR 미확인).
+  - "다 연동?" = none/bearer/DCR개방은 대표 설정0으로 바로. 화이트리스트/DCR없음/인증불일치만 보류(억지 available=연결버튼 실패 방지 = "문제상황 안 만들기").
+- **AI 코칭 추세 인식 (코칭 5파일)**: `cashCoachSchema.trends[]` + `CoachPayload.trend`(optional) + 프롬프트 전월대비% 사전계산(모델 산술오류 방지). `CashCoachPanel`이 `finance_entries` 6개월을 `buildMonthlyTrend` 집계→payload 포함, "최근 추세" 섹션 렌더. 스냅샷(cash_accounts)≠장부(finance_entries) 별개 참고로 명시. 추가형·읽기전용·DDL0·추세로드 실패해도 코칭 진행(방어적).
+- **오늘 할 일 위젯 축소 (`TodayTasks`)**: Surface p-4→p-3, 헤더·입력 mb-2→mb-1.5(수치만).
+
+**검증:** tsc0 · lint30/0 · build0. 3커밋 분리(mcp/ui/coaching) → **main-first 배포**(`c0aac03`, 롤백 `38242b9`). Vercel 프로덕션 BUILDING 확인 후 feat push(중복제거 회피).
+
+**대표 확인/미검증:** 커넥터 실연결 스모크(무인증 1개)·코칭 추세 화면·위젯 크기 = 실기기/브라우저 육안 권장. 워크플로우 모바일 질문 = **"일반 모바일 흐름"으로 확정**(세션32 픽스로 해결). **다음:** 워크플로우 사용성 개선 착수.
+
+---
+
 ## 2026-07-11 · 세션32 — 오늘할일 시각알림(pg_cron) + 그라데이션 완화 + 모바일 3픽스
 
 **무엇/왜:** "바로 착수 가능한 것" 진행 + 대표 모바일 피드백 즉시 반영.
