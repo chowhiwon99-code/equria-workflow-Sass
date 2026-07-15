@@ -35,7 +35,7 @@ export async function POST(
 
   const { data: agentVersion } = await supabase
     .from("agent_versions")
-    .select("system_prompt, model, max_tokens, temperature, mcp_servers")
+    .select("system_prompt, model, max_tokens, temperature, mcp_servers, mcp_connectors")
     .eq("agent_id", agentId)
     .eq("is_current", true)
     .maybeSingle()
@@ -140,18 +140,22 @@ export async function POST(
       }
     }
   }
-  // 내(요청자) 개인 MCP 연결(GitHub 등) — 에이전트 설정과 무관하게 항상 함께 사용 가능(내가 가져온 도구).
-  const { data: myConnections } = await supabase
-    .from("mcp_user_connections")
-    .select("id, connector_id, auth_method, encrypted_token, encrypted_refresh_token")
-    .eq("user_id", user.id)
-  for (const row of myConnections ?? []) {
-    const cfg = resolveUserConnectionConfig(row, user.id)
-    if (!cfg) continue
-    try {
-      mcpClients.push(await connectMcp(cfg))
-    } catch {
-      /* 연결 실패한 개인 커넥터는 건너뜀 */
+  // 에이전트에 바인딩된 개인 MCP 커넥터만 — 실행자(요청자) 본인의 연결로 해석(공유 에이전트도 쓰는 사람 계정 기준).
+  const boundConnectors = agentVersion.mcp_connectors ?? []
+  if (boundConnectors.length > 0) {
+    const { data: myConnections } = await supabase
+      .from("mcp_user_connections")
+      .select("id, connector_id, auth_method, encrypted_token, encrypted_refresh_token")
+      .eq("user_id", user.id)
+      .in("connector_id", boundConnectors)
+    for (const row of myConnections ?? []) {
+      const cfg = resolveUserConnectionConfig(row, user.id)
+      if (!cfg) continue
+      try {
+        mcpClients.push(await connectMcp(cfg))
+      } catch {
+        /* 연결 실패한 개인 커넥터는 건너뜀 */
+      }
     }
   }
   const toolSets = await Promise.all(mcpClients.map((c) => c.tools()))

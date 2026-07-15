@@ -71,7 +71,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const agentIds = [...new Set(topo.order.filter((n) => n.kind !== "mcp_tool").map((n) => n.agent_id))]
   const { data: versions } = await supabase
     .from("agent_versions")
-    .select("agent_id, system_prompt, model, max_tokens, temperature, mcp_servers")
+    .select("agent_id, system_prompt, model, max_tokens, temperature, mcp_servers, mcp_connectors")
     .in("agent_id", agentIds)
     .eq("is_current", true)
   const versionByAgent = new Map((versions ?? []).map((v) => [v.agent_id, v]))
@@ -142,24 +142,35 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const mcpClientCache = new Map<string, Awaited<ReturnType<typeof connectMcp>>>()
       const mcpToolsCache = new Map<string, ToolSet>()
 
-      // 내(요청자) 개인 MCP 연결(GitHub 등) — 런 전체에서 1회 로드해 모든 에이전트 노드에 병합(내가 가져온 도구).
-      const myMcpTools: ToolSet = {}
-      {
+      // 개인 MCP 연결 — 에이전트가 바인딩한 커넥터만 "실행자(요청자) 본인" 연결로 로드(채팅과 동일).
+      // 어떤 에이전트도 안 쓰는 커넥터는 연결 안 함(60s 예산 절약). connector_id → tools.
+      const myConnTools = new Map<string, ToolSet>()
+      const neededConnectors = new Set((versions ?? []).flatMap((v) => v.mcp_connectors ?? []))
+      if (neededConnectors.size > 0) {
         const { data: myConnections } = await supabase
           .from("mcp_user_connections")
           .select("id, connector_id, auth_method, encrypted_token, encrypted_refresh_token")
           .eq("user_id", user.id)
+          .in("connector_id", [...neededConnectors])
         for (const row of myConnections ?? []) {
           const cfg = resolveUserConnectionConfig(row, user.id)
           if (!cfg) continue
           try {
             const client = await connectMcp(cfg)
             mcpClientCache.set(row.id, client)
-            Object.assign(myMcpTools, await client.tools())
+            myConnTools.set(row.connector_id, await client.tools())
           } catch {
             /* 연결 실패한 개인 커넥터는 건너뜀 */
           }
         }
+      }
+      const personalToolsFor = (connectors: string[]): ToolSet => {
+        const merged: ToolSet = {}
+        for (const c of connectors) {
+          const t = myConnTools.get(c)
+          if (t) Object.assign(merged, t)
+        }
+        return merged
       }
       const mcpToolsFor = async (ids: string[]): Promise<ToolSet> => {
         const merged: ToolSet = {}
@@ -249,7 +260,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
           try {
             // 이 에이전트에 붙은 MCP 도구 + 내 개인 연결 도구(GitHub 등) 병합 — 채팅과 동일하게 다단계 도구호출 허용.
-            const mcpTools: ToolSet = { ...myMcpTools, ...(v.mcp_servers?.length ? await mcpToolsFor(v.mcp_servers) : {}) }
+            const mcpTools: ToolSet = { ...personalToolsFor(v.mcp_connectors ?? []), ...(v.mcp_servers?.length ? await mcpToolsFor(v.mcp_servers) : {}) }
             const hasTools = Object.keys(mcpTools).length > 0
             const { text, usage, totalUsage } = await generateText({
               model: anthropic(v.model),

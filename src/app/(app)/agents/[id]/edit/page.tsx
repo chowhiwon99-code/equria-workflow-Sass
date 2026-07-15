@@ -64,6 +64,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
         temperature: Number(cur?.temperature ?? 0.7),
         max_tokens: cur?.max_tokens ?? 4096,
         mcp_servers: cur?.mcp_servers ?? [],
+        mcp_connectors: cur?.mcp_connectors ?? [],
       })
       setLoading(false)
     })()

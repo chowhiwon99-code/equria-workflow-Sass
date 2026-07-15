@@ -99,6 +99,7 @@ export type Database = {
           id: string
           is_current: boolean
           max_tokens: number
+          mcp_connectors: string[]
           mcp_servers: string[]
           model: string
           system_prompt: string
@@ -114,6 +115,7 @@ export type Database = {
           id?: string
           is_current?: boolean
           max_tokens?: number
+          mcp_connectors?: string[]
           mcp_servers?: string[]
           model?: string
           system_prompt: string
@@ -129,6 +131,7 @@ export type Database = {
           id?: string
           is_current?: boolean
           max_tokens?: number
+          mcp_connectors?: string[]
           mcp_servers?: string[]
           model?: string
           system_prompt?: string

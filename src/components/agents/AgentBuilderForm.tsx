@@ -12,6 +12,7 @@ import { useUndo } from "@/components/undo/UndoProvider"
 import { IconPicker } from "@/components/agents/IconPicker"
 import { KnowledgeFilePicker } from "@/components/agents/KnowledgeFilePicker"
 import type { StagedKnowledge } from "@/lib/agentKnowledge"
+import { MCP_CONNECTORS } from "@/lib/mcp"
 import {
   AGENT_MODELS,
   AGENT_CATEGORIES,
@@ -32,6 +33,7 @@ export type AgentFormInitial = {
   temperature: number
   max_tokens: number
   mcp_servers: string[]
+  mcp_connectors: string[]
 }
 
 // 생성(create) 모드에서 위저드가 넘겨주는 초기값(부분). id 없음.
@@ -94,6 +96,27 @@ export function AgentBuilderForm({
   }, [])
   const toggleMcp = (id: string) =>
     setMcpServers((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+
+  // 이 에이전트가 사용할 "개인 MCP 커넥터"(내가 연결한 것만) — connector_id 슬러그. 실행 시 쓰는 사람 본인 연결로 해석.
+  const [mcpConnectors, setMcpConnectors] = useState<string[]>(
+    initial?.mcp_connectors ?? prefill?.mcp_connectors ?? []
+  )
+  const [availableConnectors, setAvailableConnectors] = useState<{ id: string; name: string }[]>([])
+  useEffect(() => {
+    fetch("/api/mcp/user-connections")
+      .then((r) => (r.ok ? r.json() : { connections: [] }))
+      .then((j: { connections?: { connector_id: string }[] }) => {
+        setAvailableConnectors(
+          (j.connections ?? []).map((c) => ({
+            id: c.connector_id,
+            name: MCP_CONNECTORS.find((m) => m.id === c.connector_id)?.name ?? c.connector_id,
+          }))
+        )
+      })
+      .catch(() => {})
+  }, [])
+  const toggleConnector = (id: string) =>
+    setMcpConnectors((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
 
   // 지식파일(참고 자료) — 생성 시 prefill(위저드에서 스테이징), 수정 시 DB에서 로드.
   const [knowledge, setKnowledge] = useState<StagedKnowledge[]>(prefill?.knowledge ?? [])
@@ -161,6 +184,7 @@ export function AgentBuilderForm({
         temperature,
         max_tokens: maxTokens,
         mcp_servers: mcpServers,
+        mcp_connectors: mcpConnectors,
         version: 1,
         is_current: true,
         created_by: me,
@@ -250,7 +274,8 @@ export function AgentBuilderForm({
       model !== initial.model ||
       temperature !== initial.temperature ||
       maxTokens !== initial.max_tokens ||
-      mcpKey(mcpServers) !== mcpKey(initial.mcp_servers)
+      mcpKey(mcpServers) !== mcpKey(initial.mcp_servers) ||
+      mcpKey(mcpConnectors) !== mcpKey(initial.mcp_connectors)
     if (versionChanged) {
       // version 은 unique(agent_id, version) 라서 동시 수정 시 select max(version)+1 이
       // 경합한다(둘 다 같은 값 → 두 번째 insert 가 23505). 충돌하면 max 를 다시 읽고
@@ -273,6 +298,7 @@ export function AgentBuilderForm({
           temperature,
           max_tokens: maxTokens,
           mcp_servers: mcpServers,
+        mcp_connectors: mcpConnectors,
           version,
           is_current: true, // 트리거 handle_new_agent_version 가 이전 버전 is_current=false 처리
           created_by: me,
@@ -655,6 +681,28 @@ export function AgentBuilderForm({
                   onChange={() => toggleMcp(s.id)}
                 />
                 <span>{s.name}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 내 MCP 연결 — 개인 계정으로 연결한 커넥터(Notion 등)를 이 에이전트에 붙임 */}
+      {availableConnectors.length > 0 && (
+        <div className="flex flex-col gap-2 text-sm">
+          <span className="text-xs text-muted-foreground">
+            내 MCP 연결 <span className="text-muted-foreground/70">— 내가 연결한 개인 도구. 대화 시 이 에이전트가 사용(쓰는 사람 각자 계정 기준)</span>
+          </span>
+          <div className="flex flex-col gap-1.5 rounded-lg border p-3">
+            {availableConnectors.map((c) => (
+              <label key={c.id} className="flex cursor-pointer items-center gap-2.5">
+                <input
+                  type="checkbox"
+                  className="size-4"
+                  checked={mcpConnectors.includes(c.id)}
+                  onChange={() => toggleConnector(c.id)}
+                />
+                <span>🔌 {c.name}</span>
               </label>
             ))}
           </div>
