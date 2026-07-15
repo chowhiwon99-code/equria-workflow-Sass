@@ -7,10 +7,11 @@ import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { Button } from "@/components/ui/button"
-import { normalizeGraph } from "@/lib/workflows"
+import { normalizeGraph, type WorkflowGraph } from "@/lib/workflows"
 import { Loading, ErrorState } from "@/components/shared/States"
 import { useUndo } from "@/components/undo/UndoProvider"
 import { renderAgentIcon, isLucideIcon } from "@/components/agents/AgentIcon"
+import { NewWorkflowModal } from "@/components/workflows/NewWorkflowModal"
 
 type WorkflowRow = {
   id: string
@@ -27,6 +28,8 @@ export function WorkflowsView() {
   const { push } = useUndo()
   const [rows, setRows] = useState<WorkflowRow[]>([])
   const [agentIcons, setAgentIcons] = useState<Record<string, string>>({}) // agent_id→현재 아이콘(lucide 통일)
+  const [agentOpts, setAgentOpts] = useState<{ id: string; name: string; icon: string; description: string | null }[]>([])
+  const [newOpen, setNewOpen] = useState(false) // 새 워크플로우(템플릿) 선택 모달
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -39,13 +42,15 @@ export function WorkflowsView() {
           .select("id, name, description, steps, run_count")
           .eq("is_active", true)
           .order("created_at", { ascending: false }),
-        supabase.from("agents").select("id, icon").eq("is_active", true),
+        supabase.from("agents").select("id, name, icon, description").eq("is_active", true),
       ])
       if (wfRes.error) throw wfRes.error
       setRows((wfRes.data as WorkflowRow[]) ?? [])
+      const ags = (agRes.data ?? []) as { id: string; name: string; icon: string | null; description: string | null }[]
+      setAgentOpts(ags.map((a) => ({ id: a.id, name: a.name, icon: a.icon ?? "lucide:Bot", description: a.description })))
       // 노드 아이콘은 스냅샷(이모지일 수 있음) 대신 에이전트의 현재 아이콘(lucide)으로 통일
       const map: Record<string, string> = {}
-      for (const a of (agRes.data ?? []) as { id: string; icon: string | null }[]) {
+      for (const a of ags) {
         if (a.icon) map[a.id] = a.icon
       }
       setAgentIcons(map)
@@ -68,16 +73,13 @@ export function WorkflowsView() {
     return () => window.removeEventListener("equria:reload", h)
   }, [load])
 
-  const create = async () => {
-    if (creating) return
+  const createFrom = async (choice: { name: string; description: string | null; graph: WorkflowGraph }) => {
+    if (creating || !me) return
     setCreating(true)
-    if (!me) {
-      setCreating(false)
-      return
-    }
+    setNewOpen(false)
     const { data, error } = await supabase
       .from("workflows")
-      .insert({ name: "새 워크플로우", description: null, steps: [], created_by: me })
+      .insert({ name: choice.name, description: choice.description, steps: choice.graph, created_by: me })
       .select("id")
       .single()
     setCreating(false)
@@ -113,10 +115,14 @@ export function WorkflowsView() {
             에이전트를 순서대로 엮어 실행하면 앞 단계 결과가 다음 단계로 이어집니다.
           </p>
         </div>
-        <Button size="sm" onClick={create} disabled={creating}>
+        <Button size="sm" onClick={() => setNewOpen(true)} disabled={creating}>
           <Plus /> 새 워크플로우
         </Button>
       </div>
+
+      {newOpen && (
+        <NewWorkflowModal agents={agentOpts} onPick={createFrom} onClose={() => setNewOpen(false)} />
+      )}
 
       {loading ? (
         <Loading rows={5} />
@@ -128,7 +134,7 @@ export function WorkflowsView() {
             <WorkflowIcon className="size-5" />
           </span>
           <p className="text-sm text-muted-foreground">
-            아직 워크플로우가 없어요. ‘새 워크플로우’로 시작하세요.
+            아직 워크플로우가 없어요. ‘새 워크플로우’에서 <b className="font-medium text-foreground">예시 템플릿</b>으로 바로 시작해보세요.
           </p>
         </div>
       ) : (
