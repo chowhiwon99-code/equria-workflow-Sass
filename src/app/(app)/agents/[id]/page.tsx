@@ -2,9 +2,10 @@
 
 import { use, useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Pencil, Pin, Lock, Globe } from "lucide-react"
+import { Pencil, Pin, Lock, Globe, Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
+import { useUndo } from "@/components/undo/UndoProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -21,6 +22,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
   const { id } = use(params)
   const supabase = createClient()
   const router = useRouter()
+  const { push } = useUndo()
   const [agent, setAgent] = useState<AgentDetail | null>(null)
   const [version, setVersion] = useState<Version | null>(null)
   const meId = useCurrentUserId()
@@ -77,6 +79,30 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
     }
   }, [supabase, meId, agent, pinned])
 
+  const remove = async () => {
+    if (!agent) return
+    if (!confirm("이 에이전트를 삭제할까요? (위젯에서도 사라집니다 · ⌘Z로 복구 가능)")) return
+    const agentId = agent.id
+    try {
+      await mustOk(supabase.from("agents").update({ is_active: false }).eq("id", agentId))
+    } catch {
+      return
+    }
+    push({
+      label: "에이전트 삭제",
+      undo: async () => {
+        await mustOk(supabase.from("agents").update({ is_active: true }).eq("id", agentId))
+        window.dispatchEvent(new Event("equria:agents-changed"))
+      },
+      redo: async () => {
+        await mustOk(supabase.from("agents").update({ is_active: false }).eq("id", agentId))
+        window.dispatchEvent(new Event("equria:agents-changed"))
+      },
+    })
+    window.dispatchEvent(new Event("equria:agents-changed"))
+    router.push("/agents")
+  }
+
   if (loading) return <p className="text-sm text-muted-foreground">불러오는 중…</p>
   if (missing || !agent)
     return (
@@ -121,9 +147,14 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
             {pinned ? "위젯에 있음" : "위젯에 추가"}
           </Button>
           {isOwner && (
-            <Button variant="outline" size="sm" onClick={() => router.push(`/agents/${agent.id}/edit`)}>
-              <Pencil className="size-3.5" /> 수정
-            </Button>
+            <>
+              <Button variant="outline" size="sm" onClick={() => router.push(`/agents/${agent.id}/edit`)}>
+                <Pencil className="size-3.5" /> 수정
+              </Button>
+              <Button variant="outline" size="sm" onClick={remove} className="text-destructive hover:text-destructive">
+                <Trash2 className="size-3.5" /> 삭제
+              </Button>
+            </>
           )}
         </div>
       </div>

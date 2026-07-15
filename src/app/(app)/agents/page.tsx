@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Plus, Pin, Lock, Globe } from "lucide-react"
+import { Plus, Pin, Lock, Globe, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
+import { useUndo } from "@/components/undo/UndoProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -21,6 +22,7 @@ type AgentRow = Pick<
 export default function AgentsPage() {
   const supabase = createClient()
   const router = useRouter()
+  const { push } = useUndo()
   const [agents, setAgents] = useState<AgentRow[]>([])
   const meId = useCurrentUserId()
   const [pins, setPins] = useState<Set<string>>(new Set())
@@ -82,6 +84,32 @@ export default function AgentsPage() {
     }
   }
 
+  // 소프트 삭제(is_active=false) + ⌘Z 복구 — 수정 페이지 remove()와 동일 패턴(소유자만, RLS가 강제).
+  const deleteAgent = async (agentId: string, name: string) => {
+    if (!confirm(`'${name}' 에이전트를 삭제할까요? (위젯에서도 사라집니다 · ⌘Z로 복구 가능)`)) return
+    try {
+      await mustOk(supabase.from("agents").update({ is_active: false }).eq("id", agentId))
+    } catch {
+      toast.error("삭제하지 못했어요. 다시 시도해 주세요.")
+      return
+    }
+    setAgents((prev) => prev.filter((a) => a.id !== agentId)) // 낙관적 제거
+    push({
+      label: "에이전트 삭제",
+      undo: async () => {
+        await mustOk(supabase.from("agents").update({ is_active: true }).eq("id", agentId))
+        window.dispatchEvent(new Event("equria:agents-changed"))
+        load()
+      },
+      redo: async () => {
+        await mustOk(supabase.from("agents").update({ is_active: false }).eq("id", agentId))
+        window.dispatchEvent(new Event("equria:agents-changed"))
+        load()
+      },
+    })
+    window.dispatchEvent(new Event("equria:agents-changed"))
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -107,16 +135,19 @@ export default function AgentsPage() {
                 agent={a}
                 pinned={effectivePins.has(a.id)}
                 onTogglePin={() => togglePin(a.id)}
+                onDelete={() => deleteAgent(a.id, a.name)}
                 editable
               />
             ))}
           </Section>
 
-          <Section title="기본 에이전트">
-            {defaults.map((a) => (
-              <AgentCard key={a.id} agent={a} pinned={effectivePins.has(a.id)} onTogglePin={() => togglePin(a.id)} />
-            ))}
-          </Section>
+          {defaults.length > 0 && (
+            <Section title="기본 에이전트">
+              {defaults.map((a) => (
+                <AgentCard key={a.id} agent={a} pinned={effectivePins.has(a.id)} onTogglePin={() => togglePin(a.id)} />
+              ))}
+            </Section>
+          )}
 
           {shared.length > 0 && (
             <Section title="공유된 에이전트">
@@ -160,11 +191,13 @@ function AgentCard({
   agent,
   pinned,
   onTogglePin,
+  onDelete,
   editable,
 }: {
   agent: AgentRow
   pinned: boolean
   onTogglePin: () => void
+  onDelete?: () => void
   editable?: boolean
 }) {
   return (
@@ -176,24 +209,40 @@ function AgentCard({
         <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted text-foreground">
           {renderAgentIcon(agent.icon || "lucide:Bot", "size-5")}
         </span>
-        <button
-          onClick={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            onTogglePin()
-          }}
-          className={cn(
-            "flex items-center gap-1 rounded-full px-2 py-1 text-xs transition-colors",
-            pinned
-              ? "bg-primary/10 text-primary hover:bg-primary/20"
-              : "text-muted-foreground hover:bg-muted"
+        <div className="flex items-center gap-1">
+          <button
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              onTogglePin()
+            }}
+            className={cn(
+              "flex items-center gap-1 rounded-full px-2 py-1 text-xs transition-colors",
+              pinned
+                ? "bg-primary/10 text-primary hover:bg-primary/20"
+                : "text-muted-foreground hover:bg-muted"
+            )}
+            title={pinned ? "위젯에서 제거" : "위젯에 추가"}
+            aria-pressed={pinned}
+          >
+            <Pin className={cn("size-3.5", pinned && "fill-current")} />
+            {pinned ? "위젯에 있음" : "위젯에 추가"}
+          </button>
+          {editable && onDelete && (
+            <button
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                onDelete()
+              }}
+              className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground opacity-0 transition-colors hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+              title="삭제"
+              aria-label={`${agent.name} 삭제`}
+            >
+              <Trash2 className="size-3.5" />
+            </button>
           )}
-          title={pinned ? "위젯에서 제거" : "위젯에 추가"}
-          aria-pressed={pinned}
-        >
-          <Pin className={cn("size-3.5", pinned && "fill-current")} />
-          {pinned ? "위젯에 있음" : "위젯에 추가"}
-        </button>
+        </div>
       </div>
 
       <div className="flex items-center gap-1.5">
