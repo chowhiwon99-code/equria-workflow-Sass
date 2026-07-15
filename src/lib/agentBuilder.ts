@@ -23,7 +23,7 @@ export const WIZARD_FIELDS: WizardField[] = [
     label: "에이전트 이름",
     type: "text",
     required: false,
-    placeholder: "예: 브랜드 카피라이터 (비워두면 AI가 추천)",
+    placeholder: "예: 문서 요약 도우미 (비워두면 AI가 추천)",
     step: 1,
   },
   {
@@ -31,7 +31,7 @@ export const WIZARD_FIELDS: WizardField[] = [
     label: "에이전트 목적 (한 줄)",
     type: "text",
     required: true,
-    placeholder: "예: 인스타·유튜브용 마케팅 카피를 빠르게 작성",
+    placeholder: "예: 반복 업무의 초안을 빠르게 만들어 준다",
     step: 1,
   },
   {
@@ -82,7 +82,7 @@ export const WIZARD_FIELDS: WizardField[] = [
     label: "세부 업무 (구체적으로 시켜볼 일)",
     type: "textarea",
     required: true,
-    placeholder: "예: 인스타 릴스 카피 3안 작성, 해시태그 10개 추천, 제품 USP 강조",
+    placeholder: "예: 무엇을 시킬지 구체적으로 (초안 작성·요약·분류·검토 등)",
     step: 2,
   },
   {
@@ -90,7 +90,7 @@ export const WIZARD_FIELDS: WizardField[] = [
     label: "필요한 데이터 / 입력 자료",
     type: "textarea",
     required: false,
-    placeholder: "예: 제품명·성분·가격, 타깃 고객, 참고 톤앤매너",
+    placeholder: "예: 참고할 자료·양식·규칙 (아래에서 파일도 첨부할 수 있어요)",
     step: 2,
   },
   {
@@ -109,7 +109,7 @@ export const WIZARD_FIELDS: WizardField[] = [
     label: "대상 사용자 / 수신자",
     type: "text",
     required: false,
-    placeholder: "예: 20대 여성 고객, 해외 바이어, 내부 임원",
+    placeholder: "예: 고객, 거래처, 내부 직원",
     step: 2,
   },
   {
@@ -117,7 +117,7 @@ export const WIZARD_FIELDS: WizardField[] = [
     label: "금지사항·제약 (하지 말아야 할 것)",
     type: "textarea",
     required: false,
-    placeholder: "예: 의학적 효능 단정 금지, 확정 법률자문 금지, 추측 시 명시",
+    placeholder: "예: 하지 말아야 할 것 (근거 없는 단정 금지, 추측은 추측이라 밝히기 등)",
     step: 2,
   },
   {

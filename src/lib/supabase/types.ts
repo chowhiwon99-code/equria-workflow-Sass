@@ -2556,6 +2556,57 @@ export type Database = {
           },
         ]
       }
+      agent_knowledge: {
+        Row: {
+          agent_id: string
+          created_at: string
+          created_by: string | null
+          extracted_text: string | null
+          id: string
+          mime_type: string | null
+          name: string
+          size: number | null
+          storage_path: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          created_by?: string | null
+          extracted_text?: string | null
+          id?: string
+          mime_type?: string | null
+          name: string
+          size?: number | null
+          storage_path: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          created_by?: string | null
+          extracted_text?: string | null
+          id?: string
+          mime_type?: string | null
+          name?: string
+          size?: number | null
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_knowledge_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_knowledge_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_tasks: {
         Row: {
           created_at: string

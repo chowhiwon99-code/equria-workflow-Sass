@@ -13,6 +13,8 @@ import {
 } from "@/lib/agentBuilder"
 import { AgentBuilderForm } from "@/components/agents/AgentBuilderForm"
 import { AGENT_TEMPLATES, type AgentTemplate } from "@/lib/agentTemplates"
+import { KnowledgeFilePicker } from "@/components/agents/KnowledgeFilePicker"
+import type { StagedKnowledge } from "@/lib/agentKnowledge"
 
 type Mode = "wizard" | "manual"
 type Phase = "gallery" | "input" | "result"
@@ -30,6 +32,7 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
   const [generated, setGenerated] = useState("")
+  const [knowledge, setKnowledge] = useState<StagedKnowledge[]>([]) // 필요한 데이터 스텝에서 첨부한 파일
 
   const setText = (key: string, v: string) => setInputs((p) => ({ ...p, [key]: v }))
   const toggleMulti = (key: string, opt: string) =>
@@ -206,6 +209,7 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
                 category: inferCategory(inputs),
                 system_prompt: generated,
                 ...(mcpPrefill?.length ? { mcp_servers: mcpPrefill } : {}),
+                ...(knowledge.length ? { knowledge } : {}),
               }}
               onBack={() => setPhase("input")}
             />
@@ -264,6 +268,8 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
             onText={setText}
             onToggle={toggleMulti}
             onAdvance={goNext}
+            knowledge={knowledge}
+            onKnowledgeChange={setKnowledge}
           />
         </div>
       </div>
@@ -298,6 +304,8 @@ function QuestionSlide({
   onText,
   onToggle,
   onAdvance,
+  knowledge,
+  onKnowledgeChange,
 }: {
   field: WizardField
   active: boolean
@@ -305,6 +313,8 @@ function QuestionSlide({
   onText: (key: string, v: string) => void
   onToggle: (key: string, opt: string) => void
   onAdvance: () => void
+  knowledge: StagedKnowledge[]
+  onKnowledgeChange: (next: StagedKnowledge[]) => void
 }) {
   const inputRef = useRef<HTMLElement | null>(null)
   const value = inputs[f.key]
@@ -393,6 +403,23 @@ function QuestionSlide({
               </button>
             )
           })}
+          {/* 직접 입력 — 목록에 없으면 자유롭게 작성(틀에 안 갇히게) */}
+          <input
+            className={cn(
+              fieldClass,
+              "mt-1 h-11 rounded-xl text-sm",
+              value && !f.options!.includes(value as string) && "border-primary bg-primary/5"
+            )}
+            placeholder="목록에 없으면 직접 입력하고 Enter"
+            value={f.options!.includes(value as string) ? "" : ((value as string) ?? "")}
+            onChange={(e) => onText(f.key, e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.nativeEvent.isComposing && String((value as string) ?? "").trim()) {
+                e.preventDefault()
+                onAdvance()
+              }
+            }}
+          />
         </div>
       )}
 
@@ -458,6 +485,13 @@ function QuestionSlide({
             </div>
           )
         })()}
+
+      {/* 필요한 데이터 스텝 — AI가 읽을 파일 첨부(PDF·이미지·문서) */}
+      {f.key === "requiredData" && (
+        <div className="w-full">
+          <KnowledgeFilePicker value={knowledge} onChange={onKnowledgeChange} />
+        </div>
+      )}
     </div>
   )
 }

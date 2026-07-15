@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/shared/Modal"
 import { useUndo } from "@/components/undo/UndoProvider"
 import { IconPicker } from "@/components/agents/IconPicker"
+import { KnowledgeFilePicker } from "@/components/agents/KnowledgeFilePicker"
+import type { StagedKnowledge } from "@/lib/agentKnowledge"
 import {
   AGENT_MODELS,
   AGENT_CATEGORIES,
@@ -33,7 +35,7 @@ export type AgentFormInitial = {
 }
 
 // 생성(create) 모드에서 위저드가 넘겨주는 초기값(부분). id 없음.
-export type AgentFormPrefill = Partial<Omit<AgentFormInitial, "id">>
+export type AgentFormPrefill = Partial<Omit<AgentFormInitial, "id">> & { knowledge?: StagedKnowledge[] }
 
 export function AgentBuilderForm({
   initial,
@@ -93,6 +95,34 @@ export function AgentBuilderForm({
   const toggleMcp = (id: string) =>
     setMcpServers((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
 
+  // 지식파일(참고 자료) — 생성 시 prefill(위저드에서 스테이징), 수정 시 DB에서 로드.
+  const [knowledge, setKnowledge] = useState<StagedKnowledge[]>(prefill?.knowledge ?? [])
+  const [initialKnowledge, setInitialKnowledge] = useState<StagedKnowledge[]>([])
+  useEffect(() => {
+    if (!initial) return
+    let alive = true
+    supabase
+      .from("agent_knowledge")
+      .select("id, storage_path, name, mime_type, size, extracted_text")
+      .eq("agent_id", initial.id)
+      .then(({ data }) => {
+        if (!alive) return
+        const rows: StagedKnowledge[] = (data ?? []).map((r) => ({
+          id: r.id,
+          storage_path: r.storage_path,
+          name: r.name,
+          mime_type: r.mime_type ?? "",
+          size: r.size ?? 0,
+          extracted_text: r.extracted_text,
+        }))
+        setInitialKnowledge(rows)
+        setKnowledge(rows)
+      })
+    return () => {
+      alive = false
+    }
+  }, [initial, supabase])
+
   const valid = name.trim().length > 0 && systemPrompt.trim().length > 0
 
   const save = async () => {
@@ -144,6 +174,21 @@ export function AgentBuilderForm({
       // 실패해도 생성 자체는 유지(best-effort).
       await supabase.from("user_agent_pins").insert({ user_id: me, agent_id: agent.id })
 
+      // 지식파일(참고 자료) 반영 — best-effort(실패해도 생성은 유지)
+      if (knowledge.length > 0) {
+        await supabase.from("agent_knowledge").insert(
+          knowledge.map((k) => ({
+            agent_id: agent.id,
+            storage_path: k.storage_path,
+            name: k.name,
+            mime_type: k.mime_type || null,
+            size: k.size || null,
+            extracted_text: k.extracted_text,
+            created_by: me,
+          }))
+        )
+      }
+
       push({
         label: "에이전트 생성",
         undo: async () => {
@@ -175,6 +220,28 @@ export function AgentBuilderForm({
       setError(uErr.message)
       setSaving(false)
       return
+    }
+
+    // 지식파일 반영: 새로 추가된 것(id 없음) insert, 제거된 것 delete
+    const toInsert = knowledge.filter((k) => !k.id)
+    const removedIds = initialKnowledge
+      .filter((ik) => ik.id && !knowledge.some((k) => k.id === ik.id))
+      .map((ik) => ik.id!)
+    if (toInsert.length > 0) {
+      await supabase.from("agent_knowledge").insert(
+        toInsert.map((k) => ({
+          agent_id: initial.id,
+          storage_path: k.storage_path,
+          name: k.name,
+          mime_type: k.mime_type || null,
+          size: k.size || null,
+          extracted_text: k.extracted_text,
+          created_by: me,
+        }))
+      )
+    }
+    if (removedIds.length > 0) {
+      await supabase.from("agent_knowledge").delete().in("id", removedIds)
     }
 
     const mcpKey = (arr: string[]) => JSON.stringify([...arr].sort())
@@ -305,7 +372,7 @@ export function AgentBuilderForm({
               className={cn(fieldClass, "min-h-[180px] resize-y rounded-xl font-mono text-[13px] leading-relaxed")}
               value={systemPrompt}
               onChange={(e) => setSystemPrompt(e.target.value)}
-              placeholder={"예: 당신은 우리 회사의 K-뷰티 브랜드 카피라이터입니다.\n- 밝고 트렌디한 말투\n- 인스타그램 캡션은 3줄 이내 + 해시태그 5개"}
+              placeholder={"예: 당신은 우리 회사의 문서 작성 도우미입니다.\n- 정중하고 간결한 말투\n- 핵심을 먼저, 근거는 뒤에"}
             />
           </div>
         ),
@@ -497,9 +564,17 @@ export function AgentBuilderForm({
           className={cn(fieldClass, "min-h-[180px] resize-y font-mono text-[13px] leading-relaxed")}
           value={systemPrompt}
           onChange={(e) => setSystemPrompt(e.target.value)}
-          placeholder={"예: 당신은 우리 회사의 K-뷰티 브랜드 카피라이터입니다.\n- 밝고 트렌디한 말투\n- 인스타그램 캡션은 3줄 이내 + 해시태그 5개"}
+          placeholder={"예: 당신은 우리 회사의 문서 작성 도우미입니다.\n- 정중하고 간결한 말투\n- 핵심을 먼저, 근거는 뒤에"}
         />
       </label>
+
+      {/* 참고 자료 (파일) — AI가 대화 시 함께 읽을 지식파일 */}
+      <div className="flex flex-col gap-1.5 text-sm">
+        <span className="text-xs text-muted-foreground">
+          참고 자료 <span className="text-muted-foreground/70">— PDF·이미지·문서를 붙이면 대화 시 함께 읽어요 (선택)</span>
+        </span>
+        <KnowledgeFilePicker value={knowledge} onChange={setKnowledge} />
+      </div>
 
       {/* 모델 + 최대 토큰 */}
       <div className="flex flex-wrap items-end gap-3">

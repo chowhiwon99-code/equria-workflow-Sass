@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { connectMcp, resolveUserConnectionConfig } from "@/lib/mcp/connect"
 import { computeCostUsd } from "@/lib/pricing"
 import { checkBudget, BUDGET_EXCEEDED_MSG } from "@/lib/budget"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 export const maxDuration = 60
 export const runtime = "nodejs"
@@ -83,6 +84,45 @@ export async function POST(
   const windowed = messages.slice(-HISTORY_WINDOW)
   const modelMessages = await convertToModelMessages(windowed)
 
+  // 에이전트 지식파일(참고 자료) 주입 — 텍스트는 시스템 프롬프트에, PDF/이미지는 파일 파트로.
+  // 공유 에이전트를 다른 멤버가 대화할 수 있으므로 admin 클라로 서명(소유자 폴더 RLS 우회).
+  let systemPrompt = agentVersion.system_prompt
+  {
+    const { data: kn } = await supabase
+      .from("agent_knowledge")
+      .select("storage_path, name, mime_type, extracted_text")
+      .eq("agent_id", agentId)
+    if (kn && kn.length > 0) {
+      const textBlocks: string[] = []
+      const fileParts: Array<
+        { type: "file"; data: string; mediaType: string } | { type: "image"; image: string }
+      > = []
+      const admin = createAdminClient()
+      for (const k of kn) {
+        if (k.extracted_text) {
+          textBlocks.push(`### ${k.name}\n${k.extracted_text}`)
+        } else {
+          const { data: signed } = await admin.storage.from("files").createSignedUrl(k.storage_path, 300)
+          if (!signed?.signedUrl) continue
+          if ((k.mime_type ?? "").startsWith("image/")) fileParts.push({ type: "image", image: signed.signedUrl })
+          else fileParts.push({ type: "file", data: signed.signedUrl, mediaType: k.mime_type || "application/pdf" })
+        }
+      }
+      if (textBlocks.length > 0) {
+        systemPrompt += `\n\n# 참고 자료(회사가 첨부한 지식)\n아래 자료를 우선 근거로 삼아 답하세요. 자료에 없으면 지어내지 말고 모른다고 하세요.\n\n${textBlocks.join("\n\n")}`
+      }
+      if (fileParts.length > 0) {
+        modelMessages.unshift({
+          role: "user",
+          content: [
+            { type: "text", text: "다음은 이 에이전트의 참고 자료 파일입니다. 답변의 근거로 활용하세요." },
+            ...fileParts,
+          ],
+        })
+      }
+    }
+  }
+
   // 에이전트에 연결된 MCP 서버의 도구 로드(있으면). 연결 실패 서버는 건너뜀.
   const mcpClients: Awaited<ReturnType<typeof connectMcp>>[] = []
   const mcpIds = agentVersion.mcp_servers ?? []
@@ -121,7 +161,7 @@ export async function POST(
 
   const result = streamText({
     model: anthropic(agentVersion.model),
-    system: agentVersion.system_prompt,
+    system: systemPrompt,
     messages: modelMessages,
     maxOutputTokens: agentVersion.max_tokens,
     temperature: Number(agentVersion.temperature),
