@@ -13,7 +13,7 @@ import { BackLink } from "@/components/shared/BackLink"
 import { Loading, ErrorState } from "@/components/shared/States"
 import { fieldClass } from "@/components/shared/Modal"
 import { WorkflowCanvas, type NodeRunState } from "@/components/workflows/WorkflowCanvas"
-import { agentIconText, renderAgentIcon, isLucideIcon } from "@/components/agents/AgentIcon"
+import { renderAgentIcon, isLucideIcon } from "@/components/agents/AgentIcon"
 import {
   normalizeGraph,
   genId,
@@ -23,7 +23,7 @@ import {
   type WorkflowToolType,
 } from "@/lib/workflows"
 import { WORKFLOW_TOOLS } from "@/lib/workflowTools"
-import { MCP_TOOL_KO } from "@/lib/mcp"
+import { StepPicker } from "@/components/workflows/StepPicker"
 
 type AgentOpt = { id: string; name: string; icon: string; description: string | null }
 
@@ -60,13 +60,11 @@ export function WorkflowEditor({ id }: { id: string }) {
   const [isPublic, setIsPublic] = useState(false)
   const [graph, setGraph] = useState<WorkflowGraph>({ nodes: [], edges: [] })
   const [agents, setAgents] = useState<AgentOpt[]>([])
-  const [pickAgent, setPickAgent] = useState("")
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  // MCP 도구 노드 — 연결된 MCP 서버·도구 목록(있을 때만 툴바 노출)
+  const [pickerOpen, setPickerOpen] = useState(false) // "단계 추가" 통합 피커
+  // MCP 도구 노드 — 연결된 MCP 서버·도구 목록(피커에 노출)
   const [mcpServers, setMcpServers] = useState<{ id: string; name: string }[]>([])
   const [mcpTools, setMcpTools] = useState<Record<string, { name: string; description: string | null }[]>>({})
-  const [pickMcpServer, setPickMcpServer] = useState("")
-  const [pickMcpTool, setPickMcpTool] = useState("")
 
   // 실행 상태
   const [running, setRunning] = useState(false)
@@ -137,8 +135,8 @@ export function WorkflowEditor({ id }: { id: string }) {
       .catch(() => {})
   }, [])
 
-  const addNode = () => {
-    const a = agents.find((x) => x.id === pickAgent)
+  const addNode = (agentId: string) => {
+    const a = agents.find((x) => x.id === agentId)
     if (!a) return
     setGraph((g) => {
       // 새 노드는 실행 순서의 맨 끝에 붙이고, 끈을 선형으로 자동 재연결.
@@ -158,13 +156,12 @@ export function WorkflowEditor({ id }: { id: string }) {
       const nodes = [...ordered, newNode]
       return { nodes, edges: linearEdges(nodes) }
     })
-    setPickAgent("")
   }
 
   // MCP 도구 노드 추가 — 에이전트 노드와 동일하게 맨 끝에 붙이고 선형 재연결.
-  const addMcpNode = () => {
-    const srv = mcpServers.find((s) => s.id === pickMcpServer)
-    if (!srv || !pickMcpTool) return
+  const addMcpNode = (serverId: string, toolName: string) => {
+    const srv = mcpServers.find((s) => s.id === serverId)
+    if (!srv || !toolName) return
     setGraph((g) => {
       const cur = topoOrder(g)
       const ordered = cur.ok ? [...cur.order] : [...g.nodes]
@@ -173,11 +170,11 @@ export function WorkflowEditor({ id }: { id: string }) {
         id: genId(),
         kind: "mcp_tool" as const,
         agent_id: "",
-        agent_name: pickMcpTool,
+        agent_name: toolName,
         agent_desc: `MCP · ${srv.name}`,
         note: "",
         mcp_server_id: srv.id,
-        mcp_tool_name: pickMcpTool,
+        mcp_tool_name: toolName,
         mcp_args: "",
         x: last ? last.x + 180 : 40,
         y: last ? last.y : 40,
@@ -185,7 +182,6 @@ export function WorkflowEditor({ id }: { id: string }) {
       const nodes = [...ordered, newNode]
       return { nodes, edges: linearEdges(nodes) }
     })
-    setPickMcpTool("")
   }
 
   const removeNode = (nodeId: string) => {
@@ -414,72 +410,29 @@ export function WorkflowEditor({ id }: { id: string }) {
           className="size-4"
         />
         <span className="text-muted-foreground">
-          {isPublic ? "팀 공유됨 — 다른 직원이 보고 실행할 수 있어요(수정은 나만)" : "나만 사용 (체크하면 팀에 공유)"}
+          {isPublic ? "팀에 공유됨 — 다른 직원이 보고 실행할 수 있어요(수정은 나만)" : "나만 사용 중 — 체크하면 팀 전체가 보고 실행할 수 있어요"}
         </span>
       </label>
 
-      {/* 에이전트 추가 툴바 */}
+      {/* 단계 추가 — 에이전트/도구를 하나의 피커에서 선택(순서 맨 끝에 자동 연결) */}
       <div className="flex flex-wrap items-center gap-2">
-        <select
-          className={cn(fieldClass, "max-w-xs")}
-          value={pickAgent}
-          onChange={(e) => setPickAgent(e.target.value)}
-        >
-          <option value="">에이전트 선택…</option>
-          {agents.map((a) => (
-            <option key={a.id} value={a.id}>
-              {agentIconText(a.icon)} {a.name}
-            </option>
-          ))}
-        </select>
-        <Button size="sm" variant="outline" onClick={addNode} disabled={!pickAgent}>
-          <Plus /> 노드 추가
+        <Button size="sm" onClick={() => setPickerOpen(true)}>
+          <Plus /> 단계 추가
         </Button>
-        {/* MCP 도구 노드 — 연결된 MCP 서버가 있을 때만 */}
-        {mcpServers.length > 0 && (
-          <>
-            <span className="h-5 w-px bg-border" aria-hidden />
-            <select
-              className={cn(fieldClass, "max-w-[10rem]")}
-              value={pickMcpServer}
-              onChange={(e) => {
-                setPickMcpServer(e.target.value)
-                setPickMcpTool("")
-              }}
-            >
-              <option value="">MCP 서버…</option>
-              {mcpServers.map((s) => (
-                <option key={s.id} value={s.id}>
-                  🔌 {s.name}
-                </option>
-              ))}
-            </select>
-            <select
-              className={cn(fieldClass, "max-w-[12rem]")}
-              value={pickMcpTool}
-              onChange={(e) => setPickMcpTool(e.target.value)}
-              disabled={!pickMcpServer}
-            >
-              <option value="">도구 선택…</option>
-              {(mcpTools[pickMcpServer] ?? []).map((t) => (
-                <option key={t.name} value={t.name}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-            <Button size="sm" variant="outline" onClick={addMcpNode} disabled={!pickMcpServer || !pickMcpTool}>
-              <Plug /> MCP 노드
-            </Button>
-            {/* 고른 도구가 뭘 하는지 한 줄 설명(알려진 도구만) */}
-            {pickMcpTool && MCP_TOOL_KO[pickMcpTool] && (
-              <span className="w-full text-[11px] text-muted-foreground">💡 {MCP_TOOL_KO[pickMcpTool]}</span>
-            )}
-          </>
-        )}
         <span className="text-xs text-muted-foreground">
-          노드를 드래그해 배치하고, 오른쪽 점을 끌어 다음 노드와 연결하세요.
+          추가한 순서대로 <b className="font-medium text-foreground">자동 연결</b>돼요. (고급: 캔버스에서 노드를 드래그해 재배치·재연결)
         </span>
       </div>
+      {pickerOpen && (
+        <StepPicker
+          agents={agents}
+          mcpServers={mcpServers}
+          mcpTools={mcpTools}
+          onPickAgent={addNode}
+          onPickMcp={addMcpNode}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
 
       {/* 캔버스 + 선택 노드 패널 — 모바일에선 아래로 쌓임(md+ 나란히) */}
       <div className="flex flex-col gap-3 md:flex-row">
