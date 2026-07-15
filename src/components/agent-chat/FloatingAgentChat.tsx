@@ -200,23 +200,46 @@ export function FloatingAgentChat() {
  * 닫혀 있으면 런처 버튼, 열면 같은 우하단 위치에 안내 + "에이전트 추가하기" CTA.
  */
 function EmptyAgentWidget() {
-  const { isOpen, toggle, close, position } = useAgentChat()
+  const { isOpen, toggle, close, position, setPosition } = useAgentChat()
+  // 빈 상태 런처도 드래그 가능해야 함(FabLauncher와 동일) — 예전엔 onClick만 있어 못 움직였다.
+  const { handlePointerDown, wasDraggedRef, dragging } = useDragWidget({
+    width: WIDGET_SIZE,
+    height: WIDGET_SIZE,
+    onTap: toggle,
+  })
   const tl = widgetTopLeft(position)
 
   if (!isOpen) {
     return (
       <button
         type="button"
-        onClick={toggle}
-        style={{ position: "fixed", left: tl.left, top: tl.top }}
+        onPointerDown={handlePointerDown}
+        onClick={(e) => {
+          if (wasDraggedRef.current) {
+            e.preventDefault()
+            e.stopPropagation()
+          }
+        }}
+        onDoubleClick={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          setPosition(null)
+        }}
+        style={{ position: "fixed", left: tl.left, top: tl.top, touchAction: "none" }}
         className={cn(
-          "z-50 flex size-14 items-center justify-center rounded-full border border-white/15 bg-primary/85 text-primary-foreground shadow-[var(--shadow-lg)] backdrop-blur-xl transition-shadow",
-          "hover:scale-110"
+          "z-50 flex size-14 items-center justify-center rounded-full border border-white/15 bg-primary/85 text-primary-foreground shadow-[var(--shadow-lg)] backdrop-blur-xl transition-transform",
+          dragging ? "cursor-grabbing" : "cursor-grab",
+          !dragging && "hover:scale-110"
         )}
         aria-label="에이전트 위젯 열기 (⌘K)"
         title="핀한 에이전트가 없습니다 (⌘K)"
       >
-        <span className="pointer-events-none flex items-center justify-center motion-safe:animate-float">
+        <span
+          className={cn(
+            "pointer-events-none flex items-center justify-center",
+            !dragging && "motion-safe:animate-float"
+          )}
+        >
           <Sparkles className="size-6" />
         </span>
       </button>
