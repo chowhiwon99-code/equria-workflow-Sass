@@ -16,7 +16,14 @@
   - 검증: tsc0·lint30/0·build0. 라이브 DB 확인(활성 0/비활성 8). ⚠️ 마이그는 원격=프로덕션 DB에 즉시 적용됨(앱이 원격 읽음).
 - **리서치 핵심(다음 Phase 반영)**: 가이드=구조화 템플릿+가드레일 기본탑재(환각완화) · 출력형식=업무언어 소수+미니예시+자동추천 · 지식=풀컨텍스트(RAG 아님)+cache_control · 이식=시스템프롬프트MD(어디서나)+SKILL.md+AGENTS.md · HITL=동기→재개형 실행이 유일한 큰 작업(전자결재 RPC·알림·save_file 재사용). **🐞 발견: `save_file`(source="workflow")·`notify`(type="workflow")가 CHECK 위반으로 현재 깨짐 → Phase 5 선행 수정.**
 
-**다음:** Phase 2(빌더 전면개선: 통합흐름·가이드·출력형식·예시갤러리·애플UI).
+- **StepPicker 가독성**(배포 `c4614f5`): MCP 도구를 서버별 접이식 그룹.
+- **Phase 2 부분(배포 `595558a`·`9adcddd`)**: ① **예시 갤러리**(`lib/agentTemplates` 백오피스 8종): '새 에이전트'→"어떤 일을 맡길까요?"→선택 시 입력 프리필→즉시 AI 생성(빈 화면 해소). ② **카테고리·업무영역·직무 자유입력**(select→자유입력+datalist / multiselect 커스텀 태그 / select+직접입력) — 대표 "틀에 갇힘" 반복 피드백. ③ **업계특화(K-뷰티) 문구 → 업종 중립**(placeholder·시스템프롬프트 예시). ④ **위젯 빈상태 드래그 버그수정**(`EmptyAgentWidget`가 `useDragWidget` 안 써서 못 움직이던 것 — 기본 에이전트 제거로 드러남).
+- **Phase 3 지식파일(배포 `9adcddd`, 마이그 097)**: `agent_knowledge`(부모 agents EXISTS 상속·기존 files 버킷 재사용). 위저드 '필요한 데이터' 스텝 + 빌더에 **파일 첨부**(AI-readable만: PDF·이미지·txt/md/csv/json). 채팅 라우트가 텍스트는 시스템에, PDF/이미지는 파일파트로 **풀컨텍스트 주입**(admin-sign, RAG 아님). 신규 `lib/agentKnowledge`·`KnowledgeFilePicker`.
+- **MCP 바인딩(배포 `23cca30`, 마이그 098)**: `agent_versions.mcp_connectors`(개인 커넥터 슬러그). 빌더 '내 MCP 연결'에서 내가 연결한 개인 커넥터(Notion 등) 선택. 채팅·워크플로우 실행 모두 "전부"가 아니라 **바인딩된 커넥터만** 실행자 본인 연결로 해석(공유 에이전트도 쓰는 사람 계정 기준). ※발견: 워크플로우/채팅 모두 원래 개인연결을 전부 로드하던 것을 선택-only로 일관화.
+
+**검증:** 각 배치 tsc0·lint30/0·build0. 마이그 096·097·098 원격 적용·drift0.
+
+**남은 것(다음):** MCP **3b**(워크플로우에 개인 MCP 툴노드로 추가=StepPicker 개인연결 표시+실행엔진, 노드모델 변경)·**3c**(에이전트 노드의 바인딩 MCP 배지) · P2.2 출력형식 재설계(9개 추상→업무언어 소수+미니예시) · P2.3 가드레일 기본탑재 · P2.4 위저드↔직접작성 통합 · P2.5 애플UI · Phase 4 내보내기(SKILL.md·AGENTS.md·MCP스니펫) · Phase 5 워크플로우 사람검토(재개형 실행+승인RPC, +save_file/notify CHECK 버그수정). **아이콘**=가이드 결과폼 상단에 이미 있음(대표 확인 필요).
 
 ---
 
