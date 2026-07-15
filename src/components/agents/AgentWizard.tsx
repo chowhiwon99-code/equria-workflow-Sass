@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Sparkles, Check, ArrowLeft, PenLine, Plug } from "lucide-react"
+import { Sparkles, Check, ArrowLeft, PenLine, Plug, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/shared/Modal"
@@ -12,16 +12,18 @@ import {
   type WizardInputs,
 } from "@/lib/agentBuilder"
 import { AgentBuilderForm } from "@/components/agents/AgentBuilderForm"
+import { AGENT_TEMPLATES, type AgentTemplate } from "@/lib/agentTemplates"
 
 type Mode = "wizard" | "manual"
-type Phase = "input" | "result"
+type Phase = "gallery" | "input" | "result"
 
 // 한 화면에 한 질문씩 — 아이폰 초기 설정처럼 가로 슬라이드로 진행.
 const QUESTIONS = WIZARD_FIELDS
 
 export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
   const [mode, setMode] = useState<Mode>("wizard")
-  const [phase, setPhase] = useState<Phase>("input")
+  // /mcp에서 진입(커넥터 프리필)하면 갤러리 건너뛰고 바로 위저드; 그 외엔 예시 갤러리부터.
+  const [phase, setPhase] = useState<Phase>(mcpPrefill?.length ? "input" : "gallery")
   const [index, setIndex] = useState(0)
   const [dir, setDir] = useState<1 | -1>(1) // 슬라이드 방향(다음=1 오른쪽에서 / 이전=-1 왼쪽에서)
   const [inputs, setInputs] = useState<WizardInputs>({})
@@ -59,7 +61,14 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
     setIndex((i) => Math.max(0, i - 1))
   }
 
-  const generate = async () => {
+  // 예시 갤러리에서 선택 → 입력 프리필 + 즉시 생성(결과에서 검토·수정 가능).
+  const pickTemplate = (t: AgentTemplate) => {
+    setInputs(t.inputs)
+    setDir(1)
+    void generate(t.inputs)
+  }
+
+  const generate = async (inputsArg: WizardInputs = inputs) => {
     setPhase("result")
     setGenerating(true)
     setGenError(null)
@@ -68,7 +77,7 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
       const res = await fetch("/api/agents/generate-prompt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inputs }),
+        body: JSON.stringify({ inputs: inputsArg }),
       })
       if (!res.ok || !res.body) {
         throw new Error(res.status === 401 ? "로그인이 필요합니다." : `생성 실패 (${res.status})`)
@@ -105,6 +114,54 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
     )
   }
 
+  // ── 예시 갤러리: 무엇을 맡길지 예시에서 시작(빈 화면 방지) ──
+  if (phase === "gallery") {
+    return (
+      <div className="mx-auto flex w-full max-w-2xl flex-col items-center gap-6 pt-2">
+        <button
+          type="button"
+          onClick={() => setMode("manual")}
+          className="inline-flex items-center gap-1.5 rounded-full border bg-card px-4 py-2 text-xs font-medium text-muted-foreground shadow-[var(--shadow-sm)] transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <PenLine className="size-3.5" /> 직접 작성으로 전환
+        </button>
+
+        <div className="flex flex-col items-center gap-1.5 text-center">
+          <h2 className="text-2xl font-semibold tracking-tight">어떤 일을 맡길까요?</h2>
+          <p className="text-sm text-muted-foreground">예시를 고르면 AI가 맞춰서 초안을 만들어줘요. 고른 뒤 다듬으면 끝.</p>
+        </div>
+
+        <div className="grid w-full grid-cols-1 gap-2.5 sm:grid-cols-2">
+          {AGENT_TEMPLATES.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => pickTemplate(t)}
+              className="flex items-start gap-3 rounded-xl glass p-3.5 text-left transition-shadow hover:shadow-[var(--shadow-md)] motion-safe:hover:-translate-y-0.5"
+            >
+              <span className="text-2xl leading-none">{t.emoji}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold">{t.name}</span>
+                <span className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{t.description}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setPhase("input")
+            setIndex(0)
+          }}
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
+        >
+          <Sparkles className="size-3.5" /> 예시 없이 처음부터 만들기
+        </button>
+      </div>
+    )
+  }
+
   // ── 결과: AI 생성 + 검토/저장 (기존 흐름) ──
   if (phase === "result") {
     return (
@@ -126,7 +183,7 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
                 <ArrowLeft className="size-4" /> 입력 수정
               </Button>
               {!generating && (
-                <Button size="sm" onClick={generate}>
+                <Button size="sm" onClick={() => generate()}>
                   다시 생성
                 </Button>
               )}
@@ -138,7 +195,7 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
               <span className="inline-flex items-center gap-1.5">
                 <Sparkles className="size-3.5" /> AI가 초안을 만들었어요. 아래에서 검토·수정 후 저장하세요.
               </span>
-              <button type="button" onClick={generate} className="underline hover:text-foreground">
+              <button type="button" onClick={() => generate()} className="underline hover:text-foreground">
                 다시 생성
               </button>
             </div>
@@ -251,6 +308,7 @@ function QuestionSlide({
 }) {
   const inputRef = useRef<HTMLElement | null>(null)
   const value = inputs[f.key]
+  const [custom, setCustom] = useState("") // multiselect 직접 추가 입력
 
   // 슬라이드 전환이 끝난 뒤 활성 슬라이드의 텍스트 입력에 포커스
   useEffect(() => {
@@ -338,26 +396,68 @@ function QuestionSlide({
         </div>
       )}
 
-      {f.type === "multiselect" && (
-        <div className="flex flex-wrap justify-center gap-2">
-          {f.options!.map((o) => {
-            const on = ((value as string[]) ?? []).includes(o)
-            return (
-              <button
-                type="button"
-                key={o}
-                onClick={() => onToggle(f.key, o)}
-                className={cn(
-                  "rounded-full border px-3.5 py-1.5 text-sm transition-colors",
-                  on ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted"
-                )}
-              >
-                {o}
-              </button>
-            )
-          })}
-        </div>
-      )}
+      {f.type === "multiselect" &&
+        (() => {
+          const selected = (value as string[]) ?? []
+          const customs = selected.filter((v) => !f.options!.includes(v))
+          const addCustom = () => {
+            const v = custom.trim()
+            if (v && !selected.includes(v)) onToggle(f.key, v)
+            setCustom("")
+          }
+          return (
+            <div className="flex flex-col items-center gap-3">
+              <div className="flex flex-wrap justify-center gap-2">
+                {f.options!.map((o) => {
+                  const on = selected.includes(o)
+                  return (
+                    <button
+                      type="button"
+                      key={o}
+                      onClick={() => onToggle(f.key, o)}
+                      className={cn(
+                        "rounded-full border px-3.5 py-1.5 text-sm transition-colors",
+                        on ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted"
+                      )}
+                    >
+                      {o}
+                    </button>
+                  )
+                })}
+                {/* 직접 추가한(프리셋에 없는) 값 — 클릭하면 제거 */}
+                {customs.map((v) => (
+                  <button
+                    type="button"
+                    key={v}
+                    onClick={() => onToggle(f.key, v)}
+                    className="inline-flex items-center gap-1 rounded-full border border-primary bg-primary/10 px-3.5 py-1.5 text-sm text-primary transition-colors hover:bg-primary/20"
+                    title="제거"
+                  >
+                    {v} <X className="size-3.5" />
+                  </button>
+                ))}
+              </div>
+              {/* 직접 입력 — 목록에 없는 업무영역을 자유롭게 추가 */}
+              <div className="flex w-full max-w-xs items-center gap-1.5">
+                <input
+                  className={cn(fieldClass, "h-9 rounded-full text-sm")}
+                  placeholder="직접 입력하고 Enter (예: 재고 관리)"
+                  value={custom}
+                  onChange={(e) => setCustom(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                      e.preventDefault()
+                      addCustom()
+                    }
+                  }}
+                />
+                <Button type="button" size="sm" variant="outline" onClick={addCustom} disabled={!custom.trim()}>
+                  추가
+                </Button>
+              </div>
+            </div>
+          )
+        })()}
     </div>
   )
 }

@@ -15,6 +15,7 @@ import {
   AGENT_CATEGORIES,
   AGENT_DEFAULTS,
   TEMPERATURE_PRESETS,
+  categoryToLabel,
 } from "@/lib/agents"
 
 export type AgentFormInitial = {
@@ -54,8 +55,9 @@ export function AgentBuilderForm({
 
   const [name, setName] = useState(initial?.name ?? prefill?.name ?? "")
   const [icon, setIcon] = useState(initial?.icon ?? prefill?.icon ?? AGENT_DEFAULTS.icon)
+  // 카테고리 = 자유 입력(틀에 안 갇히게). 레거시 값('cs' 등)은 라벨로 표시, 이후엔 입력 문자열 그대로 저장.
   const [category, setCategory] = useState(
-    initial?.category ?? prefill?.category ?? AGENT_DEFAULTS.category
+    categoryToLabel(initial?.category ?? prefill?.category ?? AGENT_DEFAULTS.category)
   )
   const [description, setDescription] = useState(
     initial?.description ?? prefill?.description ?? ""
@@ -268,13 +270,18 @@ export function AgentBuilderForm({
           <div className="flex flex-col gap-3">
             <label className="flex flex-col gap-1.5 text-sm">
               <span className="text-xs text-muted-foreground">카테고리</span>
-              <select className={fieldClass} value={category} onChange={(e) => setCategory(e.target.value)}>
+              <input
+                className={fieldClass}
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                list="agent-categories"
+                placeholder="예: 마케팅, 회계, 우리팀 전용…"
+              />
+              <datalist id="agent-categories">
                 {AGENT_CATEGORIES.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
+                  <option key={c.value} value={c.label} />
                 ))}
-              </select>
+              </datalist>
             </label>
             <label className="flex flex-col gap-1.5 text-sm">
               <span className="text-xs text-muted-foreground">한 줄 설명</span>
@@ -457,13 +464,18 @@ export function AgentBuilderForm({
       <div className="flex gap-3">
         <label className="flex w-40 flex-col gap-1.5 text-sm">
           <span className="text-xs text-muted-foreground">카테고리</span>
-          <select className={fieldClass} value={category} onChange={(e) => setCategory(e.target.value)}>
+          <input
+            className={fieldClass}
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            list="agent-categories"
+            placeholder="예: 마케팅, 회계, 우리팀 전용…"
+          />
+          <datalist id="agent-categories">
             {AGENT_CATEGORIES.map((c) => (
-              <option key={c.value} value={c.value}>
-                {c.label}
-              </option>
+              <option key={c.value} value={c.label} />
             ))}
-          </select>
+          </datalist>
         </label>
         <label className="flex flex-1 flex-col gap-1.5 text-sm">
           <span className="text-xs text-muted-foreground">한 줄 설명</span>

@@ -17,6 +17,11 @@ export const AGENT_CATEGORIES = [
   { value: "custom", label: "기타" },
 ] as const
 
+/** 카테고리 값(레거시 'cs' 등) 또는 자유입력 문자열 → 표시용 라벨. 알려진 값이면 라벨, 아니면 원문 그대로. */
+export function categoryToLabel(v: string): string {
+  return AGENT_CATEGORIES.find((c) => c.value === v)?.label ?? v
+}
+
 // 새 에이전트 기본값 (lucide 기반 — 렌더는 components/agents/AgentIcon.tsx)
 export const AGENT_DEFAULTS = {
   icon: "lucide:Bot",
