@@ -240,9 +240,10 @@ create policy "amem_select" on public.agent_memories for select using (
 
 ### 9-4. v1 착수 단계 (잘게 순차)
 1. ✅ 마이그 099(개인용 테이블+RLS) — advisors 신규0 + RLS 시뮬 **A본인=1 / B타인=0** 검증·drift0 완료(2026-07-16).
-2. `lib/agentMemory`(순수: 추출 프롬프트·직렬화·주입 빌더) + 추출 API.
-3. 채팅 라우트 주입(캐시 분기 정합) + 명시적 "기억해두기".
-4. 기억 목록·편집·삭제 UI + soft-delete/Undo.
+2. ✅ `lib/agentMemory`(buildMemoryBlock) + 기억 API(GET/POST/DELETE, RLS 본인만).
+3. ✅ 채팅 라우트 주입(활성 최근30, 지식파일 다음, 없으면 스킵).
+4. ✅ 위젯 `AgentMemoryPanel`('기억 관리' 토글 = 추가/목록/삭제·soft-delete). — 배포 `a2d73be`(2026-07-16).
+5. ⏳ **다음**: 자동 추출(대화 종료 시 Haiku 요점 추출)·중복병합 — 지금은 **수동 "기억해두기"**만. dogfood 후 고도화.
 
 ### 9-5. 프로젝트 공유 = v1.5 (스키마는 v1부터 지원, 노출은 다음)
 현재 에이전트 채팅 위젯은 **프로젝트 컨텍스트가 없음**(전역). 프로젝트 기억 주입은 "이 대화가 어느 프로젝트인지" 지정이 선행 → **스키마·RLS는 v1에 넣되(재마이그 방지)**, 실제 프로젝트 기억 생성/주입 UI는 v1 personal 안정화 후 v1.5로. (권장.)
