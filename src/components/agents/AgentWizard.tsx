@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Sparkles, Check, ArrowLeft, PenLine, Plug, X } from "lucide-react"
+import { Sparkles, Check, ArrowLeft, Plug, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/shared/Modal"
@@ -18,7 +18,6 @@ import { KnowledgeFilePicker } from "@/components/agents/KnowledgeFilePicker"
 import { McpConnectorPicker } from "@/components/agents/McpConnectorPicker"
 import type { StagedKnowledge } from "@/lib/agentKnowledge"
 
-type Mode = "wizard" | "manual"
 type Phase = "gallery" | "input" | "result"
 
 // 한 화면에 한 질문씩 — 아이폰 초기 설정처럼 가로 슬라이드로 진행.
@@ -36,7 +35,6 @@ const FLOAT_ICONS = [
 ] as const
 
 export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
-  const [mode, setMode] = useState<Mode>("wizard")
   // /mcp에서 진입(커넥터 프리필)하면 갤러리 건너뛰고 바로 위저드; 그 외엔 예시 갤러리부터.
   const [phase, setPhase] = useState<Phase>(mcpPrefill?.length ? "input" : "gallery")
   const [index, setIndex] = useState(0)
@@ -107,22 +105,6 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
     }
   }
 
-  // ── 직접 작성 모드(파워유저 / 기존 흐름 보존) ──
-  if (mode === "manual") {
-    return (
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
-        <button
-          type="button"
-          onClick={() => setMode("wizard")}
-          className="inline-flex items-center gap-1.5 self-start rounded-full border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-[var(--shadow-sm)] transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <Sparkles className="size-3.5" /> 가이드 마법사로 돌아가기
-        </button>
-        <AgentBuilderForm slides prefill={mcpPrefill?.length ? { mcp_servers: mcpPrefill } : undefined} />
-      </div>
-    )
-  }
-
   // ── 진입: "무슨 일을 맡기고 싶은지" 열린 입력 + 떠다니는 에이전트 아이콘(장식). 예시 없음. ──
   if (phase === "gallery") {
     const seed = ((inputs.purpose as string) ?? "").trim()
@@ -144,14 +126,6 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
             </span>
           ))}
         </div>
-
-        <button
-          type="button"
-          onClick={() => setMode("manual")}
-          className="inline-flex items-center gap-1.5 rounded-full border bg-card px-4 py-2 text-xs font-medium text-muted-foreground shadow-[var(--shadow-sm)] transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <PenLine className="size-3.5" /> 직접 작성으로 전환
-        </button>
 
         <div className="flex flex-col items-center gap-1.5 text-center">
           <h2 className="text-2xl font-semibold tracking-tight">어떤 일을 맡기고 싶으세요?</h2>
@@ -176,7 +150,7 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
           />
           <div className="mt-2.5 flex justify-end">
             <Button size="sm" disabled={!seed} onClick={startFromSeed}>
-              <Sparkles className="size-4" /> 이걸로 만들기
+              다음
             </Button>
           </div>
         </div>
@@ -245,15 +219,6 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
   // ── 입력: 한 질문씩 가로 슬라이드 ──
   return (
     <div className="mx-auto flex w-full max-w-xl flex-col items-center gap-6 pt-2">
-      {/* 직접 작성 전환 — 상단 중앙 */}
-      <button
-        type="button"
-        onClick={() => setMode("manual")}
-        className="inline-flex items-center gap-1.5 rounded-full border bg-card px-4 py-2 text-xs font-medium text-muted-foreground shadow-[var(--shadow-sm)] transition-colors hover:bg-muted hover:text-foreground"
-      >
-        <PenLine className="size-3.5" /> 직접 작성으로 전환
-      </button>
-
       {/* /mcp 바로가기로 진입 — MCP 도구가 미리 연결된 채 만들어진다는 안내 */}
       {(mcpPrefill?.length ?? 0) > 0 && (
         <p className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-medium text-foreground">
