@@ -3,7 +3,7 @@
 // 클라이언트(위저드 UI)와 서버(/api/agents/generate-prompt) 양쪽에서 import 한다.
 // → 클라이언트 전용 의존성을 두지 말 것(순수 데이터/함수만).
 
-export type WizardFieldType = "text" | "textarea" | "select" | "multiselect"
+export type WizardFieldType = "text" | "textarea" | "select" | "multiselect" | "mcp"
 
 export type WizardField = {
   key: string
@@ -110,6 +110,14 @@ export const WIZARD_FIELDS: WizardField[] = [
     step: 1,
   },
   {
+    key: "mcpConnectors",
+    label: "이 에이전트가 쓸 도구 (MCP 연결)",
+    type: "mcp",
+    required: false,
+    hint: "내가 연결한 도구(Notion 등)를 붙이면 대화 중 이 에이전트가 사용해요. 없으면 건너뛰어도 됩니다.",
+    step: 1,
+  },
+  {
     key: "workArea",
     label: "업무 영역 (복수 선택)",
     type: "multiselect",
@@ -213,12 +221,14 @@ export function inferCategory(inputs: WizardInputs): string {
 
 // 입력을 메타프롬프트용 라벨-값 텍스트로 직렬화 (빈 값은 "(미입력)" 으로 추론 대상임을 표시)
 export function serializeInputs(inputs: WizardInputs): string {
-  return WIZARD_FIELDS.map((f) => {
-    const v = inputs[f.key]
-    const text = Array.isArray(v) ? v.join(", ") : (v ?? "")
-    const shown = text && String(text).trim() ? String(text).trim() : "(미입력)"
-    return `- ${f.label}: ${shown}`
-  }).join("\n")
+  return WIZARD_FIELDS.filter((f) => f.type !== "mcp") // MCP 바인딩은 프롬프트 텍스트가 아니므로 제외
+    .map((f) => {
+      const v = inputs[f.key]
+      const text = Array.isArray(v) ? v.join(", ") : (v ?? "")
+      const shown = text && String(text).trim() ? String(text).trim() : "(미입력)"
+      return `- ${f.label}: ${shown}`
+    })
+    .join("\n")
 }
 
 // skill.md 생성 메타프롬프트(system). 섹션 구조/순서 고정.

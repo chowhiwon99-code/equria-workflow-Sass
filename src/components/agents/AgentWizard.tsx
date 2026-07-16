@@ -15,6 +15,7 @@ import {
 } from "@/lib/agentBuilder"
 import { AgentBuilderForm } from "@/components/agents/AgentBuilderForm"
 import { KnowledgeFilePicker } from "@/components/agents/KnowledgeFilePicker"
+import { McpConnectorPicker } from "@/components/agents/McpConnectorPicker"
 import type { StagedKnowledge } from "@/lib/agentKnowledge"
 
 type Mode = "wizard" | "manual"
@@ -228,6 +229,9 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
                 category: inferCategory(inputs),
                 system_prompt: generated,
                 ...(mcpPrefill?.length ? { mcp_servers: mcpPrefill } : {}),
+                ...(((inputs.mcpConnectors as string[]) ?? []).length
+                  ? { mcp_connectors: inputs.mcpConnectors as string[] }
+                  : {}),
                 ...(knowledge.length ? { knowledge } : {}),
               }}
               onBack={() => setPhase("input")}
@@ -566,6 +570,11 @@ function QuestionSlide({
             </div>
           )
         })()}
+
+      {/* MCP 연결 스텝 — 내가 연결한 도구(Notion 등)를 골라 이 에이전트에 붙임 */}
+      {f.type === "mcp" && (
+        <McpConnectorPicker value={(value as string[]) ?? []} onToggle={(id) => onToggle(f.key, id)} />
+      )}
 
       {/* 필요한 데이터 스텝 — AI가 읽을 파일 첨부(PDF·이미지·문서) */}
       {f.key === "requiredData" && (
