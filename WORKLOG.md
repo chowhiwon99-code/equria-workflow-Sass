@@ -14,7 +14,7 @@
   - **DirectChat(1:1)**: 루트 `h-full`이 세션31 리디자인 때 추가된 `PageTransition`(`animate-page-in`, auto-height) 래퍼 밑에서 **높이 사슬 끊김** → 내부 `overflow-y-auto`가 bounded 안 됨 → `<main>`이 스크롤 → 진입 시 최상단. **회귀 근본원인.** → 루트 `h-[var(--app-content-height)]`(대시보드·그룹챗 관례)로 bounded 복원.
   - **GroupChat**: bounded지만 `[roomId]` 페이지에 key 없어 방 전환 시 remount 안 됨(`didInitialScroll` ref 유지). → `key={roomId}`.
   - **DashboardAssistant·FloatingAgentChat 위젯**: 히스토리/스트리밍 모두 `smooth`만. → `jumpToBottom` ref로 진입·대화전환=즉시(`auto`), 스트리밍만 `smooth`.
-- **학습/기억 기획 착수(설계 前)**: 대표 워크플로우(higgsfield+Claude 반복 학습→퀄↑, 결과물 저장·확인)를 Complow에서 쉽게. **기술 병목 집중 분석 리서치 2갈래**(① 개인 메모리 at scale ② RAG/생성 파이프라인 at scale) 병렬 → 종합 후 기획 문서화 예정. 핵심 = 파인튜닝 아님, **앱레벨 메모리(추출+검색 하이브리드)로 스케일**, 격리는 RLS가 강제.
+- **학습/기억 기획 착수(설계 前)**: 대표 워크플로우(higgsfield+Claude 반복 학습→퀄↑, 결과물 저장·확인)를 Complow에서 쉽게. **기술 병목 집중 분석 리서치 2갈래**(① 개인 메모리 at scale ② RAG/생성 파이프라인 at scale) 병렬 → 종합 후 기획 문서화 예정. 핵심 = 파인튜닝 아님, **앱레벨 메모리(추출+검색 하이브리드)로 스케일**, 격리는 RLS가 강제. **v1 착수: `AGENTS-LEARNING-DESIGN.md` 작성 + 마이그 099(`agent_memories` 개인용·본인만 RLS) 적용·격리검증(A본인=1·B타인=0)·drift0.** 대표 결정=갤러리 인터뷰교체·학습v1 먼저·기억=사용자×에이전트(+프로젝트공유 v1.5). 다음=추출패스·채팅주입·편집UI.
 
 **검증:** tsc0 · lint30/0(신규0) · build0. 커밋 2분리(P2.2/채팅). main-first 배포(`006719b`→`aed63d9`, 롤백후보 `006719b`), Vercel 프로덕션 BUILDING 확인 후 feat push. **⚠️ 채팅 스크롤·출력형식 = 대표 실기기 육안 미검증(로그인 비번 없어 자동확인 불가).**
 

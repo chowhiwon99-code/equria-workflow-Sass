@@ -66,7 +66,7 @@
 > **⚠️ 동작 변경:** 에이전트는 이제 **선택한** 개인 MCP만 씀(예전엔 전부 자동). 기존 에이전트는 수정에서 재선택 필요.
 > 🆕 **세션35 대표 신규 방향(에이전트 개인화·학습 — 이게 최우선 차별점):**
 > - **① 예시 갤러리 축소/교체** — 대표 "갤러리 불필요, 각자 최고로 맞는 커스터마이징 필요". 큰 카드 8개 → **열린 '당신 업무 말하기' + AI 인터뷰 → 개인 맞춤 조립**(빈 화면은 작은 힌트 문구로 방지, 예시=인스피레이션만). AGENTS-MCP-STRATEGY §4 온보딩 인터뷰의 강화판.
-> - **② 학습/기억(최우선·스케일 필수)** — "계속 같으면 의미 없음". **앱레벨 메모리**(파인튜닝 아님): 세션 후 추출→다음 주입. v1=plain table 추출메모리+**편집/삭제 UI** → v2=pgvector top-k → v3 큐레이션(supersede·confidence·decay). **격리=RLS 강제**(테넌트 누출 방지·service_role 금지). 프롬프트 캐싱으로 비용↓(~$0.5~2/활성유저·월). 리서치 2갈래 완료(WORKLOG 세션35). **코드 前 설계 문서 먼저.**
+> - **② 학습/기억(최우선·스케일 필수)** — "계속 같으면 의미 없음". **앱레벨 메모리**(파인튜닝 아님): 세션 후 추출→다음 주입. v1=plain table 추출메모리+**편집/삭제 UI** → v2=pgvector top-k → v3 큐레이션(supersede·confidence·decay). **격리=RLS 강제**(테넌트 누출 방지·service_role 금지). 프롬프트 캐싱으로 비용↓(~$0.5~2/활성유저·월). 리서치 2갈래 완료(WORKLOG 세션35). **코드 前 설계 문서 먼저.** → ✅ **v1 착수: 마이그 099(`agent_memories` 개인용) 적용·격리검증(A본인=1·B타인=0)·drift0(2026-07-16). 다음=추출패스·채팅주입·편집UI.**
 > - **③ 파일 첨부 시 자료 추천** — 첨부 자료 유용/중복/저품질 평가 + "이런 자료 더 있으면 좋아요"(agent_knowledge 위 AI 1패스).
 > - **④ 대용량→RAG(대기, ②와 함께)** — <~150쪽=full-context+캐싱(그대로 최고품질)/초과=pgvector RAG(HNSW·iterative_scan로 테넌트필터 정합). **생성물(higgsfield) 파이프라인** = 비동기 잡큐(pgmq+cron+Edge Function)+Storage+리뷰승인→승인분 레퍼런스 재투입(퀄 누적). Vercel 함수는 분단위 대기 금지.
 > **다음 할 것(기존 우선순위):**
@@ -169,7 +169,7 @@
 
 - **GitHub**: `chowhiwon99-code/equria-workflow-Sass` (main=프로덕션, 작업브랜치 `feat/toss-ui-refresh`).
 - **Vercel**: team `team_wcW0NMU7oiIxNndyV1afigbp` · project `prj_CcCTUr8eIYpaStaj6RNq7VoLPZG6` (`equria-workflow-sass`) · 배포보호 off.
-- **Supabase**: project `dutovtfdckhayyvhtuxu` (ap-northeast-2 서울) · 마이그 **001~098**. 🆕 세션34: 096=`remove_default_agents`(기본 8개 소프트삭제·복구가능) · 097=`agent_knowledge`(지식파일, 부모 상속 RLS) · 098=`agent_mcp_connectors`(agent_versions.mcp_connectors 개인 커넥터 바인딩).
+- **Supabase**: project `dutovtfdckhayyvhtuxu` (ap-northeast-2 서울) · 마이그 **001~099**. 🆕세션35: 099=`agent_memories`(에이전트 개인 기억 v1, `user_id`+`agent_id`, 본인만 RLS·격리검증, 프로젝트공유·벡터는 v1.5·v2 추가형). 세션34: 096=`remove_default_agents`(기본 8개 소프트삭제·복구가능) · 097=`agent_knowledge`(지식파일, 부모 상속 RLS) · 098=`agent_mcp_connectors`(agent_versions.mcp_connectors 개인 커넥터 바인딩).
 - **.env.local**: ANTHROPIC · Supabase(URL·anon·service_role) · Google 4종 · `WORKSPACE_PASSWORD` 채워짐. ⚠️ **시크릿 값은 문서/채팅에 적지 말 것**(HANDOFF는 git 추적).
 - **테스트 계정**: 조휘원(`c6817c63-943f-4257-8500-f9840ad39bde`)·이동규·김건 (워크스페이스 비번 로그인). 모델: 기본 `claude-sonnet-4-6` / 복잡 `claude-opus-4-7`.
 - 링크: [GitHub](https://github.com/chowhiwon99-code/equria-workflow-Sass) · [Vercel](https://vercel.com/chowhiwon99-2151s-projects/equria-workflow-sass) · [Supabase](https://supabase.com/dashboard/project/dutovtfdckhayyvhtuxu) · 메모리 `~/.claude/projects/-Users-johwiwon-equria-workspace/memory/`

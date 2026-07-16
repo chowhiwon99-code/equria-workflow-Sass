@@ -176,3 +176,73 @@ create table generation_jobs (
 - 대표가 §7 결정 → 이 문서를 **설계(스키마 확정·마이그·주입 파이프라인·UI)**로 확장.
 - 병렬 안전 착수 후보: **학습 v1**(DDL 1개+추출패스+주입+편집UI) — 가장 큰 체감, 가장 안전.
 - RAG·대용량은 트리거 전까지 대기.
+
+---
+
+## 9. 대표 결정(2026-07-16 확정) + v1 확정 설계
+
+**결정:**
+1. 예시 갤러리 → **열린 인터뷰 입구로 교체**(예시=작은 힌트).
+2. **학습/기억 v1부터** 설계·구현.
+3. 기억 단위 = **개인(사용자×에이전트) 기본** + **"같은 작업 에이전트는 프로젝트 단위 공유 가능"**(scope 2종).
+
+### 9-1. 스키마 (✅ 마이그 099 적용·검증 2026-07-16 — v1은 **개인용만**)
+> **실제 적용(v1)** = 개인용만: `personal_tasks`(092)처럼 `user_id` "본인만" RLS. `scope`·`project_id`·`embedding vector`는 **넣지 않음** → 프로젝트 공유(v1.5)·의미검색(v2)에서 nullable 컬럼 **추가형**으로 붙임(재마이그 안전). 실제 SQL = `supabase/migrations/099_agent_memories.sql`. 아래 '풀' 스키마는 **최종 목표 참고용**.
+
+```sql
+create table public.agent_memories (
+  id uuid primary key default gen_random_uuid(),
+  agent_id uuid not null references public.agents(id) on delete cascade,
+  scope text not null default 'personal' check (scope in ('personal','project')),
+  user_id uuid references public.profiles(id) on delete cascade,     -- scope=personal 시 필수
+  project_id uuid references public.projects(id) on delete cascade,  -- scope=project 시 필수
+  kind text not null default 'preference'
+       check (kind in ('fact','preference','style','correction','episodic')),
+  content text not null,                 -- 오래 쓸 한 문장
+  embedding vector(1536),                -- v1=NULL(플레인), v2에서 채움
+  confidence real not null default 0.6,
+  source_conversation_id uuid,           -- provenance(어느 대화에서 뽑혔나)
+  use_count int not null default 0,
+  last_used_at timestamptz,
+  status text not null default 'active' check (status in ('active','superseded','archived')),
+  created_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint agent_memories_scope_shape check (
+    (scope='personal' and user_id is not null and project_id is null) or
+    (scope='project'  and project_id is not null and user_id is null)
+  )
+);
+create index idx_agent_memories_personal on public.agent_memories (user_id, agent_id, status) where scope='personal';
+create index idx_agent_memories_project  on public.agent_memories (project_id, agent_id, status) where scope='project';
+```
+
+### 9-2. RLS (격리는 DB가 강제 — service_role 사용자 검색 금지)
+```sql
+alter table public.agent_memories enable row level security;
+-- SELECT: 개인=본인 / 프로젝트=같은 워크스페이스에서 그 프로젝트를 볼 수 있는 멤버(094 상속)
+create policy "amem_select" on public.agent_memories for select using (
+  (scope='personal' and user_id = auth.uid()) or
+  (scope='project' and exists (
+     select 1 from public.projects p
+     where p.id = agent_memories.project_id
+       and p.workspace_id in (select public.auth_user_workspace_ids())))
+);
+-- INSERT/UPDATE/DELETE 동일 조건(개인=본인, 프로젝트=멤버). created_by=auth.uid() 권장.
+```
+> ⚠️ v2에서 pgvector 검색도 **반드시 이 RLS 스코프 연결**로(전역 ANN→필터 함정은 `hnsw.iterative_scan`으로). 추출/쓰기 잡이 service_role을 쓰면 user_id/project_id 명시 필수.
+
+### 9-3. 파이프라인 (v1)
+- **추출(쓰기):** 대화 종료/새 대화 시작 시 **Haiku 1패스**로 (사용자,에이전트) 오래쓸 사실·선호 ≤~8개 추출 → 기존 활성분과 대조해 add/update/skip(중복병합). + **명시적 "이거 기억해두기"** 어포던스(가장 고품질). `source_conversation_id` 기록.
+- **주입(읽기):** 채팅 라우트에서 활성 기억을 **system 블록에 캐시 분기 앞쪽**으로 주입(지식파일 다음). 개인 기억 always. (프로젝트 기억은 9-5 참고.)
+- **편집/삭제 UI(필수):** 마이페이지/에이전트별 "기억" 목록 — 사용자가 보고 편집·삭제(신뢰·컴플라이언스). soft-delete + ⌘Z.
+- **비용 방어:** 활성 기억 상한(에이전트당 ~30개, v1은 전부 주입) + `agent_usage`로 추출 비용 추적.
+
+### 9-4. v1 착수 단계 (잘게 순차)
+1. ✅ 마이그 099(개인용 테이블+RLS) — advisors 신규0 + RLS 시뮬 **A본인=1 / B타인=0** 검증·drift0 완료(2026-07-16).
+2. `lib/agentMemory`(순수: 추출 프롬프트·직렬화·주입 빌더) + 추출 API.
+3. 채팅 라우트 주입(캐시 분기 정합) + 명시적 "기억해두기".
+4. 기억 목록·편집·삭제 UI + soft-delete/Undo.
+
+### 9-5. 프로젝트 공유 = v1.5 (스키마는 v1부터 지원, 노출은 다음)
+현재 에이전트 채팅 위젯은 **프로젝트 컨텍스트가 없음**(전역). 프로젝트 기억 주입은 "이 대화가 어느 프로젝트인지" 지정이 선행 → **스키마·RLS는 v1에 넣되(재마이그 방지)**, 실제 프로젝트 기억 생성/주입 UI는 v1 personal 안정화 후 v1.5로. (권장.)
