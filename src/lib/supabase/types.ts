@@ -1976,18 +1976,21 @@ export type Database = {
           client_secret: string | null
           connector_id: string
           created_at: string
+          redirect_uri: string | null
         }
         Insert: {
           client_id: string
           client_secret?: string | null
           connector_id: string
           created_at?: string
+          redirect_uri?: string | null
         }
         Update: {
           client_id?: string
           client_secret?: string | null
           connector_id?: string
           created_at?: string
+          redirect_uri?: string | null
         }
         Relationships: []
       }

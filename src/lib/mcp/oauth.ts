@@ -29,10 +29,13 @@ async function loadClientInformation(connectorId: string): Promise<OAuthClientIn
   const admin = createAdminClient()
   const { data } = await admin
     .from("mcp_oauth_clients")
-    .select("client_id, client_secret")
+    .select("client_id, client_secret, redirect_uri")
     .eq("connector_id", connectorId)
     .maybeSingle()
   if (!data) return undefined
+  // 저장된 redirect_uri가 현재 기대값과 다르면(앱 주소·도메인 변경) 무효 처리 →
+  // auth()가 새 주소로 DCR 재등록(자가치유). 수동 DB 삭제 불필요.
+  if (data.redirect_uri && data.redirect_uri !== oauthRedirectUrl(connectorId)) return undefined
   return { client_id: data.client_id, client_secret: data.client_secret ?? undefined }
 }
 async function persistClientInformation(connectorId: string, info: OAuthClientInformation): Promise<void> {
@@ -40,7 +43,12 @@ async function persistClientInformation(connectorId: string, info: OAuthClientIn
   await admin
     .from("mcp_oauth_clients")
     .upsert(
-      { connector_id: connectorId, client_id: info.client_id, client_secret: info.client_secret ?? null },
+      {
+        connector_id: connectorId,
+        client_id: info.client_id,
+        client_secret: info.client_secret ?? null,
+        redirect_uri: oauthRedirectUrl(connectorId),
+      },
       { onConflict: "connector_id" }
     )
 }
