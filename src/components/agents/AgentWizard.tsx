@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/shared/Modal"
 import {
   WIZARD_FIELDS,
+  OUTPUT_FORMATS,
   inferCategory,
+  recommendOutputFormat,
   type WizardField,
   type WizardInputs,
 } from "@/lib/agentBuilder"
@@ -335,14 +337,15 @@ function QuestionSlide({
           {f.label}
           {f.required && <span className="text-primary"> *</span>}
         </h2>
-        {(f.type === "select" || f.type === "multiselect") && (
+        {f.hint ? (
+          <p className="text-sm text-muted-foreground">{f.hint}</p>
+        ) : f.type === "select" || f.type === "multiselect" ? (
           <p className="text-sm text-muted-foreground">
             {f.type === "multiselect" ? "해당하는 항목을 모두 골라주세요." : "하나를 고르면 다음으로 넘어가요."}
           </p>
-        )}
-        {f.placeholder && (f.type === "text" || f.type === "textarea") && (
+        ) : f.placeholder && (f.type === "text" || f.type === "textarea") ? (
           <p className="text-sm text-muted-foreground">{f.placeholder}</p>
-        )}
+        ) : null}
       </div>
 
       {f.type === "text" && (
@@ -381,7 +384,68 @@ function QuestionSlide({
         />
       )}
 
-      {f.type === "select" && (
+      {/* 출력 형식 — 업무언어 단일선택 + 미니 예시 + 직무기반 추천 */}
+      {f.key === "outputFormat" &&
+        (() => {
+          const selected = (value as string) ?? ""
+          const recommended = recommendOutputFormat(inputs.jobRole as string | undefined)
+          const isCustom = !!selected && !OUTPUT_FORMATS.some((o) => o.value === selected)
+          return (
+            <div className="flex flex-col gap-2">
+              {OUTPUT_FORMATS.map((o) => {
+                const on = selected === o.value
+                const rec = o.value === recommended
+                return (
+                  <button
+                    type="button"
+                    key={o.value}
+                    onClick={() => {
+                      onText(f.key, o.value)
+                      window.setTimeout(onAdvance, 160) // 선택 표시 후 스윽 넘어감
+                    }}
+                    className={cn(
+                      "flex flex-col gap-1 rounded-xl border px-4 py-3 text-left transition-colors",
+                      on ? "border-primary bg-primary/5" : "hover:bg-muted"
+                    )}
+                  >
+                    <span className="flex items-center gap-2 text-sm font-medium">
+                      {o.label}
+                      {rec && (
+                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                          추천
+                        </span>
+                      )}
+                      {on && <Check className="ml-auto size-4 text-primary" />}
+                    </span>
+                    <span className="text-xs text-muted-foreground">{o.desc}</span>
+                    <span className="mt-0.5 rounded-md bg-muted/50 px-2 py-1 font-mono text-[11px] leading-relaxed text-muted-foreground">
+                      {o.example}
+                    </span>
+                  </button>
+                )
+              })}
+              {/* 직접 입력 — 원하는 형식이 없으면 자유롭게(틀에 안 갇히게) */}
+              <input
+                className={cn(
+                  fieldClass,
+                  "mt-1 h-11 rounded-xl text-sm",
+                  isCustom && "border-primary bg-primary/5"
+                )}
+                placeholder="원하는 형식을 직접 입력하고 Enter"
+                value={isCustom ? selected : ""}
+                onChange={(e) => onText(f.key, e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing && selected.trim()) {
+                    e.preventDefault()
+                    onAdvance()
+                  }
+                }}
+              />
+            </div>
+          )
+        })()}
+
+      {f.type === "select" && f.key !== "outputFormat" && (
         <div className="flex flex-col gap-2">
           {f.options!.map((o) => {
             const on = value === o

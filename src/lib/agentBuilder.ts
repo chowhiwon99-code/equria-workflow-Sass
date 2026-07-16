@@ -12,7 +12,71 @@ export type WizardField = {
   options?: readonly string[]
   required: boolean
   placeholder?: string
+  hint?: string // 질문 밑 안내문(있으면 select/multiselect 기본 문구 대신 사용)
   step: 1 | 2
+}
+
+// 출력 형식 — 개발자 용어(JSON/마크다운) 대신 "받는 결과물" 업무언어로.
+// 단일 선택 + 미니 예시 + 직무 기반 추천(recommendOutputFormat). UI(AgentWizard)의 SSOT.
+export type OutputFormatOption = {
+  label: string // 카드 제목(짧게)
+  value: string // 저장·직렬화 값(설명 포함 → 메타프롬프트가 구체적으로 이해)
+  desc: string // 한 줄 설명
+  example: string // 미니 예시(한 줄, 결과 모양)
+  roles: readonly string[] // 이 직무면 "추천" 배지
+}
+
+export const OUTPUT_FORMATS: readonly OutputFormatOption[] = [
+  {
+    label: "바로 쓸 수 있는 초안",
+    value: "바로 쓸 수 있는 초안 (이메일·메시지·답변)",
+    desc: "그대로 복사해 보낼 수 있는 완성된 문장",
+    example: "안녕하세요 고객님, 문의하신 교환 건은…",
+    roles: ["CS", "영업", "마케팅", "HR"],
+  },
+  {
+    label: "한눈에 보는 요약",
+    value: "한눈에 보는 요약 (핵심 불릿)",
+    desc: "핵심만 불릿으로 짧게",
+    example: "• 매출 12%↑  • 신규 34명  • 재고부족 2건",
+    roles: ["대표/경영진", "법무"],
+  },
+  {
+    label: "정리된 표",
+    value: "정리된 표 (항목·수치 정리)",
+    desc: "항목과 수치를 표로 깔끔하게",
+    example: "| 항목 | 금액 |   | 광고비 | 30만 |",
+    roles: ["재무/회계", "MD/상품기획", "물류/SCM"],
+  },
+  {
+    label: "단계별 안내",
+    value: "단계별 안내 (순서대로)",
+    desc: "순서대로 따라 할 수 있게",
+    example: "1) 확인 → 2) 작성 → 3) 발송",
+    roles: ["개발/IT"],
+  },
+  {
+    label: "완성형 문서·보고서",
+    value: "완성형 문서·보고서 (제목·본문)",
+    desc: "제목·소제목을 갖춘 긴 글",
+    example: "# 3분기 실적 보고 / ## 요약 / 본문…",
+    roles: ["기획/전략"],
+  },
+  {
+    label: "자유롭게 (AI가 알아서)",
+    value: "자유롭게 (내용에 맞는 형식을 AI가 선택)",
+    desc: "내용에 맞춰 표·요약·문장을 자동 선택",
+    example: "상황에 따라 형식을 알아서 골라줘요",
+    roles: ["디자인", "기타"],
+  },
+] as const
+
+// 직무 → 추천 출력 형식(값). 매칭이 없으면 마지막 "자유롭게".
+export function recommendOutputFormat(jobRole: string | undefined): string {
+  const fallback = OUTPUT_FORMATS[OUTPUT_FORMATS.length - 1].value
+  if (!jobRole) return fallback
+  const hit = OUTPUT_FORMATS.find((o) => o.roles.includes(jobRole))
+  return hit ? hit.value : fallback
 }
 
 // 사용자가 선택/작성하는 카테고리화된 입력. Step1=빠른 선택, Step2=자유 서술.
@@ -95,13 +159,11 @@ export const WIZARD_FIELDS: WizardField[] = [
   },
   {
     key: "outputFormat",
-    label: "출력 형식 (복수 선택)",
-    type: "multiselect",
+    label: "출력 형식",
+    type: "select",
     required: true,
-    options: [
-      "불릿 요약", "표(table)", "단계별 가이드", "이메일/메시지 초안",
-      "장문 문서", "코드/마크다운", "JSON/구조화 데이터", "번역문 + 설명", "자유 서술",
-    ],
+    hint: "결과물을 어떤 모습으로 받을지 하나만 고르세요. (구체적 내용은 '세부 업무'를 따릅니다)",
+    options: OUTPUT_FORMATS.map((o) => o.value),
     step: 2,
   },
   {
