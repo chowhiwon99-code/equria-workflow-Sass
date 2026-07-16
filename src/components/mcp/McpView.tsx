@@ -13,6 +13,7 @@ import { Loading, ErrorState } from "@/components/shared/States"
 import { cn } from "@/lib/utils"
 import { Select } from "@/components/shared/Select"
 import { MCP_CONNECTORS, CONNECTOR_CATEGORIES, MCP_TOOL_KO, type Connector } from "@/lib/mcp"
+import { ConnectorLogo } from "./ConnectorLogo"
 
 type Server = {
   id: string
@@ -34,21 +35,6 @@ type UserConnection = {
   last_test_ok: boolean | null
   last_test_error: string | null
   tools: Tool[]
-}
-
-/** 커넥터 로고 — 도메인 파비콘(64px). 실패 시 emoji 폴백. */
-function ConnectorLogo({ domain, emoji }: { domain?: string; emoji: string }) {
-  const [failed, setFailed] = useState(false)
-  if (!domain || failed) return <span className="text-lg">{emoji}</span>
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
-      alt=""
-      className="size-6"
-      onError={() => setFailed(true)}
-    />
-  )
 }
 
 export function McpView() {

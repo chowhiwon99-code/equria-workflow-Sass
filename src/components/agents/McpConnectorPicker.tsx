@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Check, ExternalLink, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { MCP_CONNECTORS } from "@/lib/mcp"
+import { ConnectorLogo } from "@/components/mcp/ConnectorLogo"
 
 // 위저드 'MCP 연결' 스텝. 연결한 것 = 선택(바인딩), 안 한 것 = "연결하면 쓸 수 있는 도구"로 펼쳐 보여주고
 // 개인 계정이 필요한 건 먼저 /mcp에서 연결하도록 안내. (연결 OAuth는 위저드 밖 /mcp에서 진행)
@@ -62,7 +63,7 @@ export function McpConnectorPicker({
                   on ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted"
                 )}
               >
-                <span>{c.emoji}</span>
+                <ConnectorLogo domain={c.domain} emoji={c.emoji} imgClass="size-4" emojiClass="text-base" />
                 {c.name}
                 {on && <Check className="size-3.5" />}
               </button>
@@ -97,7 +98,7 @@ export function McpConnectorPicker({
                       title={c.description}
                       className="inline-flex items-center gap-1.5 rounded-full border border-dashed px-3 py-1.5 text-sm text-muted-foreground opacity-70 transition-all hover:bg-muted hover:opacity-100"
                     >
-                      <span>{c.emoji}</span>
+                      <ConnectorLogo domain={c.domain} emoji={c.emoji} imgClass="size-4" emojiClass="text-base" />
                       {c.name}
                       <span className="ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px]">
                         {needsAccount ? "계정 연결 필요" : "연결 필요"}
