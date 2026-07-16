@@ -18,6 +18,8 @@ export type StagedKnowledge = {
   mime_type: string
   size: number
   extracted_text: string | null
+  /** 개인 전용(true)이면 올린 본인만 열람·주입. 기본 공유(false). */
+  is_personal?: boolean
 }
 
 /** Claude가 직접 읽을 수 있는 파일인지(PDF·이미지·텍스트류). */

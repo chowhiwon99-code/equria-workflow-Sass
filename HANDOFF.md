@@ -169,7 +169,7 @@
 
 - **GitHub**: `chowhiwon99-code/equria-workflow-Sass` (main=프로덕션, 작업브랜치 `feat/toss-ui-refresh`).
 - **Vercel**: team `team_wcW0NMU7oiIxNndyV1afigbp` · project `prj_CcCTUr8eIYpaStaj6RNq7VoLPZG6` (`equria-workflow-sass`) · 배포보호 off.
-- **Supabase**: project `dutovtfdckhayyvhtuxu` (ap-northeast-2 서울) · 마이그 **001~099**. 🆕세션35: 099=`agent_memories`(에이전트 개인 기억 v1, `user_id`+`agent_id`, 본인만 RLS·격리검증, 프로젝트공유·벡터는 v1.5·v2 추가형). 세션34: 096=`remove_default_agents`(기본 8개 소프트삭제·복구가능) · 097=`agent_knowledge`(지식파일, 부모 상속 RLS) · 098=`agent_mcp_connectors`(agent_versions.mcp_connectors 개인 커넥터 바인딩).
+- **Supabase**: project `dutovtfdckhayyvhtuxu` (ap-northeast-2 서울) · 마이그 **001~100**. 🆕세션35: 100=`agent_knowledge.is_personal`(지식파일 개인전용 — true면 올린 본인만 열람·주입, RLS 검증 소유자2/타인1), 099=`agent_memories`(에이전트 개인 기억 v1, `user_id`+`agent_id`, 본인만 RLS·격리검증, 프로젝트공유·벡터는 v1.5·v2 추가형). 세션34: 096=`remove_default_agents`(기본 8개 소프트삭제·복구가능) · 097=`agent_knowledge`(지식파일, 부모 상속 RLS) · 098=`agent_mcp_connectors`(agent_versions.mcp_connectors 개인 커넥터 바인딩).
 - **.env.local**: ANTHROPIC · Supabase(URL·anon·service_role) · Google 4종 · `WORKSPACE_PASSWORD` 채워짐. ⚠️ **시크릿 값은 문서/채팅에 적지 말 것**(HANDOFF는 git 추적).
 - **테스트 계정**: 조휘원(`c6817c63-943f-4257-8500-f9840ad39bde`)·이동규·김건 (워크스페이스 비번 로그인). 모델: 기본 `claude-sonnet-4-6` / 복잡 `claude-opus-4-7`.
 - 링크: [GitHub](https://github.com/chowhiwon99-code/equria-workflow-Sass) · [Vercel](https://vercel.com/chowhiwon99-2151s-projects/equria-workflow-sass) · [Supabase](https://supabase.com/dashboard/project/dutovtfdckhayyvhtuxu) · 메모리 `~/.claude/projects/-Users-johwiwon-equria-workspace/memory/`

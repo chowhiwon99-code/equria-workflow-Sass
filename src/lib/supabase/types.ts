@@ -2617,6 +2617,7 @@ export type Database = {
           created_by: string | null
           extracted_text: string | null
           id: string
+          is_personal: boolean
           mime_type: string | null
           name: string
           size: number | null
@@ -2628,6 +2629,7 @@ export type Database = {
           created_by?: string | null
           extracted_text?: string | null
           id?: string
+          is_personal?: boolean
           mime_type?: string | null
           name: string
           size?: number | null
@@ -2639,6 +2641,7 @@ export type Database = {
           created_by?: string | null
           extracted_text?: string | null
           id?: string
+          is_personal?: boolean
           mime_type?: string | null
           name?: string
           size?: number | null

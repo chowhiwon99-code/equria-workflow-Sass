@@ -126,7 +126,7 @@ export function AgentBuilderForm({
     let alive = true
     supabase
       .from("agent_knowledge")
-      .select("id, storage_path, name, mime_type, size, extracted_text")
+      .select("id, storage_path, name, mime_type, size, extracted_text, is_personal")
       .eq("agent_id", initial.id)
       .then(({ data }) => {
         if (!alive) return
@@ -137,6 +137,7 @@ export function AgentBuilderForm({
           mime_type: r.mime_type ?? "",
           size: r.size ?? 0,
           extracted_text: r.extracted_text,
+          is_personal: r.is_personal ?? false,
         }))
         setInitialKnowledge(rows)
         setKnowledge(rows)
@@ -208,6 +209,7 @@ export function AgentBuilderForm({
             mime_type: k.mime_type || null,
             size: k.size || null,
             extracted_text: k.extracted_text,
+            is_personal: k.is_personal ?? false,
             created_by: me,
           }))
         )
@@ -260,6 +262,7 @@ export function AgentBuilderForm({
           mime_type: k.mime_type || null,
           size: k.size || null,
           extracted_text: k.extracted_text,
+          is_personal: k.is_personal ?? false,
           created_by: me,
         }))
       )
