@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { discoverMcpTools, resolveUserConnectionConfig } from "@/lib/mcp/connect"
+import { summarizeToolsKo } from "@/lib/mcp/summarize"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -25,7 +26,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ connec
   const rowId = row.id
 
   try {
-    const tools = await discoverMcpTools(cfg)
+    const tools = await summarizeToolsKo(cfg.name, await discoverMcpTools(cfg))
     await supabase
       .from("mcp_user_connections")
       .update({ last_tested_at: new Date().toISOString(), last_test_ok: true, last_test_error: null, tools })

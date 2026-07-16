@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { encryptToken } from "@/lib/google/crypto"
 import { discoverMcpTools } from "@/lib/mcp/connect"
+import { summarizeToolsKo } from "@/lib/mcp/summarize"
 import { MCP_CONNECTORS } from "@/lib/mcp"
 
 export const runtime = "nodejs"
@@ -61,14 +62,17 @@ export async function POST(req: Request) {
   if (error || !data) return NextResponse.json({ error: error?.message ?? "등록에 실패했어요." }, { status: 500 })
 
   try {
-    const tools = await discoverMcpTools({
-      id: data.id,
-      name: connector.name,
-      type: connector.preset.type,
-      url: connector.preset.url,
-      auth_type: "bearer",
-      encrypted_token,
-    })
+    const tools = await summarizeToolsKo(
+      connector.name,
+      await discoverMcpTools({
+        id: data.id,
+        name: connector.name,
+        type: connector.preset.type,
+        url: connector.preset.url,
+        auth_type: "bearer",
+        encrypted_token,
+      })
+    )
     await supabase
       .from("mcp_user_connections")
       .update({ last_tested_at: new Date().toISOString(), last_test_ok: true, last_test_error: null, tools })

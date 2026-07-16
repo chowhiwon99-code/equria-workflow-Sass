@@ -25,7 +25,7 @@ type Server = {
   last_test_ok: boolean | null
   last_test_error: string | null
 }
-type Tool = { name: string; description: string | null }
+type Tool = { name: string; description: string | null; summaryKo?: string | null }
 // 내(직원) 개인 연결 — 회사 공용 Server와 별개(RLS로 본인 것만 옴).
 type UserConnection = {
   id: string
@@ -527,7 +527,7 @@ export function McpView() {
                       <div key={tool.name} className="flex flex-col gap-0.5 rounded-lg border bg-card px-2.5 py-1.5">
                         <span className="font-mono text-xs font-medium">{tool.name}</span>
                         <span className="text-[11px] text-muted-foreground" title={tool.description ?? undefined}>
-                          {MCP_TOOL_KO[tool.name] ?? tool.description ?? "설명 없음"}
+                          {tool.summaryKo || MCP_TOOL_KO[tool.name] || tool.description || "설명 없음"}
                         </span>
                       </div>
                     ))}
@@ -615,7 +615,7 @@ export function McpView() {
                         <div key={tool.name} className="flex flex-col gap-0.5 rounded-lg border bg-card px-2.5 py-1.5">
                           <span className="font-mono text-xs font-medium">{tool.name}</span>
                           <span className="text-[11px] text-muted-foreground" title={tool.description ?? undefined}>
-                            {MCP_TOOL_KO[tool.name] ?? tool.description ?? "설명 없음"}
+                            {tool.summaryKo || MCP_TOOL_KO[tool.name] || tool.description || "설명 없음"}
                           </span>
                         </div>
                       ))}

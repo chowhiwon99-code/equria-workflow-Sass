@@ -103,7 +103,7 @@ export function resolveUserConnectionConfig(
   }
 }
 
-export type DiscoveredTool = { name: string; description: string }
+export type DiscoveredTool = { name: string; description: string; summaryKo?: string }
 
 /** 연결 → 도구 목록 디스커버리(이름·설명). 테스트/캐시 갱신용. 끝나면 close. */
 export async function discoverMcpTools(server: McpServerConfig): Promise<DiscoveredTool[]> {
