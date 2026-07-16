@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import { toast } from "sonner"
+import { Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
@@ -304,6 +305,23 @@ export function SettingsView() {
     }
   }
 
+  // 오너 전용 — 구성원 계정 완전 삭제(개인 데이터 연쇄 삭제, 공유 자원은 보존).
+  const deleteMember = async (id: string) => {
+    setBusyId(id)
+    try {
+      const res = await fetch(`/api/members/${id}`, { method: "DELETE" })
+      if (res.ok) {
+        setMemberList((prev) => prev.filter((m) => m.id !== id))
+        setUsage((prev) => (prev ? prev.filter((u) => u.user_id !== id) : prev))
+        toast.success("구성원을 삭제했어요.")
+      } else {
+        toast.error((await res.text().catch(() => "")) || "삭제에 실패했어요.")
+      }
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   const logout = async () => {
     await supabase.auth.signOut()
     router.push("/login")
@@ -420,7 +438,7 @@ export function SettingsView() {
           ) : (
             <div className="flex flex-col divide-y overflow-hidden rounded-xl border">
               {memberList.map((m) => (
-                <MemberInfoRow key={m.id} member={m} isMe={m.id === meId} busy={busyId === m.id} onSave={(dept, pos) => saveMemberInfo(m.id, dept, pos)} />
+                <MemberInfoRow key={m.id} member={m} isMe={m.id === meId} busy={busyId === m.id} onSave={(dept, pos) => saveMemberInfo(m.id, dept, pos)} onDelete={() => deleteMember(m.id)} />
               ))}
             </div>
           )}
@@ -551,14 +569,17 @@ function MemberInfoRow({
   isMe,
   busy,
   onSave,
+  onDelete,
 }: {
   member: { id: string; name: string; department: string | null; position: string | null }
   isMe: boolean
   busy: boolean
   onSave: (dept: string, position: string) => void
+  onDelete: () => void
 }) {
   const [dept, setDept] = useState(member.department ?? "")
   const [pos, setPos] = useState(member.position ?? "")
+  const [confirming, setConfirming] = useState(false)
   const dirty = dept.trim() !== (member.department ?? "") || pos.trim() !== (member.position ?? "")
   return (
     <div className="flex flex-wrap items-center gap-2 px-3.5 py-2.5">
@@ -589,6 +610,29 @@ function MemberInfoRow({
           저장
         </Button>
       </form>
+      {/* 오너 전용 삭제 — 본인은 못 지움. 2단계 확인(오삭 방지). */}
+      {!isMe &&
+        (confirming ? (
+          <span className="flex items-center gap-1.5 text-xs">
+            <span className="text-muted-foreground">계정·개인데이터 삭제?</span>
+            <Button size="sm" variant="destructive" className="h-8" onClick={onDelete} disabled={busy}>
+              삭제
+            </Button>
+            <button type="button" onClick={() => setConfirming(false)} className="text-muted-foreground hover:text-foreground">
+              취소
+            </button>
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setConfirming(true)}
+            className="rounded p-1 text-muted-foreground transition-colors hover:text-destructive"
+            title={`${member.name} 구성원 삭제`}
+            aria-label={`${member.name} 삭제`}
+          >
+            <Trash2 className="size-4" />
+          </button>
+        ))}
     </div>
   )
 }
