@@ -119,8 +119,13 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
     )
   }
 
-  // ── 예시 갤러리: 무엇을 맡길지 예시에서 시작(빈 화면 방지) ──
+  // ── 진입: "무슨 일을 맡기고 싶은지" 열린 입력이 메인. 예시는 접힌 뿌옇게 보조(굳이 필요 없음). ──
   if (phase === "gallery") {
+    const seed = ((inputs.purpose as string) ?? "").trim()
+    const startFromSeed = () => {
+      setPhase("input")
+      setIndex(0)
+    }
     return (
       <div className="mx-auto flex w-full max-w-2xl flex-col items-center gap-6 pt-2">
         <button
@@ -132,37 +137,55 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
         </button>
 
         <div className="flex flex-col items-center gap-1.5 text-center">
-          <h2 className="text-2xl font-semibold tracking-tight">어떤 일을 맡길까요?</h2>
-          <p className="text-sm text-muted-foreground">예시를 고르면 AI가 맞춰서 초안을 만들어줘요. 고른 뒤 다듬으면 끝.</p>
+          <h2 className="text-2xl font-semibold tracking-tight">어떤 일을 맡기고 싶으세요?</h2>
+          <p className="text-sm text-muted-foreground">평소 반복하는 업무를 편하게 적어주면, 몇 가지만 물어보고 AI가 맞춰 만들어줘요.</p>
         </div>
 
-        <div className="grid w-full grid-cols-1 gap-2.5 sm:grid-cols-2">
-          {AGENT_TEMPLATES.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => pickTemplate(t)}
-              className="flex items-start gap-3 rounded-xl glass p-3.5 text-left transition-shadow hover:shadow-[var(--shadow-md)] motion-safe:hover:-translate-y-0.5"
-            >
-              <span className="text-2xl leading-none">{t.emoji}</span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold">{t.name}</span>
-                <span className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{t.description}</span>
-              </span>
-            </button>
-          ))}
+        {/* 메인 = 열린 입력 */}
+        <div className="w-full">
+          <textarea
+            autoFocus
+            value={(inputs.purpose as string) ?? ""}
+            onChange={(e) => setText("purpose", e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && seed) {
+                e.preventDefault()
+                startFromSeed()
+              }
+            }}
+            placeholder="예: 매주 거래처에 보내는 안내 메일을 대신 써줘 · 영수증 정리하고 부가세 빠진 것 짚어줘"
+            rows={3}
+            className={cn(fieldClass, "min-h-[96px] w-full resize-y rounded-2xl py-3 text-base")}
+          />
+          <div className="mt-2.5 flex justify-end">
+            <Button size="sm" disabled={!seed} onClick={startFromSeed}>
+              <Sparkles className="size-4" /> 이걸로 만들기
+            </Button>
+          </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            setPhase("input")
-            setIndex(0)
-          }}
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
-        >
-          <Sparkles className="size-3.5" /> 예시 없이 처음부터 만들기
-        </button>
+        {/* 예시 = 굳이 필요 없지만, 막막할 때만 펼쳐 보는 뿌옇게 보조 */}
+        <details className="w-full">
+          <summary className="mx-auto w-fit cursor-pointer list-none text-xs text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
+            막막하면 예시에서 시작하기
+          </summary>
+          <div className="mt-3 grid w-full grid-cols-1 gap-2 opacity-55 transition-opacity hover:opacity-100 sm:grid-cols-2">
+            {AGENT_TEMPLATES.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => pickTemplate(t)}
+                className="flex items-start gap-2.5 rounded-xl border bg-card/60 p-2.5 text-left transition-shadow hover:shadow-[var(--shadow-sm)]"
+              >
+                <span className="text-lg leading-none">{t.emoji}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-xs font-medium">{t.name}</span>
+                  <span className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">{t.description}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </details>
       </div>
     )
   }
