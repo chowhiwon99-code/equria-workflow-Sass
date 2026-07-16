@@ -2559,6 +2559,57 @@ export type Database = {
           },
         ]
       }
+      agent_memories: {
+        Row: {
+          agent_id: string
+          content: string
+          created_at: string
+          deleted_at: string | null
+          id: string
+          kind: string
+          source_conversation_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agent_id: string
+          content: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          kind?: string
+          source_conversation_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agent_id?: string
+          content?: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          kind?: string
+          source_conversation_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_memories_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_memories_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_knowledge: {
         Row: {
           agent_id: string

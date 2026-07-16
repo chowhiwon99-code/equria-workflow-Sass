@@ -2,6 +2,7 @@ import { streamText, convertToModelMessages, stepCountIs, type UIMessage, type T
 import { anthropic } from "@/lib/claude/client"
 import { createClient } from "@/lib/supabase/server"
 import { connectMcp, resolveUserConnectionConfig } from "@/lib/mcp/connect"
+import { buildMemoryBlock } from "@/lib/agentMemory"
 import { computeCostUsd } from "@/lib/pricing"
 import { checkBudget, BUDGET_EXCEEDED_MSG } from "@/lib/budget"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -121,6 +122,19 @@ export async function POST(
         })
       }
     }
+  }
+
+  // 학습된 기억 주입(v1, 개인용) — 이 사용자×이 에이전트의 활성 기억. RLS가 "본인 것만" 강제.
+  // 저장은 다 하되 대화엔 최근 것 위주로 소수만(상한 30) 넣는다(컨텍스트/비용 방어).
+  {
+    const { data: mems } = await supabase
+      .from("agent_memories")
+      .select("kind, content")
+      .eq("agent_id", agentId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(30)
+    systemPrompt += buildMemoryBlock(mems ?? [])
   }
 
   // 에이전트에 연결된 MCP 서버의 도구 로드(있으면). 연결 실패 서버는 건너뜀.

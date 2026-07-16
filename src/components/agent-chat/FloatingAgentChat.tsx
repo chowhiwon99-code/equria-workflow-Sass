@@ -6,10 +6,11 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { ArrowUp, ArrowLeft, X, Plus, Maximize2, Minimize2, Copy, Check, Sparkles, SlidersHorizontal, Wrench } from "lucide-react"
+import { ArrowUp, ArrowLeft, X, Plus, Maximize2, Minimize2, Copy, Check, Sparkles, SlidersHorizontal, Wrench, Brain } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { renderAgentIcon } from "@/components/agents/AgentIcon"
 import { useAgentChat, type Agent, type WidgetPosition } from "./AgentChatContext"
+import { AgentMemoryPanel } from "./AgentMemoryPanel"
 
 const WIDGET_SIZE = 56 // size-14
 const EDGE_PADDING = 8
@@ -620,6 +621,7 @@ function IconBtn({
 function ChatBody({ agent }: { agent: Agent }) {
   const { conversationIdByAgent, setConversationId, markUnread, isOpen } = useAgentChat()
   const [input, setInput] = useState("")
+  const [showMem, setShowMem] = useState(false) // 기억 관리 화면 토글
 
   // 매 요청마다 최신 conversationId를 보내기 위한 ref
   const conversationIdRef = useRef<string | null>(conversationIdByAgent[agent.id] ?? null)
@@ -670,6 +672,10 @@ function ChatBody({ agent }: { agent: Agent }) {
     setInput("")
   }
 
+  if (showMem) {
+    return <AgentMemoryPanel agentId={agent.id} onClose={() => setShowMem(false)} />
+  }
+
   return (
     <>
       <div
@@ -693,6 +699,12 @@ function ChatBody({ agent }: { agent: Agent }) {
       </div>
 
       <div className="border-t bg-card p-3">
+        <button
+          onClick={() => setShowMem(true)}
+          className="mb-2 inline-flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <Brain className="size-3.5" /> 기억 관리
+        </button>
         <div className="flex items-end gap-2">
           <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
             {renderAgentIcon(agent.icon, "size-5")}
