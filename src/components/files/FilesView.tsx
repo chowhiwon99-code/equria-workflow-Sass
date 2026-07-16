@@ -59,7 +59,7 @@ const SORT_OPTIONS = [
 
 // 공개범위 표시(라벨·배지). 가시성 자체는 RLS(마이그 044)가 강제 — 여기선 표시·필터만.
 const VIS: Record<Visibility, { label: string; badge: string }> = {
-  personal: { label: "개인", badge: "bg-muted text-muted-foreground" },
+  personal: { label: "🔒 개인", badge: "bg-muted text-muted-foreground" },
   department: { label: "부서", badge: "bg-blue-100 text-blue-700" },
   public: { label: "공개", badge: "bg-emerald-100 text-emerald-700" },
 }
@@ -67,7 +67,7 @@ const TABS: { key: "all" | Visibility; label: string }[] = [
   { key: "all", label: "전체" },
   { key: "public", label: "공개" },
   { key: "department", label: "부서" },
-  { key: "personal", label: "개인" },
+  { key: "personal", label: "🔒 개인(나만)" },
 ]
 
 // 이미지 파일인지(실제 썸네일 대상).

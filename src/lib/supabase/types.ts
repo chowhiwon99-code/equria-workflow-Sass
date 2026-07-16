@@ -3254,6 +3254,18 @@ export type Database = {
         Args: { p_members: string[]; p_room: string }
         Returns: undefined
       }
+      admin_usage_by_member: {
+        Args: never
+        Returns: {
+          user_id: string
+          name: string
+          calls: number
+          tokens_input: number
+          tokens_output: number
+          cost_usd: number
+          month_cost_usd: number
+        }[]
+      }
       auth_is_admin: { Args: never; Returns: boolean }
       auth_is_workspace_owner: { Args: { ws_id: string }; Returns: boolean }
       auth_user_department: { Args: never; Returns: string }

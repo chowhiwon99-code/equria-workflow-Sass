@@ -142,6 +142,10 @@ export function SettingsView() {
   // 대표(오너) 전용 — 구성원 직급 일괄 관리
   const [isOwner, setIsOwner] = useState(false)
   const [memberList, setMemberList] = useState<{ id: string; name: string; department: string | null; position: string | null }[]>([])
+  // 대표(오너) 전용 — 구성원별 AI 사용량(호출·토큰·비용). 내용은 없고 사용량 메타만(RPC가 오너 게이팅).
+  const [usage, setUsage] = useState<
+    { user_id: string; name: string; calls: number; tokens_input: number; tokens_output: number; cost_usd: number; month_cost_usd: number }[] | null
+  >(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [workPhone, setWorkPhone] = useState("")
   const [mobile, setMobile] = useState("")
@@ -195,6 +199,8 @@ export function SettingsView() {
       if (owner) {
         const { data: mem } = await supabase.from("profiles").select("id, name, department, position").order("name")
         setMemberList((mem as { id: string; name: string; department: string | null; position: string | null }[]) ?? [])
+        const { data: usageRows } = await supabase.rpc("admin_usage_by_member")
+        setUsage(usageRows ?? [])
       }
       // AI 비용 예산 — 이번 달 사용액·월 한도(조회 실패는 무시)
       try {
@@ -416,6 +422,46 @@ export function SettingsView() {
               {memberList.map((m) => (
                 <MemberInfoRow key={m.id} member={m} isMe={m.id === meId} busy={busyId === m.id} onSave={(dept, pos) => saveMemberInfo(m.id, dept, pos)} />
               ))}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* 대표: 구성원별 AI 사용량 (호출·토큰·비용만, 대화 내용은 보이지 않음) */}
+      {isOwner && (
+        <Card>
+          <SectionTitle
+            title="구성원별 AI 사용량"
+            desc="누가 얼마나 AI를 썼는지 봐요. 사용량·비용만 보이고, 대화 내용은 보이지 않아요."
+          />
+          {!usage || usage.length === 0 ? (
+            <p className="text-sm text-muted-foreground">아직 사용 기록이 없어요.</p>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border">
+              <table className="w-full text-sm">
+                <thead className="border-b bg-muted/30 text-xs text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-medium">구성원</th>
+                    <th className="px-3 py-2 text-right font-medium">호출</th>
+                    <th className="px-3 py-2 text-right font-medium">토큰</th>
+                    <th className="px-3 py-2 text-right font-medium">이번 달</th>
+                    <th className="px-3 py-2 text-right font-medium">누적 비용</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {usage.map((u) => (
+                    <tr key={u.user_id}>
+                      <td className="px-3 py-2 font-medium">{u.name || "이름 없음"}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{Number(u.calls).toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                        {(Number(u.tokens_input) + Number(u.tokens_output)).toLocaleString()}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums">${Number(u.month_cost_usd).toFixed(2)}</td>
+                      <td className="px-3 py-2 text-right font-medium tabular-nums">${Number(u.cost_usd).toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </Card>
