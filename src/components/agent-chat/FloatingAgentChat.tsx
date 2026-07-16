@@ -646,12 +646,15 @@ function ChatBody({ agent }: { agent: Agent }) {
 
   const { messages, sendMessage, status, error } = useChat({ transport })
 
-  // 자동 스크롤
+  // 자동 스크롤 — 첫 진입은 즉시(auto) 하단, 이후 스트리밍은 smooth.
   const scrollRef = useRef<HTMLDivElement>(null)
+  const jumpToBottom = useRef(true)
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
-    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
+    const behavior: ScrollBehavior = jumpToBottom.current ? "auto" : "smooth"
+    jumpToBottom.current = false
+    el.scrollTo({ top: el.scrollHeight, behavior })
   }, [messages, status])
 
   // 위젯 닫힌 상태에서 새 응답 도착 → unread 표시

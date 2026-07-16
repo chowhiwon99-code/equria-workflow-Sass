@@ -599,7 +599,9 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    // 높이를 명시적으로 고정(h-full은 PageTransition 래퍼가 auto-height라 사슬이 끊겨 내부 스크롤이 안 잡힘 →
+    // 대신 --app-content-height로 bounded 컨테이너 확보 = 내부 스크롤러가 하단 고정되도록). 대시보드/그룹챗과 동일 관례.
+    <div className="flex h-[var(--app-content-height)] flex-col">
       <div className="mb-3 flex items-center gap-2 border-b pb-3">
         <Link href="/chat" className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" />

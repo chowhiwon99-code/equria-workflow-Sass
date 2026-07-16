@@ -54,9 +54,14 @@ export function DashboardAssistant() {
     loadConvos()
   }, [loadConvos])
 
+  // 진입·대화 전환 시엔 즉시(auto) 하단으로 점프(긴 히스토리를 smooth로 훑지 않게). 스트리밍 중 추가 메시지는 smooth.
+  const jumpToBottom = useRef(true)
   useEffect(() => {
     const el = scrollRef.current
-    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
+    if (!el) return
+    const behavior: ScrollBehavior = jumpToBottom.current ? "auto" : "smooth"
+    jumpToBottom.current = false
+    el.scrollTo({ top: el.scrollHeight, behavior })
   }, [messages, status])
 
   // 턴 완료 시 목록 갱신(새 대화방·제목 반영)
@@ -85,6 +90,7 @@ export function DashboardAssistant() {
     const res = await fetch(`/api/assistant/conversations/${id}`)
     if (!res.ok) return
     const j = (await res.json()) as { messages: { id: string; role: string; content: string }[] }
+    jumpToBottom.current = true // 대화 전환 = 즉시 하단으로
     setMessages(
       j.messages.map((m) => ({
         id: m.id,
