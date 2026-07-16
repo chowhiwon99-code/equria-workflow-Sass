@@ -14,7 +14,6 @@ import {
   type WizardInputs,
 } from "@/lib/agentBuilder"
 import { AgentBuilderForm } from "@/components/agents/AgentBuilderForm"
-import { AGENT_TEMPLATES, type AgentTemplate } from "@/lib/agentTemplates"
 import { KnowledgeFilePicker } from "@/components/agents/KnowledgeFilePicker"
 import type { StagedKnowledge } from "@/lib/agentKnowledge"
 
@@ -23,6 +22,17 @@ type Phase = "gallery" | "input" | "result"
 
 // 한 화면에 한 질문씩 — 아이폰 초기 설정처럼 가로 슬라이드로 진행.
 const QUESTIONS = WIZARD_FIELDS
+
+// 진입 화면 배경에 떠다니는 에이전트 아이콘(장식·클릭 불가). 중앙 입력을 피해 가장자리에 흩뿌린다.
+const FLOAT_ICONS = [
+  { e: "📄", pos: "left-[3%] top-[3%]", delay: "0s", dur: "2.6s", size: "2.2rem" },
+  { e: "💬", pos: "right-[5%] top-[8%]", delay: "0.7s", dur: "2.9s", size: "2rem" },
+  { e: "🌐", pos: "left-[6%] top-[52%]", delay: "1.3s", dur: "3.1s", size: "2.4rem" },
+  { e: "📊", pos: "right-[4%] top-[60%]", delay: "0.4s", dur: "2.7s", size: "2rem" },
+  { e: "📱", pos: "left-[15%] top-[27%]", delay: "1s", dur: "3.3s", size: "1.7rem" },
+  { e: "⚖️", pos: "right-[12%] top-[33%]", delay: "1.7s", dur: "2.5s", size: "1.7rem" },
+  { e: "🧾", pos: "left-[45%] top-[88%]", delay: "0.9s", dur: "3s", size: "1.8rem" },
+] as const
 
 export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
   const [mode, setMode] = useState<Mode>("wizard")
@@ -64,13 +74,6 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
   const goPrev = () => {
     setDir(-1)
     setIndex((i) => Math.max(0, i - 1))
-  }
-
-  // 예시 갤러리에서 선택 → 입력 프리필 + 즉시 생성(결과에서 검토·수정 가능).
-  const pickTemplate = (t: AgentTemplate) => {
-    setInputs(t.inputs)
-    setDir(1)
-    void generate(t.inputs)
   }
 
   const generate = async (inputsArg: WizardInputs = inputs) => {
@@ -119,7 +122,7 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
     )
   }
 
-  // ── 진입: "무슨 일을 맡기고 싶은지" 열린 입력이 메인. 예시는 접힌 뿌옇게 보조(굳이 필요 없음). ──
+  // ── 진입: "무슨 일을 맡기고 싶은지" 열린 입력 + 떠다니는 에이전트 아이콘(장식). 예시 없음. ──
   if (phase === "gallery") {
     const seed = ((inputs.purpose as string) ?? "").trim()
     const startFromSeed = () => {
@@ -127,7 +130,20 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
       setIndex(0)
     }
     return (
-      <div className="mx-auto flex w-full max-w-2xl flex-col items-center gap-6 pt-2">
+      <div className="relative isolate mx-auto flex w-full max-w-2xl flex-col items-center gap-6 pt-2">
+        {/* 떠다니는 에이전트 아이콘 — "이런 걸 만들어 쓸 수 있다"는 분위기(장식·클릭 불가) */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+          {FLOAT_ICONS.map((i) => (
+            <span
+              key={i.e}
+              className={cn("absolute select-none opacity-[0.16] motion-safe:animate-float", i.pos)}
+              style={{ animationDelay: i.delay, animationDuration: i.dur, fontSize: i.size }}
+            >
+              {i.e}
+            </span>
+          ))}
+        </div>
+
         <button
           type="button"
           onClick={() => setMode("manual")}
@@ -164,28 +180,6 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
           </div>
         </div>
 
-        {/* 예시 = 굳이 필요 없지만, 막막할 때만 펼쳐 보는 뿌옇게 보조 */}
-        <details className="w-full">
-          <summary className="mx-auto w-fit cursor-pointer list-none text-xs text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
-            막막하면 예시에서 시작하기
-          </summary>
-          <div className="mt-3 grid w-full grid-cols-1 gap-2 opacity-55 transition-opacity hover:opacity-100 sm:grid-cols-2">
-            {AGENT_TEMPLATES.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => pickTemplate(t)}
-                className="flex items-start gap-2.5 rounded-xl border bg-card/60 p-2.5 text-left transition-shadow hover:shadow-[var(--shadow-sm)]"
-              >
-                <span className="text-lg leading-none">{t.emoji}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-xs font-medium">{t.name}</span>
-                  <span className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">{t.description}</span>
-                </span>
-              </button>
-            ))}
-          </div>
-        </details>
       </div>
     )
   }
