@@ -147,6 +147,9 @@ export function SettingsView() {
   const [usage, setUsage] = useState<
     { user_id: string; name: string; calls: number; tokens_input: number; tokens_output: number; cost_usd: number; month_cost_usd: number }[] | null
   >(null)
+  // 대표(오너) 전용 — 시스템 점검(설정 실수 미리 감지)
+  const [health, setHealth] = useState<{ name: string; status: "ok" | "warn" | "fail"; detail: string; fix?: string }[] | null>(null)
+  const [healthLoading, setHealthLoading] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [workPhone, setWorkPhone] = useState("")
   const [mobile, setMobile] = useState("")
@@ -322,6 +325,20 @@ export function SettingsView() {
     }
   }
 
+  // 시스템 점검 — 설정(앱 주소·비번·구글 콜백·키) 실수를 미리 감지
+  const runHealth = async () => {
+    setHealthLoading(true)
+    try {
+      const res = await fetch("/api/health")
+      if (res.ok) setHealth((await res.json()).checks ?? [])
+      else toast.error("점검을 실행하지 못했어요.")
+    } catch {
+      toast.error("점검을 실행하지 못했어요.")
+    } finally {
+      setHealthLoading(false)
+    }
+  }
+
   const logout = async () => {
     await supabase.auth.signOut()
     router.push("/login")
@@ -480,6 +497,31 @@ export function SettingsView() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* 대표: 시스템 점검 — 설정 실수 미리 잡기 */}
+      {isOwner && (
+        <Card>
+          <SectionTitle title="시스템 점검" desc="앱 주소·공용비번·구글 연동·키 설정을 훑어서 문제를 미리 잡아요." />
+          <Button size="sm" className="mb-3 h-8 self-start" onClick={runHealth} disabled={healthLoading}>
+            {healthLoading ? "점검 중…" : "점검 실행"}
+          </Button>
+          {health && (
+            <div className="flex flex-col divide-y overflow-hidden rounded-xl border">
+              {health.map((c) => (
+                <div key={c.name} className="flex items-start gap-2.5 px-3.5 py-2.5 text-sm">
+                  <span className="mt-0.5 shrink-0">{c.status === "ok" ? "✅" : c.status === "warn" ? "⚠️" : "❌"}</span>
+                  <div className="min-w-0">
+                    <p className="font-medium">
+                      {c.name} <span className="font-normal text-muted-foreground">— {c.detail}</span>
+                    </p>
+                    {c.fix && c.status !== "ok" && <p className="mt-0.5 text-xs text-muted-foreground">→ {c.fix}</p>}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </Card>
