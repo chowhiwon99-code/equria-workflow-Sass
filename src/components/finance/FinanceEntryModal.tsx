@@ -19,16 +19,22 @@ export function FinanceEntryModal({
   reload,
   onClose,
   onSaved,
+  projectId,
+  defaultKind,
 }: {
   entry: FinanceEntry | null
   reload: () => void
   onClose: () => void
   onSaved: () => void
+  /** 프로젝트 상세에서 열 때 이 프로젝트에 연결(신규 항목만). 없으면 기존 동작. */
+  projectId?: string
+  /** 신규 항목 초기 종류(비용/매출 버튼에서 지정). */
+  defaultKind?: Kind
 }) {
   const supabase = createClient()
   const me = useCurrentUserId()
   const { push } = useUndo()
-  const [kind, setKind] = useState<Kind>((entry?.kind as Kind) ?? "expense")
+  const [kind, setKind] = useState<Kind>((entry?.kind as Kind) ?? defaultKind ?? "expense")
   const [entryDate, setEntryDate] = useState(entry?.entry_date ?? new Date().toISOString().slice(0, 10))
   const [category, setCategory] = useState(entry?.category ?? "")
   const [vendor, setVendor] = useState(entry?.vendor ?? "")
@@ -106,7 +112,7 @@ export function FinanceEntryModal({
     } else {
       const { data: inserted, error: err } = await supabase
         .from("finance_entries")
-        .insert({ ...payload, created_by: me })
+        .insert({ ...payload, created_by: me, ...(projectId ? { project_id: projectId } : {}) })
         .select()
         .single()
       setSaving(false)
