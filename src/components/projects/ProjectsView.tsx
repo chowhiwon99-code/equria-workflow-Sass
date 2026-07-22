@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { Plus, FolderKanban, Check } from "lucide-react"
+import { Plus, FolderKanban, Check, Trash2 } from "lucide-react"
 import { Select } from "@/components/shared/Select"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { createClient } from "@/lib/supabase/client"
+import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -59,6 +60,27 @@ function ImportanceBadge({ value }: { value: number }) {
 
 export function ProjectsView() {
   const supabase = createClient()
+  const me = useCurrentUserId()
+  const { push } = useUndo()
+
+  // 프로젝트 삭제 = 소프트삭제(deleted_at). 생성자 카드에만 노출 + Undo 복구.
+  const deleteProject = async (p: ProjectRow) => {
+    const now = new Date().toISOString()
+    await mustOk(supabase.from("projects").update({ deleted_at: now }).eq("id", p.id))
+    setProjects((prev) => prev.filter((x) => x.id !== p.id))
+    push({
+      label: "프로젝트 삭제",
+      undo: async () => {
+        await mustOk(supabase.from("projects").update({ deleted_at: null }).eq("id", p.id))
+        load()
+      },
+      redo: async () => {
+        await mustOk(supabase.from("projects").update({ deleted_at: now }).eq("id", p.id))
+        setProjects((prev) => prev.filter((x) => x.id !== p.id))
+      },
+    })
+  }
+
   const [projects, setProjects] = useState<ProjectRow[]>([])
   const [profiles, setProfiles] = useState<Pick<Profile, "id" | "name" | "avatar_url" | "position">[]>([])
   const [memberMap, setMemberMap] = useState<Record<string, string[]>>({})
@@ -77,7 +99,6 @@ export function ProjectsView() {
       let q = supabase
         .from("projects")
         .select("*", { count: "exact" })
-        .is("deleted_at", null)
       if (statusFilter) q = q.eq("status", statusFilter)
       if (searchText.trim()) {
         const s = `%${searchText.trim()}%`
@@ -103,7 +124,8 @@ export function ProjectsView() {
       } else {
         setMemberMap({})
       }
-      setProjects(projData)
+      // 소프트삭제 제외는 클라 필터 — deleted_at 컬럼이 아직 없어도(마이그105 전) 안 깨지게(방어).
+      setProjects(projData.filter((p) => !p.deleted_at))
       setTotalCount(projRes.count ?? 0)
       setProfiles(profRes.data ?? [])
     } catch (e) {
@@ -193,7 +215,7 @@ export function ProjectsView() {
             const members = Array.from(new Set(ids))
               .map((uid) => profileById.get(uid))
               .filter((m): m is MemberLite => !!m)
-            return <ProjectCard key={p.id} project={p} members={members} />
+            return <ProjectCard key={p.id} project={p} members={members} me={me} onDelete={deleteProject} />
           })}
         </div>
       )}
@@ -220,10 +242,21 @@ export function ProjectsView() {
   )
 }
 
-function ProjectCard({ project: p, members }: { project: ProjectRow; members: MemberLite[] }) {
+function ProjectCard({
+  project: p,
+  members,
+  me,
+  onDelete,
+}: {
+  project: ProjectRow
+  members: MemberLite[]
+  me: string | null
+  onDelete: (p: ProjectRow) => void
+}) {
   const st = PROJECT_STATUS[p.status as ProjectStatus]
   const pct = projectProgress(p)
   const canceled = p.status === "canceled"
+  const canDelete = !!me && p.created_by === me
   return (
     <Link
       href={`/projects/${p.id}`}
@@ -239,6 +272,21 @@ function ProjectCard({ project: p, members }: { project: ProjectRow; members: Me
             <st.icon className="size-3" />
             {st.label}
           </span>
+          {canDelete && (
+            <button
+              type="button"
+              onClick={(e) => {
+                // 카드 전체가 Link라 클릭 전파/이동을 막고 삭제만 수행.
+                e.preventDefault()
+                e.stopPropagation()
+                onDelete(p)
+              }}
+              className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+              aria-label="프로젝트 삭제"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
+          )}
         </div>
       </div>
       {p.description && <p className="line-clamp-2 text-xs text-muted-foreground">{p.description}</p>}
