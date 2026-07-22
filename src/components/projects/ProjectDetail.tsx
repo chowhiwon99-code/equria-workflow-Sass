@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
 import { X, Plus, ExternalLink, Frame, FileText, Trash2, CalendarClock, Receipt, TrendingUp, ListChecks, Check, Loader2, type LucideIcon } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
@@ -28,6 +29,8 @@ type MemberRow = { id: string; user_id: string; role: string; member: { name: st
 export function ProjectDetail({ projectId }: { projectId: string }) {
   const supabase = createClient()
   const { push } = useUndo()
+  const me = useCurrentUserId()
+  const router = useRouter()
   const [project, setProject] = useState<(Project & { owner: { name: string; position: string | null } | null }) | null>(null)
   const [members, setMembers] = useState<MemberRow[]>([])
   const [profiles, setProfiles] = useState<Pick<Profile, "id" | "name" | "position">[]>([])
@@ -105,6 +108,30 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
     })
   }
 
+  // 참고사항 메모 저장(blur 시). 멤버도 수정 가능(105 RLS). 값이 그대로면 no-op.
+  const saveNotes = async (val: string) => {
+    const next = val.trim() ? val : null
+    if ((project?.notes ?? null) === next) return
+    await supabase.from("projects").update({ notes: next }).eq("id", projectId)
+    load()
+  }
+
+  // 프로젝트 삭제 = 소프트삭제(deleted_at). 생성자만 버튼 노출. 목록으로 이동 + Undo(복구).
+  const deleteProject = async () => {
+    const now = new Date().toISOString()
+    await mustOk(supabase.from("projects").update({ deleted_at: now }).eq("id", projectId))
+    router.push("/projects")
+    push({
+      label: "프로젝트 삭제",
+      undo: async () => {
+        await mustOk(supabase.from("projects").update({ deleted_at: null }).eq("id", projectId))
+      },
+      redo: async () => {
+        await mustOk(supabase.from("projects").update({ deleted_at: now }).eq("id", projectId))
+      },
+    })
+  }
+
   const addMember = async (userId: string) => {
     if (!userId) return
     const { data: inserted } = await supabase
@@ -157,8 +184,9 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
 
   return (
     <div className="flex flex-col gap-5">
-      {/* 헤더 — 제목 + 상태 배지 */}
-      <div>
+      {/* 헤더 — 제목 + 상태 배지 + (생성자) 삭제 */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
         <BackLink href="/projects" label="프로젝트 목록" />
         <div className="mt-3 flex flex-wrap items-center gap-2.5">
           <h1 className="text-2xl font-semibold tracking-tight">{project.name}</h1>
@@ -171,11 +199,22 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
             </span>
           )}
           <span className={cn("inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium", st.badge)}>
-            <span className="size-1.5 rounded-full" style={{ backgroundColor: st.dot }} />
+            <st.icon className="size-3.5" />
             {st.label}
           </span>
         </div>
         {project.description && <p className="mt-1.5 text-sm text-muted-foreground">{project.description}</p>}
+        </div>
+        {me && project.created_by && me === project.created_by && (
+          <button
+            onClick={deleteProject}
+            className="mt-1 inline-flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+            aria-label="프로젝트 삭제"
+          >
+            <Trash2 className="size-4" />
+            삭제
+          </button>
+        )}
       </div>
 
       {/* 메타 카드 — 상태/담당자/일정 */}
@@ -257,6 +296,21 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
 
       {/* 파일/링크 현황 */}
       <FilesSection projectId={projectId} />
+
+      {/* 참고사항 메모 — blur 시 저장(멤버 공유). uncontrolled=재로드에도 타이핑 보존 */}
+      <section className="rounded-2xl glass p-5">
+        <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+          <FileText className="size-4 text-primary" /> 참고사항
+        </h2>
+        <textarea
+          key={project.id}
+          defaultValue={project.notes ?? ""}
+          onBlur={(e) => saveNotes(e.target.value)}
+          placeholder="프로젝트 관련 참고사항·메모를 남겨보세요. (예: 논의 내용, 링크, 주의사항)"
+          rows={4}
+          className="mt-3 w-full resize-y rounded-xl border bg-card px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring"
+        />
+      </section>
     </div>
   )
 }

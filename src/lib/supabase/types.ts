@@ -2829,6 +2829,8 @@ export type Database = {
           start_date: string | null
           status: string
           updated_at: string
+          deleted_at: string | null
+          notes: string | null
           workspace_id: string
         }
         Insert: {
@@ -2844,6 +2846,8 @@ export type Database = {
           start_date?: string | null
           status?: string
           updated_at?: string
+          deleted_at?: string | null
+          notes?: string | null
           workspace_id?: string
         }
         Update: {
@@ -2859,6 +2863,8 @@ export type Database = {
           start_date?: string | null
           status?: string
           updated_at?: string
+          deleted_at?: string | null
+          notes?: string | null
           workspace_id?: string
         }
         Relationships: [

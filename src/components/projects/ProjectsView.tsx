@@ -77,6 +77,7 @@ export function ProjectsView() {
       let q = supabase
         .from("projects")
         .select("*", { count: "exact" })
+        .is("deleted_at", null)
       if (statusFilter) q = q.eq("status", statusFilter)
       if (searchText.trim()) {
         const s = `%${searchText.trim()}%`
@@ -235,7 +236,7 @@ function ProjectCard({ project: p, members }: { project: ProjectRow; members: Me
         <div className="flex shrink-0 items-center gap-1">
           <ImportanceBadge value={p.importance ?? 0} />
           <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs", st.badge)}>
-            <span className="size-1.5 rounded-full" style={{ backgroundColor: st.dot }} />
+            <st.icon className="size-3" />
             {st.label}
           </span>
         </div>
