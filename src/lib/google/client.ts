@@ -27,12 +27,15 @@ export async function getGoogleAuthForUser(userId: string) {
   auth.setCredentials({ refresh_token: decryptToken(data.refresh_token) })
 
   // 라이브러리가 access_token을 자동 재발급할 때마다 암호화해 저장(드물게 회전된 refresh_token 포함).
-  auth.on("tokens", (tokens) => {
+  // ⚠️ Supabase 쿼리빌더는 lazy thenable — await/.then 없으면 HTTP 전송이 안 됨(safe-changes §5).
+  //    핸들러를 async로 만들어 실제로 저장한다. 안 하면 회전된 refresh_token이 유실돼 Gmail/Drive가 조용히 끊김.
+  auth.on("tokens", async (tokens) => {
     const patch: GCUpdate = { updated_at: new Date().toISOString() }
     if (tokens.access_token) patch.access_token = encryptToken(tokens.access_token)
     if (tokens.refresh_token) patch.refresh_token = encryptToken(tokens.refresh_token)
     if (tokens.expiry_date) patch.expires_at = new Date(tokens.expiry_date).toISOString()
-    void admin.from("google_connections").update(patch).eq("user_id", userId)
+    const { error } = await admin.from("google_connections").update(patch).eq("user_id", userId)
+    if (error) console.error("[google] 토큰 갱신 저장 실패:", error.message)
   })
 
   return auth
