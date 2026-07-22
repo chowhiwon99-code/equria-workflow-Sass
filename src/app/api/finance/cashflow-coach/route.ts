@@ -6,6 +6,7 @@ import { cashCoachSchema } from "@/lib/claude/schemas"
 import { computeCostUsd } from "@/lib/pricing"
 import { checkBudget, BUDGET_EXCEEDED_MSG } from "@/lib/budget"
 import { buildCoachPrompt, type CoachPayload } from "@/lib/cashCoach"
+import { getUserWorkspaceId, withWorkspace } from "@/lib/workspace"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -47,6 +48,8 @@ export async function POST(req: Request) {
   const budget = await checkBudget(user.id)
   if (!budget.ok) return NextResponse.json({ error: BUDGET_EXCEEDED_MSG }, { status: 429 })
 
+  const workspaceId = await getUserWorkspaceId(supabase, user.id) // B1-b: agent_usage에 명시
+
   const body = (await req.json().catch(() => null)) as { payload?: CoachPayload } | null
   const payload = body?.payload
   if (!payload || !Array.isArray(payload.slots) || !Array.isArray(payload.summaries)) {
@@ -67,25 +70,35 @@ export async function POST(req: Request) {
     })
     const inT = result.usage.inputTokens ?? 0
     const outT = result.usage.outputTokens ?? 0
-    await supabase.from("agent_usage").insert({
-      user_id: user.id,
-      tokens_input: inT,
-      tokens_output: outT,
-      duration_ms: Date.now() - startedAt,
-      success: true,
-      model: MODELS.default,
-      cost_usd: computeCostUsd(MODELS.default, inT, outT),
-    })
+    await supabase.from("agent_usage").insert(
+      withWorkspace(
+        {
+          user_id: user.id,
+          tokens_input: inT,
+          tokens_output: outT,
+          duration_ms: Date.now() - startedAt,
+          success: true,
+          model: MODELS.default,
+          cost_usd: computeCostUsd(MODELS.default, inT, outT),
+        },
+        workspaceId,
+      ),
+    )
     return NextResponse.json({ result: result.object })
   } catch (e) {
     // 실패 사용량 기록(관측성) — 어시스턴트 라우트와 동일 패턴.
-    await supabase.from("agent_usage").insert({
-      user_id: user.id,
-      duration_ms: Date.now() - startedAt,
-      success: false,
-      error_message: e instanceof Error ? e.message : String(e),
-      model: MODELS.default,
-    })
+    await supabase.from("agent_usage").insert(
+      withWorkspace(
+        {
+          user_id: user.id,
+          duration_ms: Date.now() - startedAt,
+          success: false,
+          error_message: e instanceof Error ? e.message : String(e),
+          model: MODELS.default,
+        },
+        workspaceId,
+      ),
+    )
     return NextResponse.json({ error: "코칭 분석에 실패했어요. 잠시 후 다시 시도해 주세요." }, { status: 502 })
   }
 }

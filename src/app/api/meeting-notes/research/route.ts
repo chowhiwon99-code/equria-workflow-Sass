@@ -2,6 +2,7 @@ import { generateText } from "ai"
 import { anthropic, MODELS } from "@/lib/claude/client"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { getUserWorkspaceId, withWorkspace } from "@/lib/workspace"
 import { computeCostUsd } from "@/lib/pricing"
 import { checkBudget, BUDGET_EXCEEDED_MSG } from "@/lib/budget"
 
@@ -111,15 +112,21 @@ export async function POST(req: Request) {
   // 비용 기록 (best-effort — 실패해도 결과는 반환)
   try {
     const admin = createAdminClient()
-    await admin.from("agent_usage").insert({
-      user_id: user.id,
-      tokens_input: inputTokens,
-      tokens_output: outputTokens,
-      duration_ms: Date.now() - started,
-      success: true,
-      model: MODELS.default,
-      cost_usd: computeCostUsd(MODELS.default, inputTokens, outputTokens),
-    })
+    const workspaceId = await getUserWorkspaceId(supabase, user.id)
+    await admin.from("agent_usage").insert(
+      withWorkspace(
+        {
+          user_id: user.id,
+          tokens_input: inputTokens,
+          tokens_output: outputTokens,
+          duration_ms: Date.now() - started,
+          success: true,
+          model: MODELS.default,
+          cost_usd: computeCostUsd(MODELS.default, inputTokens, outputTokens),
+        },
+        workspaceId,
+      ),
+    )
   } catch {
     /* 비용 기록 실패 무시 */
   }

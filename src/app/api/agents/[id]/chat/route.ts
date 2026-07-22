@@ -6,6 +6,7 @@ import { buildMemoryBlock } from "@/lib/agentMemory"
 import { computeCostUsd } from "@/lib/pricing"
 import { checkBudget, BUDGET_EXCEEDED_MSG } from "@/lib/budget"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { getUserWorkspaceId, withWorkspace } from "@/lib/workspace"
 
 export const maxDuration = 60
 export const runtime = "nodejs"
@@ -45,6 +46,9 @@ export async function POST(
     return new Response("Agent not found", { status: 404 })
   }
 
+  // B1-b: 이 사용자의 워크스페이스 id(첫 멤버십). 이후 conversations/messages/agent_usage INSERT에 명시.
+  const workspaceId = await getUserWorkspaceId(supabase, user.id)
+
   if (!conversationId) {
     const firstUser = messages.find((m) => m.role === "user")
     const firstText =
@@ -56,7 +60,7 @@ export async function POST(
 
     const { data: conv, error: convErr } = await supabase
       .from("conversations")
-      .insert({ agent_id: agentId, user_id: user.id, title })
+      .insert(withWorkspace({ agent_id: agentId, user_id: user.id, title }, workspaceId))
       .select("id")
       .single()
     if (convErr || !conv) {
@@ -75,11 +79,9 @@ export async function POST(
       .map((p) => (p.type === "text" ? p.text : ""))
       .join("\n")
       .trim() ?? ""
-  await supabase.from("messages").insert({
-    conversation_id: conversationId,
-    role: "user",
-    content: lastUserText,
-  })
+  await supabase.from("messages").insert(
+    withWorkspace({ conversation_id: conversationId, role: "user", content: lastUserText }, workspaceId),
+  )
 
   const startedAt = Date.now()
   const windowed = messages.slice(-HISTORY_WINDOW)
@@ -188,15 +190,20 @@ export async function POST(
     async onError({ error }) {
       // 사용자 메시지는 이미 선저장됨(위). 실패 사용량을 기록해 관측성 확보 + MCP 정리(M3).
       await Promise.all([
-        supabase.from("agent_usage").insert({
-          agent_id: agentId,
-          user_id: user.id,
-          conversation_id: conversationId,
-          duration_ms: Date.now() - startedAt,
-          success: false,
-          error_message: error instanceof Error ? error.message : String(error),
-          model: agentVersion.model,
-        }),
+        supabase.from("agent_usage").insert(
+          withWorkspace(
+            {
+              agent_id: agentId,
+              user_id: user.id,
+              conversation_id: conversationId,
+              duration_ms: Date.now() - startedAt,
+              success: false,
+              error_message: error instanceof Error ? error.message : String(error),
+              model: agentVersion.model,
+            },
+            workspaceId,
+          ),
+        ),
         closeMcp(),
       ])
     },
@@ -207,24 +214,34 @@ export async function POST(
       const outputTokens = u.outputTokens ?? 0
 
       await Promise.all([
-        supabase.from("messages").insert({
-          conversation_id: conversationId!,
-          role: "assistant",
-          content: text,
-          tokens_used: outputTokens,
-          model: agentVersion.model,
-        }),
-        supabase.from("agent_usage").insert({
-          agent_id: agentId,
-          user_id: user.id,
-          conversation_id: conversationId,
-          tokens_input: inputTokens,
-          tokens_output: outputTokens,
-          duration_ms: Date.now() - startedAt,
-          success: true,
-          model: agentVersion.model,
-          cost_usd: computeCostUsd(agentVersion.model, inputTokens, outputTokens),
-        }),
+        supabase.from("messages").insert(
+          withWorkspace(
+            {
+              conversation_id: conversationId!,
+              role: "assistant",
+              content: text,
+              tokens_used: outputTokens,
+              model: agentVersion.model,
+            },
+            workspaceId,
+          ),
+        ),
+        supabase.from("agent_usage").insert(
+          withWorkspace(
+            {
+              agent_id: agentId,
+              user_id: user.id,
+              conversation_id: conversationId,
+              tokens_input: inputTokens,
+              tokens_output: outputTokens,
+              duration_ms: Date.now() - startedAt,
+              success: true,
+              model: agentVersion.model,
+              cost_usd: computeCostUsd(agentVersion.model, inputTokens, outputTokens),
+            },
+            workspaceId,
+          ),
+        ),
         supabase
           .from("conversations")
           .update({ updated_at: new Date().toISOString() })

@@ -3,6 +3,7 @@ import { anthropic, MODELS } from "@/lib/claude/client"
 import { createClient } from "@/lib/supabase/server"
 import { computeCostUsd } from "@/lib/pricing"
 import { checkBudget, BUDGET_EXCEEDED_MSG } from "@/lib/budget"
+import { getUserWorkspaceId, withWorkspace } from "@/lib/workspace"
 
 export const maxDuration = 60
 export const runtime = "nodejs"
@@ -34,6 +35,9 @@ export async function POST(req: Request) {
   const budget = await checkBudget(user.id)
   if (!budget.ok) return new Response(BUDGET_EXCEEDED_MSG, { status: 429 })
 
+  // B1-b: 이후 assistant_conversations/messages/agent_usage INSERT에 명시할 워크스페이스 id.
+  const workspaceId = await getUserWorkspaceId(supabase, user.id)
+
   const body = (await req.json().catch(() => ({}))) as {
     messages?: UIMessage[]
     conversationId?: string | null
@@ -46,7 +50,7 @@ export async function POST(req: Request) {
     const title = lastUserText(messages).slice(0, 40) || null
     const { data: conv, error: convErr } = await supabase
       .from("assistant_conversations")
-      .insert({ user_id: user.id, title })
+      .insert(withWorkspace({ user_id: user.id, title }, workspaceId))
       .select("id")
       .single()
     if (convErr || !conv) {
@@ -59,11 +63,9 @@ export async function POST(req: Request) {
   const convId = conversationId
 
   // 이번 턴의 사용자 메시지를 스트리밍 전에 먼저 저장(중단/에러로 onFinish가 안 돌아도 유실 방지·H2).
-  await supabase.from("assistant_messages").insert({
-    conversation_id: convId,
-    role: "user",
-    content: lastUserText(messages),
-  })
+  await supabase.from("assistant_messages").insert(
+    withWorkspace({ conversation_id: convId, role: "user", content: lastUserText(messages) }, workspaceId),
+  )
 
   const startedAt = Date.now()
   const modelMessages = await convertToModelMessages(messages.slice(-HISTORY_WINDOW))
@@ -78,21 +80,24 @@ export async function POST(req: Request) {
       const inT = usage.inputTokens ?? 0
       const outT = usage.outputTokens ?? 0
       await Promise.all([
-        supabase.from("agent_usage").insert({
-          user_id: user.id,
-          tokens_input: inT,
-          tokens_output: outT,
-          duration_ms: Date.now() - startedAt,
-          success: true,
-          model: MODELS.default,
-          cost_usd: computeCostUsd(MODELS.default, inT, outT),
-        }),
+        supabase.from("agent_usage").insert(
+          withWorkspace(
+            {
+              user_id: user.id,
+              tokens_input: inT,
+              tokens_output: outT,
+              duration_ms: Date.now() - startedAt,
+              success: true,
+              model: MODELS.default,
+              cost_usd: computeCostUsd(MODELS.default, inT, outT),
+            },
+            workspaceId,
+          ),
+        ),
         // 이번 턴의 어시스턴트 답변만 저장(사용자 메시지는 위에서 선저장)
-        supabase.from("assistant_messages").insert({
-          conversation_id: convId,
-          role: "assistant",
-          content: text,
-        }),
+        supabase.from("assistant_messages").insert(
+          withWorkspace({ conversation_id: convId, role: "assistant", content: text }, workspaceId),
+        ),
         supabase
           .from("assistant_conversations")
           .update({ updated_at: new Date().toISOString() })
@@ -101,13 +106,18 @@ export async function POST(req: Request) {
     },
     async onError({ error }) {
       // 사용자 메시지는 이미 선저장됨. 실패 사용량 기록(관측성).
-      await supabase.from("agent_usage").insert({
-        user_id: user.id,
-        duration_ms: Date.now() - startedAt,
-        success: false,
-        error_message: error instanceof Error ? error.message : String(error),
-        model: MODELS.default,
-      })
+      await supabase.from("agent_usage").insert(
+        withWorkspace(
+          {
+            user_id: user.id,
+            duration_ms: Date.now() - startedAt,
+            success: false,
+            error_message: error instanceof Error ? error.message : String(error),
+            model: MODELS.default,
+          },
+          workspaceId,
+        ),
+      )
     },
   })
 

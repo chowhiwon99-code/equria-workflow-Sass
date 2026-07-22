@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { normalizeGraph, topoOrder } from "@/lib/workflows"
 import { isSafeWebhookUrl, MAX_RUN_NODES } from "@/lib/workflowTools"
 import { safeFetch } from "@/lib/safeFetch"
+import { getUserWorkspaceId, withWorkspace } from "@/lib/workspace"
 import { connectMcp, resolveUserConnectionConfig } from "@/lib/mcp/connect"
 import { computeCostUsd } from "@/lib/pricing"
 import { checkBudget, PER_RUN_MAX_USD, BUDGET_EXCEEDED_MSG } from "@/lib/budget"
@@ -95,6 +96,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
   const mcpServerById = new Map(mcpServerRows.map((s) => [s.id, s]))
 
+  // B1-b: 이후 workflow_runs·files·notifications·agent_usage INSERT에 명시할 워크스페이스 id.
+  const workspaceId = await getUserWorkspaceId(supabase, user.id)
+
   const startedAt = Date.now()
   const encoder = new TextEncoder()
   const stream = new ReadableStream({
@@ -107,13 +111,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       let runId: string | null = null
       const { data: runRow } = await supabase
         .from("workflow_runs")
-        .insert({
-          workflow_id: id,
-          user_id: user.id,
-          input: userInput || null,
-          status: "running",
-          node_count: topo.order.length,
-        })
+        .insert(
+          withWorkspace(
+            {
+              workflow_id: id,
+              user_id: user.id,
+              input: userInput || null,
+              status: "running",
+              node_count: topo.order.length,
+            },
+            workspaceId,
+          ),
+        )
         .select("id")
         .maybeSingle()
       runId = runRow?.id ?? null
@@ -310,14 +319,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
                   .from("files")
                   .upload(path, text, { contentType: "text/markdown", upsert: false })
                 if (upErr) throw upErr
-                const { error: insErr } = await supabase.from("files").insert({
-                  source: "workflow",
-                  name: `${node.agent_name || "워크플로우"} 결과.md`,
-                  mime_type: "text/markdown",
-                  size_bytes: new TextEncoder().encode(text).length,
-                  owner_id: user.id,
-                  metadata: { storage_path: path },
-                })
+                const { error: insErr } = await supabase.from("files").insert(
+                  withWorkspace(
+                    {
+                      source: "workflow",
+                      name: `${node.agent_name || "워크플로우"} 결과.md`,
+                      mime_type: "text/markdown",
+                      size_bytes: new TextEncoder().encode(text).length,
+                      owner_id: user.id,
+                      metadata: { storage_path: path },
+                    },
+                    workspaceId,
+                  ),
+                )
                 // 행 생성 실패 시 방금 올린 파일을 정리(고아 방지) 후 실패로 보고 — 이전엔 에러를 삼켜 거짓 성공.
                 if (insErr) {
                   await supabase.storage.from("files").remove([path])
@@ -330,13 +344,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             } else if (tool?.type === "notify") {
               // 결과를 실행자 본인 알림으로 전송(NotificationBell에 노출).
               try {
-                const { error: notifErr } = await supabase.from("notifications").insert({
-                  user_id: user.id,
-                  type: "workflow",
-                  title: `워크플로우 완료 — ${node.agent_name || "단계"}`,
-                  body: text.slice(0, 280),
-                  link: `/workflows/${id}`,
-                })
+                const { error: notifErr } = await supabase.from("notifications").insert(
+                  withWorkspace(
+                    {
+                      user_id: user.id,
+                      type: "workflow",
+                      title: `워크플로우 완료 — ${node.agent_name || "단계"}`,
+                      body: text.slice(0, 280),
+                      link: `/workflows/${id}`,
+                    },
+                    workspaceId,
+                  ),
+                )
                 if (notifErr) throw notifErr
                 toolNote = "알림 전송됨 🔔"
               } catch (e) {
@@ -350,15 +369,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             // 사용량 로깅(best-effort, 실패 무시) + 실행당 누적 비용
             const nodeCost = computeCostUsd(v.model, u.inputTokens ?? 0, u.outputTokens ?? 0)
             runCostUsd += nodeCost
-            await supabase.from("agent_usage").insert({
-              agent_id: node.agent_id,
-              user_id: user.id,
-              tokens_input: u.inputTokens ?? 0,
-              tokens_output: u.outputTokens ?? 0,
-              success: true,
-              model: v.model,
-              cost_usd: nodeCost,
-            })
+            await supabase.from("agent_usage").insert(
+              withWorkspace(
+                {
+                  agent_id: node.agent_id,
+                  user_id: user.id,
+                  tokens_input: u.inputTokens ?? 0,
+                  tokens_output: u.outputTokens ?? 0,
+                  success: true,
+                  model: v.model,
+                  cost_usd: nodeCost,
+                },
+                workspaceId,
+              ),
+            )
 
             // 실행당 비용 상한 — 누적이 상한을 넘으면 즉시 중단(폭주 방지).
             if (runCostUsd > PER_RUN_MAX_USD) {
@@ -372,12 +396,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             const msg = err instanceof Error ? err.message : "에이전트 호출 실패"
             nodeResults.push({ nodeId: node.id, agent_name: node.agent_name, status: "error", error: msg })
             // 실패도 사용량에 기록(기존엔 성공만 기록하던 갭 해소)
-            await supabase.from("agent_usage").insert({
-              agent_id: node.agent_id,
-              user_id: user.id,
-              success: false,
-              error_message: msg,
-            })
+            await supabase.from("agent_usage").insert(
+              withWorkspace(
+                {
+                  agent_id: node.agent_id,
+                  user_id: user.id,
+                  success: false,
+                  error_message: msg,
+                },
+                workspaceId,
+              ),
+            )
             await finalizeRun("error", { error: `${node.agent_name || "단계"}에서 중단됨: ${msg}` })
             send({ type: "node", nodeId: node.id, status: "error", error: msg })
             send({ type: "error", error: `${node.agent_name || "단계"}에서 중단됨: ${msg}` })
