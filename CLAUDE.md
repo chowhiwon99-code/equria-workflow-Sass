@@ -138,28 +138,29 @@ equria-workspace/
 
 ---
 
-## 6. DB 스키마 요약 (약 53개 테이블 · 마이그 001~098)
+## 6. DB 스키마 요약 (약 55개 테이블 · 마이그 001~103)
 
 | 영역 | 테이블 |
 |------|--------|
 | 직원/인증 | `profiles` |
-| 에이전트 | `agents` · `agent_versions` · `user_agent_pins` · `agent_usage` |
+| 에이전트 | `agents` · `agent_versions` · `user_agent_pins` · `agent_usage` · `agent_knowledge`(지식파일·마이그097·`is_personal` 100) · `agent_memories`(개인 기억·마이그099) |
 | 에이전트 대화 | `conversations` · `messages` |
 | 어시스턴트(대시보드) | `assistant_conversations` · `assistant_messages` |
 | 팀 채팅(DM) | `direct_conversations` · `direct_messages` · `message_attachments` · `message_reactions` |
 | 그룹 채팅 | `group_rooms` · `group_messages` · `group_message_attachments` · `group_message_reactions` · `group_read_state` · `room_members` (전체방+다중방·읽음, 마이그 071~075) |
 | 워크플로우 | `workflows` · `workflow_runs` |
 | 캘린더 | `calendar_events` |
-| MCP | `mcp_servers` · `mcp_tools` |
+| MCP | `mcp_servers` · `mcp_tools` · `mcp_user_connections`(개인연결·마이그088) · `mcp_oauth_clients`(DCR·`redirect_uri` 자가치유 102) |
+| 프로젝트/개인 | `projects` · `project_members` · `project_tasks`(094) · `personal_tasks`(092) |
+| 테넌시 | `workspaces` · `workspace_members`(회사 격리·마이그030~) |
 | 파일/문서 | `files` · `business_cards` · `tax_invoices` |
 | 회의 | `meeting_notes` · `meeting_note_folders` · `meeting_categories`(분류·중요도, 마이그 070) |
 | 재무 | `finance_entries` · `fx_rates`(환율) |
 | 현금흐름(손익) | `cash_accounts`(슬롯) · `cash_transfers` · `cash_categories`(그룹) · `cashflow_settings` · `cash_calc_types`(회사 계산 유형·AST 수식) (마이그 078~085) |
-| 프로젝트 | `projects` · `project_members` |
 | 알림 | `notifications` |
 | 구글 연동 | `google_connections` |
 
-> 전체 SQL: `supabase/migrations/` (001~095). 원격 적용·drift 없음. **세부 진행상황·최신 변경은 HANDOFF.md가 SSOT.**
+> 전체 SQL: `supabase/migrations/` (001~103). 원격 적용·drift 없음. **세부 진행상황·최신 변경은 HANDOFF.md가 SSOT.**
 > 기본 에이전트 8개 시드: `supabase/seed.sql` 참고
 
 ---
