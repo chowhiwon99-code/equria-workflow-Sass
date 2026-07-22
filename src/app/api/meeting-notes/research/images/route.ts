@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
-import { safeHttpUrl } from "@/lib/safeFetch"
+import { safeFetch } from "@/lib/safeFetch"
 
 export const runtime = "nodejs"
 export const maxDuration = 30
@@ -48,17 +48,17 @@ export async function POST(req: Request) {
 
   const results = await Promise.all(
     urls.map(async (raw): Promise<Candidate[]> => {
-      const url = safeHttpUrl(raw)
-      if (!url) return []
       try {
-        const res = await fetch(url.href, {
+        // safeFetch = URL검증 + DNS 공인검증 + 리다이렉트 매 홉 재검증. 무효/차단 시 throw→[].
+        const res = await safeFetch(raw, {
           headers: { "User-Agent": "Mozilla/5.0 (compatible; EQURIA-bot)" },
           signal: AbortSignal.timeout(8000),
         })
         if (!res.ok || !(res.headers.get("content-type") ?? "").includes("text/html")) return []
         const html = (await res.text()).slice(0, 600000)
         const title = html.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1]?.trim()
-        return extractImages(html, url).map((image) => ({ image, source: url.href, title }))
+        const base = new URL(res.url) // 리다이렉트 후 최종 URL을 상대경로 기준으로
+        return extractImages(html, base).map((image) => ({ image, source: base.href, title }))
       } catch {
         return []
       }

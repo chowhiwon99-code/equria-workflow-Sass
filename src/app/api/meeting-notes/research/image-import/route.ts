@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { safeHttpUrl } from "@/lib/safeFetch"
+import { safeHttpUrl, safeFetch } from "@/lib/safeFetch"
 
 export const runtime = "nodejs"
 export const maxDuration = 30
@@ -25,11 +25,12 @@ export async function POST(req: Request) {
   if (!user) return new Response("Unauthorized", { status: 401 })
 
   const body = (await req.json().catch(() => null)) as { url?: unknown } | null
-  const url = typeof body?.url === "string" ? safeHttpUrl(body.url) : null
-  if (!url) return new Response("Bad Request", { status: 400 })
+  // 문자열 단계 사전검증(명백히 잘못된 URL은 400) — 실제 네트워크는 safeFetch가 DNS·리다이렉트까지 재검증.
+  if (typeof body?.url !== "string" || !safeHttpUrl(body.url)) return new Response("Bad Request", { status: 400 })
+  const target = body.url
 
   try {
-    const res = await fetch(url.href, {
+    const res = await safeFetch(target, {
       headers: { "User-Agent": "Mozilla/5.0 (compatible; EQURIA-bot)" },
       signal: AbortSignal.timeout(10000),
     })
