@@ -63,19 +63,19 @@ export function ProjectsView() {
   const me = useCurrentUserId()
   const { push } = useUndo()
 
-  // 프로젝트 삭제 = 소프트삭제(deleted_at). 생성자 카드에만 노출 + Undo 복구.
+  // 프로젝트 삭제 = 하드삭제(기존 DELETE RLS=created_by, 마이그 불필요·즉시 동작).
+  // FK: members/tasks=CASCADE(정상), finance/files/calendar=SET NULL(데이터 보존). 생성자 카드에만 노출 + Undo(행 재삽입).
   const deleteProject = async (p: ProjectRow) => {
-    const now = new Date().toISOString()
-    await mustOk(supabase.from("projects").update({ deleted_at: now }).eq("id", p.id))
+    await mustOk(supabase.from("projects").delete().eq("id", p.id))
     setProjects((prev) => prev.filter((x) => x.id !== p.id))
     push({
       label: "프로젝트 삭제",
       undo: async () => {
-        await mustOk(supabase.from("projects").update({ deleted_at: null }).eq("id", p.id))
+        await mustOk(supabase.from("projects").insert(p))
         load()
       },
       redo: async () => {
-        await mustOk(supabase.from("projects").update({ deleted_at: now }).eq("id", p.id))
+        await mustOk(supabase.from("projects").delete().eq("id", p.id))
         setProjects((prev) => prev.filter((x) => x.id !== p.id))
       },
     })
