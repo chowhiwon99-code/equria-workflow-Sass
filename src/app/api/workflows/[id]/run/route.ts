@@ -3,6 +3,7 @@ import { anthropic } from "@/lib/claude/client"
 import { createClient } from "@/lib/supabase/server"
 import { normalizeGraph, topoOrder } from "@/lib/workflows"
 import { isSafeWebhookUrl, MAX_RUN_NODES } from "@/lib/workflowTools"
+import { safeFetch } from "@/lib/safeFetch"
 import { connectMcp, resolveUserConnectionConfig } from "@/lib/mcp/connect"
 import { computeCostUsd } from "@/lib/pricing"
 import { checkBudget, PER_RUN_MAX_USD, BUDGET_EXCEEDED_MSG } from "@/lib/budget"
@@ -283,7 +284,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
                 toolNote = `웹훅 차단됨: ${safe.reason}`
               } else {
                 try {
-                  const resp = await fetch(tool.url, {
+                  // maxRedirects:0 — 웹훅은 리다이렉트 금지(공개주소→내부IP 302 우회 차단) + DNS 공인검증.
+                  const resp = await safeFetch(tool.url, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -293,6 +295,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
                       output: text,
                     }),
                     signal: AbortSignal.timeout(15000),
+                    maxRedirects: 0,
                   })
                   toolNote = `웹훅 전송 → HTTP ${resp.status}`
                 } catch (e) {
@@ -307,7 +310,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
                   .from("files")
                   .upload(path, text, { contentType: "text/markdown", upsert: false })
                 if (upErr) throw upErr
-                await supabase.from("files").insert({
+                const { error: insErr } = await supabase.from("files").insert({
                   source: "workflow",
                   name: `${node.agent_name || "워크플로우"} 결과.md`,
                   mime_type: "text/markdown",
@@ -315,6 +318,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
                   owner_id: user.id,
                   metadata: { storage_path: path },
                 })
+                // 행 생성 실패 시 방금 올린 파일을 정리(고아 방지) 후 실패로 보고 — 이전엔 에러를 삼켜 거짓 성공.
+                if (insErr) {
+                  await supabase.storage.from("files").remove([path])
+                  throw insErr
+                }
                 toolNote = "파일로 저장됨 → 파일 관리"
               } catch (e) {
                 toolNote = `파일 저장 실패: ${e instanceof Error ? e.message : "오류"}`
