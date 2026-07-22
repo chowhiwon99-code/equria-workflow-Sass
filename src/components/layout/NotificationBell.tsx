@@ -64,12 +64,14 @@ export function NotificationBell({ userId }: { userId: string }) {
   const unread = items.filter((n) => !n.is_read).length
 
   // 클릭 = 즉시 닫고 이동(이동을 DB 쓰기에 막지 않음). 읽음 처리는 낙관적 + 백그라운드.
-  const open = (n: Notification) => {
+  const open = async (n: Notification) => {
     setMenuOpen(false)
     if (n.link) router.push(n.link)
     if (!n.is_read) {
       setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, is_read: true } : x)))
-      void supabase.from("notifications").update({ is_read: true }).eq("id", n.id)
+      // lazy thenable — await로 실제 전송(안 하면 새로고침 시 배지가 다시 안 읽음으로, safe-changes §5).
+      const { error } = await supabase.from("notifications").update({ is_read: true }).eq("id", n.id)
+      if (error) console.error("[notif] 읽음 저장 실패:", error.message)
     }
   }
 
