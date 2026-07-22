@@ -5,6 +5,22 @@
 
 ---
 
+## 2026-07-22 · 세션36 — 맹점 5종 수정 배포 (신뢰성 4 + 보안 SSRF 1) + 마이그104
+
+**무엇/왜:** 대표 요청 "맹점 파악·우선순위대로 하나씩 수정". 코드 3병렬 감사(API보안·멀티테넌시 쓰기격리·AI/신뢰성)로 발견한 **실사용 버그·보안구멍**을 우선순위대로 수정. 매 수정 **본보기 코드(Before→After)** 제시. tsc0·lint30/0·build0·main-first.
+
+- **#1 워크플로우 도구 CHECK 위반 (HIGH · 마이그104)**: `save_file`(source='workflow')·`notify`(type='workflow')가 CHECK 제약에 없어 매번 INSERT 실패 → 파일은 `files` 버킷에 **고아**로 남고 "저장됨" **거짓 보고**(save_file은 insert 에러조차 미캡처였음). 관례대로 CHECK 확장(files 004·notif 076 기준으로 'workflow' 추가) + `run/route.ts` insert 에러 캡처·실패 시 고아 파일 `remove`. UI는 이미 `lib/files.ts`에 "워크플로우 결과" 라벨 보유 → 값만 열어주면 정합. **마이그104는 이 세션 Supabase MCP/CLI 부재로 프로덕션 SQL Editor에 대표가 직접 적용 완료(Success).**
+- **#2 채팅 비용 과소집계 (HIGH)**: MCP 다단계(도구) 에이전트가 `usage`(마지막 스텝만)로 과금 → `totalUsage ?? usage` 합산(`run/route.ts:274`와 동일). 예산 한도 정확도 회복.
+- **#3 OAuth 토큰 저장 (MED · Gmail/Notion 끊김 유력원인)**: `google/client.ts` `auth.on("tokens", …)`가 `void admin.update()`라 **HTTP 미전송**(lazy thenable, safe-changes §5) → 회전 refresh_token 유실 → 시간 지나면 Gmail/Drive 조용히 끊김. 핸들러 async+await로 실제 저장 + 에러 로깅.
+- **#4 알림 읽음 저장 (MED)**: `NotificationBell.open()`도 동일 `void update()` → 새로고침 시 배지 오표시. async+await로 수정(`markAllRead`는 이미 정상이라 불일치 해소).
+- **#10 SSRF 하드닝 (MED)**: 가드(`safeHttpUrl`/`isSafeWebhookUrl`)가 **최초 URL 호스트명 문자열만** 검사 → 302 리다이렉트·DNS 리바인딩으로 내부IP(169.254.169.254 등) 우회 가능. 공용 **`safeFetch`**(`lib/safeFetch`): ① DNS 실제 IP 공인검증(v4/v6 사설·loopback·링크로컬·CGNAT·IPv4-mapped) ② 리다이렉트를 fetch에 안 맡기고 **수동 매 홉 재검증**. 웹훅=`maxRedirects:0`(리다이렉트 차단), 리서치 이미지 2곳=3홉(CDN 허용·재검증). 3 sink(webhook·research/images·image-import) 배선.
+
+**예상이슈 체크(수행):** ① 마이그104 미적용 상태로 코드 배포해도 무해 — save_file이 이제 깔끔히 실패처리+고아정리(적용 후 정상저장). ② `open()` async화 → 호출부 `onClick={() => open(n)}`라 반환 promise 무시=안전. ③ `safeFetch`의 `redirect:"manual"`은 Node(undici) fetch에서 3xx 실제 응답+Location 반환(브라우저 opaque와 다름) — 수동 추적 성립. ④ 잔여 위험: check→connect 사이 초고속 DNS-flip 리바인딩은 IP핀 없이는 잔여(LOW·내부툴, known-issues I18). 검증 tsc0·lint30/0·build0.
+
+**롤백:** 직전 프로덕션 **`a0e86bd`**. 마이그104 롤백=두 constraint 배열에서 'workflow'만 제거 재적용.
+
+---
+
 ## 2026-07-16 · 세션35 — P2.2 출력형식 재설계 + 채팅 진입 하단 스크롤(4곳) + 학습/기억 기획 착수
 
 **무엇/왜:** ① 세션34 다음 우선순위 P2.2 진행 ② 대표 지시 "채팅 들어가면 바로 최근 대화(하단)에 있어야 함" ③ 대표 신규 방향: 예시 갤러리 불필요·개인 맞춤 우선 + **작업할수록 학습/기억(많은 사용자에도 스케일)** + 결과물 저장·확인 + 기술 병목 분석 후 기획·설계.
