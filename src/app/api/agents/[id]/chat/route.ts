@@ -200,9 +200,11 @@ export async function POST(
         closeMcp(),
       ])
     },
-    async onFinish({ text, usage }) {
-      const inputTokens = usage.inputTokens ?? 0
-      const outputTokens = usage.outputTokens ?? 0
+    async onFinish({ text, usage, totalUsage }) {
+      // 다단계(MCP 도구) 실행이면 totalUsage가 전 스텝 합산 — 비용/토큰은 합산 기준(워크플로우 run 라우트와 동일).
+      const u = totalUsage ?? usage
+      const inputTokens = u.inputTokens ?? 0
+      const outputTokens = u.outputTokens ?? 0
 
       await Promise.all([
         supabase.from("messages").insert({
