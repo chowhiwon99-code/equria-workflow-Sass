@@ -7,6 +7,7 @@ import { AgentChatProvider } from "@/components/agent-chat/AgentChatContext"
 import { FloatingAgentChat } from "@/components/agent-chat/FloatingAgentChat"
 import { UndoProvider } from "@/components/undo/UndoProvider"
 import { CurrentUserProvider } from "@/components/auth/CurrentUserProvider"
+import { WorkspaceProvider, type WorkspaceSummary } from "@/components/workspace/WorkspaceProvider"
 import { PageTransition } from "@/components/layout/PageTransition"
 import { Toaster } from "@/components/ui/sonner"
 
@@ -29,8 +30,26 @@ export default async function AppLayout({
     .eq("id", user.id)
     .single()
 
+  // B1-b Step 0: 내가 속한 워크스페이스(회사)를 RLS로 로드 → 클라 컨텍스트로 주입.
+  // 멤버십 순서를 보존해 첫 번째를 현재 워크스페이스 기본값으로. (단일 테넌트면 equria 1개)
+  const { data: mems } = await supabase
+    .from("workspace_members")
+    .select("workspace_id")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: true })
+  const orderedIds = (mems ?? []).map((m) => m.workspace_id)
+  const { data: wss } = orderedIds.length
+    ? await supabase.from("workspaces").select("id, name, slug").in("id", orderedIds)
+    : { data: [] as WorkspaceSummary[] }
+  const byId = new Map((wss ?? []).map((w) => [w.id, w]))
+  const workspaces = orderedIds
+    .map((id) => byId.get(id))
+    .filter((w): w is WorkspaceSummary => !!w)
+  const initialWorkspaceId = workspaces[0]?.id ?? null
+
   return (
     <CurrentUserProvider userId={user.id}>
+      <WorkspaceProvider workspaces={workspaces} initialWorkspaceId={initialWorkspaceId}>
       <UndoProvider>
       <AgentChatProvider>
         {/* dvh: iOS 사파리 주소창이 가리는 만큼 실시간 보정(데스크톱은 vh와 동일) */}
@@ -51,6 +70,7 @@ export default async function AppLayout({
         <Toaster />
       </AgentChatProvider>
       </UndoProvider>
+      </WorkspaceProvider>
     </CurrentUserProvider>
   )
 }
