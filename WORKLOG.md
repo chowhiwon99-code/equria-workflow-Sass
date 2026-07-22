@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-07-22 · 세션36(이어서) — B1-b 착수 + 프로젝트 협업/허브 (대표 dogfood 피드백)
+
+**무엇/왜:** 맹점 배포 후 대표 실사용 피드백으로 연속 작업. 매 건 본보기코드+검증(tsc0·lint29~30/0·build0).
+
+- **B1-b 쓰기격리 착수(무위험)**: `WorkspaceProvider`/`useWorkspace`(Step0, 서버레이아웃 멤버십 로드) + `lib/workspace.ts`(`getUserWorkspaceId`·`withWorkspace`) → **AI 대화·사용량 도메인 서버 22곳**에 `workspace_id` 명시(Step1a: chat·assistant·cashflow-coach·workflows/run·리서치5). 단일 테넌트엔 값==DEFAULT라 동작 변화 0. 감사 finding 1D(agent_usage 예산우회) 선제 해소. 남은 도메인(client·projects·finance 등 ~50곳)·DEFAULT 제거는 후속.
+- **프로젝트 협업 개선(마이그105)**: `projects_update` RLS에 project_members OR 추가(멤버도 중요도/상태 변경) + `deleted_at`(소프트삭제) + `notes`(참고사항) + 상태 배지 **점→아이콘**(완료=CircleCheck 등) + 목록/상세 삭제 버튼(생성자). ⚠️마이그105 프로덕션 직접적용 필요.
+- **프로젝트 삭제 하드전환**: 소프트삭제가 미적용 마이그105 컬럼 의존이라 안 되던 걸 **하드삭제(기존 DELETE RLS=created_by, 마이그 불필요)** 로. FK 검증 = finance/files/calendar SET NULL(보존)·members/tasks CASCADE(정상). Undo=행 재삽입.
+- **프로젝트 상세 = 일정·정산 허브(죽은 요약카드 살리기)**: 요약카드 3개가 연결 UI 부재로 항상 0이던 근본원인 규명(2병렬 조사) → ① 연결된 일정 섹션(calendar_events.project_id 인라인 추가) ② 비용·매출 정산 섹션(FinanceEntryModal 재사용+projectId 주입, **통화별 합계+순익**, 통화 섞어 더하던 버그 수정=aggregateByCurrency+money) ③ 요약카드 라이브+클릭 스크롤. **마이그 불필요**(project_id 컬럼 이미 존재). 계획=`~/.claude/plans/snazzy-booping-muffin.md`.
+
+---
+
 ## 2026-07-22 · 세션36 — 맹점 5종 수정 배포 (신뢰성 4 + 보안 SSRF 1) + 마이그104
 
 **무엇/왜:** 대표 요청 "맹점 파악·우선순위대로 하나씩 수정". 코드 3병렬 감사(API보안·멀티테넌시 쓰기격리·AI/신뢰성)로 발견한 **실사용 버그·보안구멍**을 우선순위대로 수정. 매 수정 **본보기 코드(Before→After)** 제시. tsc0·lint30/0·build0·main-first.
