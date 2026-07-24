@@ -97,7 +97,7 @@ export const MCP_CONNECTORS: Connector[] = [
   { id: "slack", name: "Slack", description: "메시지·채널 조회·전송 (OAuth·앱 사전등록 필요)", emoji: "💬", domain: "slack.com", category: "커뮤니케이션", status: "coming_soon", scope: "user" },
   { id: "figma", name: "Figma", description: "디자인 파일·코드 커넥트 (OAuth·승인된 클라이언트 전용)", emoji: "🎨", domain: "figma.com", category: "디자인", status: "coming_soon", scope: "user" },
   { id: "vercel", name: "Vercel", description: "배포·프로젝트 관리 (OAuth·승인된 클라이언트 전용)", emoji: "▲", domain: "vercel.com", category: "개발", status: "coming_soon", scope: "user" },
-  { id: "exa", name: "Exa", description: "AI 웹 검색 (API 키 헤더 방식이 프리셋과 상이)", emoji: "🔎", domain: "exa.ai", category: "데이터", status: "coming_soon", scope: "user" },
+  { id: "exa", name: "Exa", description: "AI 웹 검색 (내 API 키)", emoji: "🔎", domain: "exa.ai", category: "데이터", status: "available", scope: "user", preset: { type: "http", url: "https://mcp.exa.ai/mcp", auth: "bearer", tokenHelpUrl: "https://dashboard.exa.ai/api-keys" } },
   { id: "zapier", name: "Zapier", description: "6천+ 앱 자동화 (계정별 전용 URL 필요)", emoji: "⚡", domain: "zapier.com", category: "생산성", status: "coming_soon", scope: "user" },
   { id: "paypal", name: "PayPal", description: "결제·거래 조회 (OAuth·DCR 미확인)", emoji: "🅿️", domain: "paypal.com", category: "데이터", status: "coming_soon", scope: "user" },
 ]
