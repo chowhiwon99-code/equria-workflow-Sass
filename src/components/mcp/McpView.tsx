@@ -12,7 +12,7 @@ import { Modal, fieldClass } from "@/components/shared/Modal"
 import { Loading, ErrorState } from "@/components/shared/States"
 import { cn } from "@/lib/utils"
 import { Select } from "@/components/shared/Select"
-import { MCP_CONNECTORS, CONNECTOR_CATEGORIES, MCP_TOOL_KO, type Connector } from "@/lib/mcp"
+import { MCP_CONNECTORS, CONNECTOR_CATEGORIES, MCP_TOOL_KO, credentialKeyFor, type Connector } from "@/lib/mcp"
 import { ConnectorLogo } from "./ConnectorLogo"
 
 type Server = {
@@ -46,6 +46,8 @@ export function McpView() {
   const [servers, setServers] = useState<Server[]>([])
   const [tools, setTools] = useState<Record<string, Tool[]>>({})
   const [userConnections, setUserConnections] = useState<UserConnection[]>([])
+  // 대표가 앱 크리덴셜을 등록해둔 그룹(구글·Slack·PayPal) — 이게 있어야 requiresAppCredential 커넥터를 연결할 수 있음.
+  const [configuredCreds, setConfiguredCreds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [testing, setTesting] = useState<string | null>(null)
@@ -66,9 +68,10 @@ export function McpView() {
 
   const load = useCallback(async () => {
     try {
-      const [srvRes, connRes] = await Promise.all([
+      const [srvRes, connRes, credRes] = await Promise.all([
         fetch("/api/mcp/servers"),
         fetch("/api/mcp/user-connections"),
+        fetch("/api/mcp/oauth-clients"),
       ])
       if (!srvRes.ok) throw new Error("MCP 서버 목록을 불러오지 못했어요.")
       const srvJson = await srvRes.json()
@@ -77,6 +80,10 @@ export function McpView() {
       if (connRes.ok) {
         const connJson = await connRes.json()
         setUserConnections(connJson.connections ?? [])
+      }
+      if (credRes.ok) {
+        const credJson = (await credRes.json()) as { groups?: { key: string; configured: boolean }[] }
+        setConfiguredCreds(new Set((credJson.groups ?? []).filter((g) => g.configured).map((g) => g.key)))
       }
       setError(null)
     } catch (e) {
@@ -298,6 +305,8 @@ export function McpView() {
 
   const renderCard = (c: Connector) => {
     const connected = isConnected(c)
+    // 구글·Slack·PayPal은 대표가 OAuth 앱 크리덴셜을 먼저 넣어야 직원이 연결 가능. 미설정이면 안내만.
+    const needsCred = !!c.requiresAppCredential && !configuredCreds.has(credentialKeyFor(c))
     return (
       <div key={c.id} className="flex min-w-0 flex-col gap-2 rounded-xl glass p-4">
         <div className="flex items-center gap-2.5">
@@ -312,6 +321,10 @@ export function McpView() {
             <span className="shrink-0 text-[11px] font-medium text-success">연결됨 ✓</span>
           ) : c.status === "coming_soon" ? (
             <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">준비 중</span>
+          ) : needsCred ? (
+            <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground" title="대표가 설정 → MCP 앱 크리덴셜에서 앱을 먼저 등록해야 해요">
+              관리자 설정 필요
+            </span>
           ) : c.scope === "user" || isAdmin ? (
             /* 개인 연결(scope=user)은 누구나 — 회사 공용은 관리자만. 연결은 폰에서 숨김(보기 전용, 대표 확정) */
             <Button
@@ -328,9 +341,11 @@ export function McpView() {
           )}
         </div>
         <p className="line-clamp-2 text-xs text-muted-foreground">{c.description}</p>
-        {c.scope === "user" && !connected && c.status === "available" && (
+        {needsCred ? (
+          <span className="text-[10px] text-muted-foreground/70">대표가 ‘설정 → MCP 앱 크리덴셜’에서 앱을 등록하면 연결할 수 있어요.</span>
+        ) : c.scope === "user" && !connected && c.status === "available" ? (
           <span className="text-[10px] text-muted-foreground/70">🔒 내 계정으로 연결 — 나만 보고 관리해요</span>
-        )}
+        ) : null}
       </div>
     )
   }
