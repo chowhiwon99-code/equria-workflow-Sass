@@ -1976,6 +1976,7 @@ export type Database = {
           client_secret: string | null
           connector_id: string
           created_at: string
+          is_static: boolean
           redirect_uri: string | null
         }
         Insert: {
@@ -1983,6 +1984,7 @@ export type Database = {
           client_secret?: string | null
           connector_id: string
           created_at?: string
+          is_static?: boolean
           redirect_uri?: string | null
         }
         Update: {
@@ -1990,6 +1992,7 @@ export type Database = {
           client_secret?: string | null
           connector_id?: string
           created_at?: string
+          is_static?: boolean
           redirect_uri?: string | null
         }
         Relationships: []
@@ -2109,6 +2112,7 @@ export type Database = {
           auth_method: string
           connector_id: string
           created_at: string
+          custom_url: string | null
           encrypted_refresh_token: string | null
           encrypted_token: string
           expires_at: string | null
@@ -2124,6 +2128,7 @@ export type Database = {
           auth_method?: string
           connector_id: string
           created_at?: string
+          custom_url?: string | null
           encrypted_refresh_token?: string | null
           encrypted_token: string
           expires_at?: string | null
@@ -2139,6 +2144,7 @@ export type Database = {
           auth_method?: string
           connector_id?: string
           created_at?: string
+          custom_url?: string | null
           encrypted_refresh_token?: string | null
           encrypted_token?: string
           expires_at?: string | null

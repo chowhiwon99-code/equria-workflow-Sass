@@ -30,6 +30,25 @@ export type Connector = {
     /** bearer일 때 "토큰 발급받기" 링크 — 해당 서비스의 토큰 발급 페이지로 안내(연결 모달에 노출) */
     tokenHelpUrl?: string
   }
+  /**
+   * oauth 커넥터 중 DCR(동적 클라이언트 등록) 미지원 서비스 — 대표가 OAuth 앱을 등록해
+   * client_id/secret을 설정(mcp_oauth_clients)해야만 직원이 연결할 수 있다(구글·Slack·PayPal).
+   * true인데 크리덴셜 미설정이면 UI가 "관리자 설정 필요"로 표시(연결 버튼 비활성).
+   */
+  requiresAppCredential?: boolean
+  /** mcp_oauth_clients 조회 키(기본=id). 구글 3형제(Gmail·Cal·Drive)가 하나의 "google" 크리덴셜을 공유하도록. */
+  credentialKey?: string
+  /** OAuth 인가 스코프(space-separated). 구글처럼 스코프 자동발견이 안 되는 서비스에 명시. */
+  oauthScope?: string
+  /** 인가 URL에 덧붙일 추가 파라미터. 구글: access_type=offline·prompt=consent(refresh_token 발급). */
+  authorizationParams?: Record<string, string>
+  /** 사용자가 접속 URL을 직접 입력하는 커넥터(예: Zapier 계정별 MCP URL). preset.url은 폴백/미사용. */
+  customUrl?: boolean
+}
+
+/** 커넥터의 크리덴셜 조회 키 — mcp_oauth_clients 행 키(공유 크리덴셜 그룹). 기본은 커넥터 id. */
+export function credentialKeyFor(connector: Pick<Connector, "id" | "credentialKey">): string {
+  return connector.credentialKey ?? connector.id
 }
 
 /** 알려진 MCP 도구의 한국어 설명(도구 이름 기준). 목록에 없으면 서버가 준 원문 설명을 그대로 노출. */
@@ -93,11 +112,67 @@ export const MCP_CONNECTORS: Connector[] = [
   { id: "wix", name: "Wix", description: "사이트·비즈니스 데이터 관리 (내 계정, OAuth)", emoji: "🔷", domain: "wix.com", category: "디자인", status: "available", scope: "user", preset: { type: "http", url: "https://mcp.wix.com/mcp", auth: "oauth" } },
   { id: "canva", name: "Canva", description: "디자인 검색·생성·내보내기 (내 계정, OAuth)", emoji: "🖼️", domain: "canva.com", category: "디자인", featured: true, status: "available", scope: "user", preset: { type: "http", url: "https://mcp.canva.com/mcp", auth: "oauth" } },
   { id: "prisma", name: "Prisma", description: "Prisma Postgres 데이터·스키마 (내 계정, OAuth)", emoji: "△", domain: "prisma.io", category: "데이터", status: "available", scope: "user", preset: { type: "http", url: "https://mcp.prisma.io/mcp", auth: "oauth" } },
-  // 준비 중 — DCR 미지원(대표가 개발자앱 등록) / 화이트리스트 게이트 / 인증 방식이 프리셋과 불일치. 무리한 연결 대신 카드만 노출.
-  { id: "slack", name: "Slack", description: "메시지·채널 조회·전송 (OAuth·앱 사전등록 필요)", emoji: "💬", domain: "slack.com", category: "커뮤니케이션", status: "coming_soon", scope: "user" },
+  // 🆕 구글 워크스페이스 — 공식 원격 MCP(Gmail·Cal·Drive). DCR 미지원 → 대표가 Google Cloud에 OAuth 앱 등록해
+  //    client_id/secret을 설정(mcp_oauth_clients)해야 연결됨. 3형제가 OAuth 앱 하나(credentialKey="google") 공유.
+  //    refresh_token 발급 위해 access_type=offline·prompt=consent 필요(연결 라우트에서 주입). 엔드포인트/스코프 실검증 2026-07-24.
+  { id: "google-gmail", name: "Gmail", description: "메일 검색·읽기·초안 작성 (내 계정, 대표 앱 등록)", emoji: "📧", domain: "gmail.com", category: "커뮤니케이션", featured: true, status: "available", scope: "user", requiresAppCredential: true, credentialKey: "google", oauthScope: "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.compose", authorizationParams: { access_type: "offline", prompt: "consent" }, preset: { type: "http", url: "https://gmailmcp.googleapis.com/mcp/v1", auth: "oauth" } },
+  { id: "google-calendar", name: "Google 캘린더", description: "일정 조회·한가한 시간 확인 (내 계정, 대표 앱 등록)", emoji: "📅", domain: "calendar.google.com", category: "생산성", status: "available", scope: "user", requiresAppCredential: true, credentialKey: "google", oauthScope: "https://www.googleapis.com/auth/calendar.events.readonly https://www.googleapis.com/auth/calendar.events.freebusy", authorizationParams: { access_type: "offline", prompt: "consent" }, preset: { type: "http", url: "https://calendarmcp.googleapis.com/mcp/v1", auth: "oauth" } },
+  { id: "google-drive", name: "Google 드라이브", description: "파일 검색·읽기 (내 계정, 대표 앱 등록)", emoji: "📁", domain: "drive.google.com", category: "문서", status: "available", scope: "user", requiresAppCredential: true, credentialKey: "google", oauthScope: "https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file", authorizationParams: { access_type: "offline", prompt: "consent" }, preset: { type: "http", url: "https://drivemcp.googleapis.com/mcp/v1", auth: "oauth" } },
+  // 🆕 Slack·PayPal — 공식 원격 MCP·DCR 미지원 → 대표 앱 등록(client_id/secret) 후 연결. 엔드포인트 실검증 2026-07-24.
+  { id: "slack", name: "Slack", description: "메시지·채널 조회·전송 (내 계정, 대표 앱 등록)", emoji: "💬", domain: "slack.com", category: "커뮤니케이션", status: "available", scope: "user", requiresAppCredential: true, credentialKey: "slack", authorizationParams: { prompt: "consent" }, preset: { type: "http", url: "https://mcp.slack.com/mcp", auth: "oauth" } },
+  { id: "paypal", name: "PayPal", description: "결제·거래 조회 (내 계정, 대표 앱 등록)", emoji: "🅿️", domain: "paypal.com", category: "데이터", status: "available", scope: "user", requiresAppCredential: true, credentialKey: "paypal", preset: { type: "http", url: "https://mcp.paypal.com/mcp", auth: "oauth" } },
+  // Zapier — 계정별 전용 MCP URL(사용자가 붙여넣기). URL 자체에 시크릿 포함 → 저장 스키마 별도 조정 필요(fast-follow). 지금은 카드만.
+  { id: "zapier", name: "Zapier", description: "6천+ 앱 자동화 (내 전용 MCP URL 붙여넣기 — 준비 중)", emoji: "⚡", domain: "zapier.com", category: "생산성", status: "coming_soon", scope: "user", customUrl: true },
+  // Exa — 개인 API 키(bearer). 대표 액션 0.
+  { id: "exa", name: "Exa", description: "AI 웹 검색 (내 API 키)", emoji: "🔎", domain: "exa.ai", category: "데이터", status: "available", scope: "user", preset: { type: "http", url: "https://mcp.exa.ai/mcp", auth: "bearer", tokenHelpUrl: "https://dashboard.exa.ai/api-keys" } },
+  // 준비 중 — 화이트리스트 게이트(승인된 client_name만) / 사실상 막힘. 무리한 연결 대신 카드만 노출.
   { id: "figma", name: "Figma", description: "디자인 파일·코드 커넥트 (OAuth·승인된 클라이언트 전용)", emoji: "🎨", domain: "figma.com", category: "디자인", status: "coming_soon", scope: "user" },
   { id: "vercel", name: "Vercel", description: "배포·프로젝트 관리 (OAuth·승인된 클라이언트 전용)", emoji: "▲", domain: "vercel.com", category: "개발", status: "coming_soon", scope: "user" },
-  { id: "exa", name: "Exa", description: "AI 웹 검색 (내 API 키)", emoji: "🔎", domain: "exa.ai", category: "데이터", status: "available", scope: "user", preset: { type: "http", url: "https://mcp.exa.ai/mcp", auth: "bearer", tokenHelpUrl: "https://dashboard.exa.ai/api-keys" } },
-  { id: "zapier", name: "Zapier", description: "6천+ 앱 자동화 (계정별 전용 URL 필요)", emoji: "⚡", domain: "zapier.com", category: "생산성", status: "coming_soon", scope: "user" },
-  { id: "paypal", name: "PayPal", description: "결제·거래 조회 (OAuth·DCR 미확인)", emoji: "🅿️", domain: "paypal.com", category: "데이터", status: "coming_soon", scope: "user" },
 ]
+
+/** 대표가 OAuth 앱을 등록해 client_id/secret을 넣어야 연결되는 크리덴셜 그룹(설정 화면 SSOT).
+ *  여러 커넥터가 한 앱을 공유(구글 3형제 = 하나의 "google" 앱). requiresAppCredential 커넥터를 credentialKey로 묶는다. */
+export type AppCredentialGroup = {
+  key: string
+  label: string
+  /** 개발자 콘솔 링크(대표가 앱 등록하러 가는 곳) */
+  setupUrl: string
+  /** 무엇을 등록하는지 짧은 안내(스코프·주의) */
+  help: string
+  connectorIds: string[]
+}
+
+const APP_CREDENTIAL_META: Record<string, { label: string; setupUrl: string; help: string }> = {
+  google: {
+    label: "Google Workspace (Gmail·캘린더·드라이브)",
+    setupUrl: "https://console.cloud.google.com/apis/credentials",
+    help: "Google Cloud → OAuth 동의화면 구성 → '웹 애플리케이션' OAuth 클라이언트 ID 생성. 아래 리디렉션 URI 3개와 각 커넥터의 스코프를 동의화면에 등록하세요. 앱이 '테스트' 모드면 refresh 토큰이 7일 만에 만료되니 '게시(프로덕션)'로 전환하세요.",
+  },
+  slack: {
+    label: "Slack",
+    setupUrl: "https://api.slack.com/apps",
+    help: "api.slack.com에서 앱을 만들고, 아래 리디렉션 URI를 OAuth Redirect URLs에 등록한 뒤 client_id/secret을 넣으세요.",
+  },
+  paypal: {
+    label: "PayPal",
+    setupUrl: "https://developer.paypal.com/dashboard/applications",
+    help: "developer.paypal.com에서 앱을 만들고 아래 리디렉션 URI를 등록한 뒤 client_id/secret을 넣으세요.",
+  },
+}
+
+/** requiresAppCredential 커넥터를 credentialKey로 묶어 크리덴셜 그룹 목록을 만든다(설정·게이팅 공용). */
+export function appCredentialGroups(): AppCredentialGroup[] {
+  const byKey = new Map<string, string[]>()
+  for (const c of MCP_CONNECTORS) {
+    if (!c.requiresAppCredential) continue
+    const k = credentialKeyFor(c)
+    byKey.set(k, [...(byKey.get(k) ?? []), c.id])
+  }
+  const groups: AppCredentialGroup[] = []
+  for (const [key, connectorIds] of byKey) {
+    const meta = APP_CREDENTIAL_META[key]
+    if (!meta) continue
+    groups.push({ key, label: meta.label, setupUrl: meta.setupUrl, help: meta.help, connectorIds })
+  }
+  return groups
+}

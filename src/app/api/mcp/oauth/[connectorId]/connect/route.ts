@@ -31,6 +31,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ connect
       throw new Error("인가 URL 생성 실패")
     }
 
+    // 커넥터별 추가 인가 파라미터 주입 — 구글은 refresh_token을 받으려면 access_type=offline·prompt=consent가 필요.
+    // (@ai-sdk/mcp의 startAuthorization은 offline_access 스코프만 처리하고 구글식 access_type은 안 붙임.)
+    if (connector.authorizationParams) {
+      for (const [k, v] of Object.entries(connector.authorizationParams)) {
+        provider.savedAuthUrl.searchParams.set(k, v)
+      }
+    }
+
     const payload = Buffer.from(
       JSON.stringify({ connectorId, state: provider.savedState, codeVerifier: provider.savedCodeVerifier })
     ).toString("base64url")

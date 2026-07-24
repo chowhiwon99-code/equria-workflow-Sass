@@ -5,6 +5,7 @@
 import type { OAuthClientProvider, OAuthClientInformation, OAuthClientMetadata, OAuthTokens } from "@ai-sdk/mcp"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { encryptToken, decryptToken } from "@/lib/google/crypto"
+import { MCP_CONNECTORS, credentialKeyFor } from "@/lib/mcp"
 
 function appUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
@@ -14,37 +15,58 @@ export function oauthRedirectUrl(connectorId: string): string {
   return `${appUrl()}/api/mcp/oauth/${connectorId}/callback`
 }
 
+/** 커넥터의 크리덴셜 조회 키 — 여러 커넥터가 한 OAuth 앱을 공유(구글 3형제)할 수 있어 id와 다를 수 있다. */
+function credKey(connectorId: string): string {
+  const c = MCP_CONNECTORS.find((x) => x.id === connectorId)
+  return c ? credentialKeyFor(c) : connectorId
+}
+
 function clientMetadataFor(connectorId: string): OAuthClientMetadata {
+  const c = MCP_CONNECTORS.find((x) => x.id === connectorId)
   return {
     redirect_uris: [oauthRedirectUrl(connectorId)],
     client_name: "Complow 워크스페이스",
     grant_types: ["authorization_code", "refresh_token"],
     response_types: ["code"],
-    token_endpoint_auth_method: "none", // 공개 클라이언트(PKCE) — 시크릿 저장/관리 불필요
+    token_endpoint_auth_method: "none", // 공개 클라이언트(PKCE) — DCR 경로 기본값. 정적 confidential 클라이언트는
+    // clientInformation()이 client_secret을 반환하면 SDK가 자동으로 client_secret_post 사용(auth 메서드는 이 값과 무관).
+    // 구글처럼 스코프 자동발견이 안 되는 서비스는 명시 스코프 필요 — startAuthorization이 clientMetadata.scope를 사용.
+    scope: c?.oauthScope,
   }
 }
 
-/** 커넥터별 DCR 등록 정보 조회 — 전 직원이 같은 앱 신원(client_id) 공유(service_role 전용 테이블, RLS 정책 없음). */
+/** 커넥터별 OAuth 클라이언트 정보 조회. 세 갈래:
+ *  ① 정적(is_static, 대표 등록) — redirect_uri 자가치유를 건너뛰고 항상 반환(DCR 미지원 서비스라 무효화하면 안 됨).
+ *  ② DCR 등록 — 앱 주소가 바뀌면 redirect_uri 불일치로 무효 처리 → auth()가 새 주소로 자동 재등록(자가치유).
+ *  전 직원이 같은 앱 신원(client_id) 공유(service_role 전용 테이블, RLS 정책 없음). */
 async function loadClientInformation(connectorId: string): Promise<OAuthClientInformation | undefined> {
   const admin = createAdminClient()
   const { data } = await admin
     .from("mcp_oauth_clients")
-    .select("client_id, client_secret, redirect_uri")
-    .eq("connector_id", connectorId)
+    .select("client_id, client_secret, redirect_uri, is_static")
+    .eq("connector_id", credKey(connectorId))
     .maybeSingle()
   if (!data) return undefined
-  // 저장된 redirect_uri가 현재 기대값과 다르면(앱 주소·도메인 변경) 무효 처리 →
-  // auth()가 새 주소로 DCR 재등록(자가치유). 수동 DB 삭제 불필요.
-  if (data.redirect_uri && data.redirect_uri !== oauthRedirectUrl(connectorId)) return undefined
+  // 정적(대표 등록) 크리덴셜은 자가치유 대상이 아님 — redirect_uri 불일치여도 그대로 사용(DCR 재등록 시 실패).
+  if (!data.is_static && data.redirect_uri && data.redirect_uri !== oauthRedirectUrl(connectorId)) return undefined
   return { client_id: data.client_id, client_secret: data.client_secret ?? undefined }
 }
 async function persistClientInformation(connectorId: string, info: OAuthClientInformation): Promise<void> {
   const admin = createAdminClient()
+  const key = credKey(connectorId)
+  // 정적 크리덴셜(대표 등록)은 DCR 결과로 절대 덮지 않는다(가드). 정적 커넥터는 애초에 DCR을 타지 않지만,
+  // 만에 하나 자가치유 경로가 열려도 정적값이 유지되도록 방어.
+  const { data: existing } = await admin
+    .from("mcp_oauth_clients")
+    .select("is_static")
+    .eq("connector_id", key)
+    .maybeSingle()
+  if (existing?.is_static) return
   await admin
     .from("mcp_oauth_clients")
     .upsert(
       {
-        connector_id: connectorId,
+        connector_id: key,
         client_id: info.client_id,
         client_secret: info.client_secret ?? null,
         redirect_uri: oauthRedirectUrl(connectorId),
