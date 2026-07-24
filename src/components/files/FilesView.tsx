@@ -17,7 +17,6 @@ import {
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { toast } from "sonner"
-import GoogleDriveTab from "./GoogleDriveTab"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
@@ -118,7 +117,6 @@ export function FilesView() {
   const [sel, setSel] = useState<Set<string>>(new Set()) // 다중 선택된 파일 id
   const [myDept, setMyDept] = useState<string | null>(null)
   const [tab, setTab] = useState<"all" | Visibility>("all")
-  const [driveMode, setDriveMode] = useState(false)
   const [uploadVis, setUploadVis] = useState<Visibility>("public")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -425,37 +423,8 @@ export function FilesView() {
     )
   }
 
-  const modeToggle = (
-    <div className="flex w-fit items-center gap-1 rounded-xl border bg-muted/30 p-1 text-sm">
-      <button
-        type="button"
-        onClick={() => setDriveMode(false)}
-        className={cn("rounded-lg px-3 py-1.5 font-medium transition-colors", !driveMode ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
-      >
-        내 파일
-      </button>
-      <button
-        type="button"
-        onClick={() => setDriveMode(true)}
-        className={cn("rounded-lg px-3 py-1.5 font-medium transition-colors", driveMode ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
-      >
-        Google Drive
-      </button>
-    </div>
-  )
-
-  if (driveMode) {
-    return (
-      <div className="flex flex-col gap-6">
-        {modeToggle}
-        <GoogleDriveTab />
-      </div>
-    )
-  }
-
   return (
     <div className="flex flex-col gap-6">
-      {modeToggle}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-lg font-semibold">파일 관리</h1>

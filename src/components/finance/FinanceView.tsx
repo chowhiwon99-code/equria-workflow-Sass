@@ -415,7 +415,20 @@ export function FinanceView() {
       {loading ? (
         <Loading rows={6} />
       ) : tab === "cashflow" ? (
-        <CashFlowView />
+        <div className="flex flex-col gap-3">
+          {/* 실제 장부(내역/요약과 같은 집계) 참고 — 현금흐름 계산기와 같은 화면에서 대조(계산 연동 v1) */}
+          {currencyRows.length > 0 && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">실제 장부 · {mode === "month" ? `${ym.y}년 ${ym.m}월` : mode === "year" ? `${ym.y}년` : "전체"}</span>
+              {currencyRows.map(([cur, v]) => (
+                <span key={cur} className="tabular-nums">
+                  매출 <b className="font-medium text-success">{money(v.revenue, cur)}</b> · 비용 <b className="font-medium text-destructive">{money(v.expense, cur)}</b>
+                </span>
+              ))}
+            </div>
+          )}
+          <CashFlowView />
+        </div>
       ) : tab === "summary" ? (
         currencyRows.length === 0 ? (
           <EmptyState

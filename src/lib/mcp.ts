@@ -146,19 +146,19 @@ export type AppCredentialGroup = {
 
 const APP_CREDENTIAL_META: Record<string, { label: string; setupUrl: string; help: string }> = {
   google: {
-    label: "Google Workspace (Gmail 작성·캘린더)",
+    label: "Google (Gmail 작성·캘린더)",
     setupUrl: "https://console.cloud.google.com/apis/credentials",
-    help: "Google Cloud → OAuth 동의화면 구성 → '웹 애플리케이션' OAuth 클라이언트 ID 생성. 동의화면 스코프에 gmail.compose·calendar.events.readonly 추가 + 아래 리디렉션 URI를 모두 등록하세요. (받은메일/드라이브 읽기는 제한된 스코프·검증 비용이라 매출 후 추가)",
+    help: "OAuth 클라이언트(웹 애플리케이션)를 만들어요. 스코프: gmail.compose · calendar.events.readonly",
   },
   slack: {
     label: "Slack",
     setupUrl: "https://api.slack.com/apps",
-    help: "api.slack.com에서 앱을 만들고, 아래 리디렉션 URI를 OAuth Redirect URLs에 등록한 뒤 client_id/secret을 넣으세요.",
+    help: "앱을 만들고 OAuth Redirect URLs에 아래 주소를 등록해요.",
   },
   paypal: {
     label: "PayPal",
     setupUrl: "https://developer.paypal.com/dashboard/applications",
-    help: "developer.paypal.com에서 앱을 만들고 아래 리디렉션 URI를 등록한 뒤 client_id/secret을 넣으세요.",
+    help: "앱을 만들고 아래 리디렉션 주소를 등록해요.",
   },
 }
 

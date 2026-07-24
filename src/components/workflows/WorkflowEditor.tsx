@@ -78,6 +78,7 @@ export function WorkflowEditor({ id }: { id: string }) {
   // 실행 이력(workflow_runs) — 새로고침 후에도 조회 가능
   const [runs, setRuns] = useState<RunRow[]>([])
   const [openRunId, setOpenRunId] = useState<string | null>(null)
+  const [showAllRuns, setShowAllRuns] = useState(false) // 최근 실행 기본 3개만 — 목록 도배 방지
 
   const load = useCallback(async () => {
     try {
@@ -588,12 +589,22 @@ export function WorkflowEditor({ id }: { id: string }) {
         )}
       </div>
 
-      {/* 최근 실행 이력 — 새로고침 후에도 남음 */}
+      {/* 최근 실행 이력 — 새로고침 후에도 남음. 기본 3개 + 더 보기(도배 방지) */}
       {runs.length > 0 && (
         <div className="flex flex-col gap-1 rounded-xl border p-3">
-          <span className="text-sm font-semibold">최근 실행</span>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold">최근 실행</span>
+            {runs.length > 3 && (
+              <button
+                onClick={() => setShowAllRuns((v) => !v)}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                {showAllRuns ? "접기" : `전체 보기 (${runs.length})`}
+              </button>
+            )}
+          </div>
           <div className="flex flex-col divide-y">
-            {runs.map((r) => {
+            {(showAllRuns ? runs : runs.slice(0, 3)).map((r) => {
               const open = openRunId === r.id
               return (
                 <div key={r.id} className="py-1.5">
@@ -614,7 +625,6 @@ export function WorkflowEditor({ id }: { id: string }) {
                     <span className="text-muted-foreground">
                       {new Date(r.created_at).toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" })}
                     </span>
-                    <span className="text-muted-foreground">· {r.node_count}단계</span>
                     {r.duration_ms != null && (
                       <span className="text-muted-foreground">· {(r.duration_ms / 1000).toFixed(1)}s</span>
                     )}

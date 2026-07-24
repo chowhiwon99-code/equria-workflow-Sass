@@ -21,9 +21,9 @@ const BOXES: { key: Box; label: string; icon: typeof Inbox; empty: string }[] = 
 const GUIDE_KEY = "equria:approval-guide-collapsed"
 
 const GUIDE_STEPS = [
-  { n: 1, title: "새 기안 작성", body: "오른쪽 위 ‘새 기안’에서 양식(지출결의서·휴가신청 등)을 고르고 내용을 채워요." },
-  { n: 2, title: "결재선 지정 → 상신", body: "승인할 사람을 순서대로 추가하고(참조자도 지정 가능), ‘상신’을 누르면 첫 결재자에게 전달돼요." },
-  { n: 3, title: "결재 / 반려", body: "내 차례가 오면 ‘결재할 문서’에 빨간 숫자가 떠요. 열어서 승인하거나 사유와 함께 반려하면 다음 사람에게 넘어가요." },
+  { n: 1, title: "새 기안", body: "양식을 고르고 내용을 채워요." },
+  { n: 2, title: "상신", body: "결재할 사람을 순서대로 넣고 올려요." },
+  { n: 3, title: "결재", body: "내 차례가 오면 승인하거나 반려해요." },
 ]
 
 /** 전자결재 사용법 안내 — 대표 온보딩용. 접으면 localStorage로 유지(로직 변경 없음). */

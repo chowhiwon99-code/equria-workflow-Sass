@@ -14,6 +14,18 @@ import { DOC_TYPES, DOC_FIELDS, type DocType } from "./templates"
 import type { Person } from "./lib"
 
 type LineEntry = { approver_id: string; role: "결재" | "참조" }
+
+/** 로컬 기준 오늘(YYYY-MM-DD). 날짜 필드 기본값 — 빈 date 입력의 '연도. 월. 일.' 플레이스홀더 노출 방지. */
+function todayStr(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+}
+/** 양식의 date 필드를 오늘로 채운 초기값. */
+function defaultFields(docType: DocType): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const f of DOC_FIELDS[docType]) if (f.type === "date") out[f.key] = todayStr()
+  return out
+}
 // 편집 대상(임시저장/회수/반려 후 임시저장 문서) — 있으면 생성 대신 수정 모드.
 export type EditDoc = { id: string; docType: DocType; title: string; fields: Record<string, string>; line: LineEntry[] }
 
@@ -35,7 +47,7 @@ export function NewDocumentModal({
   const supabase = createClient()
   const [docType, setDocType] = useState<DocType>(editDoc?.docType ?? "일반기안")
   const [title, setTitle] = useState(editDoc?.title ?? "")
-  const [fields, setFields] = useState<Record<string, string>>(editDoc?.fields ?? {})
+  const [fields, setFields] = useState<Record<string, string>>(editDoc?.fields ?? defaultFields(editDoc?.docType ?? "일반기안"))
   // 편집이면 기존 결재선, 아니면 기본(대표가 본인이 아니면 1명 자동)
   const [line, setLine] = useState<LineEntry[]>(
     editDoc?.line ?? (ownerId && ownerId !== me ? [{ approver_id: ownerId, role: "결재" }] : [])
@@ -159,7 +171,7 @@ export function NewDocumentModal({
             value={docType}
             onChange={(v) => {
               setDocType(v as DocType)
-              setFields({})
+              setFields(defaultFields(v as DocType))
             }}
             options={DOC_TYPES.map((t) => ({ value: t, label: t }))}
             className="h-9 w-36"
@@ -202,9 +214,7 @@ export function NewDocumentModal({
         {/* 결재선 */}
         <div className="rounded-lg border bg-muted/20 p-3">
           <p className="mb-1 text-xs font-medium text-muted-foreground">결재선</p>
-          <p className="mb-2 text-[11px] leading-relaxed text-muted-foreground/70">
-            승인할 사람을 순서대로 추가하세요. 위에서부터 차례로 결재가 넘어가요. 각 사람의 <b className="font-medium">결재</b>(승인 권한) ↔ <b className="font-medium">참조</b>(열람만)는 배지를 눌러 바꿔요.
-          </p>
+          <p className="mb-2 text-[11px] text-muted-foreground/70">위에서부터 차례로 결재돼요 · 배지를 눌러 결재↔참조 전환</p>
           {line.length === 0 ? (
             <p className="mb-2 text-xs text-muted-foreground/70">결재자를 추가해 주세요.</p>
           ) : (
