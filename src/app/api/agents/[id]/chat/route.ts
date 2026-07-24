@@ -2,7 +2,8 @@ import { streamText, convertToModelMessages, stepCountIs, type UIMessage, type T
 import { anthropic } from "@/lib/claude/client"
 import { createClient } from "@/lib/supabase/server"
 import { connectMcp, resolveUserConnectionConfig } from "@/lib/mcp/connect"
-import { buildMemoryBlock } from "@/lib/agentMemory"
+import { buildMemoryBlock, type ExtractTurn } from "@/lib/agentMemory"
+import { extractAndStoreMemories } from "@/lib/agentMemoryExtract"
 import { computeCostUsd } from "@/lib/pricing"
 import { checkBudget, BUDGET_EXCEEDED_MSG } from "@/lib/budget"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -12,6 +13,24 @@ export const maxDuration = 60
 export const runtime = "nodejs"
 
 const HISTORY_WINDOW = 10
+// 자동 기억 추출: 매 턴 아님 — 사용자 턴이 이 값의 배수일 때만(비용·지연 방어).
+const EXTRACT_EVERY_TURNS = 3
+
+// 최근 메시지 + 이번 응답을 추출용 턴 배열로. 각 발화는 과길이 방어로 800자 컷.
+function turnsForExtraction(msgs: UIMessage[], latestAssistant: string): ExtractTurn[] {
+  const turns: ExtractTurn[] = []
+  for (const m of msgs.slice(-12)) {
+    if (m.role !== "user" && m.role !== "assistant") continue
+    const text = m.parts
+      .map((p) => (p.type === "text" ? p.text : ""))
+      .join("\n")
+      .trim()
+    if (text) turns.push({ role: m.role, text: text.slice(0, 800) })
+  }
+  const reply = latestAssistant.trim()
+  if (reply) turns.push({ role: "assistant", text: reply.slice(0, 800) })
+  return turns
+}
 
 export async function POST(
   req: Request,
@@ -33,6 +52,7 @@ export async function POST(
     conversationId?: string | null
   }
   const { messages } = body
+  const userTurns = messages.filter((m) => m.role === "user").length
   let conversationId = body.conversationId ?? null
 
   const { data: agentVersion } = await supabase
@@ -248,6 +268,22 @@ export async function POST(
           .eq("id", conversationId!),
       ])
       await closeMcp()
+
+      // 자동 기억 추출(v2) — 사용자 턴이 EXTRACT_EVERY_TURNS 배수일 때만, 백그라운드로.
+      // 스트림은 이미 끝난 뒤라 사용자 대기 없음. 실패해도 채팅에 영향 없음(try/catch).
+      if (userTurns > 0 && userTurns % EXTRACT_EVERY_TURNS === 0) {
+        try {
+          await extractAndStoreMemories(supabase, {
+            agentId,
+            userId: user.id,
+            conversationId: conversationId!,
+            workspaceId,
+            turns: turnsForExtraction(messages, text),
+          })
+        } catch {
+          /* 기억 추출 실패는 채팅에 영향 주지 않음 */
+        }
+      }
     },
   })
 

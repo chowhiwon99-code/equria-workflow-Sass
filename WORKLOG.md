@@ -5,6 +5,23 @@
 
 ---
 
+## 2026-07-24 · 세션37 — 에이전트 자동 기억(v2) + 마이그105 적용 + Stripe 오식별 정정
+
+**무엇/왜:** 쉬고 온 뒤 이어서. ① 세션36 "Stripe 키 폐기" 대표 액션이 실제로 유효한지 역추적 → **오식별로 판명·종결**(별도 커밋 `beaf222`, 위 정정 블록). ② 미적용이던 **마이그105 프로덕션 적용**(참고사항 메모·멤버 수정권한이 죽어 있던 것 복구). ③ 워크스페이스 고도화 첫 착수 = **에이전트 자동 기억(학습 v2)**.
+
+- **마이그105 적용·검증(Supabase MCP)**: `projects`에 `notes`·`deleted_at` 컬럼 + `projects_update` RLS에 project_members OR 추가. 롤백 지점(035 원문=created_by/owner_id만) 사전 확보. 적용 후 컬럼·정책 재조회로 검증. 코드는 이미 배포돼 있어 재배포 불필요 — 참고사항 메모·멤버 중요도/상태 변경이 라이브에서 살아남.
+- **에이전트 자동 기억 v2 (수동 '기억해두기' → 자동 추출)**: 세션35 v1은 수동이라 실사용에서 거의 안 쓰이던 문제. **대화가 쌓이면 요점을 자동 추출·저장**하게. 마이그 불필요(099 `agent_memories` 재사용).
+  - **설계**: 트리거=채팅 라우트 `onFinish`(응답 끝난 뒤 백그라운드, 사용자 대기 0) · 빈도=사용자 턴 **3의 배수**마다(비용/지연 방어) · 모델=**Haiku**(`MODELS.cheap`=claude-haiku-4-5, $1/$5) · 중복방지=기존 기억을 프롬프트에 주입("겹치면 만들지 마") + 코드 정규화 비교(`normalizeMemoryContent`) **2중** · 안전=budget 이미 상단 통과·`agent_usage` 성공/실패 기록·try/catch로 채팅 절대 안 깨짐.
+  - **파일**: `lib/claude/client.ts`(cheap 별칭) · `lib/claude/schemas.ts`(`memoryExtractionSchema`) · `lib/agentMemory.ts`(순수 헬퍼: `EXTRACTION_SYSTEM`·`buildExtractionPrompt`·`dedupeCandidates`·`normalizeMemoryContent`·`ExtractTurn`) · **신규 `lib/agentMemoryExtract.ts`**(generateObject→dedup→insert, 기존 기억 최근40 비교, RLS 본인만) · `api/agents/[id]/chat/route.ts`(userTurns 카운트·`turnsForExtraction` 800자컷·onFinish 배선). agent_memories는 개인용(워크스페이스 컬럼 없음)이라 withWorkspace 미사용.
+  - **위젯 무변경**: '기억 관리' 패널이 agent_memories를 그대로 조회 → 자동 추출분도 자동 노출.
+  - **예상이슈**: onFinish가 Haiku 호출만큼(~1-3s) 길어짐=사용자 무영향(텍스트 이미 렌더·maxDuration 60s 내) / 할루시네이션 중복=2중 방어 / 마이그 불필요.
+  - **검증**: tsc0 · lint29/0(신규0·베이스라인 30에서 오히려 -1) · build0. **⚠️ 실사용 육안 미검증(로그인 비번 없음) — 대표 dogfood 필요.**
+- **Stripe 키 정정(커밋 `beaf222`)**: 세션35 "Vercel WORKSPACE_PASSWORD=Stripe 라이브 키" 단정을 트랜스크립트 역추적 → 대표가 보낸 Vercel 스크린샷의 잘린 값을 읽은 **추정**이었음(당시 기록도 "값 Sensitive라 못 봄"·"앞부분만 잘려 보임"·확인은 유도질문). 실제 키값 트랜스크립트 0건 + 대표 확인 Stripe 가입 이력 없음 → **폐기 대상 없음, 종결**. 레포 clean(전수검색 0건). HANDOFF 미해결①=✅종결, 교훈=스크린샷 판독은 추정으로 표기.
+
+**다음 후보**: 자동 기억 dogfood 후 고도화(추출 품질·병합 로직·프로젝트공유 v1.5) · 공용비번 `4321`→강한값(대표) · Gmail/Drive 복구(대표) · B1-b Step1b(나머지 ~50곳 배선).
+
+---
+
 ## 2026-07-22 · 세션36(이어서) — B1-b 착수 + 프로젝트 협업/허브 (대표 dogfood 피드백)
 
 **무엇/왜:** 맹점 배포 후 대표 실사용 피드백으로 연속 작업. 매 건 본보기코드+검증(tsc0·lint29~30/0·build0).

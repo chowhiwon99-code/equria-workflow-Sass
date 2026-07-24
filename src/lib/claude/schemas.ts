@@ -67,3 +67,20 @@ export const cashCoachSchema = z.object({
     .describe("실제 회계 내역(장부) 기준 최근 월별 추세에서 발견한 신호 0~3개. 추세 데이터가 없으면 빈 배열."),
 })
 export type CashCoachResult = z.infer<typeof cashCoachSchema>
+
+/** 에이전트 자동 기억 추출 결과 — 대화에서 "오래 기억할 사용자 정보"만. 없으면 빈 배열. */
+export const memoryExtractionSchema = z.object({
+  memories: z
+    .array(
+      z.object({
+        kind: z
+          .enum(["fact", "preference", "style", "correction"])
+          .describe("사실(fact)·선호(preference)·말투(style)·교정(correction) 중 하나"),
+        content: z
+          .string()
+          .describe("오래 기억할 한 문장. 이 사용자 고유이고 앞으로도 유효한 것만. 구체적으로."),
+      })
+    )
+    .describe("새로 기억할 항목 0~5개. 애매하거나 일회성이면 넣지 말고, 없으면 빈 배열."),
+})
+export type MemoryExtractionResult = z.infer<typeof memoryExtractionSchema>
