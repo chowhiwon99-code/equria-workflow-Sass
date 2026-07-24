@@ -5,6 +5,18 @@
 
 ---
 
+## 2026-07-24 · 세션37(이어서3) — 자동기억 품질 고도화 + Exa 활성화 + MCP 연결 로드맵 분석
+
+**무엇/왜:** 대표 dogfood 연속. 마이그 불필요(106 재사용). 각 tsc0·lint29/0(신규0)·build0·main-first.
+
+- **자동기억 품질 고도화(배포 `4e8fb6f`)**: 자동추출이 ① **중요도 자동 매김**(`memoryExtractionSchema`에 importance 1~3 추가 → 핵심 규칙=높음, insert 반영 → 중요도순 주입 즉시 반영) ② **근접중복 차단**(`dedupeCandidates`를 정확일치→`similarMemory`=포함관계+토큰 자카드≥0.6로 확장, 기존·이번 후보 양쪽 대비 → "보고서는 표로" ~ "보고서는 항상 표로 정리" 사실상 중복 안 쌓임). `clampImportance` 방어. 추출 프롬프트 중요도 규칙 추가.
+- **Exa 커넥터 활성화(배포 `58b6783`)**: 웹조사 확인 — Exa 원격 MCP(`mcp.exa.ai/mcp`)가 `Authorization: Bearer <API키>` 지원 → 기존 bearer 프리셋과 일치. '인증 방식 상이'로 준비중이던 것 → **available 전환**. 직원 각자 Exa 키로 원클릭. 대표 등록 불필요.
+- **MCP 연결 로드맵 분석(코드 변경 없음·조사)**: 대표 "구글 MCP 연결"·"준비중 왜 안 되나" 질문에 실제 웹조사로 답. **핵심 발견**: ① 구글은 이제 **공식 원격 MCP 있음**(내 이전 "없다" 정정) — DCR 없어 대표 OAuth 앱 등록 필요 ② 우리 OAuth가 `mcp_oauth_clients`에서 client 정보 읽어 **정적 client_id/secret 주입 시 DCR 건너뛰고 작동**(Slack·구글·PayPal 공통 경로) ③ Exa=bearer(즉시), Zapier=계정별 URL(커스텀URL 필요), Vercel=승인게이트, Figma=사실상 막힘(DCR 403·승인클라 전용). → 상세·대표 액션·개발 계획 = **HANDOFF "다음 세션 착수" 블록**.
+
+**다음(HANDOFF 착수 블록):** 트랙1=MCP 정적 클라이언트 인프라(구글·Slack·PayPal, 대표 OAuth 앱 등록 선행) · 트랙2=대화 요약 압축. context 정리 후 다음 세션 진행.
+
+---
+
 ## 2026-07-24 · 세션37(이어서2) — 로딩바 + 기억 정리(AI·마이그106) + 대화 히스토리 3종
 
 **무엇/왜:** 대표 dogfood 연속 피드백. 마이그106 1개(추가형). 각 tsc0·lint29/0(신규0)·build0·main-first.
