@@ -18,7 +18,9 @@ import { KnowledgeFilePicker } from "@/components/agents/KnowledgeFilePicker"
 import { McpConnectorPicker } from "@/components/agents/McpConnectorPicker"
 import type { StagedKnowledge } from "@/lib/agentKnowledge"
 
-type Phase = "gallery" | "input" | "result"
+type Phase = "gallery" | "input" | "interview" | "result"
+
+type InterviewQ = { id: string; question: string; hint?: string }
 
 // 한 화면에 한 질문씩 — 아이폰 초기 설정처럼 가로 슬라이드로 진행.
 const QUESTIONS = WIZARD_FIELDS
@@ -44,6 +46,11 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
   const [genError, setGenError] = useState<string | null>(null)
   const [generated, setGenerated] = useState("")
   const [knowledge, setKnowledge] = useState<StagedKnowledge[]>([]) // 필요한 데이터 스텝에서 첨부한 파일
+  // AI 되물음 인터뷰(생성 직전) — 빈틈 질문 + 답변. clarifications는 생성/재생성에 재사용.
+  const [interviewLoading, setInterviewLoading] = useState(false)
+  const [interviewQs, setInterviewQs] = useState<InterviewQ[]>([])
+  const [interviewAns, setInterviewAns] = useState<Record<string, string>>({})
+  const [clarifications, setClarifications] = useState("")
 
   const setText = (key: string, v: string) => setInputs((p) => ({ ...p, [key]: v }))
   const toggleMulti = (key: string, opt: string) =>
@@ -64,7 +71,7 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
   // 가드는 '다음' 버튼 disabled + 텍스트 Enter 인라인 검증으로 — 여기선 무가드(select 자동넘김의 stale 방지)
   const goNext = () => {
     if (isLast) {
-      void generate()
+      void startInterview()
       return
     }
     setDir(1)
@@ -75,7 +82,55 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
     setIndex((i) => Math.max(0, i - 1))
   }
 
-  const generate = async (inputsArg: WizardInputs = inputs) => {
+  // 인터뷰 답변을 Q/A 텍스트로 직렬화(빈 답변 제외). generate에 clarifications로 넘긴다.
+  const buildClarifications = () =>
+    interviewQs
+      .map((q) => {
+        const a = (interviewAns[q.id] ?? "").trim()
+        return a ? `Q: ${q.question}\nA: ${a}` : null
+      })
+      .filter((s): s is string => !!s)
+      .join("\n\n")
+
+  // 생성 직전 되물음: 빈틈 질문을 받아온다. 빈틈 없음/실패면 바로 생성(막지 않음).
+  const startInterview = async () => {
+    setPhase("interview")
+    setInterviewLoading(true)
+    setInterviewQs([])
+    setInterviewAns({})
+    setClarifications("")
+    try {
+      const res = await fetch("/api/agents/interview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inputs }),
+      })
+      const j = (res.ok ? await res.json() : { questions: [] }) as { questions?: InterviewQ[] }
+      const qs = j.questions ?? []
+      if (qs.length === 0) {
+        void generate("") // 빈틈 없음 → 바로 생성
+        return
+      }
+      setInterviewQs(qs)
+    } catch {
+      void generate("") // 인터뷰 실패 → 바로 생성
+    } finally {
+      setInterviewLoading(false)
+    }
+  }
+
+  const submitInterview = () => {
+    const c = buildClarifications()
+    setClarifications(c)
+    void generate(c)
+  }
+  const skipInterview = () => {
+    setClarifications("")
+    void generate("")
+  }
+
+  const generate = async (clarifyArg?: string) => {
+    const clarify = clarifyArg ?? clarifications
     setPhase("result")
     setGenerating(true)
     setGenError(null)
@@ -84,7 +139,7 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
       const res = await fetch("/api/agents/generate-prompt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inputs: inputsArg }),
+        body: JSON.stringify({ inputs, clarifications: clarify }),
       })
       if (!res.ok || !res.body) {
         throw new Error(res.status === 401 ? "로그인이 필요합니다." : `생성 실패 (${res.status})`)
@@ -211,6 +266,57 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
               onBack={() => setPhase("input")}
             />
           </div>
+        )}
+      </div>
+    )
+  }
+
+  // ── 되물음 인터뷰: 정확한 기획을 위해 빈틈만 물어본다(생성 직전) ──
+  if (phase === "interview") {
+    return (
+      <div className="mx-auto flex w-full max-w-xl flex-col gap-4 pt-2">
+        <div className="flex flex-col items-center gap-1 text-center">
+          <h2 className="text-lg font-semibold tracking-tight">조금만 더 알려주세요</h2>
+          <p className="text-xs text-muted-foreground">
+            정확한 기획일수록 결과가 정확해져요. 아래만 답하면 훨씬 좋아집니다. (건너뛰어도 됩니다)
+          </p>
+        </div>
+
+        {interviewLoading ? (
+          <p className="flex items-center justify-center gap-1.5 py-10 text-sm text-muted-foreground">
+            <Sparkles className="size-4 animate-pulse" /> 부족한 부분을 살펴보는 중…
+          </p>
+        ) : (
+          <>
+            <div className="flex flex-col gap-3.5">
+              {interviewQs.map((q) => (
+                <div key={q.id} className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium">{q.question}</label>
+                  {q.hint && <p className="text-xs text-muted-foreground">{q.hint}</p>}
+                  <textarea
+                    value={interviewAns[q.id] ?? ""}
+                    onChange={(e) => setInterviewAns((p) => ({ ...p, [q.id]: e.target.value }))}
+                    rows={2}
+                    placeholder="답변 (건너뛰어도 됩니다)"
+                    className={cn(fieldClass, "w-full resize-y rounded-xl py-2 text-sm")}
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center justify-between">
+              <Button variant="ghost" size="sm" onClick={() => setPhase("input")}>
+                <ArrowLeft className="size-4" /> 입력 수정
+              </Button>
+              <div className="flex gap-1.5">
+                <Button variant="outline" size="sm" onClick={skipInterview}>
+                  건너뛰기
+                </Button>
+                <Button size="sm" onClick={submitInterview}>
+                  <Sparkles className="size-4" /> 이 내용으로 만들기
+                </Button>
+              </div>
+            </div>
+          </>
         )}
       </div>
     )

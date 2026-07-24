@@ -6,11 +6,12 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { ArrowUp, ArrowLeft, X, Plus, Maximize2, Minimize2, Copy, Check, Sparkles, SlidersHorizontal, Wrench, Brain } from "lucide-react"
+import { ArrowUp, ArrowLeft, X, Plus, Maximize2, Minimize2, Copy, Check, Sparkles, SlidersHorizontal, Wrench, Brain, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { renderAgentIcon } from "@/components/agents/AgentIcon"
 import { useAgentChat, type Agent, type WidgetPosition } from "./AgentChatContext"
 import { AgentMemoryPanel } from "./AgentMemoryPanel"
+import { MEMORY_KINDS, MEMORY_KIND_LABEL, isMemoryKind, type AgentMemoryKind } from "@/lib/agentMemory"
 
 const WIDGET_SIZE = 56 // size-14
 const EDGE_PADDING = 8
@@ -648,6 +649,26 @@ function ChatBody({ agent }: { agent: Agent }) {
 
   const { messages, sendMessage, status, error } = useChat({ transport })
 
+  // '기억하기' 1회성 안내 — 첫 assistant 답변이 뜨면 한 번 보여주고, 닫으면 localStorage로 영구 숨김.
+  // lazy 초기화(effect 아님)로 set-state-in-effect 회피. 초기 렌더는 messages가 비어 어차피 안 뜸 → 하이드레이션 안전.
+  const [hintDismissed, setHintDismissed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true
+    try {
+      return localStorage.getItem("equria:mem-hint") === "1"
+    } catch {
+      return true
+    }
+  })
+  const dismissHint = () => {
+    setHintDismissed(true)
+    try {
+      localStorage.setItem("equria:mem-hint", "1")
+    } catch {
+      /* ignore */
+    }
+  }
+  const showMemHint = !hintDismissed && messages.some((m) => m.role === "assistant")
+
   // 자동 스크롤 — 첫 진입은 즉시(auto) 하단, 이후 스트리밍은 smooth.
   const scrollRef = useRef<HTMLDivElement>(null)
   const jumpToBottom = useRef(true)
@@ -690,7 +711,15 @@ function ChatBody({ agent }: { agent: Agent }) {
             <p className="mt-2 text-xs text-muted-foreground">메시지를 입력해 시작하세요.</p>
           </div>
         ) : (
-          messages.map((m) => <Bubble key={m.id} message={m} agentIcon={agent.icon} />)
+          messages.map((m) => (
+            <Bubble
+              key={m.id}
+              message={m}
+              agentIcon={agent.icon}
+              agentId={agent.id}
+              conversationId={conversationIdByAgent[agent.id] ?? null}
+            />
+          ))
         )}
         {status === "streaming" && (
           <p className="text-xs text-muted-foreground">생각 중…</p>
@@ -699,6 +728,17 @@ function ChatBody({ agent }: { agent: Agent }) {
       </div>
 
       <div className="border-t bg-card p-3">
+        {showMemHint && (
+          <div className="mb-2 flex items-start gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-1.5 text-[11px] text-muted-foreground">
+            <Brain className="mt-0.5 size-3.5 shrink-0 text-primary" />
+            <span className="flex-1">
+              마음에 드는 답변에 마우스를 올리면 <b className="font-medium text-foreground">기억하기</b>가 나와요. 저장해두면 다음 대화부터 반영돼요.
+            </span>
+            <button onClick={dismissHint} className="shrink-0 text-muted-foreground hover:text-foreground" aria-label="안내 닫기">
+              <X className="size-3.5" />
+            </button>
+          </div>
+        )}
         <button
           onClick={() => setShowMem(true)}
           className="mb-2 inline-flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
@@ -739,7 +779,19 @@ function ChatBody({ agent }: { agent: Agent }) {
   )
 }
 
-function Bubble({ message, agentIcon }: { message: UIMessage; agentIcon: string }) {
+type MemState = "idle" | "loading" | "draft" | "saving" | "saved"
+
+function Bubble({
+  message,
+  agentIcon,
+  agentId,
+  conversationId,
+}: {
+  message: UIMessage
+  agentIcon: string
+  agentId: string
+  conversationId: string | null
+}) {
   const text = message.parts
     .map((p) => (p.type === "text" ? p.text : ""))
     .join("")
@@ -756,6 +808,11 @@ function Bubble({ message, agentIcon }: { message: UIMessage; agentIcon: string 
   const isUser = message.role === "user"
   const [copied, setCopied] = useState(false)
 
+  // 원클릭 '기억하기': AI가 한 줄 추출 → 확인·수정 → 저장(기존 memory POST). 복사·붙여넣기 없이.
+  const [mem, setMem] = useState<MemState>("idle")
+  const [draft, setDraft] = useState("")
+  const [kind, setKind] = useState<AgentMemoryKind>("preference")
+
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(text)
@@ -763,6 +820,43 @@ function Bubble({ message, agentIcon }: { message: UIMessage; agentIcon: string 
       setTimeout(() => setCopied(false), 1200)
     } catch {
       // ignore
+    }
+  }
+
+  const startRemember = async () => {
+    setMem("loading")
+    try {
+      const res = await fetch(`/api/agents/${agentId}/memory/suggest`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      })
+      if (!res.ok) throw new Error()
+      const j = (await res.json()) as { kind?: string; content?: string }
+      setDraft((j.content ?? "").trim() || text.slice(0, 120))
+      setKind(isMemoryKind(j.kind) ? j.kind : "preference")
+    } catch {
+      setDraft(text.slice(0, 120)) // 추출 실패해도 직접 다듬어 저장 가능
+      setKind("preference")
+    }
+    setMem("draft")
+  }
+
+  const saveMem = async () => {
+    const content = draft.trim()
+    if (!content) return
+    setMem("saving")
+    try {
+      const res = await fetch(`/api/agents/${agentId}/memory`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content, kind, sourceConversationId: conversationId }),
+      })
+      if (!res.ok) throw new Error()
+      setMem("saved")
+      setTimeout(() => setMem("idle"), 1600)
+    } catch {
+      setMem("draft") // 실패 시 다시 편집 가능
     }
   }
 
@@ -800,15 +894,81 @@ function Bubble({ message, agentIcon }: { message: UIMessage; agentIcon: string 
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
           </div>
         )}
-        {!isUser && text && (
-          <button
-            onClick={copy}
-            className="absolute -bottom-2 -right-2 flex size-6 items-center justify-center rounded-full border bg-muted text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
-            aria-label="복사"
-            title="복사"
-          >
-            {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
-          </button>
+        {!isUser && text && mem === "idle" && (
+          <div className="absolute -bottom-2 -right-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+            <button
+              onClick={startRemember}
+              className="flex size-6 items-center justify-center rounded-full border bg-muted text-muted-foreground hover:text-primary"
+              aria-label="기억하기"
+              title="기억하기 (다음 대화부터 반영)"
+            >
+              <Brain className="size-3" />
+            </button>
+            <button
+              onClick={copy}
+              className="flex size-6 items-center justify-center rounded-full border bg-muted text-muted-foreground hover:text-foreground"
+              aria-label="복사"
+              title="복사"
+            >
+              {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+            </button>
+          </div>
+        )}
+
+        {!isUser && mem !== "idle" && (
+          <div className="mt-2 rounded-xl border bg-card p-2">
+            {mem === "loading" ? (
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Loader2 className="size-3.5 animate-spin" /> 기억할 내용을 뽑는 중…
+              </p>
+            ) : mem === "saved" ? (
+              <p className="flex items-center gap-1.5 text-xs text-primary">
+                <Check className="size-3.5" /> 기억했어요
+              </p>
+            ) : (
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5">
+                  <Brain className="size-3.5 text-primary" />
+                  <span className="text-[11px] font-medium">이 내용을 기억할까요? (수정 가능)</span>
+                </div>
+                <textarea
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  rows={2}
+                  className="w-full resize-none rounded-lg border bg-background px-2 py-1 text-xs outline-none focus:border-ring"
+                />
+                <div className="flex items-center gap-1.5">
+                  <select
+                    value={kind}
+                    onChange={(e) => setKind(e.target.value as AgentMemoryKind)}
+                    className="rounded-lg border bg-background px-1.5 py-1 text-[11px] outline-none"
+                    aria-label="기억 종류"
+                  >
+                    {MEMORY_KINDS.map((k) => (
+                      <option key={k} value={k}>
+                        {MEMORY_KIND_LABEL[k]}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="ml-auto flex gap-1">
+                    <button
+                      onClick={() => setMem("idle")}
+                      className="rounded-lg px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground"
+                    >
+                      취소
+                    </button>
+                    <button
+                      onClick={saveMem}
+                      disabled={!draft.trim() || mem === "saving"}
+                      className="rounded-lg bg-primary px-2.5 py-1 text-[11px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
+                    >
+                      {mem === "saving" ? "저장 중…" : "저장"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>

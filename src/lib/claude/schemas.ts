@@ -84,3 +84,28 @@ export const memoryExtractionSchema = z.object({
     .describe("새로 기억할 항목 0~5개. 애매하거나 일회성이면 넣지 말고, 없으면 빈 배열."),
 })
 export type MemoryExtractionResult = z.infer<typeof memoryExtractionSchema>
+
+/** 채팅 답변 1건 → 저장할 기억 한 줄 제안(원클릭 '기억하기'). 사용자가 확인·수정 후 저장. */
+export const memorySuggestSchema = z.object({
+  kind: z
+    .enum(["fact", "preference", "style", "correction"])
+    .describe("사실(fact)·선호(preference)·말투(style)·교정(correction) 중 가장 맞는 하나"),
+  content: z
+    .string()
+    .describe("이 답변에서 앞으로도 계속 유효한 '오래 기억할 한 문장'. 이 사용자 고유·구체적으로. 답변 전체를 옮기지 말고 한 줄로 압축."),
+})
+export type MemorySuggestResult = z.infer<typeof memorySuggestSchema>
+
+/** 에이전트 제작 되물음 인터뷰 — 위저드 입력의 빈틈을 겨냥한 맞춤 질문. 이미 충분하면 빈 배열. */
+export const interviewSchema = z.object({
+  questions: z
+    .array(
+      z.object({
+        id: z.string().describe("질문 식별자(영문 슬러그, 예: example, success, edgecase, scope, rule)"),
+        question: z.string().describe("사용자에게 물을 구체적 질문 한 문장. 이 에이전트 맥락에 맞춰."),
+        hint: z.string().describe("답변을 돕는 짧은 예시나 안내(선택). 없으면 빈 문자열."),
+      })
+    )
+    .describe("정확도를 높이려 채워야 할 빈틈 질문 2~4개. 이미 충분히 구체적이면 빈 배열."),
+})
+export type InterviewResult = z.infer<typeof interviewSchema>
