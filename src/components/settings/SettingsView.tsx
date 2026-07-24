@@ -14,6 +14,7 @@ import { fieldClass } from "@/components/shared/Modal"
 import { MANUAL_STATUSES } from "@/components/chat/StatusDot"
 import { Loading, ErrorState } from "@/components/shared/States"
 import { formatUsd } from "@/lib/pricing"
+import { McpCredentialsCard } from "./McpCredentialsCard"
 
 const THEMES = [
   { value: "light", label: "라이트" },
@@ -501,6 +502,9 @@ export function SettingsView() {
           )}
         </Card>
       )}
+
+      {/* 대표: MCP 앱 크리덴셜(구글·Slack·PayPal OAuth 앱 등록) — 자체 완결 컴포넌트 */}
+      {isOwner && <McpCredentialsCard />}
 
       {/* 대표: 시스템 점검 — 설정 실수 미리 잡기 */}
       {isOwner && (
