@@ -109,3 +109,24 @@ export const interviewSchema = z.object({
     .describe("정확도를 높이려 채워야 할 빈틈 질문 2~4개. 이미 충분히 구체적이면 빈 배열."),
 })
 export type InterviewResult = z.infer<typeof interviewSchema>
+
+/** 기억 정리(AI) — 현재 기억 전체를 병합·중복제거·쓰레기제거·재분류·우선순위 매김한 "정리된 최종 목록". */
+export const memoryOrganizeSchema = z.object({
+  memories: z
+    .array(
+      z.object({
+        kind: z
+          .enum(["fact", "preference", "style", "correction"])
+          .describe("사실(fact)·선호(preference)·말투(style)·교정(correction) 중 가장 맞는 하나"),
+        content: z.string().describe("정리된 한 문장. 병합 시 여러 개를 하나로 합쳐 명확하게."),
+        importance: z
+          .number()
+          .int()
+          .describe("중요도 1(낮음)·2(보통)·3(높음). 자주 지켜야 할 핵심 규칙일수록 높게."),
+      })
+    )
+    .describe(
+      "정리된 최종 기억 목록. 중복·유사는 하나로 병합, 명령문('~해'·'기억해')·일회성 작업지시 등 오래 안 갈 것은 제외, 종류·중요도 재정리. 남길 게 없으면 빈 배열.",
+    ),
+})
+export type MemoryOrganizeResult = z.infer<typeof memoryOrganizeSchema>

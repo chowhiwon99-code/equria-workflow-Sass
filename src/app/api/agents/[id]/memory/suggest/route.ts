@@ -15,6 +15,7 @@ export const maxDuration = 30
 const SYSTEM =
   `당신은 대화 답변에서 "이 사용자가 앞으로도 계속 쓰고 싶어할 한 가지"를 골라 한 문장으로 압축하는 추출기입니다.\n` +
   `답변 전체를 옮기지 마세요. 오래 유효하고 이 사용자 고유의 선호·사실·말투·교정 중 가장 핵심 하나만 한 줄로.\n` +
+  `명령문('~해줘'·'기억해')이나 일회성 작업지시가 아니라, 앞으로도 통하는 규칙·선호로 바꿔 쓰세요.\n` +
   `예: 답변이 표로 잘 정리돼 좋았다면 content="보고서는 표로 정리", kind="preference".`
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {

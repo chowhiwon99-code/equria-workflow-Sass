@@ -154,6 +154,7 @@ export async function POST(
       .select("kind, content")
       .eq("agent_id", agentId)
       .is("deleted_at", null)
+      .order("importance", { ascending: false }) // 중요한 규칙이 최근 잡담에 안 밀리게(마이그106)
       .order("created_at", { ascending: false })
       .limit(30)
     systemPrompt += buildMemoryBlock(mems ?? [])

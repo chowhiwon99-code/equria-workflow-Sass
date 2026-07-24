@@ -14,9 +14,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   const { data, error } = await supabase
     .from("agent_memories")
-    .select("id, kind, content, created_at")
+    .select("id, kind, content, importance, created_at")
     .eq("agent_id", agentId)
     .is("deleted_at", null)
+    .order("importance", { ascending: false })
     .order("created_at", { ascending: false })
   if (error) return new Response(error.message, { status: 500 })
   return Response.json({ memories: data ?? [] })

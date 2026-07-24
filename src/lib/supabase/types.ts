@@ -2569,6 +2569,7 @@ export type Database = {
           created_at: string
           deleted_at: string | null
           id: string
+          importance: number
           kind: string
           source_conversation_id: string | null
           updated_at: string
@@ -2580,6 +2581,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           id?: string
+          importance?: number
           kind?: string
           source_conversation_id?: string | null
           updated_at?: string
@@ -2591,6 +2593,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           id?: string
+          importance?: number
           kind?: string
           source_conversation_id?: string | null
           updated_at?: string
