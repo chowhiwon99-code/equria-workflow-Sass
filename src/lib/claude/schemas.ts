@@ -79,6 +79,10 @@ export const memoryExtractionSchema = z.object({
         content: z
           .string()
           .describe("오래 기억할 한 문장. 이 사용자 고유이고 앞으로도 유효한 것만. 구체적으로."),
+        importance: z
+          .number()
+          .int()
+          .describe("중요도 1(낮음)·2(보통)·3(높음). 자주 지켜야 할 핵심 규칙일수록 높게."),
       })
     )
     .describe("새로 기억할 항목 0~5개. 애매하거나 일회성이면 넣지 말고, 없으면 빈 배열."),

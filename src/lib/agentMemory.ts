@@ -51,21 +51,49 @@ export function buildExtractionPrompt(turns: ExtractTurn[], existing: string[]):
     `- 오래 유효한 것만: 이번 한 번의 작업 지시·일회성 질문·맥락은 제외.\n` +
     `- 이 사용자 고유의 것만: 일반 상식이나 에이전트가 답한 내용은 제외.\n` +
     `- 위 "이미 기억하고 있는 것"과 중복·유사하면 절대 다시 만들지 마세요.\n` +
+    `- 각 항목에 중요도(importance)를 매기세요: 자주 지켜야 할 핵심 규칙=3, 보통=2, 사소=1.\n` +
     `- 각 항목은 한 문장, 구체적으로. 새로 기억할 게 없으면 빈 배열.`
   )
 }
 
-// 후보 정리: 빈/과길이 제거, kind 검증, 기존·후보 간 중복 제거, 최대 5개.
-export function dedupeCandidates(candidates: MemoryLite[], existing: string[]): MemoryLite[] {
-  const seen = new Set(existing.map(normalizeMemoryContent))
-  const out: MemoryLite[] = []
+// 중요도 1~3 클램프(모델이 벗어난 값·빈값 방어). 기본 2(보통).
+export function clampImportance(n: number | undefined | null): number {
+  return Math.min(3, Math.max(1, Math.round(Number(n) || 2)))
+}
+
+// 근접 중복 판정 — 정확히 같지 않아도 "사실상 같은" 기억을 걸러낸다(포함관계 + 토큰 자카드).
+// 예: "보고서는 표로" ~ "보고서는 항상 표로 정리" → 같은 것으로 봄. 정확일치만 막던 한계 보완.
+export function similarMemory(a: string, b: string): boolean {
+  const na = normalizeMemoryContent(a)
+  const nb = normalizeMemoryContent(b)
+  if (!na || !nb) return false
+  if (na === nb) return true
+  if (na.length >= 6 && nb.length >= 6 && (na.includes(nb) || nb.includes(na))) return true
+  const ta = new Set(na.split(" ").filter((w) => w.length > 1))
+  const tb = new Set(nb.split(" ").filter((w) => w.length > 1))
+  if (ta.size === 0 || tb.size === 0) return false
+  let inter = 0
+  for (const t of ta) if (tb.has(t)) inter++
+  const jaccard = inter / (ta.size + tb.size - inter)
+  return jaccard >= 0.6
+}
+
+export type MemoryCandidate = { kind: string; content: string; importance?: number }
+export type DedupedMemory = { kind: string; content: string; importance: number }
+
+// 후보 정리: 빈/과길이 제거, kind 검증, 중요도 클램프, 기존·후보와 근접중복 제거, 최대 5개.
+export function dedupeCandidates(candidates: MemoryCandidate[], existing: string[]): DedupedMemory[] {
+  const out: DedupedMemory[] = []
   for (const c of candidates) {
     const content = (c.content ?? "").trim()
     if (!content || content.length > 400) continue
-    const key = normalizeMemoryContent(content)
-    if (!key || seen.has(key)) continue
-    seen.add(key)
-    out.push({ kind: isMemoryKind(c.kind) ? c.kind : "preference", content })
+    if (existing.some((e) => similarMemory(e, content))) continue // 기존과 사실상 같으면 제외
+    if (out.some((o) => similarMemory(o.content, content))) continue // 이번 후보끼리 중복 제외
+    out.push({
+      kind: isMemoryKind(c.kind) ? c.kind : "preference",
+      content,
+      importance: clampImportance(c.importance),
+    })
     if (out.length >= 5) break
   }
   return out

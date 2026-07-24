@@ -48,7 +48,7 @@ export async function extractAndStoreMemories(
   const existing = (existingRows ?? []).map((r) => r.content)
 
   const startedAt = Date.now()
-  let candidates: { kind: string; content: string }[] = []
+  let candidates: { kind: string; content: string; importance?: number }[] = []
   try {
     const result = await generateObject({
       model: anthropic(MODELS.cheap),
@@ -105,6 +105,7 @@ export async function extractAndStoreMemories(
       user_id: opts.userId,
       kind: m.kind,
       content: m.content,
+      importance: m.importance, // 자동추출이 매긴 중요도(중요도순 주입에 반영)
       source_conversation_id: opts.conversationId,
     })),
   )
