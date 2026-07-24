@@ -433,6 +433,9 @@ function SlotCard({
             </div>
             <p className="text-right text-sm font-bold tabular-nums">{money(shownAmount, s.currency)}</p>
           </>
+        ) : s.item_type === "ledger" ? (
+          // 장부 연동 — 이번 달 내역 합계 자동 반영(수정 불가, 삭제로 해제)
+          <p className="text-right text-sm font-bold tabular-nums" title="장부 자동 — 내역이 바뀌면 갱신돼요">{money(Number(s.amount), s.currency)}</p>
         ) : (
           <div className="text-right">
             <InlineNumber value={Number(s.amount)} onCommit={(v) => onUpdateSlot(s.id, { amount: v })} width="w-full" />

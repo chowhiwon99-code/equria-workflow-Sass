@@ -141,6 +141,10 @@ export function CashGrid({
           )}
         </td>
         <td className="px-2 py-1">
+          {s.item_type === "ledger" ? (
+            // 장부 연동 슬롯 — 이번 달 내역 합계 자동 반영(요약 탭과 같은 계산). 유형 변경 대신 삭제로 해제.
+            <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground" title="내역(장부) 이번 달 합계가 자동 반영돼요">장부 자동</span>
+          ) : (
           <select
             value={s.calc_type_id ? `c:${s.calc_type_id}` : s.item_type}
             onChange={(e) => {
@@ -163,6 +167,7 @@ export function CashGrid({
               </optgroup>
             )}
           </select>
+          )}
         </td>
         {isDefault ? (
           dfields.map((f) => (
@@ -191,7 +196,9 @@ export function CashGrid({
           </td>
         )}
         <td className="px-2 py-1 text-right">
-          {calc ? <span className="px-1 font-medium tabular-nums">{money(shownAmount, s.currency)}</span> : <InlineNumber width="w-24" value={Number(s.amount)} onCommit={(v) => onUpdateSlot(s.id, { amount: v })} />}
+          {s.item_type === "ledger" ? (
+            <span className="px-1 font-medium tabular-nums" title="장부 자동 — 내역이 바뀌면 갱신돼요">{money(Number(s.amount), s.currency)}</span>
+          ) : calc ? <span className="px-1 font-medium tabular-nums">{money(shownAmount, s.currency)}</span> : <InlineNumber width="w-24" value={Number(s.amount)} onCommit={(v) => onUpdateSlot(s.id, { amount: v })} />}
         </td>
         <td className="px-2 py-1">
           <select value={s.currency} onChange={(e) => onUpdateSlot(s.id, { currency: e.target.value })} className="rounded border-0 bg-transparent text-xs outline-none focus:ring-1 focus:ring-ring">

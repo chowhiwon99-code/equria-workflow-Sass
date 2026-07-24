@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
-import { Download, FileDown, Settings, X, Sheet, Calculator, Sparkles } from "lucide-react"
+import { Download, FileDown, Settings, X, Sheet, Calculator, Sparkles, Link2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { useUndo } from "@/components/undo/UndoProvider"
@@ -24,6 +24,23 @@ import { CalcTypeBuilder } from "./CalcTypeBuilder"
 import { CashCoachPanel } from "./CashCoachPanel"
 
 const WORKSPACE_ID = "00000000-0000-0000-0000-0000000000e1"
+
+/** 이번 달 [시작, 다음달 시작) — 장부(finance_entries) 합계 동기화 범위. */
+function currentMonthRange(): { start: string; end: string } {
+  const now = new Date()
+  const p = (n: number) => String(n).padStart(2, "0")
+  const y = now.getFullYear()
+  const m = now.getMonth() + 1
+  return { start: `${y}-${p(m)}-01`, end: m === 12 ? `${y + 1}-01-01` : `${y}-${p(m + 1)}-01` }
+}
+
+/** 통화별 장부 합계(이번 달·휴지통 제외). ledger 슬롯 amount의 원천. */
+type LedgerTotals = Record<string, { revenue: number; expense: number }>
+function ledgerAmountFor(slot: { kind: string; currency: string }, totals: LedgerTotals): number {
+  const t = totals[slot.currency || "KRW"]
+  if (!t) return 0
+  return slot.kind === "revenue_src" ? t.revenue : slot.kind === "expense_dst" ? t.expense : 0
+}
 const DEFAULT_TYPE_NAME = "기본 계산" // 회사가 편집하는 표 계산 칸의 출처(시드 1회)
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => (c === "&" ? "&amp;" : c === "<" ? "&lt;" : c === ">" ? "&gt;" : "&quot;"))
 const PRINT_CSS = `body{font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;color:#111;margin:24px;-webkit-print-color-adjust:exact}h1{font-size:18px;margin:0}h2{font-size:14px;margin:18px 0 4px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #ddd;padding:4px 8px;text-align:left}th{background:#f5f5f5}.r{text-align:right;font-variant-numeric:tabular-nums}@media print{@page{margin:14mm}}`
@@ -48,19 +65,38 @@ export function CashFlowView() {
   const [editType, setEditType] = useState<CashCalcType | null>(null)
   const [poolPos, setPoolPos] = useState<{ x: number; y: number } | null>(null)
   const [defaultCalcTypeId, setDefaultCalcTypeId] = useState<string | null>(null)
+  const [ledgerTotals, setLedgerTotals] = useState<LedgerTotals>({}) // 이번 달 장부 합계(연동 슬롯 생성·동기화용)
   const seededRef = useRef(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
-      const [{ data: slotData, error: e }, { data: settings }, { data: types }, { data: grps }] = await Promise.all([
+      const mr = currentMonthRange()
+      const [{ data: slotData, error: e }, { data: settings }, { data: types }, { data: grps }, { data: ledgerRows }] = await Promise.all([
         supabase.from("cash_accounts").select("*").is("deleted_at", null).order("sort_order"),
         supabase.from("cashflow_settings").select("opening_cash, default_currency, pool_pos, default_calc_type_id").maybeSingle(),
         supabase.from("cash_calc_types").select("*").order("sort_order"),
         supabase.from("cash_categories").select("*").order("sort_order"),
+        // 장부(내역) 이번 달 합계 — ledger 슬롯 amount의 원천(요약 탭과 같은 데이터)
+        supabase.from("finance_entries").select("kind, total_amount, currency").is("deleted_at", null).gte("entry_date", mr.start).lt("entry_date", mr.end),
       ])
       if (e) throw e
+
+      // 장부 합계 집계(통화별) + ledger 슬롯 동기화 — 열 때마다 최신 장부가 계산기에 반영(요약↔현금흐름 일치)
+      const totals: LedgerTotals = {}
+      for (const r of ledgerRows ?? []) {
+        const t = (totals[r.currency || "KRW"] ??= { revenue: 0, expense: 0 })
+        if (r.kind === "revenue") t.revenue += Number(r.total_amount)
+        else t.expense += Number(r.total_amount)
+      }
+      setLedgerTotals(totals)
+      let slotList = (slotData as CashAccount[]) ?? []
+      const stale = slotList.filter((s) => s.item_type === "ledger" && Number(s.amount) !== ledgerAmountFor(s, totals))
+      if (stale.length > 0) {
+        await Promise.all(stale.map((s) => supabase.from("cash_accounts").update({ amount: ledgerAmountFor(s, totals) }).eq("id", s.id)))
+        slotList = slotList.map((s) => (s.item_type === "ledger" ? { ...s, amount: ledgerAmountFor(s, totals) } : s))
+      }
       let typeList = (types as CashCalcType[]) ?? []
       let defId = (settings?.default_calc_type_id as string | null) ?? null
       // 회사 "기본 계산 유형" 1회 멱등 시드 — 표 계산 칸(필드)의 출처. 회사가 이 유형을 편집해 칸을 바꿈.
@@ -81,7 +117,7 @@ export function CashFlowView() {
         }
         if (defId) await supabase.from("cashflow_settings").upsert({ workspace_id: WORKSPACE_ID, default_calc_type_id: defId, updated_by: me, updated_at: new Date().toISOString() }, { onConflict: "workspace_id" })
       }
-      setSlots((slotData as CashAccount[]) ?? [])
+      setSlots(slotList)
       setGroups((grps as CashCategory[]) ?? [])
       setCalcTypes(typeList)
       setOpening((settings?.opening_cash as Record<string, number>) ?? {})
@@ -146,6 +182,26 @@ export function CashFlowView() {
       .from("cash_accounts")
       .insert({ name: "새 항목", kind, color, item_type: "qty", calc_type_id: null, created_by: me, sort_order: slots.length })
     if (e) return toast.error("항목을 추가하지 못했어요.")
+    load()
+  }
+  // 장부 연동 — "요약(실제 장부)과 계산기가 안 맞는" 문제의 정면 해결. 이번 달 내역 합계가
+  // 자동 반영되는 슬롯 2개(매출·비용)를 만든다. 이후 amount는 load()가 항상 최신 장부로 동기화.
+  const linkLedger = async () => {
+    if (!me) return
+    const existing = new Set(slots.filter((s) => s.item_type === "ledger").map((s) => s.kind))
+    const wanted = [
+      { kind: "revenue_src", color: "green", name: "장부 매출(이번 달)" },
+      { kind: "expense_dst", color: "red", name: "장부 비용(이번 달)" },
+    ].filter((w) => !existing.has(w.kind))
+    if (wanted.length === 0) return toast.info("이미 장부와 연동돼 있어요.")
+    const rows = wanted.map((w, i) => ({
+      name: w.name, kind: w.kind, color: w.color, item_type: "ledger", calc_type_id: null,
+      amount: ledgerAmountFor({ kind: w.kind, currency: defaultCurrency }, ledgerTotals),
+      currency: defaultCurrency, created_by: me, sort_order: slots.length + i,
+    }))
+    const { error: e } = await supabase.from("cash_accounts").insert(rows)
+    if (e) return toast.error("장부 연동에 실패했어요.")
+    toast.success("장부와 연동됐어요 — 내역이 바뀌면 자동 반영돼요.")
     load()
   }
   const updateSlot = async (id: string, patch: Partial<CashAccount>) => {
@@ -335,6 +391,12 @@ export function CashFlowView() {
             <Button size="sm" variant={showCoach ? "default" : "outline"} onClick={() => setShowCoach((v) => !v)} disabled={slots.length === 0}>
               <Sparkles className="size-3.5" /> AI 코칭
             </Button>
+            {/* 요약·내역(실제 장부)과 계산기를 잇는 자동 슬롯 — 이미 연동돼 있으면 숨김 */}
+            {!slots.some((s) => s.item_type === "ledger") && (
+              <Button size="sm" variant="outline" onClick={linkLedger}>
+                <Link2 className="size-3.5" /> 장부 연동
+              </Button>
+            )}
             <Button size="sm" variant="outline" onClick={() => setShowBuilder(true)}>
               <Calculator className="size-3.5" /> 계산 유형
             </Button>
