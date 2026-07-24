@@ -2,11 +2,11 @@
 
 import { useChat } from "@ai-sdk/react"
 import { DefaultChatTransport, type UIMessage } from "ai"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { ArrowUp, ArrowLeft, X, Plus, Maximize2, Minimize2, Copy, Check, Sparkles, SlidersHorizontal, Wrench, Brain, Loader2 } from "lucide-react"
+import { ArrowUp, ArrowLeft, X, Plus, Maximize2, Minimize2, Copy, Check, Sparkles, SlidersHorizontal, Wrench, Brain, Loader2, SquarePen, History, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { renderAgentIcon } from "@/components/agents/AgentIcon"
 import { useAgentChat, type Agent, type WidgetPosition } from "./AgentChatContext"
@@ -619,10 +619,14 @@ function IconBtn({
   )
 }
 
+type Convo = { id: string; title: string | null; updated_at: string }
+
 function ChatBody({ agent }: { agent: Agent }) {
-  const { conversationIdByAgent, setConversationId, markUnread, isOpen } = useAgentChat()
+  const { conversationIdByAgent, setConversationId, startNewConversation, markUnread, isOpen } = useAgentChat()
   const [input, setInput] = useState("")
   const [showMem, setShowMem] = useState(false) // 기억 관리 화면 토글
+  const [showHistory, setShowHistory] = useState(false) // 대화 목록 화면 토글
+  const [convos, setConvos] = useState<Convo[]>([])
 
   // 매 요청마다 최신 conversationId를 보내기 위한 ref
   const conversationIdRef = useRef<string | null>(conversationIdByAgent[agent.id] ?? null)
@@ -647,7 +651,58 @@ function ChatBody({ agent }: { agent: Agent }) {
     [agent.id, setConversationId]
   )
 
-  const { messages, sendMessage, status, error } = useChat({ transport })
+  const { messages, sendMessage, status, error, setMessages } = useChat({ transport })
+
+  // 자동 스크롤 제어 ref — 진입·대화전환은 즉시(auto) 하단, 스트리밍은 smooth.
+  const jumpToBottom = useRef(true)
+
+  // 대화 목록 로드(최근순) — '대화 목록' 열 때 온디맨드로 호출(이펙트 아님 → 최신 반영·set-state-in-effect 회피).
+  const loadConvos = useCallback(async () => {
+    const res = await fetch(`/api/agents/${agent.id}/conversations`)
+    if (res.ok) setConvos(((await res.json()).conversations ?? []) as Convo[])
+  }, [agent.id])
+
+  // 대화 열기: DB 메시지 → 화면 복원.
+  const openConvo = useCallback(
+    async (id: string) => {
+      setConversationId(agent.id, id)
+      setShowHistory(false)
+      const res = await fetch(`/api/agents/${agent.id}/conversations/${id}`)
+      if (!res.ok) return
+      const j = (await res.json()) as { messages: { id: string; role: string; content: string }[] }
+      jumpToBottom.current = true
+      setMessages(
+        (j.messages ?? []).map((m) => ({
+          id: m.id,
+          role: m.role === "user" ? ("user" as const) : ("assistant" as const),
+          parts: [{ type: "text" as const, text: m.content }],
+        })),
+      )
+    },
+    [agent.id, setConversationId, setMessages],
+  )
+
+  // 위젯 열 때(마운트) 이어지던 대화가 있으면 화면 복원 — "닫으면 사라짐" 해소. 1회만.
+  const hydrated = useRef(false)
+  useEffect(() => {
+    if (hydrated.current) return
+    hydrated.current = true
+    const cid = conversationIdRef.current
+    if (cid) void openConvo(cid)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const newChat = () => {
+    setMessages([])
+    setShowHistory(false)
+    startNewConversation() // conversationId 삭제 + ChatBody remount(빈 상태)
+  }
+
+  const deleteConvo = async (id: string) => {
+    setConvos((p) => p.filter((c) => c.id !== id)) // 낙관적
+    await fetch(`/api/agents/${agent.id}/conversations/${id}`, { method: "DELETE" })
+    if (conversationIdRef.current === id) newChat()
+  }
 
   // '기억하기' 1회성 안내 — 첫 assistant 답변이 뜨면 한 번 보여주고, 닫으면 localStorage로 영구 숨김.
   // lazy 초기화(effect 아님)로 set-state-in-effect 회피. 초기 렌더는 messages가 비어 어차피 안 뜸 → 하이드레이션 안전.
@@ -669,9 +724,8 @@ function ChatBody({ agent }: { agent: Agent }) {
   }
   const showMemHint = !hintDismissed && messages.some((m) => m.role === "assistant")
 
-  // 자동 스크롤 — 첫 진입은 즉시(auto) 하단, 이후 스트리밍은 smooth.
+  // 자동 스크롤 — 첫 진입은 즉시(auto) 하단, 이후 스트리밍은 smooth.(jumpToBottom은 위에서 선언)
   const scrollRef = useRef<HTMLDivElement>(null)
-  const jumpToBottom = useRef(true)
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
@@ -695,6 +749,65 @@ function ChatBody({ agent }: { agent: Agent }) {
 
   if (showMem) {
     return <AgentMemoryPanel agentId={agent.id} onClose={() => setShowMem(false)} />
+  }
+
+  if (showHistory) {
+    const activeId = conversationIdByAgent[agent.id] ?? null
+    return (
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="flex items-center gap-2 border-b px-3 py-2">
+          <button
+            onClick={() => setShowHistory(false)}
+            className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            aria-label="대화로 돌아가기"
+          >
+            <ArrowLeft className="size-4" />
+          </button>
+          <p className="flex flex-1 items-center gap-1.5 text-sm font-medium">
+            <History className="size-4" /> 대화 목록
+          </p>
+          <button
+            onClick={newChat}
+            className="flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-medium transition-colors hover:bg-muted"
+          >
+            <SquarePen className="size-3.5" /> 새 대화
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-2 [scrollbar-width:thin]">
+          {convos.length === 0 ? (
+            <p className="p-2 text-xs text-muted-foreground">아직 저장된 대화가 없어요.</p>
+          ) : (
+            convos.map((c) => {
+              const active = c.id === activeId
+              return (
+                <div
+                  key={c.id}
+                  className={cn(
+                    "group flex items-center gap-1 rounded-lg px-2 py-1.5",
+                    active ? "bg-muted" : "hover:bg-muted/60",
+                  )}
+                >
+                  <button
+                    onClick={() => void openConvo(c.id)}
+                    className="min-w-0 flex-1 truncate text-left text-sm"
+                    title={c.title ?? "새 대화"}
+                  >
+                    {c.title || "새 대화"}
+                  </button>
+                  <button
+                    onClick={() => void deleteConvo(c.id)}
+                    className="shrink-0 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+                    aria-label="대화 삭제"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </div>
+              )
+            })
+          )}
+        </div>
+      </div>
+    )
   }
 
   const loading = status === "submitted" || status === "streaming"
@@ -727,9 +840,6 @@ function ChatBody({ agent }: { agent: Agent }) {
             />
           ))
         )}
-        {status === "streaming" && (
-          <p className="text-xs text-muted-foreground">생각 중…</p>
-        )}
         {error && <p className="text-xs text-destructive">오류: {error.message}</p>}
       </div>
 
@@ -745,12 +855,23 @@ function ChatBody({ agent }: { agent: Agent }) {
             </button>
           </div>
         )}
-        <button
-          onClick={() => setShowMem(true)}
-          className="mb-2 inline-flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <Brain className="size-3.5" /> 기억 관리
-        </button>
+        <div className="mb-2 flex items-center gap-3 text-[11px] text-muted-foreground">
+          <button onClick={newChat} className="inline-flex items-center gap-1 transition-colors hover:text-foreground">
+            <SquarePen className="size-3.5" /> 새 대화
+          </button>
+          <button
+            onClick={() => {
+              setShowHistory(true)
+              void loadConvos()
+            }}
+            className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
+          >
+            <History className="size-3.5" /> 대화 목록
+          </button>
+          <button onClick={() => setShowMem(true)} className="inline-flex items-center gap-1 transition-colors hover:text-foreground">
+            <Brain className="size-3.5" /> 기억 관리
+          </button>
+        </div>
         <div className="flex items-end gap-2">
           <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
             {renderAgentIcon(agent.icon, "size-5")}

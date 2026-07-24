@@ -48,6 +48,7 @@ const STORAGE_KEY = "equria.agent-chat"
 type Persisted = {
   selectedAgentId?: string | null
   position?: WidgetPosition | null
+  conversationIdByAgent?: Record<string, string> // 새로고침해도 대화 이어가게(메모리→localStorage)
 }
 
 function loadPersisted(): Persisted {
@@ -81,13 +82,14 @@ export function AgentChatProvider({ children }: { children: React.ReactNode }) {
     const persisted = loadPersisted()
     if (persisted.selectedAgentId) setSelectedAgentIdState(persisted.selectedAgentId)
     if (persisted.position) setPositionState(persisted.position)
+    if (persisted.conversationIdByAgent) setConversationIdByAgentState(persisted.conversationIdByAgent)
   }, [])
 
   useEffect(() => {
     if (typeof window === "undefined") return
-    const payload: Persisted = { selectedAgentId, position }
+    const payload: Persisted = { selectedAgentId, position, conversationIdByAgent }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
-  }, [selectedAgentId, position])
+  }, [selectedAgentId, position, conversationIdByAgent])
 
   // 위젯에 띄울 에이전트 = 내가 핀한 것만. 핀이 0개면 위젯을 비운다(폴백 없음).
   const loadAgents = useCallback(async () => {
