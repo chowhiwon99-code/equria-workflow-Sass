@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-07-24 · 세션37(이어서) — 품질 루프 강화: 채팅 원클릭 기억 + 제작 되물음 인터뷰
+
+**무엇/왜:** 자동기억 v2 배포 후 대표 요청 2건. ① 채팅 중 좋은 답변을 복사·붙여넣기 없이 원클릭으로 기억 저장 ② 에이전트 제작 시 더 디테일한 기획을 요구("정확한 기획 → 정확한 결과"). 계획=`~/.claude/plans/reactive-napping-wall.md`(대표 승인). 마이그 불필요(agent_memories/agent_versions 재사용), 전부 추가형. 신규 AI 라우트는 checkBudget+agent_usage+withWorkspace 기존 패턴 준수.
+
+- **Part A — 채팅 원클릭 '기억하기'**: 답변 버블 hover에 복사 옆 '기억하기'(Brain) → **Haiku가 그 답변에서 오래 쓸 한 줄 추출**(신규 `/api/agents/[id]/memory/suggest`, `memorySuggestSchema`) → 인라인 확인·수정·kind 선택 → 기존 memory POST로 저장. 첫 답변 시 **1회성 안내**(localStorage dismiss). `Bubble`에 agentId/conversationId prop, sourceConversationId best-effort. 복사·붙여넣기 루프 제거. 위젯 '기억 관리' 패널은 무변경(자동 노출).
+- **Part B — 에이전트 제작 AI 되물음 인터뷰 + 항목 강화**(전략문서 §4 온보딩 인터뷰의 첫 실체): 위저드 마지막 질문 → 생성 직전 새 phase `interview`. 신규 `/api/agents/interview`가 **Sonnet으로 빈틈**(예시없음·성공기준모호·엣지케이스·회사규칙) **2~4개 되물음**(`interviewSchema`) → 답하거나 건너뛰기 → `clarifications`를 generate-prompt에 반영(SKILL_MD_SYSTEM 규칙8=최우선 근거). **성공 기준**(`successCriteria`) 필드 신설(required)·예시 강력권장. `SKILL_MD_SYSTEM`: **'성공 정의' 섹션 추가**·측정가능 합격선 지시·**K-뷰티 하드코딩 가드레일을 업종무관으로 중립화**(브랜드 정책 정합, P2.3 일부). 인터뷰 실패/빈틈없음이면 바로 생성(막지 않음).
+- **파일**: 신규 `api/agents/[id]/memory/suggest`·`api/agents/interview` · `lib/claude/schemas.ts`(memorySuggest·interview) · `lib/agentBuilder.ts`(successCriteria·메타프롬프트) · `api/agents/generate-prompt`(clarifications) · `components/agent-chat/FloatingAgentChat.tsx`(Bubble 버튼·확인행·힌트) · `components/agents/AgentWizard.tsx`(interview phase).
+- **검증**: tsc0 · lint29/0(신규0) · build0 · 신규 라우트 2개 등록 확인. main-first 배포(코드 `d0e24ab`, 롤백=직전 프로덕션 `311cf4c`). **⚠️ 실사용 육안 미검증(로그인 비번 없음)=대표 dogfood.**
+
+**다음 후보**: 위 2종 dogfood 후 고도화(추출 품질·유사기억 병합·인터뷰 질문 튜닝) · 공용비번 강화·Gmail/Drive 복구(대표) · B1-b Step1b.
+
+---
+
 ## 2026-07-24 · 세션37 — 에이전트 자동 기억(v2) + 마이그105 적용 + Stripe 오식별 정정
 
 **무엇/왜:** 쉬고 온 뒤 이어서. ① 세션36 "Stripe 키 폐기" 대표 액션이 실제로 유효한지 역추적 → **오식별로 판명·종결**(별도 커밋 `beaf222`, 위 정정 블록). ② 미적용이던 **마이그105 프로덕션 적용**(참고사항 메모·멤버 수정권한이 죽어 있던 것 복구). ③ 워크스페이스 고도화 첫 착수 = **에이전트 자동 기억(학습 v2)**.
