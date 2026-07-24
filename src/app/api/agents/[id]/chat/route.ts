@@ -3,6 +3,7 @@ import { anthropic } from "@/lib/claude/client"
 import { createClient } from "@/lib/supabase/server"
 import { connectMcp, resolveUserConnectionConfig } from "@/lib/mcp/connect"
 import { buildMemoryBlock, type ExtractTurn } from "@/lib/agentMemory"
+import { OUTPUT_STYLE_RULE } from "@/lib/claude/style"
 import { extractAndStoreMemories } from "@/lib/agentMemoryExtract"
 import { computeCostUsd } from "@/lib/pricing"
 import { checkBudget, BUDGET_EXCEEDED_MSG } from "@/lib/budget"
@@ -109,7 +110,7 @@ export async function POST(
 
   // 에이전트 지식파일(참고 자료) 주입 — 텍스트는 시스템 프롬프트에, PDF/이미지는 파일 파트로.
   // 공유 에이전트를 다른 멤버가 대화할 수 있으므로 admin 클라로 서명(소유자 폴더 RLS 우회).
-  let systemPrompt = agentVersion.system_prompt
+  let systemPrompt = agentVersion.system_prompt + OUTPUT_STYLE_RULE // 전 에이전트 공통 — AI 티 나는 기호(-, *, **) 절제
   {
     const { data: kn } = await supabase
       .from("agent_knowledge")
