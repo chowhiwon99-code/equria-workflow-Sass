@@ -16,7 +16,11 @@
 - **⚠️ 대표 액션(값 주면 배선 끝·병렬 가능)**: ①⭐구글 — Google Cloud Console(`console.cloud.google.com/apis/credentials`)에서 OAuth 동의화면 구성(스코프: gmail.readonly·gmail.compose·calendar.events.readonly·calendar.events.freebusy·drive.readonly·drive.file) + '웹 애플리케이션' OAuth 클라이언트 생성 → **리디렉션 URI 3개**(`https://complow.kr/api/mcp/oauth/google-gmail/callback`·`.../google-calendar/callback`·`.../google-drive/callback`) 등록 → 앱 '게시(프로덕션)' 전환(테스트 모드=refresh 7일 만료) → 설정 'MCP 앱 크리덴셜'에 client_id/secret 입력. ②Slack — api.slack.com 앱+리디렉션 `.../oauth/slack/callback`. ③PayPal — developer.paypal.com 앱+리디렉션 `.../oauth/paypal/callback`.
 - **남긴 것(fast-follow)**: **Zapier 커스텀 URL** — URL 자체에 시크릿이 포함돼 저장 스키마(암호화·`auth_method` 제약·nullable token) 별도 조정 필요 → 준비중 유지(customUrl 타입·custom_url 컬럼은 미리 넣어둠). 구글 등 OAuth 정적경로 완결 우선.
 
-**다음 후보**: 대표 크리덴셜 입력 후 **실연결 1회 육안 검증**(브라우저 OAuth 왕복은 대표만 가능) · Zapier 커스텀URL 마무리 · 트랙2 대화 요약 압축.
+- **🟢 실연결 검증 완료(2026-07-24 · 대표 dogfood):** 대표가 Google Cloud OAuth 앱 등록(client_id/secret) → 설정 'MCP 앱 크리덴셜' 입력 → **Gmail·Google캘린더 실제 연결 성공.** access+**refresh token** 저장 확인(access_type=offline 주입 작동), **Gmail 13도구·캘린더 9도구 디스커버리 성공**(토큰이 `*mcp.googleapis.com` 실인증) = 정적 client→DCR 건너뜀 인프라 100% 검증. 계정 `complow@complow.kr`·External+Testing(테스트 사용자 4명).
+- **린 구성 확정(배포 `f99edcc`):** 대표 결정 "100명 넘겨도 돈 드는 건 안 켠다" → Gmail=compose만·Drive 커넥터 제거·네이티브 메일 탭 숨김(제한스코프 CASA 비용 회피). 남은 스코프 2개 다 '민감'→ 게시 시 가벼운 브랜드 검증만.
+- **[전략 정리]** 멀티테넌트 자동 연동 = **전역 앱 1개 + 사용자별 토큰 격리**(OAuth 앱 공유해도 데이터 격리 유지, Zapier/Notion 방식)가 정답. "회사별 앱 등록"은 자동연동을 깨므로 반려. 자가서비스는 **브랜드 검증 1회**로 켜짐(런치 전 병렬 처리).
+
+**다음 후보**: **브랜드 검증 준비물**(`/privacy`·`/terms` 페이지·도메인 인증·로고·스코프 사유) → 자가서비스 자동 연동 · 에이전트에 Gmail 바인딩해 실사용 · Slack/PayPal 크리덴셜(대표) · Zapier 커스텀URL · 트랙2 대화 요약 압축.
 
 ---
 

@@ -12,10 +12,13 @@
 
 > 현재 프로덕션 `a8b832f` READY · main=feat=origin 동기·작업트리 clean·전부 push됨 · tsc0·lint29/0.
 
-### 트랙1 — MCP 정적 클라이언트 인프라 → 구글·Slack·PayPal 연결 (✅ 인프라 배포됨 `a8b832f` · 🔴 대표 OAuth 앱 등록만 남음)
-- **✅ 완료·배포(세션38):** ① 오너 설정 **'MCP 앱 크리덴셜'** UI(커넥터별 client_id/secret 저장 + 콘솔 등록용 리디렉션 URI 복사, `McpCredentialsCard`) + `/api/mcp/oauth-clients`(오너 게이트, `is_static=true` seed) ② 카탈로그에 **Gmail·Google캘린더·Google드라이브·Slack·PayPal** 추가(available·oauth·requiresAppCredential) ③ McpView **'관리자 설정 필요'** 게이팅. **엔진 검증(@ai-sdk/mcp 소스)**: 정적 client seed 시 DCR 건너뜀·secret 있으면 confidential 자동·`is_static` 가드로 마이그102 자가치유가 정적값 안 덮음·구글 `access_type=offline` 인가파라미터 주입. 마이그107(`is_static`·`custom_url` 추가형). 상세=WORKLOG 세션38.
-- **🔴 대표 액션(이것만 하면 바로 라이브 — 값 넣을 곳=설정→MCP 앱 크리덴셜):** ①⭐**구글**: Google Cloud Console(`console.cloud.google.com/apis/credentials`) → OAuth 동의화면 구성(스코프: `gmail.readonly gmail.compose calendar.events.readonly drive.readonly drive.file`) · **동의화면 User type=Internal 권장**(사내 워크스페이스 조직 전용 → gmail/drive=제한된 스코프인데 CASA 검증 불필요·refresh 7일 만료 없음. External이면 프로덕션 게시에 CASA 감사 필요) → '웹 애플리케이션' OAuth 클라이언트 생성 → **리디렉션 URI 3개** 등록(`https://complow.kr/api/mcp/oauth/google-gmail/callback`·`.../google-calendar/callback`·`.../google-drive/callback`) → 앱 **'게시(프로덕션)'** 전환(테스트=refresh 7일 만료) → 설정에 client_id/secret 입력. ②**Slack**: api.slack.com 앱 + 리디렉션 `.../oauth/slack/callback` → client_id/secret. ③**PayPal**: developer.paypal.com 앱 + 리디렉션 `.../oauth/paypal/callback` → client_id/secret.
-- **fast-follow:** **Zapier 커스텀 URL**(URL에 시크릿 포함→저장 스키마 조정 필요, 준비중 유지·`custom_url` 컬럼은 미리 넣어둠). **실연결 육안 검증**은 대표만 가능(브라우저 OAuth 왕복).
+### 트랙1 — MCP 정적 클라이언트 인프라 → 구글 연결 (✅✅ 실연결 검증 완료 2026-07-24)
+- **🟢 실연결 성공(2026-07-24, 대표 dogfood 육안 검증):** 대표가 Google Cloud에 OAuth 앱 등록(client_id/secret) → 설정 'MCP 앱 크리덴셜'에 입력 → **Gmail·Google캘린더 실제 연결됨**. `mcp_user_connections`에 access+**refresh token** 저장 확인(access_type=offline 주입 작동), **Gmail 13도구·캘린더 9도구 디스커버리 성공**(토큰이 `*mcp.googleapis.com`에 실인증). **정적 client seed→DCR 건너뜀 가설이 실환경에서 통함 = 인프라 100% 검증.** 계정=`complow@complow.kr`(테스트 사용자 4명 등록·External+Testing 모드).
+- **⚙️ 최종 구성(대표 결정 — 검증비 회피):** Gmail=**compose(작성)만**(gmail.readonly=제한스코프·CASA비용 제외) · 캘린더=events.readonly · **Drive 커넥터 제거**(drive.readonly=제한스코프) · **네이티브 메일 탭 사이드바 숨김**(hiddenFromNav — 메일은 에이전트가 compose로). 남은 스코프 2개 다 '민감'(제한 아님)→ 게시 시 **가벼운 브랜드 검증만**(CASA 없음).
+- **🔜 자동 연동(자가서비스 SaaS) 조건 = 앱 브랜드 검증 1회:** 현재 Testing(테스트 사용자·100명)이라 신규 유저마다 등록 필요. **게시+브랜드 검증** 통과하면 아무 구글 계정이나 가입 즉시 연결(등록0). **격리는 유지**(OAuth 앱은 공유해도 토큰은 사용자별 RLS 격리 — Zapier/Notion 방식). 검증 준비물: 도메인 인증·`/privacy`·`/terms` 페이지(초안 `docs/legal/` 존재)·로고·스코프 사유. **다음 작업 후보=검증 준비물 만들기.**
+- **인프라(배포 `a8b832f`~`f99edcc`, 세션38):** 오너 설정 **'MCP 앱 크리덴셜'** UI(client_id/secret 저장·리디렉션 URI 복사, `McpCredentialsCard`) + `/api/mcp/oauth-clients`(오너 게이트·`is_static=true` seed) · 카탈로그 Gmail·캘린더·Slack·PayPal(available·oauth·requiresAppCredential) · McpView **'관리자 설정 필요'** 게이팅. 엔진 검증(@ai-sdk/mcp 소스): 정적 client→DCR 건너뜀·secret 있으면 confidential 자동·`is_static` 가드(마이그102 자가치유 방지)·구글 `access_type=offline` 주입. 마이그107(`is_static`·`custom_url` 추가형).
+- **Slack·PayPal(미완·대표 액션 남음):** 구글과 동일 방식 — 각 개발자 콘솔에 앱 등록(리디렉션 `https://complow.kr/api/mcp/oauth/slack/callback`·`.../paypal/callback`) → client_id/secret을 설정 'MCP 앱 크리덴셜'에 입력. 아직 미입력이라 '관리자 설정 필요' 상태. (구글은 완료)
+- **fast-follow:** **Zapier 커스텀 URL**(URL에 시크릿 포함→저장 스키마 조정 필요·준비중, `custom_url` 컬럼 선반영).
 - **보류/후순위:** Vercel=승인된 클라만(whitelist·불확실) · **Figma=사실상 막힘**(DCR 403·승인 클라 전용) · Exa=이미 활성(직원 각자 API키·대표 액션 0).
 
 ### 트랙2 — 대화 요약 압축(compaction)
