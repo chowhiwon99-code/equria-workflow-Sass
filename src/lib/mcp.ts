@@ -115,9 +115,11 @@ export const MCP_CONNECTORS: Connector[] = [
   // 🆕 구글 워크스페이스 — 공식 원격 MCP(Gmail·Cal·Drive). DCR 미지원 → 대표가 Google Cloud에 OAuth 앱 등록해
   //    client_id/secret을 설정(mcp_oauth_clients)해야 연결됨. 3형제가 OAuth 앱 하나(credentialKey="google") 공유.
   //    refresh_token 발급 위해 access_type=offline·prompt=consent 필요(연결 라우트에서 주입). 엔드포인트/스코프 실검증 2026-07-24.
-  { id: "google-gmail", name: "Gmail", description: "메일 검색·읽기·초안 작성 (내 계정, 대표 앱 등록)", emoji: "📧", domain: "gmail.com", category: "커뮤니케이션", featured: true, status: "available", scope: "user", requiresAppCredential: true, credentialKey: "google", oauthScope: "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.compose", authorizationParams: { access_type: "offline", prompt: "consent" }, preset: { type: "http", url: "https://gmailmcp.googleapis.com/mcp/v1", auth: "oauth" } },
+  // Gmail = 작성(compose)만 — gmail.readonly(받은메일 읽기)는 '제한된 스코프'라 프로덕션 게시 시 CASA 검증 비용 발생 → 매출 후 추가.
+  //         compose는 '민감' 스코프(검증 비용 없음) → AI가 회사 톤으로 새 메일 작성. 정책: 100명 넘겨도 돈 드는 건 안 켠다.
+  { id: "google-gmail", name: "Gmail", description: "AI가 메일 작성 (내 계정, 대표 앱 등록)", emoji: "📧", domain: "gmail.com", category: "커뮤니케이션", featured: true, status: "available", scope: "user", requiresAppCredential: true, credentialKey: "google", oauthScope: "https://www.googleapis.com/auth/gmail.compose", authorizationParams: { access_type: "offline", prompt: "consent" }, preset: { type: "http", url: "https://gmailmcp.googleapis.com/mcp/v1", auth: "oauth" } },
   { id: "google-calendar", name: "Google 캘린더", description: "일정 조회 (내 계정, 대표 앱 등록)", emoji: "📅", domain: "calendar.google.com", category: "생산성", status: "available", scope: "user", requiresAppCredential: true, credentialKey: "google", oauthScope: "https://www.googleapis.com/auth/calendar.events.readonly", authorizationParams: { access_type: "offline", prompt: "consent" }, preset: { type: "http", url: "https://calendarmcp.googleapis.com/mcp/v1", auth: "oauth" } },
-  { id: "google-drive", name: "Google 드라이브", description: "파일 검색·읽기 (내 계정, 대표 앱 등록)", emoji: "📁", domain: "drive.google.com", category: "문서", status: "available", scope: "user", requiresAppCredential: true, credentialKey: "google", oauthScope: "https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file", authorizationParams: { access_type: "offline", prompt: "consent" }, preset: { type: "http", url: "https://drivemcp.googleapis.com/mcp/v1", auth: "oauth" } },
+  // Google 드라이브 = 지금은 뺌 — 유용한 drive.readonly가 '제한된 스코프'(CASA 비용)라 매출 후 추가. drive.file만으론 쓸모 적음.
   // 🆕 Slack·PayPal — 공식 원격 MCP·DCR 미지원 → 대표 앱 등록(client_id/secret) 후 연결. 엔드포인트 실검증 2026-07-24.
   { id: "slack", name: "Slack", description: "메시지·채널 조회·전송 (내 계정, 대표 앱 등록)", emoji: "💬", domain: "slack.com", category: "커뮤니케이션", status: "available", scope: "user", requiresAppCredential: true, credentialKey: "slack", authorizationParams: { prompt: "consent" }, preset: { type: "http", url: "https://mcp.slack.com/mcp", auth: "oauth" } },
   { id: "paypal", name: "PayPal", description: "결제·거래 조회 (내 계정, 대표 앱 등록)", emoji: "🅿️", domain: "paypal.com", category: "데이터", status: "available", scope: "user", requiresAppCredential: true, credentialKey: "paypal", preset: { type: "http", url: "https://mcp.paypal.com/mcp", auth: "oauth" } },
@@ -144,9 +146,9 @@ export type AppCredentialGroup = {
 
 const APP_CREDENTIAL_META: Record<string, { label: string; setupUrl: string; help: string }> = {
   google: {
-    label: "Google Workspace (Gmail·캘린더·드라이브)",
+    label: "Google Workspace (Gmail 작성·캘린더)",
     setupUrl: "https://console.cloud.google.com/apis/credentials",
-    help: "Google Cloud → OAuth 동의화면 구성 → '웹 애플리케이션' OAuth 클라이언트 ID 생성. 아래 리디렉션 URI 3개와 각 커넥터의 스코프를 동의화면에 등록하세요. 앱이 '테스트' 모드면 refresh 토큰이 7일 만에 만료되니 '게시(프로덕션)'로 전환하세요.",
+    help: "Google Cloud → OAuth 동의화면 구성 → '웹 애플리케이션' OAuth 클라이언트 ID 생성. 동의화면 스코프에 gmail.compose·calendar.events.readonly 추가 + 아래 리디렉션 URI를 모두 등록하세요. (받은메일/드라이브 읽기는 제한된 스코프·검증 비용이라 매출 후 추가)",
   },
   slack: {
     label: "Slack",

@@ -146,7 +146,7 @@ export function Sidebar({
 
       <nav ref={navRef} onKeyDown={onNavKeyDown} className="flex-1 space-y-3 overflow-y-auto p-2">
         {FEATURE_GROUPS.map((group) => {
-          const all = FEATURES.filter((f) => f.group === group.id)
+          const all = FEATURES.filter((f) => f.group === group.id && !f.hiddenFromNav)
           if (all.length === 0) return null
           const visibleCount = all.filter((f) => !hidden.includes(f.href)).length
           // 평소엔 가시 항목이 0이면 그룹 헤더까지 접고, 편집 중엔 항상 펼침

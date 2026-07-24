@@ -42,6 +42,8 @@ export interface Feature {
   phase: number
   /** 사이드바 섹션 그룹 */
   group: FeatureGroup
+  /** true면 사이드바 네비에서 숨김(라우트·제목은 유지 — 되돌리려면 이 값만 제거). */
+  hiddenFromNav?: boolean
 }
 
 /** 사이드바 그룹 순서 + 헤더 라벨 (label=null 이면 헤더 없이 최상단)
@@ -123,9 +125,9 @@ export const FEATURES: Feature[] = [
   {
     href: "/files",
     label: "파일 관리",
-    description: "파일 업로드·정리 (Google Drive 연동 예정)",
+    description: "파일 업로드·정리",
     icon: FolderOpen,
-    status: "wip",
+    status: "ready",
     phase: 6,
     group: "work",
   },
@@ -177,6 +179,8 @@ export const FEATURES: Feature[] = [
   },
   // ── 연동 ──
   {
+    // 네이티브 메일함(받은메일 읽기 UI)은 사이드바에서 숨김 — 메일은 에이전트가 Gmail 커넥터(compose)로 작성.
+    // gmail.readonly(제한된 스코프·CASA 검증 비용) 회피 정책과 일치. 되돌리려면 hiddenFromNav 제거.
     href: "/mail",
     label: "메일",
     description: "Gmail 연동 — 받은편지함·작성·발송 (개인 계정 연결)",
@@ -184,6 +188,7 @@ export const FEATURES: Feature[] = [
     status: "ready",
     phase: 6,
     group: "connect",
+    hiddenFromNav: true,
   },
   {
     href: "/mcp",

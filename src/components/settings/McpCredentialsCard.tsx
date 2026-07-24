@@ -209,7 +209,7 @@ export function McpCredentialsCard() {
 
       <p className="rounded-lg bg-muted/30 p-2.5 text-[11px] leading-relaxed text-muted-foreground">
         🔒 client_secret은 저장 후 화면에 다시 표시하지 않아요. 값을 바꿀 때만 다시 입력하면 돼요.
-        구글은 세 커넥터(Gmail·캘린더·드라이브)가 OAuth 앱 하나를 공유하니, 콘솔에 리디렉션 URI 3개를 모두 등록하세요.
+        한 그룹의 여러 커넥터가 OAuth 앱 하나를 공유하니, 콘솔에 아래 리디렉션 URI를 모두 등록하세요.
       </p>
     </section>
   )
