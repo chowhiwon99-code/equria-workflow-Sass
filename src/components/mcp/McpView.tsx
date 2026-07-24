@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Plug, Plus, RefreshCw, Trash2, ChevronDown, Loader2, Wrench, Search, ExternalLink, ShieldCheck } from "lucide-react"
+import { Plug, Plus, RefreshCw, Trash2, ChevronDown, Loader2, Wrench, Search, ExternalLink, ShieldCheck, Lock } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
@@ -344,7 +344,7 @@ export function McpView() {
         {needsCred ? (
           <span className="text-[10px] text-muted-foreground/70">대표가 ‘설정 → MCP 앱 크리덴셜’에서 앱을 등록하면 연결할 수 있어요.</span>
         ) : c.scope === "user" && !connected && c.status === "available" ? (
-          <span className="text-[10px] text-muted-foreground/70">🔒 내 계정으로 연결 — 나만 보고 관리해요</span>
+          <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/70"><Lock className="size-3" /> 내 계정으로 연결 — 나만 보고 관리해요</span>
         ) : null}
       </div>
     )
@@ -392,7 +392,7 @@ export function McpView() {
       </div>
       {/* 개인 vs 공용 구분 — GitHub 등은 회사 대표 토큰 공유가 아니라 "각자 자기 계정으로" (요청 반영) */}
       <div className="flex flex-wrap items-start gap-x-2 gap-y-1 rounded-xl border border-dashed px-3.5 py-2.5 text-xs text-muted-foreground">
-        <span aria-hidden>🔒</span>
+        <Lock className="mt-0.5 size-3.5 shrink-0" aria-hidden />
         <span>
           <b className="text-foreground">GitHub·Supabase·Stripe 같은 개인 계정 성격의 커넥터는 직원 각자 자기 토큰으로 연결</b>해요.
           회사 전체가 토큰 하나를 공유하지 않아 — 누가 뭘 했는지 구분되고, 본인만 조회·해제할 수 있고, 나중에 개별 회수도 쉬워요.

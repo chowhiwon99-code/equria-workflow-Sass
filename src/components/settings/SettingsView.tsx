@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import { toast } from "sonner"
-import { Trash2 } from "lucide-react"
+import { Trash2, CircleCheck, TriangleAlert, CircleX } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
@@ -517,7 +517,9 @@ export function SettingsView() {
             <div className="flex flex-col divide-y overflow-hidden rounded-xl border">
               {health.map((c) => (
                 <div key={c.name} className="flex items-start gap-2.5 px-3.5 py-2.5 text-sm">
-                  <span className="mt-0.5 shrink-0">{c.status === "ok" ? "✅" : c.status === "warn" ? "⚠️" : "❌"}</span>
+                  <span className="mt-0.5 shrink-0">
+                    {c.status === "ok" ? <CircleCheck className="size-4 text-success" /> : c.status === "warn" ? <TriangleAlert className="size-4 text-warning" /> : <CircleX className="size-4 text-destructive" />}
+                  </span>
                   <div className="min-w-0">
                     <p className="font-medium">
                       {c.name} <span className="font-normal text-muted-foreground">— {c.detail}</span>
@@ -679,6 +681,8 @@ function MemberInfoRow({
             <Trash2 className="size-4" />
           </button>
         ))}
+      {/* 본인 행 — 삭제 버튼 자리를 비워두면 입력칸이 밀려 열이 어긋남 → 같은 폭 placeholder로 정렬 유지 */}
+      {isMe && <span className="w-6" aria-hidden />}
     </div>
   )
 }

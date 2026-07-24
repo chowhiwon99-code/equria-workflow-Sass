@@ -211,7 +211,7 @@ export function McpCredentialsCard() {
                         />
                       </div>
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-[11px] text-muted-foreground/70">🔒 secret은 저장 후 다시 표시되지 않아요.</span>
+                        <span className="text-[11px] text-muted-foreground/70">secret은 저장 후 다시 표시되지 않아요.</span>
                         <Button size="sm" className="h-7" onClick={() => save(g)} disabled={busy}>
                           {busy ? <Loader2 className="size-3.5 animate-spin" /> : null} 저장
                         </Button>

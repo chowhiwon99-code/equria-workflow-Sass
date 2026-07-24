@@ -47,6 +47,19 @@ type RunRow = {
   created_at: string
 }
 
+/** 실행 시각 — "7월 16일 23:54"(올해는 연도 생략). 기본 로케일 포맷("26. 7. 16. 오후…")이 지저분해 직접 조립. */
+function fmtRunDate(iso: string): string {
+  const d = new Date(iso)
+  const year = d.getFullYear() === new Date().getFullYear() ? "" : `${d.getFullYear()}년 `
+  const p = (n: number) => String(n).padStart(2, "0")
+  return `${year}${d.getMonth() + 1}월 ${d.getDate()}일 ${p(d.getHours())}:${p(d.getMinutes())}`
+}
+/** 소요 시간 — "52초" / "1분 12초". */
+function fmtDuration(ms: number): string {
+  const s = Math.round(ms / 1000)
+  return s < 60 ? `${s}초` : `${Math.floor(s / 60)}분 ${s % 60}초`
+}
+
 export function WorkflowEditor({ id }: { id: string }) {
   const supabase = createClient()
   const router = useRouter()
@@ -622,11 +635,9 @@ export function WorkflowEditor({ id }: { id: string }) {
                             : "bg-muted-foreground animate-pulse"
                       )}
                     />
-                    <span className="text-muted-foreground">
-                      {new Date(r.created_at).toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" })}
-                    </span>
+                    <span className="text-muted-foreground">{fmtRunDate(r.created_at)}</span>
                     {r.duration_ms != null && (
-                      <span className="text-muted-foreground">· {(r.duration_ms / 1000).toFixed(1)}s</span>
+                      <span className="text-muted-foreground">· {fmtDuration(r.duration_ms)}</span>
                     )}
                     {r.status === "error" && <span className="text-destructive">· 오류</span>}
                     <ChevronDown
@@ -650,7 +661,7 @@ export function WorkflowEditor({ id }: { id: string }) {
                         <div key={`${n.nodeId}-${i}`} className="text-[11px]">
                           <span className="font-medium text-muted-foreground">
                             {i + 1}. {n.agent_name || "단계"}
-                            {n.status === "error" ? " ⚠️" : ""}
+                            {n.status === "error" ? " (오류)" : ""}
                           </span>
                           {n.toolNote && <p className="text-muted-foreground/70">🔗 {n.toolNote}</p>}
                           <pre className="mt-0.5 max-h-40 overflow-auto whitespace-pre-wrap rounded-md bg-muted/40 p-2">

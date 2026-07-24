@@ -653,7 +653,7 @@ export function MeetingEditor({
               {researchResult && (
                 <>
                   {!researchResult.searched && (
-                    <p className="mt-2 text-[11px] text-warning">⚠️ 웹 검색 비활성 — Claude 지식 기반(최신성 한계). Anthropic 콘솔에서 web search 활성화가 필요해요.</p>
+                    <p className="mt-2 text-[11px] text-warning">웹 검색 비활성 — Claude 지식 기반(최신성 한계). Anthropic 콘솔에서 web search 활성화가 필요해요.</p>
                   )}
                   <div className="mt-2 max-h-72 overflow-y-auto whitespace-pre-wrap break-words text-sm">{researchResult.text}</div>
 

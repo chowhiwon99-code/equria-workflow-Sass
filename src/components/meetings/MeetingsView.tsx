@@ -218,6 +218,10 @@ export function MeetingsView() {
           )}
         </div>
         <div className="flex items-center gap-2 pr-1">
+          {/* 정렬을 토글 왼쪽에 — 표 모드에서 정렬이 사라져도 그리드/표 토글이 오른쪽 끝에 고정(자리 점프 방지) */}
+          {currentFolder === null && listMode === "grid" && (
+            <Select value={folderSort} onChange={(v) => setFolderSort(v as FolderSort)} options={SORT_OPTIONS} align="end" className="h-8" />
+          )}
           <div className="inline-flex rounded-full bg-muted p-0.5 text-xs">
             <button
               onClick={() => setListMode("grid")}
@@ -238,9 +242,6 @@ export function MeetingsView() {
               표
             </button>
           </div>
-          {currentFolder === null && listMode === "grid" && (
-            <Select value={folderSort} onChange={(v) => setFolderSort(v as FolderSort)} options={SORT_OPTIONS} align="end" className="h-8" />
-          )}
         </div>
       </div>
 
