@@ -5,6 +5,21 @@
 
 ---
 
+## 2026-07-24 · 세션38 — 트랙1: MCP 정적 OAuth 클라이언트 인프라 (구글·Slack·PayPal 연결)
+
+**무엇/왜:** 세션37 분석의 트랙1 실행. 구글(Gmail·Cal·Drive)·Slack·PayPal의 원격 MCP는 **DCR 미지원** → 대표가 각 서비스에 OAuth 앱을 등록해 받은 client_id/secret을 넣어야 직원이 자기 계정으로 연결 가능. 마이그107 1개(추가형). tsc0·lint29/0(신규0)·build0·main-first. **배포 `a8b832f`·롤백 `9b17bff`.** ⚠️ 대표 OAuth 앱 등록 선행 필요(아래 액션) · 실사용 육안 미검증.
+
+- **핵심 근거(@ai-sdk/mcp 1.0.45 소스 직접 검증)**: `auth()`는 `clientInformation()`이 값을 반환하면 **DCR(동적 등록)을 건너뛴다**(index.js ~1021) → 정적 client를 seed하면 DCR 재등록이 아예 안 일어나 정적값이 안 덮임. 토큰 교환 auth 메서드는 우리 `clientMetadata`가 아니라 **secret 유무로 자동 결정**(`selectClientAuthMethod` ~748, secret 있으면 `client_secret_post`) → **구글 confidential 클라이언트도 코어 수정 없이 작동**. 스코프는 `provider.clientMetadata.scope`에서 옴(~1094). 구글식 `access_type=offline`은 SDK가 안 붙임(`offline_access`만 처리) → 연결 라우트에서 주입.
+- **엔진(커밋 `0f3a0b9`)**: 마이그107(`mcp_oauth_clients.is_static` + `mcp_user_connections.custom_url`, 추가형·멱등, Supabase MCP 적용·drift0) · `oauth.ts` 가드: is_static이면 redirect_uri 자가치유(마이그102) 건너뛰어 정적값 무효화 방지 + `persistClientInformation`이 정적 행을 DCR 결과로 안 덮음 + `credKey()`로 credentialKey 해석(구글 3형제=한 앱 공유) + `clientMetadataFor`에 커넥터별 `oauthScope` · connect 라우트가 인가 URL에 커넥터별 `authorizationParams`(구글 `access_type=offline·prompt=consent`=refresh_token) 주입 · `lib/mcp.ts` Connector 타입 확장(requiresAppCredential·credentialKey·oauthScope·authorizationParams·customUrl)+`credentialKeyFor()`.
+- **오너 크리덴셜(커밋 `8e6ed14`)**: 신규 `/api/mcp/oauth-clients`(오너 게이트, `workspaces.owner_id`) GET(그룹 현황·`configured`는 전 로그인유저=McpView 게이팅용, client_id 유무는 오너만·**secret 값 절대 미반환**)·POST(등록·secret 미입력 시 기존값 보존, `is_static=true` 저장)·DELETE · 자체 완결 `McpCredentialsCard`(그룹별 client_id/secret 입력 + **콘솔에 등록할 리디렉션 URI 복사** + 콘솔 링크·스코프 안내) · SettingsView 오너일 때만 렌더.
+- **카탈로그+게이팅(커밋 `a8b832f`)**: 카탈로그에 **Gmail·Google캘린더·Google드라이브**(credentialKey `google` 공유·엔드포인트 `*mcp.googleapis.com/mcp/v1`·스코프 명시)·**Slack**(`mcp.slack.com/mcp`)·**PayPal**(`mcp.paypal.com/mcp`)을 available·oauth·requiresAppCredential로 추가(웹조사 실검증 2026-07-24). McpView: requiresAppCredential인데 대표 크리덴셜 미설정이면 **'관리자 설정 필요'** 표시(깨진 연결 방지)·`/api/mcp/oauth-clients`로 설정 여부 조회.
+- **⚠️ 대표 액션(값 주면 배선 끝·병렬 가능)**: ①⭐구글 — Google Cloud Console(`console.cloud.google.com/apis/credentials`)에서 OAuth 동의화면 구성(스코프: gmail.readonly·gmail.compose·calendar.events.readonly·calendar.events.freebusy·drive.readonly·drive.file) + '웹 애플리케이션' OAuth 클라이언트 생성 → **리디렉션 URI 3개**(`https://complow.kr/api/mcp/oauth/google-gmail/callback`·`.../google-calendar/callback`·`.../google-drive/callback`) 등록 → 앱 '게시(프로덕션)' 전환(테스트 모드=refresh 7일 만료) → 설정 'MCP 앱 크리덴셜'에 client_id/secret 입력. ②Slack — api.slack.com 앱+리디렉션 `.../oauth/slack/callback`. ③PayPal — developer.paypal.com 앱+리디렉션 `.../oauth/paypal/callback`.
+- **남긴 것(fast-follow)**: **Zapier 커스텀 URL** — URL 자체에 시크릿이 포함돼 저장 스키마(암호화·`auth_method` 제약·nullable token) 별도 조정 필요 → 준비중 유지(customUrl 타입·custom_url 컬럼은 미리 넣어둠). 구글 등 OAuth 정적경로 완결 우선.
+
+**다음 후보**: 대표 크리덴셜 입력 후 **실연결 1회 육안 검증**(브라우저 OAuth 왕복은 대표만 가능) · Zapier 커스텀URL 마무리 · 트랙2 대화 요약 압축.
+
+---
+
 ## 2026-07-24 · 세션37(이어서3) — 자동기억 품질 고도화 + Exa 활성화 + MCP 연결 로드맵 분석
 
 **무엇/왜:** 대표 dogfood 연속. 마이그 불필요(106 재사용). 각 tsc0·lint29/0(신규0)·build0·main-first.
