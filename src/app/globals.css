@@ -358,6 +358,34 @@ body {
   .animate-soft-pulse {
     animation: equria-soft-pulse 3.2s ease-in-out infinite;
   }
+  /* 응답 로딩 — 유튜브식 상단 인디케이터(얇은 바가 좌→우로 흐름) */
+  .animate-loadbar {
+    animation: equria-loadbar 1.1s cubic-bezier(0.65, 0.05, 0.36, 1) infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .animate-loadbar {
+      animation: none;
+      left: 0;
+      width: 100%;
+      opacity: 0.6;
+    }
+  }
+}
+
+/* 유튜브식 로딩바 — 얇은 세그먼트가 폭을 늘였다 줄이며 좌→우로 흘러감(indeterminate) */
+@keyframes equria-loadbar {
+  0% {
+    left: -35%;
+    width: 35%;
+  }
+  55% {
+    left: 55%;
+    width: 45%;
+  }
+  100% {
+    left: 100%;
+    width: 30%;
+  }
 }
 
 @keyframes equria-float {

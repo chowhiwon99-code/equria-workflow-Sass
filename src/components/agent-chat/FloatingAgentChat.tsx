@@ -697,8 +697,14 @@ function ChatBody({ agent }: { agent: Agent }) {
     return <AgentMemoryPanel agentId={agent.id} onClose={() => setShowMem(false)} />
   }
 
+  const loading = status === "submitted" || status === "streaming"
+
   return (
     <>
+      {/* 응답 로딩 — 유튜브식 상단 인디케이터(헤더 바로 아래 얇은 바) */}
+      <div className="relative h-0.5 w-full shrink-0 overflow-hidden bg-primary/10" aria-hidden>
+        {loading && <span className="absolute top-0 h-full rounded-full bg-primary motion-safe:animate-loadbar" />}
+      </div>
       <div
         ref={scrollRef}
         className="flex-1 space-y-3 overflow-y-auto p-3 [scrollbar-width:thin]"
