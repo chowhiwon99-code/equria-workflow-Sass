@@ -46,6 +46,24 @@ export function FinanceView() {
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [tab, setTab] = useState<Tab>("summary")
+  // 손익 계산기(현금흐름 탭 cash_accounts) 합계 — 요약 탭에 함께 표시(대표: "손익에서 편집하면 요약에 반영").
+  // 요약 탭 진입마다 재조회 → 현금흐름에서 편집하고 돌아오면 즉시 최신.
+  const [pnlByCurrency, setPnlByCurrency] = useState<Record<string, { revenue: number; expense: number }>>({})
+  useEffect(() => {
+    if (tab !== "summary") return
+    ;(async () => {
+      const { data } = await supabase.from("cash_accounts").select("kind, amount, currency").is("deleted_at", null)
+      const out: Record<string, { revenue: number; expense: number }> = {}
+      for (const s of data ?? []) {
+        const cur = s.currency || "KRW"
+        const t = (out[cur] ??= { revenue: 0, expense: 0 })
+        if (s.kind === "revenue_src") t.revenue += Number(s.amount)
+        else if (s.kind === "expense_dst") t.expense += Number(s.amount)
+      }
+      setPnlByCurrency(out)
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- supabase 클라이언트는 안정 참조
+  }, [tab])
   // 필터·페이지네이션 (내역 탭 전용)
   const [searchText, setSearchText] = useState("")
   const [kindFilter, setKindFilter] = useState<KindFilter>("all")
@@ -282,6 +300,14 @@ export function FinanceView() {
       }),
     [byCurrency],
   )
+  // 손익 계산기 합계(통화별·KRW 우선) — 요약 탭 상단 표시용
+  const pnlRows = useMemo(
+    () =>
+      Object.entries(pnlByCurrency)
+        .filter(([, v]) => v.revenue !== 0 || v.expense !== 0)
+        .sort(([a], [b]) => (a === "KRW" ? -1 : b === "KRW" ? 1 : a.localeCompare(b))),
+    [pnlByCurrency],
+  )
   // 전월대비(증감% 배지) — mode='month'일 때만 의미. trendRaw에서 prevMonth(ym) 버킷 집계.
   const prevByCurrency = useMemo(() => {
     const pr = monthRange(prevMonth(ym))
@@ -430,7 +456,7 @@ export function FinanceView() {
           <CashFlowView />
         </div>
       ) : tab === "summary" ? (
-        currencyRows.length === 0 ? (
+        currencyRows.length === 0 && pnlRows.length === 0 ? (
           <EmptyState
             icon={Upload}
             title="이 기간 데이터가 없어요"
@@ -439,6 +465,27 @@ export function FinanceView() {
           />
         ) : (
           <div className="flex flex-col gap-6">
+            {/* 손익 계산기(현금흐름 탭) 합계 — 계산기에서 편집하면 여기 바로 반영 */}
+            {pnlRows.length > 0 && (
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-1">
+                  <span className="text-xs font-medium text-foreground">손익 계산기</span>
+                  <button onClick={() => setTab("cashflow")} className="text-xs text-muted-foreground hover:text-foreground">
+                    현금흐름 탭에서 편집 →
+                  </button>
+                </div>
+                <div className="flex flex-col gap-3">
+                  {pnlRows.map(([cur, v]) => (
+                    <div key={cur} className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                      <SummaryCard label={pnlRows.length > 1 ? `매출 (${cur})` : "매출"} value={money(v.revenue, cur)} className="text-success" />
+                      <SummaryCard label={pnlRows.length > 1 ? `비용 (${cur})` : "비용"} value={money(v.expense, cur)} className="text-destructive" />
+                      <SummaryCard label="순이익" value={money(v.revenue - v.expense, cur)} className={v.revenue - v.expense >= 0 ? "text-foreground" : "text-destructive"} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* 원화 환산 합계 (전 통화→KRW, fiat만) */}
             {fxConverted?.usedFx && (
               <div className="rounded-lg border bg-muted/30 p-3">
@@ -458,8 +505,11 @@ export function FinanceView() {
               </div>
             )}
 
-            {/* 통화별 KPI 카드 */}
+            {/* 통화별 KPI 카드 — 실제 장부(내역 기준). 위 손익 계산기와 구분 */}
             <div className="flex flex-col gap-3">
+              {pnlRows.length > 0 && currencyRows.length > 0 && (
+                <span className="text-xs font-medium text-muted-foreground">실제 장부 · 내역 기준</span>
+              )}
               {currencyRows.map(([cur, v]) => {
                 const net = v.revenue - v.expense
                 const prev = prevByCurrency[cur]
