@@ -74,8 +74,16 @@ export const CALC_TEMPLATES: CalcTemplate[] = [
   { id: "discount", label: "할인/묶음 — 정가 × (1−할인율) × 수량", flow: "revenue", fields: [{ key: "list", label: "정가", kind: "number" }, { key: "disc", label: "할인율", kind: "percent" }, { key: "qty", label: "수량", kind: "number" }], ast: op("*", op("*", f("list"), op("-", c(1), f("disc"))), f("qty")) },
   // 비용 일반
   { id: "qty", label: "수량 비용 — 갯수 × 단가 (+ 정액)", flow: "expense", fields: BUILTIN_FIELDS.qty, ast: QTY_AST },
-  { id: "labor", label: "인건비 — 시급 × 시간 × 인원", flow: "expense", fields: [{ key: "wage", label: "시급", kind: "number" }, { key: "hours", label: "근무시간", kind: "number" }, { key: "people", label: "인원", kind: "number" }], ast: op("*", op("*", f("wage"), f("hours")), f("people")) },
-  { id: "labor_ins", label: "인건비(4대보험) — 급여 × (1+보험요율)", flow: "expense", fields: [{ key: "salary", label: "월급여", kind: "number" }, { key: "ins", label: "사업주부담요율", kind: "percent" }], ast: op("*", f("salary"), op("+", c(1), f("ins"))) },
+  // 급여 — 한국 급여 형태별(2026 요율 조사 반영). 요율은 매년 바뀌므로 수식에 박지 않고 %칸+안내로.
+  // 2026 사업주 부담: 국민연금 4.75% + 건강 3.595%(+장기요양 12.95%) + 고용 1.15~1.75% + 산재(업종별) ≈ 약 10.8%
+  { id: "labor_ins", label: "정규직 월급 — 월급 × (1+사업주부담%) · 4대보험 사업주 약 10.8%(2026)", flow: "expense", fields: [{ key: "salary", label: "월급여", kind: "number" }, { key: "ins", label: "사업주부담", kind: "percent" }], ast: op("*", f("salary"), op("+", c(1), f("ins"))) },
+  { id: "salary_full", label: "정규직 총비용 — 월급 × (1+사업주부담%+퇴직적립%) · 퇴직적립 8.33%", flow: "expense", fields: [{ key: "salary", label: "월급여", kind: "number" }, { key: "ins", label: "사업주부담", kind: "percent" }, { key: "sev", label: "퇴직적립", kind: "percent" }], ast: op("*", f("salary"), op("+", op("+", c(1), f("ins")), f("sev"))) },
+  { id: "salary_annual", label: "연봉제 월 환산 — 연봉 ÷ 12 × (1+사업주부담%)", flow: "expense", fields: [{ key: "annual", label: "연봉", kind: "number" }, { key: "ins", label: "사업주부담", kind: "percent" }], ast: op("*", op("/", f("annual"), c(12)), op("+", c(1), f("ins"))) },
+  { id: "labor", label: "시급제 — 시급 × 시간 × 인원", flow: "expense", fields: [{ key: "wage", label: "시급", kind: "number" }, { key: "hours", label: "근무시간", kind: "number" }, { key: "people", label: "인원", kind: "number" }], ast: op("*", op("*", f("wage"), f("hours")), f("people")) },
+  { id: "parttime_week", label: "알바(주휴 포함) — 시급 × 월시간 × (1+주휴가산%) · 주15h↑ 약 20%", flow: "expense", fields: [{ key: "wage", label: "시급", kind: "number" }, { key: "hours", label: "월 근무시간", kind: "number" }, { key: "weekly", label: "주휴가산", kind: "percent" }], ast: op("*", op("*", f("wage"), f("hours")), op("+", c(1), f("weekly"))) },
+  { id: "daily_labor", label: "일용직 — 일당 × 근무일수 × 인원", flow: "expense", fields: [{ key: "daily", label: "일당", kind: "number" }, { key: "days", label: "근무일수", kind: "number" }, { key: "people", label: "인원", kind: "number" }], ast: op("*", op("*", f("daily"), f("days")), f("people")) },
+  { id: "freelance", label: "프리랜서(3.3%) — 지급액 그대로 · 원천징수는 지급액에 포함(회사 추가부담 없음)", flow: "expense", fields: [{ key: "amount", label: "지급액", kind: "number" }], ast: f("amount") },
+  { id: "incentive_pay", label: "기본급+성과급 — 기본급 + 매출 × 인센티브%", flow: "expense", fields: [{ key: "base", label: "기본급", kind: "number" }, { key: "rev", label: "대상 매출", kind: "number" }, { key: "rate", label: "인센티브", kind: "percent" }], ast: op("+", f("base"), op("*", f("rev"), f("rate"))) },
   { id: "rent", label: "임대료 — 평수 × 평당임대료", flow: "expense", fields: [{ key: "area", label: "면적(평)", kind: "number" }, { key: "perPy", label: "평당임대료", kind: "number" }], ast: op("*", f("area"), f("perPy")) },
   // F&B
   { id: "guest", label: "객단가 매출 — 객단가 × 방문수", flow: "revenue", fields: [{ key: "per", label: "객단가", kind: "number" }, { key: "visits", label: "방문객수", kind: "number" }], ast: op("*", f("per"), f("visits")) },
@@ -103,10 +111,11 @@ export const CALC_TEMPLATES: CalcTemplate[] = [
 ]
 
 // ── 템플릿 업종 카테고리(탐색용 탭·검색). 템플릿 정의는 안 건드리고 id로 매핑. ──
-export const TEMPLATE_CATEGORIES = ["이커머스", "비용", "F&B", "제조", "마케팅", "서비스", "광고·금융"] as const
+export const TEMPLATE_CATEGORIES = ["이커머스", "급여", "비용", "F&B", "제조", "마케팅", "서비스", "광고·금융"] as const
 const TEMPLATE_CATEGORY: Record<string, (typeof TEMPLATE_CATEGORIES)[number]> = {
   channel: "이커머스", ecom_settle: "이커머스", ecom_var: "이커머스", margin: "이커머스", discount: "이커머스",
-  qty: "비용", labor: "비용", labor_ins: "비용", rent: "비용",
+  labor: "급여", labor_ins: "급여", salary_full: "급여", salary_annual: "급여", parttime_week: "급여", daily_labor: "급여", freelance: "급여", incentive_pay: "급여",
+  qty: "비용", rent: "비용",
   guest: "F&B", food_cost: "F&B",
   mfg_mat: "제조", mfg_yield: "제조", cosmetic: "제조",
   influencer: "마케팅", fulfill_out: "마케팅", inbound: "마케팅",
