@@ -13,15 +13,9 @@ const CONTACT = "mailto:complow@complow.kr?subject=Complow 도입 문의"
 const RED = "#ff4628"
 const INK = "#202020"
 
+// 가로형 로고(심볼+워드마크 포함) — 대표 제공 브랜드 로고(2026-07-27)
 function Logo({ className = "" }: { className?: string }) {
-  return (
-    <span className={`inline-flex items-center gap-2 ${className}`}>
-      <Image src="/complow-logo.png" alt="Complow" width={215} height={120} className="h-[22px] w-auto" priority />
-      <span className="text-[17px] font-extrabold tracking-tight" style={{ color: INK }}>
-        Complow<span style={{ color: RED }}>.</span>
-      </span>
-    </span>
-  )
+  return <Image src="/brand/logo-horizontal.png" alt="Complow" width={1044} height={256} className={`h-7 w-auto ${className}`} priority />
 }
 
 export default function LandingPage() {
