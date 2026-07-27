@@ -18,10 +18,10 @@ import { useUndo } from "@/components/undo/UndoProvider"
 import { won, money, CURRENCIES, EXPENSE_CATEGORIES, REVENUE_CATEGORIES } from "@/lib/finance"
 import { downloadCsv, todayStamp } from "@/lib/csv"
 import type { FinanceEntry, TaxInvoice } from "@/types"
-import { usePeriodFilter, prevMonth, type PeriodMode } from "./usePeriodFilter"
+import { usePeriodFilter, type PeriodMode } from "./usePeriodFilter"
 import { CashFlowView } from "./CashFlowView"
 import { aggregateByCurrency, aggregateByCategory, toBreakdown, buildMonthlyTrend, type SumRow } from "./financeAgg"
-import { SummaryCard, TrendBadge, TrendBars, BreakdownBars } from "./financeCharts"
+import { TrendBars, BreakdownBars } from "./financeCharts"
 import { FinanceEntryModal } from "./FinanceEntryModal"
 import { TaxInvoiceModal } from "./TaxInvoiceModal"
 
@@ -283,12 +283,6 @@ export function FinanceView() {
       }),
     [byCurrency],
   )
-  // 전월대비(증감% 배지) — mode='month'일 때만 의미. trendRaw에서 prevMonth(ym) 버킷 집계.
-  const prevByCurrency = useMemo(() => {
-    const pr = monthRange(prevMonth(ym))
-    return aggregateByCurrency(trendRaw.filter((r) => r.entry_date != null && r.entry_date >= pr.start && r.entry_date < pr.end))
-  }, [trendRaw, ym])
-  const showTrend = mode === "month"
   const expenseBreakdown = useMemo(() => toBreakdown(aggregateByCategory(sumRows, "expense")), [sumRows])
   const revenueBreakdown = useMemo(() => toBreakdown(aggregateByCategory(sumRows, "revenue")), [sumRows])
 
@@ -422,61 +416,21 @@ export function FinanceView() {
           {/* 기록 집계(구 요약 흡수) — 이 기간 내역의 합계·추세·분류. 회사 손익의 기준은 '손익' 탭. */}
           {currencyRows.length > 0 && (
           <div className="flex flex-col gap-4">
-            {/* 원화 환산 합계 (전 통화→KRW, fiat만) */}
-            {fxConverted?.usedFx && (
-              <div className="rounded-lg border bg-muted/30 p-3">
-                <div className="mb-2 flex flex-wrap items-center justify-between gap-1">
-                  <span className="text-xs font-medium text-foreground">
-                    원화 환산 합계 <span className="font-normal text-muted-foreground">(전 통화 → KRW)</span>
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    기준환율 {fxConverted.asOf ?? "—"} · 참고{fxConverted.skippedBtc ? " · BTC 제외" : ""}
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <SummaryCard label="총 매출" value={won(Math.round(fxConverted.revenue))} className="text-success" />
-                  <SummaryCard label="총 지출" value={won(Math.round(fxConverted.expense))} className="text-destructive" />
-                  <SummaryCard label="순수익" value={won(Math.round(fxConverted.net))} className={fxConverted.net >= 0 ? "text-foreground" : "text-destructive"} />
-                </div>
-              </div>
-            )}
-
-            {/* 통화별 합계 카드 — 이 기간 기록(내역) 기준 */}
-            <div className="flex flex-col gap-3">
-              {currencyRows.map(([cur, v]) => {
-                const net = v.revenue - v.expense
-                const prev = prevByCurrency[cur]
-                const prevNet = prev ? prev.revenue - prev.expense : 0
-                return (
-                  <div key={cur} className="flex flex-col gap-1.5">
-                    {currencyRows.length > 1 && (
-                      <span className="text-xs font-medium text-muted-foreground">
-                        {CURRENCIES.find((c) => c.code === cur)?.label ?? cur}
-                      </span>
-                    )}
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                      <SummaryCard
-                        label="총 매출"
-                        value={money(v.revenue, cur)}
-                        className="text-success"
-                        trend={showTrend && prev ? <TrendBadge curr={v.revenue} prev={prev.revenue} /> : undefined}
-                      />
-                      <SummaryCard
-                        label="총 지출"
-                        value={money(v.expense, cur)}
-                        className="text-destructive"
-                        trend={showTrend && prev ? <TrendBadge curr={v.expense} prev={prev.expense} invert /> : undefined}
-                      />
-                      <SummaryCard
-                        label="순수익"
-                        value={money(net, cur)}
-                        className={net >= 0 ? "text-foreground" : "text-destructive"}
-                        trend={showTrend && prev ? <TrendBadge curr={net} prev={prevNet} /> : undefined}
-                      />
-                    </div>
-                  </div>
-                )
-              })}
+            {/* 기록 합계 — 작은 한 줄. 큰 KPI 카드·'순수익' 표기는 손익 탭과 헷갈려 제거(손익=손익 탭이 유일 기준). */}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">이 기간 기록 합계</span>
+              {currencyRows.map(([cur, v]) => (
+                <span key={cur} className="tabular-nums">
+                  {currencyRows.length > 1 ? `${cur} ` : ""}매출 <b className="font-medium text-success">{money(v.revenue, cur)}</b> · 지출{" "}
+                  <b className="font-medium text-destructive">{money(v.expense, cur)}</b>
+                </span>
+              ))}
+              {fxConverted?.usedFx && (
+                <span className="tabular-nums text-muted-foreground/70">
+                  ≈ 환산 매출 {won(Math.round(fxConverted.revenue))} · 지출 {won(Math.round(fxConverted.expense))} (기준환율{" "}
+                  {fxConverted.asOf ?? "—"}{fxConverted.skippedBtc ? " · BTC 제외" : ""})
+                </span>
+              )}
             </div>
 
             {/* 월간 추세(작게·좌 2/5) + 분류 분해(우 3/5) — 한눈에 */}
