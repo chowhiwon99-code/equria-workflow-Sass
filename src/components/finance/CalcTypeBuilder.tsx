@@ -90,7 +90,17 @@ export function CalcTypeBuilder({ types, editType, onClose, onSaved }: { types: 
 
   // 텍스트 → AST+칸 (편집 모드는 기존 칸의 key·kind 보존)
   const parsed = useMemo(() => parseFormulaText(formulaText, isEdit ? editFields : []), [formulaText, isEdit, editFields])
-  // 자연어 → 수식 AI 폴백(파서 실패 시에만 버튼 노출) — 결과는 다시 파서가 검증
+  // 문장 감지 — 암묵 곱셈 때문에 "제품을 여러개로 곱해줘" 같은 문장이 엉터리 수식으로 '성공'해버려
+  // AI 버튼이 안 뜨던 문제 방지: 동사/조사 단서가 있거나, 연산자·숫자 없이 단어만 나열이면 문장으로 본다.
+  const looksLikeSentence = useMemo(() => {
+    const t = formulaText.trim()
+    if (!t) return false
+    const HINTS = ["곱해", "곱하", "더해", "더하", "나눠", "나누", "빼줘", "빼주", "떼", "얹", "해줘", "해주", "주세요", "퍼센트", "프로", "합쳐", "합해", "값을", "금액을"]
+    if (HINTS.some((w) => t.includes(w))) return true
+    const hasFormulaSignal = /[+\-−–*×/÷%()]/.test(t) || /\d/.test(t)
+    return !hasFormulaSignal && parsed.ok && parsed.fields.length >= 2
+  }, [formulaText, parsed])
+  // 자연어 → 수식 AI 폴백 — 결과는 다시 파서가 검증
   const [aiBusy, setAiBusy] = useState(false)
   const aiConvert = async () => {
     setAiBusy(true)
@@ -281,6 +291,19 @@ export function CalcTypeBuilder({ types, editType, onClose, onSaved }: { types: 
                 {formulaText.trim() &&
                   (parsed.ok ? (
                     <div className="flex flex-col gap-1">
+                      {/* 문장 같으면 — 해석이 엉터리일 수 있으니 AI 변환을 먼저 권함 */}
+                      {looksLikeSentence && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-[11px] text-warning">문장처럼 보여요 — 아래 해석이 이상하면:</span>
+                          <button
+                            onClick={aiConvert}
+                            disabled={aiBusy}
+                            className="inline-flex items-center gap-1 rounded border border-primary/40 px-1.5 py-0.5 text-[11px] font-medium text-primary transition-colors hover:bg-primary/10 disabled:opacity-50"
+                          >
+                            {aiBusy ? <Loader2 className="size-3 animate-spin" /> : null} AI로 수식 바꾸기
+                          </button>
+                        </div>
+                      )}
                       {/* 해석 — 암묵 곱셈("급여 3.3%"→급여 × 3.3%) 등 파서가 이해한 결과를 투명하게 */}
                       <p className="text-[11px] text-muted-foreground">
                         해석: <span className="font-medium text-foreground">{astToEditableText(parsed.ast, parsed.fields)}</span>
