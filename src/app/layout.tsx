@@ -14,6 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://complow.kr"),
   title: "Complow 워크스페이스",
   description: "Complow 직원 전용 워크스페이스",
 };

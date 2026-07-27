@@ -67,7 +67,7 @@ const FAQS = [
   { q: "정말 무료로 시작할 수 있나요?", a: "네. 14일 동안 모든 기능을 무료로 쓸 수 있습니다. 체험 중 기능 제한은 없습니다." },
   { q: "가격은 언제 공개되나요?", a: "현재 준비 중입니다. 사전 신청한 회사에는 얼리버드 할인이 적용될 예정이니 도입 문의로 미리 알려주세요." },
   { q: "우리 회사 데이터는 안전한가요?", a: "회사별로 데이터가 격리되고, 민감 정보는 암호화해 국내 리전에 저장합니다. 데이터의 소유권은 회사에 있습니다." },
-  { q: "우리 회사 방식에 맞출 수 있나요?", a: "그게 Complow의 출발점입니다. 손익 계산 수식, AI 에이전트, 결재선까지 회사 방식대로 직접 구성할 수 있습니다." },
+  { q: "우리 회사 방식에 맞출 수 있나요?", a: "그게 컴플로우(Complow)의 출발점입니다. 손익 계산 수식, AI 에이전트, 결재선까지 회사 방식대로 직접 구성할 수 있습니다." },
   { q: "도입은 어떻게 진행되나요?", a: "도입 문의를 남기면 세팅부터 온보딩까지 함께합니다. 쓰던 도구(구글·노션 등)는 연동으로 그대로 이어집니다." },
 ]
 
@@ -112,7 +112,7 @@ export default function LandingPage() {
           하나의 워크스페이스로.
         </h1>
         <p className="animate-fade-up mx-auto mt-6 max-w-md text-[17px] leading-relaxed text-black/45" style={{ animationDelay: "0.1s" }}>
-          AI 에이전트부터 손익 관리까지 — 회사에 맞게 커스터마이징되는 업무 플랫폼.
+          AI 에이전트부터 손익 관리까지 — 회사에 맞게 커스터마이징되는 업무 플랫폼, 컴플로우.
         </p>
         <div className="animate-fade-up mt-10 flex flex-col items-center gap-4" style={{ animationDelay: "0.2s" }}>
           <div className="flex flex-col items-center gap-3 sm:flex-row">

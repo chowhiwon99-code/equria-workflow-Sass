@@ -1,5 +1,11 @@
+import type { Metadata } from "next"
 import Link from "next/link"
 import Image from "next/image"
+
+// 로그인·가입 화면은 검색 색인 제외 — 검색엔 랜딩이 나와야 한다(구글이 구 로그인 문구를 스니펫으로 쓰던 문제).
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+}
 
 export default function AuthLayout({
   children,
