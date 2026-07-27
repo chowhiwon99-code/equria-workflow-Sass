@@ -1,6 +1,6 @@
 import Link from "next/link"
 import Image from "next/image"
-import { ArrowRight, Bot, LineChart, MessagesSquare, Stamp, Plug, ShieldCheck } from "lucide-react"
+import { ArrowRight, Bot, LineChart, MessagesSquare, Stamp, Plug, ShieldCheck, Sparkles, LayoutDashboard, Calendar, FolderKanban, Receipt, CheckCircle2 } from "lucide-react"
 
 /**
  * Complow 랜딩(마케팅) 페이지 — 공개(로그인 불필요).
@@ -41,17 +41,30 @@ export default function LandingPage() {
         </div>
       </header>
 
-      {/* ── 히어로 — 타이포가 주인공 ── */}
-      <section className="mx-auto max-w-4xl px-6 pb-28 pt-28 text-center sm:pt-36">
-        <h1 className="text-[clamp(2.4rem,7vw,4.2rem)] font-extrabold leading-[1.08] tracking-[-0.035em]">
+      {/* ── 히어로 — 타이포 중심 + 잔디식 플로팅 AI 말풍선 ── */}
+      <section className="relative mx-auto max-w-5xl px-6 pt-28 text-center sm:pt-36">
+        {/* 떠다니는 AI 프롬프트 칩(장식) — 데스크톱만, 각기 다른 딜레이로 둥둥 */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 hidden lg:block">
+          <span className="animate-float absolute left-2 top-24 inline-flex items-center gap-1.5 rounded-full border border-black/[0.07] bg-white px-3.5 py-2 text-[13px] font-medium text-black/60 shadow-[0_8px_24px_rgba(0,0,0,0.07)]">
+            <Sparkles className="size-3.5" /> 회사 톤으로 메일 써줘
+          </span>
+          <span className="animate-float absolute right-0 top-40 inline-flex items-center gap-1.5 rounded-full border border-black/[0.07] bg-white px-3.5 py-2 text-[13px] font-medium text-black/60 shadow-[0_8px_24px_rgba(0,0,0,0.07)]" style={{ animationDelay: "0.7s" }}>
+            <Bot className="size-3.5" /> 이번 달 손익 요약해줘
+          </span>
+          <span className="animate-float absolute left-16 top-[19rem] inline-flex items-center gap-1.5 rounded-full border border-black/[0.07] bg-white px-3.5 py-2 text-[13px] font-medium text-black/60 shadow-[0_8px_24px_rgba(0,0,0,0.07)]" style={{ animationDelay: "1.3s" }}>
+            <CheckCircle2 className="size-3.5" /> 회의록 액션아이템 뽑아줘
+          </span>
+        </div>
+
+        <h1 className="animate-fade-up text-[clamp(2.4rem,7vw,4.2rem)] font-extrabold leading-[1.08] tracking-[-0.035em]">
           회사의 모든 일을,
           <br />
           하나의 워크스페이스로.
         </h1>
-        <p className="mx-auto mt-6 max-w-md text-[17px] leading-relaxed text-black/45">
+        <p className="animate-fade-up mx-auto mt-6 max-w-md text-[17px] leading-relaxed text-black/45" style={{ animationDelay: "0.1s" }}>
           AI 에이전트부터 손익 관리까지 — 회사에 맞게 커스터마이징되는 업무 플랫폼.
         </p>
-        <div className="mt-10 flex flex-col items-center gap-4">
+        <div className="animate-fade-up mt-10 flex flex-col items-center gap-4" style={{ animationDelay: "0.2s" }}>
           <a
             href={CONTACT}
             className="inline-flex items-center gap-2 rounded-full px-7 py-4 text-[15px] font-bold text-white transition-opacity hover:opacity-80"
@@ -60,6 +73,79 @@ export default function LandingPage() {
             도입 문의하기 <ArrowRight className="size-4" />
           </a>
           <span className="text-[13px] text-black/35">문의 후 1영업일 내 회신 · 도입부터 세팅까지 함께합니다</span>
+        </div>
+
+        {/* ── 제품 화면(실제 디자인 재현·데모 숫자) — 스르륵 등장 ── */}
+        <div className="animate-fade-up relative mx-auto mt-16 max-w-4xl pb-24 text-left" style={{ animationDelay: "0.35s" }}>
+          <div className="overflow-hidden rounded-2xl border border-black/[0.08] bg-white shadow-[0_24px_60px_rgba(0,0,0,0.10)]">
+            {/* 브라우저 바 */}
+            <div className="flex items-center gap-2 border-b border-black/[0.06] bg-[#fafafa] px-4 py-2.5">
+              <span className="size-2.5 rounded-full bg-[#ff5f57]" />
+              <span className="size-2.5 rounded-full bg-[#febc2e]" />
+              <span className="size-2.5 rounded-full bg-[#28c840]" />
+              <span className="ml-3 rounded-md bg-white px-3 py-1 text-[11px] font-medium text-black/40 shadow-sm">complow.kr</span>
+            </div>
+            <div className="flex h-[360px]">
+              {/* 사이드바 — 실제 메뉴 구성 */}
+              <aside className="hidden w-44 shrink-0 border-r border-black/[0.05] bg-[#fbfbfc] px-2.5 py-3 sm:block">
+                <Image src="/brand/logo-horizontal.png" alt="" width={1046} height={256} className="mb-4 ml-1.5 h-4 w-auto" />
+                {[
+                  { icon: LayoutDashboard, l: "대시보드", on: true },
+                  { icon: Calendar, l: "팀 캘린더" },
+                  { icon: FolderKanban, l: "프로젝트" },
+                  { icon: MessagesSquare, l: "직원 채팅" },
+                  { icon: Receipt, l: "비용·매출" },
+                  { icon: Bot, l: "AI 에이전트" },
+                  { icon: Stamp, l: "전자결재" },
+                ].map((m) => (
+                  <div key={m.l} className={`mb-0.5 flex items-center gap-2 rounded-lg px-2 py-1.5 text-[12px] font-medium ${m.on ? "bg-black/[0.05] text-black" : "text-black/45"}`}>
+                    <m.icon className="size-3.5" strokeWidth={1.75} /> {m.l}
+                  </div>
+                ))}
+              </aside>
+              {/* 본문 — 손익 요약(데모 숫자) */}
+              <div className="min-w-0 flex-1 bg-[#f7f8fa] p-5">
+                <p className="text-[13px] font-semibold">손익 요약</p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-600">매출 ₩128,400,000</span>
+                  <span className="rounded-full bg-rose-500/10 px-2.5 py-1 text-[11px] font-semibold text-rose-500">비용 ₩41,200,000</span>
+                  <span className="rounded-full bg-blue-500/10 px-2.5 py-1 text-[11px] font-semibold text-blue-600">순이익 ₩87,200,000</span>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div className="rounded-xl border border-black/[0.05] bg-white p-3.5 shadow-sm">
+                    <p className="text-[11px] font-semibold text-black/40">오늘 할 일</p>
+                    {["신제품 발주서 확정", "11월 정산 기록", "채용 면접 2시"].map((t, i) => (
+                      <div key={t} className="mt-2 flex items-center gap-2 text-[12px] text-black/70">
+                        <CheckCircle2 className={`size-3.5 ${i === 0 ? "text-emerald-500" : "text-black/20"}`} /> {t}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="rounded-xl border border-black/[0.05] bg-white p-3.5 shadow-sm">
+                    <p className="text-[11px] font-semibold text-black/40">최근 기록</p>
+                    {[["네이버 정산", "+₩42,300,000"], ["물류비", "−₩3,120,000"], ["마케팅비", "−₩1,800,000"]].map(([l, v]) => (
+                      <div key={l} className="mt-2 flex items-center justify-between text-[12px]">
+                        <span className="text-black/70">{l}</span>
+                        <span className={`tabular-nums ${v.startsWith("+") ? "text-emerald-600" : "text-black/50"}`}>{v}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 에이전트 채팅 오버레이 — 둥둥 */}
+          <div className="animate-float absolute -bottom-8 right-2 w-72 rounded-2xl border border-black/[0.07] bg-white p-3.5 shadow-[0_16px_48px_rgba(0,0,0,0.14)] sm:right-6" style={{ animationDelay: "0.5s" }}>
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-black/40">
+              <Bot className="size-3.5" /> AI 에이전트
+            </div>
+            <div className="mt-2 ml-auto w-fit rounded-2xl rounded-br-sm px-3 py-1.5 text-[12px] font-medium text-white" style={{ background: INK }}>
+              이번 달 손익 요약해줘
+            </div>
+            <div className="mt-1.5 w-fit rounded-2xl rounded-bl-sm bg-black/[0.05] px-3 py-1.5 text-[12px] leading-relaxed text-black/70">
+              10월 매출 ₩128,400,000 · 순이익 ₩87,200,000 — 전월 대비 12% 늘었어요.
+            </div>
+          </div>
         </div>
       </section>
 
