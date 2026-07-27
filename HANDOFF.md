@@ -27,7 +27,7 @@
 ### 🔴 기존 미해결 대표 액션(연동/보안)
 - 🏠 **랜딩 트랙 진행(최신 `5d47732`)**: 공개→새 로고(순검정)→미니멀 전환→잔디식 모션(플로팅 AI 칩·제품 화면 재현)→**구독제 섹션 UX 틀**(가격 ₩— 플레이스홀더·얼리버드/연간/리퍼럴 자리). [대표 결정] 수익모델=**구독제**(가격은 토큰 원가 측정 후 확정)·프로모션=얼리버드+연간 2개월+리퍼럴·CTA=도입 문의 유지(보류). 다음=토큰 원가 측정→가격 확정→사전 신청 CTA.
 - 🏠 이전 랜딩 공개(`bfa92d2`): complow.kr 루트=마케팅 랜딩(도입 문의 CTA·기능 6종·가격 없음—대표 결정). 로그인 상태는 대시보드로. 법적 문서 로그인 리다이렉트 버그 픽스.
-- 📄 **구글 브랜드 검증 제출(대표 액션·준비물 완료)**: /privacy·/terms 게시됨(`4eb9499`) → ① Search Console에서 complow.kr 도메인 소유 인증 ② 콘솔 Google 인증 플랫폼→브랜딩: 앱 로고·홈페이지 `https://complow.kr`·개인정보처리방침 `https://complow.kr/privacy`·서비스 약관 `https://complow.kr/terms`·승인된 도메인 `complow.kr` ③ 대상 탭 "앱 게시"→확인 요청 제출. **PG(결제) 심사 병렬 준비(대표 체크리스트)**: /terms·/privacy·/refund(`42d72c7`)·서비스URL=완료 4칸 / 대표 남은 것=통신판매업 신고(정부24·구매안전서비스 이용확인증 필요)·사업자 명의 통장 사본(스코프 사유: "사내 업무용 AI가 사용자를 대신해 메일 초안 작성(gmail.compose)·일정 조회(calendar.events.readonly)"). 심사 며칠~2주·통과 시 가입 즉시 구글 연동. ⚠️ 법적 문서는 변호사 검토 전 게시 상태.
+- 📄 **구글 브랜드 검증 제출(대표 액션·준비물 완료)**: /privacy·/terms 게시됨(`4eb9499`) → ① ✅ Search Console complow.kr 도메인 소유 인증 **완료(2026-07-28**, 가비아 TXT `uo_Wtvs...b45w` 추가·통과. 후속: sitemap.xml 제출+루트 색인 요청은 대표 진행 중) ② 콘솔 Google 인증 플랫폼→브랜딩: 앱 로고·홈페이지 `https://complow.kr`·개인정보처리방침 `https://complow.kr/privacy`·서비스 약관 `https://complow.kr/terms`·승인된 도메인 `complow.kr` ③ 대상 탭 "앱 게시"→확인 요청 제출. **PG(결제) 심사 병렬 준비(대표 체크리스트)**: /terms·/privacy·/refund(`42d72c7`)·서비스URL=완료 4칸 / 대표 남은 것=통신판매업 신고(정부24·구매안전서비스 이용확인증 필요)·사업자 명의 통장 사본(스코프 사유: "사내 업무용 AI가 사용자를 대신해 메일 초안 작성(gmail.compose)·일정 조회(calendar.events.readonly)"). 심사 며칠~2주·통과 시 가입 즉시 구글 연동. ⚠️ 법적 문서는 변호사 검토 전 게시 상태.
 - 🔑 공용비번 `4321`→강한 값 · 📧 **네이티브 구글(메일/드라이브 탭) 복구** = Vercel `GOOGLE_OAUTH_REDIRECT_URI=https://complow.kr/api/google/callback` + Google Console '승인된 리디렉션 URI' 등록(트랙1의 에이전트용 구글 MCP와는 별개 통합).
 
 ---
