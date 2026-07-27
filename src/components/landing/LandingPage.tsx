@@ -162,6 +162,55 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── 구독제 — UX 틀(가격은 토큰 원가 측정 후 확정, 프로모션 자리만 선반영) ── */}
+      <section className="mx-auto max-w-4xl border-t border-black/[0.06] px-6 py-24">
+        <div className="text-center">
+          <h2 className="text-[clamp(1.6rem,4vw,2.2rem)] font-extrabold tracking-[-0.02em]">간단한 구독제</h2>
+          <p className="mt-3 text-[15px] text-black/45">회사 단위로 시작하고, 인원만큼만 내세요. 14일 무료 체험.</p>
+          {/* 얼리버드 스트립(프로모션 틀) */}
+          <span className="mt-5 inline-flex items-center gap-1.5 rounded-full border border-black/[0.08] bg-black/[0.03] px-3.5 py-1.5 text-[12px] font-semibold text-black/60">
+            <Sparkles className="size-3.5" /> 얼리버드 — 사전 신청 회사 한정 할인 예정
+          </span>
+        </div>
+        <div className="mx-auto mt-10 grid max-w-2xl gap-4 sm:grid-cols-2">
+          {/* 스탠다드 */}
+          <div className="rounded-2xl border p-7" style={{ borderColor: INK }}>
+            <div className="flex items-center justify-between">
+              <span className="text-[15px] font-bold">스탠다드</span>
+              <span className="rounded-full px-2.5 py-1 text-[11px] font-bold text-white" style={{ background: INK }}>추천</span>
+            </div>
+            <div className="mt-4 flex items-baseline gap-1.5">
+              <span className="text-3xl font-extrabold tracking-tight">₩ —</span>
+              <span className="text-[13px] text-black/40">/인/월 · 가격 공개 예정</span>
+            </div>
+            <ul className="mt-5 space-y-2 text-[14px] text-black/60">
+              <li>모든 기능 (AI 에이전트·손익·협업·결재)</li>
+              <li>AI 표준 사용량 포함</li>
+              <li>이메일 지원</li>
+            </ul>
+            <a href={CONTACT} className="mt-7 block rounded-full py-3 text-center text-[14px] font-bold text-white transition-opacity hover:opacity-80" style={{ background: INK }}>
+              도입 문의하기
+            </a>
+          </div>
+          {/* 프로 */}
+          <div className="rounded-2xl border border-black/[0.08] p-7">
+            <span className="text-[15px] font-bold">프로</span>
+            <div className="mt-4 flex items-baseline gap-1.5">
+              <span className="text-3xl font-extrabold tracking-tight text-black/70">₩ —</span>
+              <span className="text-[13px] text-black/40">/인/월 · 준비 중</span>
+            </div>
+            <ul className="mt-5 space-y-2 text-[14px] text-black/60">
+              <li>스탠다드 전체 포함</li>
+              <li>AI 사용량 한도 상향</li>
+              <li>우선 지원·도입 컨설팅</li>
+            </ul>
+            <span className="mt-7 block rounded-full border border-black/15 py-3 text-center text-[14px] font-bold text-black/35">준비 중</span>
+          </div>
+        </div>
+        {/* 프로모션 틀 — 연간·리퍼럴 자리 */}
+        <p className="mt-6 text-center text-[13px] text-black/40">연간 결제 시 2개월 무료 · 추천한 회사가 시작하면 양쪽 모두 1개월 무료</p>
+      </section>
+
       {/* ── 마무리 ── */}
       <section className="mx-auto max-w-4xl border-t border-black/[0.06] px-6 py-24 text-center">
         <h2 className="text-[clamp(1.6rem,4vw,2.2rem)] font-extrabold tracking-[-0.02em]">지금, 회사의 일을 흐르게.</h2>
