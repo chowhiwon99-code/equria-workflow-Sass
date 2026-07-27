@@ -41,6 +41,7 @@ export function CashFlowCanvas({
   onMoveAccount,
   onMovePool,
   onSetOpening,
+  onRecord,
 }: {
   slots: CashAccount[]
   groups: CashCategory[]
@@ -58,6 +59,7 @@ export function CashFlowCanvas({
   onMoveAccount: (id: string, x: number, y: number) => void
   onMovePool: (x: number, y: number) => void
   onSetOpening: (currency: string, value: number) => void
+  onRecord: (slot: CashAccount) => void
 }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const [drag, setDrag] = useState<Drag>(null)
@@ -230,6 +232,7 @@ export function CashFlowCanvas({
     defaultCalcTypeId,
     onUpdateSlot,
     onDeleteSlot,
+    onRecord,
     onUngroup: s.category_id
       ? () => {
           // 그룹 오른쪽 옆에 자유 배치(falsy 0 폴백 버그 없이).
@@ -341,6 +344,7 @@ function SlotCard({
   onGrip,
   onUpdateSlot,
   onDeleteSlot,
+  onRecord,
   onUngroup,
 }: {
   slot: CashAccount
@@ -354,10 +358,12 @@ function SlotCard({
   onGrip: (e: React.PointerEvent) => void
   onUpdateSlot: (id: string, patch: Partial<CashAccount>) => void
   onDeleteSlot: (slot: CashAccount) => void
+  onRecord: (slot: CashAccount) => void
   onUngroup?: () => void
 }) {
   // 계산칸 표시 = 계산유형(기본 포함)이거나 수량/채널. 구분 잠금은 '명명 커스텀'만(기본계산·수량/채널은 구분 편집 유지 — 표와 동일).
   const calc = !!s.calc_type_id || s.item_type === "qty" || s.item_type === "channel"
+  const isHold = slotCategory(s.kind) === "hold" // 보유금 — 장부 개념 없음, 직접 입력 유지
   const isOtherCustom = !!s.calc_type_id && s.calc_type_id !== defaultCalcTypeId
   const { fields, getVal, setVal } = fieldsOf(s, calcTypes, onUpdateSlot)
   // 타이핑 즉시 금액 미리보기 — 입력 중 로컬 override로 계산(커밋은 blur에서 DB 반영).
@@ -431,14 +437,34 @@ function SlotCard({
                 </label>
               ))}
             </div>
-            <p className="text-right text-sm font-bold tabular-nums">{money(shownAmount, s.currency)}</p>
+            {isHold ? (
+              <p className="text-right text-sm font-bold tabular-nums">{money(shownAmount, s.currency)}</p>
+            ) : (
+              <>
+                {/* 계산값 = 기록 프리필 도우미 · 굵은 금액 = 이번 달 장부 기록 합계(진실) */}
+                <div className="flex items-center justify-between gap-1 text-[11px] text-muted-foreground">
+                  <span className="tabular-nums" title="수식 계산값 — '기록'을 누르면 이 값이 장부에 기록돼요">계산값 {money(shownAmount, s.currency)}</span>
+                  <button onClick={() => onRecord(s)} className="rounded border px-1.5 py-0.5 font-medium transition-colors hover:border-primary/40 hover:text-primary" title="장부에 기록">
+                    기록
+                  </button>
+                </div>
+                <p className="text-right text-sm font-bold tabular-nums" title="이번 달 기록 합계 — 장부 기준">{money(Number(s.amount), s.currency)}</p>
+              </>
+            )}
           </>
         ) : s.item_type === "ledger" ? (
-          // 장부 연동 — 이번 달 내역 합계 자동 반영(수정 불가, 삭제로 해제)
-          <p className="text-right text-sm font-bold tabular-nums" title="장부 자동 — 내역이 바뀌면 갱신돼요">{money(Number(s.amount), s.currency)}</p>
-        ) : (
+          // 장부 연동(잔여 자동) — 슬롯 미연결 기록 합계 자동 반영(수정 불가, 삭제로 해제)
+          <p className="text-right text-sm font-bold tabular-nums" title="미연결 기록 잔여 합계 — 장부 자동">{money(Number(s.amount), s.currency)}</p>
+        ) : isHold ? (
           <div className="text-right">
             <InlineNumber value={Number(s.amount)} onCommit={(v) => onUpdateSlot(s.id, { amount: v })} width="w-full" />
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-1">
+            <button onClick={() => onRecord(s)} className="rounded border px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary" title="장부에 기록">
+              기록
+            </button>
+            <p className="text-right text-sm font-bold tabular-nums" title="이번 달 기록 합계 — 장부 기준">{money(Number(s.amount), s.currency)}</p>
           </div>
         )}
         <InlineText value={s.note ?? ""} onCommit={(v) => onUpdateSlot(s.id, { note: v })} className="w-full text-[11px] text-muted-foreground" placeholder="설명" />

@@ -1,7 +1,7 @@
 "use client"
 
 import { Fragment, useMemo, useState } from "react"
-import { Trash2, Plus, Search, ArrowUpDown, ArrowUp, ArrowDown, SlidersHorizontal, ChevronDown, ChevronRight } from "lucide-react"
+import { Trash2, Plus, Search, ArrowUpDown, ArrowUp, ArrowDown, SlidersHorizontal, ChevronDown, ChevronRight, PenLine } from "lucide-react"
 import { CURRENCIES, EXPENSE_CATEGORIES, REVENUE_CATEGORIES, money } from "@/lib/finance"
 import { SLOT_TYPES, ITEM_TYPES, slotLabel, slotColor, fieldsOf, astOf } from "@/lib/cashAccounts"
 import { tagBg, swatch, CATEGORY_COLORS } from "@/lib/meetingMeta"
@@ -26,6 +26,7 @@ export function CashGrid({
   onDeleteSlot,
   onUpdateCalcType,
   onEditColumns,
+  onRecord,
 }: {
   slots: CashAccount[]
   groups: CashCategory[]
@@ -37,6 +38,7 @@ export function CashGrid({
   onDeleteSlot: (slot: CashAccount) => void
   onUpdateCalcType: (id: string, patch: Partial<CashCalcType>) => void
   onEditColumns: () => void
+  onRecord: (slot: CashAccount) => void
 }) {
   const [q, setQ] = useState("")
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "kind", dir: 1 })
@@ -182,6 +184,12 @@ export function CashGrid({
                   {editor(f)}
                 </label>
               ))}
+              {/* 계산값 = 기록 프리필용 도우미(진실 아님 — 진실은 금액 열의 이번 달 기록 합계) */}
+              {slotCategory(s.kind) !== "hold" && (
+                <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] tabular-nums text-muted-foreground" title="수식 계산값 — '기록'을 누르면 이 값이 장부에 기록돼요">
+                  계산값 {money(shownAmount, s.currency)}
+                </span>
+              )}
             </div>
           </td>
         ) : s.item_type === "ledger" ? (
@@ -218,8 +226,14 @@ export function CashGrid({
         )}
         <td className="px-2 py-1 text-right">
           {s.item_type === "ledger" ? (
-            <span className="px-1 font-medium tabular-nums" title="장부 자동 — 내역이 바뀌면 갱신돼요">{money(Number(s.amount), s.currency)}</span>
-          ) : calc ? <span className="px-1 font-medium tabular-nums">{money(shownAmount, s.currency)}</span> : <InlineNumber width="w-24" value={Number(s.amount)} onCommit={(v) => onUpdateSlot(s.id, { amount: v })} />}
+            <span className="px-1 font-medium tabular-nums" title="미연결 기록 잔여 합계 — 장부 자동">{money(Number(s.amount), s.currency)}</span>
+          ) : slotCategory(s.kind) === "hold" ? (
+            /* 보유금 — 장부 개념 없음, 직접 입력/수식 유지 */
+            calc ? <span className="px-1 font-medium tabular-nums">{money(shownAmount, s.currency)}</span> : <InlineNumber width="w-24" value={Number(s.amount)} onCommit={(v) => onUpdateSlot(s.id, { amount: v })} />
+          ) : (
+            /* 매출·비용 = 원장 파생(이번 달 자기 기록 합계) — 편집은 '기록'으로 */
+            <span className="px-1 font-medium tabular-nums" title="이번 달 기록 합계 — 장부 기준(기록 버튼으로 추가)">{money(Number(s.amount), s.currency)}</span>
+          )}
         </td>
         <td className="px-2 py-1">
           <select value={s.currency} onChange={(e) => onUpdateSlot(s.id, { currency: e.target.value })} className="rounded border-0 bg-transparent text-xs outline-none focus:ring-1 focus:ring-ring">
@@ -228,10 +242,18 @@ export function CashGrid({
             ))}
           </select>
         </td>
-        <td className="px-1 py-1 text-right">
-          <button onClick={() => onDeleteSlot(s)} className="text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:text-destructive" title="삭제">
-            <Trash2 className="size-3.5" />
-          </button>
+        <td className="px-1 py-1">
+          <div className="flex items-center justify-end gap-1.5">
+            {/* 기록 — 매출·비용 슬롯의 장부 쓰기(항상 노출). 보유금·ledger 자동 슬롯 제외 */}
+            {s.item_type !== "ledger" && slotCategory(s.kind) !== "hold" && (
+              <button onClick={() => onRecord(s)} className="rounded p-0.5 text-muted-foreground transition hover:text-primary" title="장부에 기록">
+                <PenLine className="size-3.5" />
+              </button>
+            )}
+            <button onClick={() => onDeleteSlot(s)} className="text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:text-destructive" title="삭제">
+              <Trash2 className="size-3.5" />
+            </button>
+          </div>
         </td>
       </tr>
     )
@@ -273,7 +295,7 @@ export function CashGrid({
               ) : (
                 <th className={thR}>계산</th>
               )}
-              <th className={thR}><button onClick={() => toggleSort("amount")} className="inline-flex items-center gap-1 hover:text-foreground">금액 {sortIcon("amount")}</button></th>
+              <th className={thR}><button onClick={() => toggleSort("amount")} className="inline-flex items-center gap-1 hover:text-foreground" title="매출·비용 = 이번 달 장부 기록 합계(자동) · 보유금 = 직접 입력">이번 달 금액 {sortIcon("amount")}</button></th>
               <th className={th}>통화</th>
               <th className="w-8 px-1 py-2" />
             </tr>

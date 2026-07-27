@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button"
 import { downloadCsv, todayStamp } from "@/lib/csv"
 import { downloadPnlXlsx } from "@/lib/xlsx"
 import { money, CURRENCIES, computeSlotAmount } from "@/lib/finance"
-import { slotLabel, CASHFLOW_TEMPLATES, ITEM_TYPES } from "@/lib/cashAccounts"
+import { slotLabel, CASHFLOW_TEMPLATES, ITEM_TYPES, astOf } from "@/lib/cashAccounts"
 import { evalFormula, flowToKind, BUILTIN_FIELDS, QTY_AST, CHANNEL_AST, type CalcNode, type CalcField } from "@/lib/calcFormula"
 import { cn } from "@/lib/utils"
 import type { CashAccount, CashCalcType, CashCategory } from "@/types"
@@ -20,6 +20,7 @@ import { buildSlotGraph } from "@/lib/cashflowGraph"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { CashGrid } from "./CashGrid"
 import { CashFlowCanvas } from "./CashFlowCanvas"
+import { RecordEntryDialog } from "./RecordEntryDialog"
 import { CalcTypeBuilder } from "./CalcTypeBuilder"
 import { CashCoachPanel } from "./CashCoachPanel"
 
@@ -34,7 +35,9 @@ function currentMonthRange(): { start: string; end: string } {
   return { start: `${y}-${p(m)}-01`, end: m === 12 ? `${y + 1}-01-01` : `${y}-${p(m + 1)}-01` }
 }
 
-/** 통화별 장부 합계(이번 달·휴지통 제외) + 분류별 소계. ledger 슬롯 amount의 원천. */
+/** 통화별 미귀속 장부 합계(이번 달·휴지통 제외) + 분류별 소계 — ledger(잔여 자동) 슬롯 amount의 원천.
+ * SSOT 재설계(세션39): 장부 기록은 슬롯 귀속(claimed, account_id 일치)과 미귀속(unclaimed)으로 분할된다.
+ * ledger 슬롯은 미귀속만 합산 → pool = Σ귀속 + 잔여 = 이번 달 장부 전체(이중 집계 구조적 불가). */
 type LedgerBucket = { revenue: number; expense: number }
 type LedgerTotals = Record<string, LedgerBucket & { byCat: Record<string, LedgerBucket> }>
 function ledgerAmountFor(
@@ -47,6 +50,16 @@ function ledgerAmountFor(
   const bucket = slot.ledger_category ? t.byCat[slot.ledger_category] : t
   if (!bucket) return 0
   return slot.kind === "revenue_src" ? bucket.revenue : slot.kind === "expense_dst" ? bucket.expense : 0
+}
+/** 기록이 이 슬롯에 귀속되는가 — 활성·비ledger·매출/비용 슬롯 + 구분·통화 일치. 어긋나면 미귀속(잔여)로. */
+function isClaimedBy(
+  slot: CashAccount,
+  r: { kind: string; currency: string | null }
+): boolean {
+  if (slot.item_type === "ledger") return false
+  const kindMatch =
+    slot.kind === "revenue_src" ? r.kind === "revenue" : slot.kind === "expense_dst" ? r.kind === "expense" : false
+  return kindMatch && (slot.currency || "KRW") === (r.currency || "KRW")
 }
 const DEFAULT_TYPE_NAME = "기본 계산" // 회사가 편집하는 표 계산 칸의 출처(시드 1회)
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => (c === "&" ? "&amp;" : c === "<" ? "&lt;" : c === ">" ? "&gt;" : "&quot;"))
@@ -72,7 +85,8 @@ export function CashFlowView() {
   const [editType, setEditType] = useState<CashCalcType | null>(null)
   const [poolPos, setPoolPos] = useState<{ x: number; y: number } | null>(null)
   const [defaultCalcTypeId, setDefaultCalcTypeId] = useState<string | null>(null)
-  const [ledgerTotals, setLedgerTotals] = useState<LedgerTotals>({}) // 이번 달 장부 합계(연동 슬롯 생성·동기화용)
+  const [ledgerTotals, setLedgerTotals] = useState<LedgerTotals>({}) // 이번 달 미귀속(잔여) 장부 합계 — ledger 슬롯 생성용
+  const [recordSlot, setRecordSlot] = useState<CashAccount | null>(null) // "기록" 다이얼로그 대상 슬롯
   const seededRef = useRef(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -85,16 +99,25 @@ export function CashFlowView() {
         supabase.from("cashflow_settings").select("opening_cash, default_currency, pool_pos, default_calc_type_id").maybeSingle(),
         supabase.from("cash_calc_types").select("*").order("sort_order"),
         supabase.from("cash_categories").select("*").order("sort_order"),
-        // 장부(내역) 이번 달 합계 — ledger 슬롯 amount의 원천(내역 탭과 같은 데이터)
-        supabase.from("finance_entries").select("kind, total_amount, currency, category").is("deleted_at", null).gte("entry_date", mr.start).lt("entry_date", mr.end),
+        // 장부(원장=SSOT) 이번 달 기록 — 모든 매출·비용 슬롯 amount의 원천(내역 탭과 같은 데이터)
+        supabase.from("finance_entries").select("kind, total_amount, currency, category, account_id").is("deleted_at", null).gte("entry_date", mr.start).lt("entry_date", mr.end),
       ])
       if (e) throw e
 
-      // 장부 합계 집계(통화별 전체 + 분류별 소계) + ledger 슬롯 동기화 — 열 때마다 최신 장부가 계산기에 반영
-      const totals: LedgerTotals = {}
+      // 2단 집계: ① 슬롯 귀속(claimed — account_id가 활성 슬롯이고 구분·통화 일치) ② 나머지 전부 미귀속(잔여).
+      // 분할이라 pool = Σ귀속 + 잔여 = 장부 전체 — 이중 집계가 구조적으로 불가능.
+      let slotList = (slotData as CashAccount[]) ?? []
+      const byId = new Map(slotList.map((s) => [s.id, s]))
+      const claimed = new Map<string, number>()
+      const unclaimed: LedgerTotals = {}
       for (const r of ledgerRows ?? []) {
-        const t = (totals[r.currency || "KRW"] ??= { revenue: 0, expense: 0, byCat: {} })
         const amt = Number(r.total_amount)
+        const owner = r.account_id ? byId.get(r.account_id) : undefined
+        if (owner && isClaimedBy(owner, r)) {
+          claimed.set(owner.id, (claimed.get(owner.id) ?? 0) + amt)
+          continue
+        }
+        const t = (unclaimed[r.currency || "KRW"] ??= { revenue: 0, expense: 0, byCat: {} })
         const cat = r.category ? ((t.byCat[r.category] ??= { revenue: 0, expense: 0 })) : null
         if (r.kind === "revenue") {
           t.revenue += amt
@@ -104,12 +127,20 @@ export function CashFlowView() {
           if (cat) cat.expense += amt
         }
       }
-      setLedgerTotals(totals)
-      let slotList = (slotData as CashAccount[]) ?? []
-      const stale = slotList.filter((s) => s.item_type === "ledger" && Number(s.amount) !== ledgerAmountFor(s, totals))
+      setLedgerTotals(unclaimed)
+      // 전 슬롯 동기화 — ledger=미귀속 잔여 / 매출·비용 일반 슬롯=자기 귀속 합계 / 보유금(reserve)=직접 입력 유지.
+      const targetAmount = (s: CashAccount): number | null => {
+        if (s.item_type === "ledger") return ledgerAmountFor(s, unclaimed)
+        if (s.kind === "revenue_src" || s.kind === "expense_dst") return claimed.get(s.id) ?? 0
+        return null
+      }
+      const stale = slotList
+        .map((s) => ({ s, t: targetAmount(s) }))
+        .filter((x): x is { s: CashAccount; t: number } => x.t != null && Number(x.s.amount) !== x.t)
       if (stale.length > 0) {
-        await Promise.all(stale.map((s) => supabase.from("cash_accounts").update({ amount: ledgerAmountFor(s, totals) }).eq("id", s.id)))
-        slotList = slotList.map((s) => (s.item_type === "ledger" ? { ...s, amount: ledgerAmountFor(s, totals) } : s))
+        await Promise.all(stale.map(({ s, t }) => supabase.from("cash_accounts").update({ amount: t }).eq("id", s.id)))
+        const fixedById = new Map(stale.map(({ s, t }) => [s.id, t]))
+        slotList = slotList.map((s) => (fixedById.has(s.id) ? { ...s, amount: fixedById.get(s.id) as number } : s))
       }
       let typeList = (types as CashCalcType[]) ?? []
       let defId = (settings?.default_calc_type_id as string | null) ?? null
@@ -219,23 +250,84 @@ export function CashFlowView() {
     load()
   }
   const updateSlot = async (id: string, patch: Partial<CashAccount>) => {
-    // 어떤 입력칸을 고쳐도 amount 자동 재계산: 커스텀 유형이면 AST 평가, 아니면 빌트인.
+    // SSOT 재설계: 매출·비용 슬롯의 amount는 원장(finance_entries) 파생이라 여기서 쓰지 않는다(load()가 동기화).
+    // 보유금(reserve)만 직접 입력/수식 재계산 유지. 수식 값은 '계산 도우미'(기록 프리필)로만 쓰인다.
     const cur = slots.find((s) => s.id === id)
     const merged = { ...cur, ...patch } as CashAccount
     const derived: Partial<CashAccount> = {}
-    let amount: number
     if (merged.calc_type_id) {
       const ct = calcTypes.find((t) => t.id === merged.calc_type_id)
-      const ast = (ct?.formula as { ast?: CalcNode } | null)?.ast ?? null
-      amount = evalFormula(ast, (merged.field_values as Record<string, number>) ?? {})
       // 회사 기본 계산 유형은 구분을 강제하지 않음(매출·비용 모두 같은 칸 사용). 그 외 명명 유형만 flow→구분.
       if (ct && ct.id !== defaultCalcTypeId) derived.kind = flowToKind(ct.flow)
-    } else {
-      amount = computeSlotAmount(merged)
     }
-    await mustOk(supabase.from("cash_accounts").update({ ...patch, ...derived, amount, updated_at: new Date().toISOString() }).eq("id", id))
+    const safePatch: Partial<CashAccount> = { ...patch }
+    let amountPatch: Partial<CashAccount> = {}
+    if (merged.kind === "reserve") {
+      if (merged.calc_type_id) {
+        const ct = calcTypes.find((t) => t.id === merged.calc_type_id)
+        const ast = (ct?.formula as { ast?: CalcNode } | null)?.ast ?? null
+        amountPatch = { amount: evalFormula(ast, (merged.field_values as Record<string, number>) ?? {}) }
+      } else {
+        amountPatch = { amount: computeSlotAmount(merged) }
+      }
+    } else {
+      delete safePatch.amount // 매출·비용 슬롯 amount 직접 쓰기 차단(파생값 보호)
+    }
+    await mustOk(supabase.from("cash_accounts").update({ ...safePatch, ...derived, ...amountPatch, updated_at: new Date().toISOString() }).eq("id", id))
     load()
   }
+  /** 수식(계산 도우미) 미리보기 값 — 기록 다이얼로그 금액 프리필용. 수식 없으면 null. */
+  const calcPreview = (s: CashAccount): number | null => {
+    const ast = astOf(s, calcTypes)
+    if (!ast) return null
+    const vals = s.calc_type_id
+      ? ((s.field_values as Record<string, number>) ?? {})
+      : { units: Number(s.units), unit_price: Number(s.unit_price), rate: Number(s.rate), extra: Number(s.extra) }
+    return evalFormula(ast, vals)
+  }
+
+  /** 슬롯에서 장부(원장)에 기록 — 캔버스 편집이 내역·추세·손익 전체에 반영되는 핵심 경로(SSOT 재설계). */
+  const recordEntry = async (slot: CashAccount, input: { date: string; amount: number; memo: string }) => {
+    if (!me) return
+    const { data: inserted, error: e } = await supabase
+      .from("finance_entries")
+      .insert({
+        kind: slot.kind === "revenue_src" ? "revenue" : "expense",
+        entry_date: input.date,
+        vendor: slot.name,
+        category: slot.name,
+        description: input.memo.trim() || null,
+        amount: input.amount,
+        tax_amount: 0,
+        fee_amount: 0,
+        total_amount: input.amount,
+        currency: slot.currency,
+        account_id: slot.id, // 슬롯 귀속 — load()의 claimed 집계가 이 기록을 슬롯 금액으로 파생
+        source: "manual",
+        status: "confirmed",
+        created_by: me,
+      })
+      .select()
+      .single()
+    if (e || !inserted) {
+      toast.error("기록에 실패했어요.")
+      return
+    }
+    push({
+      label: `${slot.name} 기록`,
+      undo: async () => {
+        await supabase.from("finance_entries").delete().eq("id", inserted.id)
+      },
+      redo: async () => {
+        await supabase.from("finance_entries").insert(inserted)
+      },
+    })
+    toast.success(`${slot.name} ${money(input.amount, slot.currency)} 기록됨 — 내역·손익에 반영`)
+    setRecordSlot(null)
+    // 자체 load() 대신 전역 reload — 이 뷰(리스너 보유)와 내역(FinanceView) 모두 갱신.
+    window.dispatchEvent(new Event("equria:reload"))
+  }
+
   const deleteSlot = async (slot: CashAccount) => {
     await supabase.from("cash_accounts").update({ deleted_at: new Date().toISOString() }).eq("id", slot.id)
     push({
@@ -275,7 +367,8 @@ export function CashFlowView() {
     await mustOk(supabase.from("cash_calc_types").update(patch).eq("id", id))
     const ct = { ...calcTypes.find((t) => t.id === id), ...patch } as CashCalcType
     const ast = (ct.formula as { ast?: CalcNode } | null)?.ast ?? null
-    const affected = slots.filter((s) => s.calc_type_id === id)
+    // 매출·비용 슬롯 amount는 원장 파생(load 동기화) — 수식 변경의 amount 반영은 보유금(reserve)만.
+    const affected = slots.filter((s) => s.calc_type_id === id && s.kind === "reserve")
     await Promise.all(affected.map((s) => supabase.from("cash_accounts").update({ amount: evalFormula(ast, (s.field_values as Record<string, number>) ?? {}) }).eq("id", s.id)))
     load()
   }
@@ -507,14 +600,23 @@ export function CashFlowView() {
             onMoveAccount={moveAccount}
             onMovePool={movePool}
             onSetOpening={setOpeningFor}
+            onRecord={setRecordSlot}
           />
         )}
       </div>
 
-      {/* 슬롯 표 — 금액 직접 입력 */}
-      <CashGrid slots={slots} groups={groups} pool={graph.pool} calcTypes={calcTypes} defaultType={defaultType} onAddSlot={addSlot} onUpdateSlot={updateSlot} onDeleteSlot={deleteSlot} onUpdateCalcType={onUpdateCalcType} onEditColumns={editColumns} />
+      {/* 슬롯 표 — 금액은 원장 파생(이번 달 기록 합계), 기록 버튼으로 장부에 쓴다 */}
+      <CashGrid slots={slots} groups={groups} pool={graph.pool} calcTypes={calcTypes} defaultType={defaultType} onAddSlot={addSlot} onUpdateSlot={updateSlot} onDeleteSlot={deleteSlot} onUpdateCalcType={onUpdateCalcType} onEditColumns={editColumns} onRecord={setRecordSlot} />
 
       {showBuilder && <CalcTypeBuilder types={calcTypes} editType={editType} onClose={() => { setShowBuilder(false); setEditType(null) }} onSaved={load} />}
+      {recordSlot && (
+        <RecordEntryDialog
+          slot={recordSlot}
+          prefillAmount={calcPreview(recordSlot)}
+          onSubmit={(input) => recordEntry(recordSlot, input)}
+          onClose={() => setRecordSlot(null)}
+        />
+      )}
     </div>
   )
 }
