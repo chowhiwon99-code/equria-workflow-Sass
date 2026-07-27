@@ -1,7 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import Image from "next/image"
+import { createClient } from "@/lib/supabase/client"
 import {
   ArrowRight, Bot, LineChart, MessagesSquare, Stamp, Plug, ShieldCheck, Sparkles,
   LayoutDashboard, Calendar, FolderKanban, Receipt, CheckCircle2, Check,
@@ -70,12 +72,24 @@ const FAQS = [
 ]
 
 export default function LandingPage() {
+  const router = useRouter()
   // 로그인·가입 모달(노션식) — null이면 닫힘
   const [auth, setAuth] = useState<AuthMode | null>(null)
+  // 로그인 상태 — 랜딩은 로그인해도 열람(2026-07-28), 상태에 따라 CTA만 앱 진입으로 전환
+  const [loggedIn, setLoggedIn] = useState(false)
+
+  useEffect(() => {
+    createClient()
+      .auth.getSession()
+      .then(({ data }) => setLoggedIn(!!data.session))
+  }, [])
+
+  // 본문 CTA — 로그인 상태면 모달 대신 앱으로
+  const startFree = () => (loggedIn ? router.push("/dashboard") : setAuth("signup"))
 
   return (
     <div className="min-h-screen bg-white" style={{ color: INK }}>
-      <LandingHeader onLogin={() => setAuth("login")} onSignup={() => setAuth("signup")} />
+      <LandingHeader onLogin={() => setAuth("login")} onSignup={() => setAuth("signup")} loggedIn={loggedIn} />
 
       {/* ── 히어로 — 타이포 중심 + 잔디식 플로팅 AI 말풍선 ── */}
       <section className="relative mx-auto max-w-5xl px-6 pt-28 text-center sm:pt-36">
@@ -104,7 +118,7 @@ export default function LandingPage() {
           <div className="flex flex-col items-center gap-3 sm:flex-row">
             <button
               type="button"
-              onClick={() => setAuth("signup")}
+              onClick={startFree}
               className="inline-flex items-center gap-2 rounded-lg px-6 py-3.5 text-[15px] font-bold text-white transition-opacity hover:opacity-85"
               style={{ background: INK }}
             >
@@ -391,7 +405,7 @@ export default function LandingPage() {
               <li>AI 표준 사용량 포함</li>
               <li>이메일 지원</li>
             </ul>
-            <button type="button" onClick={() => setAuth("signup")} className="mt-7 block w-full rounded-lg py-3 text-center text-[14px] font-bold text-white transition-opacity hover:opacity-85" style={{ background: INK }}>
+            <button type="button" onClick={startFree} className="mt-7 block w-full rounded-lg py-3 text-center text-[14px] font-bold text-white transition-opacity hover:opacity-85" style={{ background: INK }}>
               무료로 시작하기
             </button>
           </div>
@@ -462,7 +476,7 @@ export default function LandingPage() {
       <section className="mx-auto max-w-4xl border-t border-black/[0.06] px-6 py-24 text-center">
         <h2 className="text-[clamp(1.6rem,4vw,2.2rem)] font-extrabold tracking-[-0.02em]">지금, 회사의 일을 흐르게.</h2>
         <div className="mt-8 flex justify-center">
-          <button type="button" onClick={() => setAuth("signup")} className="inline-flex items-center gap-2 rounded-lg px-6 py-3.5 text-[15px] font-bold text-white transition-opacity hover:opacity-85" style={{ background: INK }}>
+          <button type="button" onClick={startFree} className="inline-flex items-center gap-2 rounded-lg px-6 py-3.5 text-[15px] font-bold text-white transition-opacity hover:opacity-85" style={{ background: INK }}>
             Complow 무료로 사용하기 <ArrowRight className="size-4" />
           </button>
         </div>

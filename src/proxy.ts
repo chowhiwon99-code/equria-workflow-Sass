@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 import type { Database } from "@/lib/supabase/types"
 
-/** 인증 화면 — 미로그인 공개, 로그인 상태면 앱(대시보드)으로 보냄. 루트(/) 랜딩도 동일 취급. */
+/** 인증 화면 — 미로그인 공개, 로그인 상태면 앱(대시보드)으로 보냄. 루트(/) 랜딩은 로그인해도 열람(2026-07-28 대표 결정). */
 const AUTH_PATHS = ["/login", "/signup"]
 /** 법적 문서 — 로그인 여부와 무관하게 항상 접근(구글 검증·PG 심사 요건. 로그인 상태 리다이렉트 버그 픽스) */
 const OPEN_PATHS = ["/privacy", "/terms", "/refund"]
@@ -48,8 +48,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // 인증된 사용자가 랜딩/로그인/회원가입 접근 → 대시보드로 (법적문서는 로그인해도 그대로 열람)
-  if (user && (isRoot || isAuthPage)) {
+  // 인증된 사용자가 로그인/회원가입 접근 → 대시보드로 (랜딩·법적문서는 로그인해도 그대로 열람)
+  if (user && isAuthPage) {
     const url = request.nextUrl.clone()
     url.pathname = "/dashboard"
     return NextResponse.redirect(url)

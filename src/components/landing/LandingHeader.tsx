@@ -10,8 +10,9 @@ import { INK, CONTACT } from "./const"
  * 화면 전체 폭: 로고 왼쪽 끝 / 메뉴 중앙(기능·AI·가격·리소스·도입 문의) / 로그인·무료 CTA 오른쪽 끝.
  * 리소스는 호버 드롭다운(소개자료·협업툴 자료 — 하위 페이지는 추후 별도 제작).
  * 로그인·가입은 페이지 이동 없이 모달로 연다(onLogin·onSignup).
+ * 로그인 상태(loggedIn)면 우측을 "워크스페이스 열기"로 교체(랜딩은 로그인해도 열람).
  */
-export function LandingHeader({ onLogin, onSignup }: { onLogin: () => void; onSignup: () => void }) {
+export function LandingHeader({ onLogin, onSignup, loggedIn }: { onLogin: () => void; onSignup: () => void; loggedIn: boolean }) {
   return (
     <header className="sticky top-0 z-30 border-b border-black/[0.05] bg-white/90 backdrop-blur-md">
       <div className="relative flex h-[60px] w-full items-center justify-between px-4 sm:px-6">
@@ -43,12 +44,20 @@ export function LandingHeader({ onLogin, onSignup }: { onLogin: () => void; onSi
         </nav>
 
         <div className="flex items-center gap-2.5">
-          <button type="button" onClick={onLogin} className="rounded-lg px-3 py-1.5 text-[14px] font-medium transition-colors hover:bg-black/[0.05]">
-            로그인
-          </button>
-          <button type="button" onClick={onSignup} className="rounded-lg px-4 py-2 text-[14px] font-semibold text-white transition-opacity hover:opacity-85" style={{ background: INK }}>
-            Complow 무료로 사용하기
-          </button>
+          {loggedIn ? (
+            <Link href="/dashboard" className="rounded-lg px-4 py-2 text-[14px] font-semibold text-white transition-opacity hover:opacity-85" style={{ background: INK }}>
+              워크스페이스 열기
+            </Link>
+          ) : (
+            <>
+              <button type="button" onClick={onLogin} className="rounded-lg px-3 py-1.5 text-[14px] font-medium transition-colors hover:bg-black/[0.05]">
+                로그인
+              </button>
+              <button type="button" onClick={onSignup} className="rounded-lg px-4 py-2 text-[14px] font-semibold text-white transition-opacity hover:opacity-85" style={{ background: INK }}>
+                Complow 무료로 사용하기
+              </button>
+            </>
+          )}
         </div>
       </div>
     </header>
