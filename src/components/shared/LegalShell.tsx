@@ -17,6 +17,8 @@ export function LegalShell({ title, effective, children }: { title: string; effe
           {" · "}
           <Link href="/privacy" className="underline hover:text-foreground">개인정보처리방침</Link>
           {" · "}
+          <Link href="/refund" className="underline hover:text-foreground">환불정책</Link>
+          {" · "}
           <span>문의: complow@complow.kr</span>
         </div>
       </div>
