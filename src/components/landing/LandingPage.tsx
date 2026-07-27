@@ -1,15 +1,20 @@
+"use client"
+
+import { useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { ArrowRight, Bot, LineChart, MessagesSquare, Stamp, Plug, ShieldCheck, Sparkles, LayoutDashboard, Calendar, FolderKanban, Receipt, CheckCircle2 } from "lucide-react"
+import { LandingHeader } from "./LandingHeader"
+import { AuthModal } from "./AuthModal"
+import { INK, CONTACT } from "./const"
+import type { AuthMode } from "@/components/auth/AuthForm"
 
 /**
  * Complow 랜딩(마케팅) 페이지 — 공개(로그인 불필요).
  * 미니멀리즘(대표 결정 2026-07-27): 타이포 중심·여백·모노톤(검정+회색), 목업/카드/컬러 밴드 제거.
- * CTA = 무료로 사용하기(구독제·노션식 GNB, 2026-07-28) + 도입 문의 보조. 앱과 분리된 마케팅 표면.
+ * GNB(LandingHeader)와 본문 완전 분리 + 로그인·가입은 노션식 모달(AuthModal)로(2026-07-28).
+ * CTA = 무료로 사용하기(구독제) + 도입 문의 보조. 앱과 분리된 마케팅 표면.
  */
-
-const INK = "#111111"
-const CONTACT = "mailto:complow@complow.kr?subject=Complow 도입 문의"
 
 // 가로형 로고(심볼+워드마크 포함) — 대표 제공 브랜드 로고(2026-07-27)
 function Logo({ className = "" }: { className?: string }) {
@@ -26,29 +31,12 @@ const FEATURES = [
 ]
 
 export default function LandingPage() {
+  // 로그인·가입 모달(노션식) — null이면 닫힘
+  const [auth, setAuth] = useState<AuthMode | null>(null)
+
   return (
     <div className="min-h-screen bg-white" style={{ color: INK }}>
-      {/* ── 헤더 — 노션식 GNB: 로고 좌 / 메뉴 중앙 / 로그인·무료 CTA 우 ── */}
-      <header className="sticky top-0 z-30 border-b border-black/[0.05] bg-white/90 backdrop-blur-md">
-        <div className="relative mx-auto flex h-[60px] max-w-7xl items-center justify-between px-6">
-          <Link href="/" aria-label="Complow 홈">
-            <Logo className="h-5" />
-          </Link>
-          <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-8 text-[14px] font-medium text-black/70 md:flex">
-            <a href="#features" className="transition-colors hover:text-black">기능</a>
-            <a href="#pricing" className="transition-colors hover:text-black">가격</a>
-            <a href={CONTACT} className="transition-colors hover:text-black">도입 문의</a>
-          </nav>
-          <div className="flex items-center gap-5">
-            <Link href="/login" className="text-[14px] font-medium transition-opacity hover:opacity-60">
-              로그인
-            </Link>
-            <Link href="/signup" className="rounded-lg px-4 py-2 text-[14px] font-semibold text-white transition-opacity hover:opacity-85" style={{ background: INK }}>
-              Complow 무료로 사용하기
-            </Link>
-          </div>
-        </div>
-      </header>
+      <LandingHeader onLogin={() => setAuth("login")} onSignup={() => setAuth("signup")} />
 
       {/* ── 히어로 — 타이포 중심 + 잔디식 플로팅 AI 말풍선 ── */}
       <section className="relative mx-auto max-w-5xl px-6 pt-28 text-center sm:pt-36">
@@ -75,13 +63,14 @@ export default function LandingPage() {
         </p>
         <div className="animate-fade-up mt-10 flex flex-col items-center gap-4" style={{ animationDelay: "0.2s" }}>
           <div className="flex flex-col items-center gap-3 sm:flex-row">
-            <Link
-              href="/signup"
+            <button
+              type="button"
+              onClick={() => setAuth("signup")}
               className="inline-flex items-center gap-2 rounded-lg px-6 py-3.5 text-[15px] font-bold text-white transition-opacity hover:opacity-85"
               style={{ background: INK }}
             >
               Complow 무료로 사용하기 <ArrowRight className="size-4" />
-            </Link>
+            </button>
             <a href={CONTACT} className="inline-flex items-center rounded-lg bg-black/[0.05] px-6 py-3.5 text-[15px] font-bold text-black/70 transition-colors hover:bg-black/[0.08]">
               도입 문의하기
             </a>
@@ -202,9 +191,9 @@ export default function LandingPage() {
               <li>AI 표준 사용량 포함</li>
               <li>이메일 지원</li>
             </ul>
-            <Link href="/signup" className="mt-7 block rounded-lg py-3 text-center text-[14px] font-bold text-white transition-opacity hover:opacity-85" style={{ background: INK }}>
+            <button type="button" onClick={() => setAuth("signup")} className="mt-7 block w-full rounded-lg py-3 text-center text-[14px] font-bold text-white transition-opacity hover:opacity-85" style={{ background: INK }}>
               무료로 시작하기
-            </Link>
+            </button>
           </div>
           {/* 프로 */}
           <div className="rounded-2xl border border-black/[0.08] p-7">
@@ -229,9 +218,9 @@ export default function LandingPage() {
       <section className="mx-auto max-w-4xl border-t border-black/[0.06] px-6 py-24 text-center">
         <h2 className="text-[clamp(1.6rem,4vw,2.2rem)] font-extrabold tracking-[-0.02em]">지금, 회사의 일을 흐르게.</h2>
         <div className="mt-8 flex justify-center">
-          <Link href="/signup" className="inline-flex items-center gap-2 rounded-lg px-6 py-3.5 text-[15px] font-bold text-white transition-opacity hover:opacity-85" style={{ background: INK }}>
+          <button type="button" onClick={() => setAuth("signup")} className="inline-flex items-center gap-2 rounded-lg px-6 py-3.5 text-[15px] font-bold text-white transition-opacity hover:opacity-85" style={{ background: INK }}>
             Complow 무료로 사용하기 <ArrowRight className="size-4" />
-          </Link>
+          </button>
         </div>
       </section>
 
@@ -249,6 +238,9 @@ export default function LandingPage() {
           <span className="text-[13px] text-black/30">© 2026 Complow</span>
         </div>
       </footer>
+
+      {/* ── 로그인·가입 모달(노션식) — 랜딩 위 블러 오버레이 ── */}
+      {auth && <AuthModal mode={auth} onClose={() => setAuth(null)} onSwitchMode={setAuth} />}
     </div>
   )
 }

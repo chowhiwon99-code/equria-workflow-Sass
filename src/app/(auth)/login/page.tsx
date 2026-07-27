@@ -1,39 +1,7 @@
-"use client"
+import { AuthForm } from "@/components/auth/AuthForm"
 
-import { useState } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
-import { nameToEmail } from "@/lib/auth"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-
+// 직접 접속용 로그인 페이지 — 랜딩에서는 같은 폼이 노션식 모달(AuthModal)로 뜬다.
 export default function LoginPage() {
-  const router = useRouter()
-  const [name, setName] = useState("")
-  const [password, setPassword] = useState("")
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
-    setLoading(true)
-    const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({
-      email: nameToEmail(name),
-      password,
-    })
-    if (error) {
-      setError("이름 또는 비밀번호가 올바르지 않습니다.")
-      setLoading(false)
-      return
-    }
-    router.push("/dashboard")
-    router.refresh()
-  }
-
   return (
     <div className="w-full max-w-[400px]">
       <div className="mb-8 text-center">
@@ -44,31 +12,7 @@ export default function LoginPage() {
           Complow 계정에 로그인
         </p>
       </div>
-
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="name">이름</Label>
-          <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="이름을 입력하세요." autoComplete="username" required className="h-11" />
-          <p className="text-xs text-muted-foreground">조직에서 사용하는 이름으로 팀원들과 협업하세요.</p>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="password">비밀번호</Label>
-          <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required className="h-11" />
-        </div>
-        {error && <p className="text-sm text-destructive">{error}</p>}
-        <Button type="submit" className="h-11 w-full text-[15px]" disabled={loading}>
-          {loading ? "로그인 중..." : "계속"}
-        </Button>
-      </form>
-
-      <p className="mt-8 text-center text-sm text-muted-foreground">
-        신규 사용자이신가요?{" "}
-        <Link href="/signup" className="font-semibold text-foreground underline">가입하기</Link>
-      </p>
-      <p className="mx-auto mt-6 max-w-[320px] text-center text-xs leading-relaxed text-muted-foreground/70">
-        계속 진행하면 <Link href="/terms" className="underline">이용약관</Link> 및 <Link href="/privacy" className="underline">개인정보처리방침</Link>을
-        이해했으며 이에 동의하는 것으로 간주됩니다.
-      </p>
+      <AuthForm mode="login" />
     </div>
   )
 }
