@@ -94,9 +94,24 @@ export function LandingFooter() {
             <Link href="/terms" className="transition-colors hover:text-white">이용약관</Link>
             <Link href="/refund" className="transition-colors hover:text-white">환불정책</Link>
           </div>
-          <a href={CONTACT} aria-label="이메일 문의" className="text-white/40 transition-colors hover:text-white">
-            <Mail className="size-5" />
-          </a>
+          {/* 소셜 — 인스타·X 계정 개설 후 실제 URL로 교체 */}
+          <div className="flex items-center gap-5">
+            <a href={CONTACT} aria-label="이메일 문의" className="text-white/40 transition-colors hover:text-white">
+              <Mail className="size-5" />
+            </a>
+            <a href="https://www.instagram.com/" target="_blank" rel="noreferrer" aria-label="인스타그램" className="text-white/40 transition-colors hover:text-white">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-5" aria-hidden>
+                <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
+                <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+                <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
+              </svg>
+            </a>
+            <a href="https://x.com/" target="_blank" rel="noreferrer" aria-label="X" className="text-white/40 transition-colors hover:text-white">
+              <svg viewBox="0 0 24 24" fill="currentColor" className="size-[18px]" aria-hidden>
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+              </svg>
+            </a>
+          </div>
         </div>
       </div>
     </footer>
