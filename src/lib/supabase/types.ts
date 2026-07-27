@@ -763,6 +763,7 @@ export type Database = {
           id: string
           item_type: string
           kind: string
+          ledger_category: string | null
           name: string
           note: string | null
           opening_balance: number
@@ -790,6 +791,7 @@ export type Database = {
           id?: string
           item_type?: string
           kind?: string
+          ledger_category?: string | null
           name: string
           note?: string | null
           opening_balance?: number
@@ -817,6 +819,7 @@ export type Database = {
           id?: string
           item_type?: string
           kind?: string
+          ledger_category?: string | null
           name?: string
           note?: string | null
           opening_balance?: number

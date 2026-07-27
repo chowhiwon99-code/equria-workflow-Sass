@@ -2,7 +2,7 @@
 
 import { Fragment, useMemo, useState } from "react"
 import { Trash2, Plus, Search, ArrowUpDown, ArrowUp, ArrowDown, SlidersHorizontal, ChevronDown, ChevronRight } from "lucide-react"
-import { CURRENCIES, money } from "@/lib/finance"
+import { CURRENCIES, EXPENSE_CATEGORIES, REVENUE_CATEGORIES, money } from "@/lib/finance"
 import { SLOT_TYPES, ITEM_TYPES, slotLabel, slotColor, fieldsOf, astOf } from "@/lib/cashAccounts"
 import { tagBg, swatch, CATEGORY_COLORS } from "@/lib/meetingMeta"
 import { evalFormula, type CalcField } from "@/lib/calcFormula"
@@ -183,6 +183,27 @@ export function CashGrid({
                 </label>
               ))}
             </div>
+          </td>
+        ) : s.item_type === "ledger" ? (
+          // 장부 연동 슬롯 — 어떤 분류를 합산할지 선택(전체/식비/…). 바꾸면 다음 로드에서 금액 동기화.
+          <td className="px-2 py-1" colSpan={ncol}>
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              분류
+              <select
+                value={s.ledger_category ?? ""}
+                onChange={(e) => onUpdateSlot(s.id, { ledger_category: e.target.value || null })}
+                className="cursor-pointer rounded border bg-background px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-ring"
+              >
+                <option value="">전체</option>
+                {(slotCategory(s.kind) === "income" ? REVENUE_CATEGORIES : EXPENSE_CATEGORIES).map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+                {s.ledger_category &&
+                  !((slotCategory(s.kind) === "income" ? REVENUE_CATEGORIES : EXPENSE_CATEGORIES) as readonly string[]).includes(s.ledger_category) && (
+                    <option value={s.ledger_category}>{s.ledger_category}</option>
+                  )}
+              </select>
+            </label>
           </td>
         ) : dfields.length > 0 ? (
           dfields.map((f) => (
