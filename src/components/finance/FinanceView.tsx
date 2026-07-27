@@ -27,7 +27,8 @@ import { TaxInvoiceModal } from "./TaxInvoiceModal"
 
 type Kind = "expense" | "revenue"
 type KindFilter = "all" | Kind
-type Tab = "summary" | "cashflow" | "ledger" | "tax"
+// 손익 = 계산기(cash_accounts)가 회사 손익의 단일 기준(SSOT). 내역 = 장부 기록+그 집계(구 요약 흡수).
+type Tab = "pnl" | "ledger" | "tax"
 const PAGE_SIZE = 50
 
 export function FinanceView() {
@@ -45,25 +46,7 @@ export function FinanceView() {
   const [receiptPreview, setReceiptPreview] = useState<{ url: string; name: string; mime: string | null } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const [tab, setTab] = useState<Tab>("summary")
-  // 손익 계산기(현금흐름 탭 cash_accounts) 합계 — 요약 탭에 함께 표시(대표: "손익에서 편집하면 요약에 반영").
-  // 요약 탭 진입마다 재조회 → 현금흐름에서 편집하고 돌아오면 즉시 최신.
-  const [pnlByCurrency, setPnlByCurrency] = useState<Record<string, { revenue: number; expense: number }>>({})
-  useEffect(() => {
-    if (tab !== "summary") return
-    ;(async () => {
-      const { data } = await supabase.from("cash_accounts").select("kind, amount, currency").is("deleted_at", null)
-      const out: Record<string, { revenue: number; expense: number }> = {}
-      for (const s of data ?? []) {
-        const cur = s.currency || "KRW"
-        const t = (out[cur] ??= { revenue: 0, expense: 0 })
-        if (s.kind === "revenue_src") t.revenue += Number(s.amount)
-        else if (s.kind === "expense_dst") t.expense += Number(s.amount)
-      }
-      setPnlByCurrency(out)
-    })()
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- supabase 클라이언트는 안정 참조
-  }, [tab])
+  const [tab, setTab] = useState<Tab>("pnl")
   // 필터·페이지네이션 (내역 탭 전용)
   const [searchText, setSearchText] = useState("")
   const [kindFilter, setKindFilter] = useState<KindFilter>("all")
@@ -300,14 +283,6 @@ export function FinanceView() {
       }),
     [byCurrency],
   )
-  // 손익 계산기 합계(통화별·KRW 우선) — 요약 탭 상단 표시용
-  const pnlRows = useMemo(
-    () =>
-      Object.entries(pnlByCurrency)
-        .filter(([, v]) => v.revenue !== 0 || v.expense !== 0)
-        .sort(([a], [b]) => (a === "KRW" ? -1 : b === "KRW" ? 1 : a.localeCompare(b))),
-    [pnlByCurrency],
-  )
   // 전월대비(증감% 배지) — mode='month'일 때만 의미. trendRaw에서 prevMonth(ym) 버킷 집계.
   const prevByCurrency = useMemo(() => {
     const pr = monthRange(prevMonth(ym))
@@ -355,8 +330,7 @@ export function FinanceView() {
     ["all", "전체", () => setMode("all")],
   ]
   const tabs: [Tab, string][] = [
-    ["summary", "요약"],
-    ["cashflow", "현금흐름"],
+    ["pnl", "손익"],
     ["ledger", "내역"],
     ["tax", "세금계산서"],
   ]
@@ -396,9 +370,9 @@ export function FinanceView() {
         </div>
       </div>
 
-      {/* 컨트롤 스트립: 기간 프리셋 + 월 스텝퍼 / 탭 */}
+      {/* 컨트롤 스트립: 기간 프리셋 + 월 스텝퍼 / 탭. 손익 탭은 기간 개념이 없어 좌측을 숨김(자리는 유지 — 탭 점프 방지) */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
-        <div className="flex items-center gap-2">
+        <div className={cn("flex items-center gap-2", tab === "pnl" && "invisible")}>
           <div className="flex items-center gap-1">
             {periodPresets.map(([m, label, onClick]) => (
               <button
@@ -440,52 +414,14 @@ export function FinanceView() {
 
       {loading ? (
         <Loading rows={6} />
-      ) : tab === "cashflow" ? (
-        <div className="flex flex-col gap-3">
-          {/* 실제 장부(내역/요약과 같은 집계) 참고 — 현금흐름 계산기와 같은 화면에서 대조(계산 연동 v1) */}
+      ) : tab === "pnl" ? (
+        /* 손익 = 계산기 하나가 회사 손익의 기준(SSOT). KPI는 CashFlowView 헤더(매출·비용·순이익·가용현금) 한 벌. */
+        <CashFlowView />
+      ) : tab === "ledger" ? (
+        <div className="flex flex-col gap-4">
+          {/* 기록 집계(구 요약 흡수) — 이 기간 내역의 합계·추세·분류. 회사 손익의 기준은 '손익' 탭. */}
           {currencyRows.length > 0 && (
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">
-              <span className="font-medium text-foreground">실제 장부 · {mode === "month" ? `${ym.y}년 ${ym.m}월` : mode === "year" ? `${ym.y}년` : "전체"}</span>
-              {currencyRows.map(([cur, v]) => (
-                <span key={cur} className="tabular-nums">
-                  매출 <b className="font-medium text-success">{money(v.revenue, cur)}</b> · 비용 <b className="font-medium text-destructive">{money(v.expense, cur)}</b>
-                </span>
-              ))}
-            </div>
-          )}
-          <CashFlowView />
-        </div>
-      ) : tab === "summary" ? (
-        currencyRows.length === 0 && pnlRows.length === 0 ? (
-          <EmptyState
-            icon={Upload}
-            title="이 기간 데이터가 없어요"
-            description="기간을 바꾸거나 영수증 OCR·직접 입력으로 비용·매출을 기록하세요."
-            action={mode !== "all" ? <Button size="sm" variant="outline" onClick={() => setMode("all")}>전체 보기</Button> : undefined}
-          />
-        ) : (
-          <div className="flex flex-col gap-6">
-            {/* 손익 계산기(현금흐름 탭) 합계 — 계산기에서 편집하면 여기 바로 반영 */}
-            {pnlRows.length > 0 && (
-              <div className="rounded-lg border bg-muted/30 p-3">
-                <div className="mb-2 flex flex-wrap items-center justify-between gap-1">
-                  <span className="text-xs font-medium text-foreground">손익 계산기</span>
-                  <button onClick={() => setTab("cashflow")} className="text-xs text-muted-foreground hover:text-foreground">
-                    현금흐름 탭에서 편집 →
-                  </button>
-                </div>
-                <div className="flex flex-col gap-3">
-                  {pnlRows.map(([cur, v]) => (
-                    <div key={cur} className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                      <SummaryCard label={pnlRows.length > 1 ? `매출 (${cur})` : "매출"} value={money(v.revenue, cur)} className="text-success" />
-                      <SummaryCard label={pnlRows.length > 1 ? `비용 (${cur})` : "비용"} value={money(v.expense, cur)} className="text-destructive" />
-                      <SummaryCard label="순이익" value={money(v.revenue - v.expense, cur)} className={v.revenue - v.expense >= 0 ? "text-foreground" : "text-destructive"} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
+          <div className="flex flex-col gap-4">
             {/* 원화 환산 합계 (전 통화→KRW, fiat만) */}
             {fxConverted?.usedFx && (
               <div className="rounded-lg border bg-muted/30 p-3">
@@ -505,11 +441,8 @@ export function FinanceView() {
               </div>
             )}
 
-            {/* 통화별 KPI 카드 — 실제 장부(내역 기준). 위 손익 계산기와 구분 */}
+            {/* 통화별 합계 카드 — 이 기간 기록(내역) 기준 */}
             <div className="flex flex-col gap-3">
-              {pnlRows.length > 0 && currencyRows.length > 0 && (
-                <span className="text-xs font-medium text-muted-foreground">실제 장부 · 내역 기준</span>
-              )}
               {currencyRows.map(([cur, v]) => {
                 const net = v.revenue - v.expense
                 const prev = prevByCurrency[cur]
@@ -594,9 +527,7 @@ export function FinanceView() {
               </div>
             </div>
           </div>
-        )
-      ) : tab === "ledger" ? (
-        <div className="flex flex-col gap-4">
+          )}
           {/* 필터·검색 바 */}
           <div className="flex flex-wrap items-center gap-2">
             <input

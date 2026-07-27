@@ -34,12 +34,19 @@ function currentMonthRange(): { start: string; end: string } {
   return { start: `${y}-${p(m)}-01`, end: m === 12 ? `${y + 1}-01-01` : `${y}-${p(m + 1)}-01` }
 }
 
-/** 통화별 장부 합계(이번 달·휴지통 제외). ledger 슬롯 amount의 원천. */
-type LedgerTotals = Record<string, { revenue: number; expense: number }>
-function ledgerAmountFor(slot: { kind: string; currency: string }, totals: LedgerTotals): number {
+/** 통화별 장부 합계(이번 달·휴지통 제외) + 분류별 소계. ledger 슬롯 amount의 원천. */
+type LedgerBucket = { revenue: number; expense: number }
+type LedgerTotals = Record<string, LedgerBucket & { byCat: Record<string, LedgerBucket> }>
+function ledgerAmountFor(
+  slot: { kind: string; currency: string; ledger_category?: string | null },
+  totals: LedgerTotals
+): number {
   const t = totals[slot.currency || "KRW"]
   if (!t) return 0
-  return slot.kind === "revenue_src" ? t.revenue : slot.kind === "expense_dst" ? t.expense : 0
+  // 분류 지정 슬롯(예: 식비)은 그 분류만, 아니면 전체 합계.
+  const bucket = slot.ledger_category ? t.byCat[slot.ledger_category] : t
+  if (!bucket) return 0
+  return slot.kind === "revenue_src" ? bucket.revenue : slot.kind === "expense_dst" ? bucket.expense : 0
 }
 const DEFAULT_TYPE_NAME = "기본 계산" // 회사가 편집하는 표 계산 칸의 출처(시드 1회)
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => (c === "&" ? "&amp;" : c === "<" ? "&lt;" : c === ">" ? "&gt;" : "&quot;"))
@@ -78,17 +85,24 @@ export function CashFlowView() {
         supabase.from("cashflow_settings").select("opening_cash, default_currency, pool_pos, default_calc_type_id").maybeSingle(),
         supabase.from("cash_calc_types").select("*").order("sort_order"),
         supabase.from("cash_categories").select("*").order("sort_order"),
-        // 장부(내역) 이번 달 합계 — ledger 슬롯 amount의 원천(요약 탭과 같은 데이터)
-        supabase.from("finance_entries").select("kind, total_amount, currency").is("deleted_at", null).gte("entry_date", mr.start).lt("entry_date", mr.end),
+        // 장부(내역) 이번 달 합계 — ledger 슬롯 amount의 원천(내역 탭과 같은 데이터)
+        supabase.from("finance_entries").select("kind, total_amount, currency, category").is("deleted_at", null).gte("entry_date", mr.start).lt("entry_date", mr.end),
       ])
       if (e) throw e
 
-      // 장부 합계 집계(통화별) + ledger 슬롯 동기화 — 열 때마다 최신 장부가 계산기에 반영(요약↔현금흐름 일치)
+      // 장부 합계 집계(통화별 전체 + 분류별 소계) + ledger 슬롯 동기화 — 열 때마다 최신 장부가 계산기에 반영
       const totals: LedgerTotals = {}
       for (const r of ledgerRows ?? []) {
-        const t = (totals[r.currency || "KRW"] ??= { revenue: 0, expense: 0 })
-        if (r.kind === "revenue") t.revenue += Number(r.total_amount)
-        else t.expense += Number(r.total_amount)
+        const t = (totals[r.currency || "KRW"] ??= { revenue: 0, expense: 0, byCat: {} })
+        const amt = Number(r.total_amount)
+        const cat = r.category ? ((t.byCat[r.category] ??= { revenue: 0, expense: 0 })) : null
+        if (r.kind === "revenue") {
+          t.revenue += amt
+          if (cat) cat.revenue += amt
+        } else {
+          t.expense += amt
+          if (cat) cat.expense += amt
+        }
       }
       setLedgerTotals(totals)
       let slotList = (slotData as CashAccount[]) ?? []
@@ -379,11 +393,18 @@ export function CashFlowView() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-semibold">손익 요약</h3>
-            <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium tabular-nums", graph.pool.available < 0 ? "bg-rose-500/10 text-rose-600" : "bg-emerald-500/10 text-emerald-600")}>
-              가용현금 {money(graph.pool.available, graph.pool.currency)}
+            {/* 회사 손익의 헤드라인 한 벌 — 매출·비용·순이익·가용현금 (탭 통일로 여기가 유일한 기준) */}
+            <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium tabular-nums text-emerald-600">
+              매출 {money(graph.pool.revenue, graph.pool.currency)}
+            </span>
+            <span className="rounded-full bg-rose-500/10 px-2 py-0.5 text-xs font-medium tabular-nums text-rose-600">
+              비용 {money(graph.pool.expense, graph.pool.currency)}
             </span>
             <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium tabular-nums", graph.pool.netProfit < 0 ? "bg-rose-500/10 text-rose-600" : "bg-blue-500/10 text-blue-600")}>
               순이익 {money(graph.pool.netProfit, graph.pool.currency)}
+            </span>
+            <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium tabular-nums", graph.pool.available < 0 ? "bg-rose-500/10 text-rose-600" : "bg-muted text-muted-foreground")}>
+              가용현금 {money(graph.pool.available, graph.pool.currency)}
             </span>
           </div>
           {/* 모바일: 줄바꿈 허용(버튼 줄 화면 밖 삐짐 방지) */}
