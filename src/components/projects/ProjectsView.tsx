@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Modal, fieldClass } from "@/components/shared/Modal"
+import { DateInput } from "@/components/shared/DateInput"
 import { Loading, EmptyState, ErrorState } from "@/components/shared/States"
 import { useUndo } from "@/components/undo/UndoProvider"
 import { PROJECT_STATUS, PROJECT_STATUS_ORDER } from "@/lib/projects"
@@ -499,11 +500,11 @@ function CreateProjectModal({
         <div className="flex gap-2">
           <label className="flex-1 text-xs text-muted-foreground">
             시작일
-            <input type="date" className={fieldClass} value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            <DateInput className="w-full" value={startDate} onChange={setStartDate} />
           </label>
           <label className="flex-1 text-xs text-muted-foreground">
             종료예정
-            <input type="date" className={fieldClass} value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+            <DateInput className="w-full" value={dueDate} onChange={setDueDate} min={startDate || undefined} />
           </label>
         </div>
         {error && <p className="text-sm text-destructive">{error}</p>}

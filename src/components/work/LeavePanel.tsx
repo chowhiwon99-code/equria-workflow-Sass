@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Select } from "@/components/shared/Select"
 import { Loading } from "@/components/shared/States"
+import { DateInput } from "@/components/shared/DateInput"
 import { fieldClass } from "@/components/shared/Modal"
 import { STATUS_BADGE } from "./status"
 
@@ -121,9 +122,9 @@ export function LeavePanel() {
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
             <Select value={type} onChange={setType} options={TYPES.map((t) => ({ value: t, label: t }))} className="h-9" />
-            <input type="date" className={cn(fieldClass, "w-auto")} value={start} onChange={(e) => setStart(e.target.value)} />
+            <DateInput className="w-36" value={start} onChange={setStart} />
             <span className="text-sm text-muted-foreground">~</span>
-            <input type="date" className={cn(fieldClass, "w-auto")} value={end} onChange={(e) => setEnd(e.target.value)} />
+            <DateInput className="w-36" value={end} onChange={setEnd} min={start || undefined} />
           </div>
           <textarea
             className={cn(fieldClass, "h-16 resize-none py-2")}

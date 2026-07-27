@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Select } from "@/components/shared/Select"
 import { Modal, fieldClass } from "@/components/shared/Modal"
+import { DateInput } from "@/components/shared/DateInput"
 import { BackLink } from "@/components/shared/BackLink"
 import { Loading, ErrorState } from "@/components/shared/States"
 import { useUndo } from "@/components/undo/UndoProvider"
@@ -461,7 +462,7 @@ function ChecklistSection({ projectId }: { projectId: string }) {
             if (e.key === "Enter" && !e.nativeEvent.isComposing) add()
           }}
         />
-        <input type="date" className={cn(fieldClass, "w-36")} value={due} onChange={(e) => setDue(e.target.value)} title="기한(선택)" />
+        <DateInput className="w-36" value={due} onChange={setDue} title="기한(선택)" placeholder="기한 선택" />
         <Button size="sm" onClick={add} disabled={busy || !title.trim()}>
           {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />} 추가
         </Button>
@@ -783,7 +784,7 @@ function ScheduleSection({ projectId, onCount }: { projectId: string; onCount: (
           placeholder="일정 제목 (예: 킥오프 미팅)"
           className={cn(fieldClass, "flex-1")}
         />
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={cn(fieldClass, "w-40")} />
+        <DateInput className="w-40" value={date} onChange={setDate} />
         <Button size="sm" onClick={add} disabled={busy || !title.trim()}>
           {busy ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
         </Button>

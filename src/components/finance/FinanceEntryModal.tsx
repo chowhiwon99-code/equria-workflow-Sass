@@ -7,6 +7,7 @@ import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Modal, fieldClass } from "@/components/shared/Modal"
+import { DateInput } from "@/components/shared/DateInput"
 import { useUndo } from "@/components/undo/UndoProvider"
 import { categoriesFor, computeAmounts, won, CURRENCIES } from "@/lib/finance"
 import type { FinanceEntry } from "@/types"
@@ -183,7 +184,7 @@ export function FinanceEntryModal({
         <div className="flex flex-wrap gap-2">
           <label className="min-w-0 flex-1 text-xs text-muted-foreground">
             날짜
-            <input type="date" className={fieldClass} value={entryDate} onChange={(e) => setEntryDate(e.target.value)} />
+            <DateInput className="w-full" value={entryDate} onChange={setEntryDate} />
           </label>
           <label className="flex-1 text-xs text-muted-foreground">
             분류

@@ -10,6 +10,7 @@ import { dueBadge } from "@/lib/tasks"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/shared/Modal"
+import { DateInput } from "@/components/shared/DateInput"
 import { Surface } from "@/components/shared/Surface"
 import type { Tables } from "@/lib/supabase/types"
 
@@ -129,13 +130,7 @@ export function TodayTasks() {
             if (e.key === "Enter" && !e.nativeEvent.isComposing) add()
           }}
         />
-        <input
-          type="date"
-          className={cn(fieldClass, "w-36")}
-          value={due}
-          onChange={(e) => setDue(e.target.value)}
-          title="기한(선택)"
-        />
+        <DateInput className="w-36" value={due} onChange={setDue} title="기한(선택)" placeholder="기한 선택" />
         <Button size="sm" onClick={add} disabled={busy || !title.trim()}>
           {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />} 추가
         </Button>

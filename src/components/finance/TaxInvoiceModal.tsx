@@ -6,6 +6,7 @@ import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Modal, fieldClass } from "@/components/shared/Modal"
+import { DateInput } from "@/components/shared/DateInput"
 import { useUndo } from "@/components/undo/UndoProvider"
 import { won } from "@/lib/finance"
 import type { TaxInvoice } from "@/types"
@@ -91,7 +92,7 @@ export function TaxInvoiceModal({
         <div className="flex gap-2">
           <label className="flex-1 text-xs text-muted-foreground">
             발행일
-            <input type="date" className={fieldClass} value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
+            <DateInput className="w-full" value={issueDate} onChange={setIssueDate} />
           </label>
           <label className="flex-1 text-xs text-muted-foreground">
             공급자

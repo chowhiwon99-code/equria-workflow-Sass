@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useUndo } from "@/components/undo/UndoProvider"
 import { Loading, ErrorState } from "@/components/shared/States"
+import { DateInput } from "@/components/shared/DateInput"
 import { uploadFile } from "@/lib/upload"
 import { formatBytes } from "@/lib/files"
 import type { CalendarEvent } from "@/types"
@@ -507,7 +508,6 @@ function CreateEventModal({
 
   const inputCls =
     "h-9 w-full rounded-lg border border-border bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-  const dateCls = cn(inputCls, "accent-primary [color-scheme:light] dark:[color-scheme:dark]")
 
   // YYYY-MM-DD → "2026년 5월 12일"
   const fmtKo = (s: string) => {
@@ -642,11 +642,11 @@ function CreateEventModal({
           <div className="grid grid-cols-2 gap-2">
             <label className="text-xs text-muted-foreground">
               <span className="mb-1 block">시작일</span>
-              <input type="date" className={dateCls} value={startDateStr} onChange={(e) => setStartDateStr(e.target.value)} />
+              <DateInput className="w-full" value={startDateStr} onChange={setStartDateStr} />
             </label>
             <label className="text-xs text-muted-foreground">
               <span className="mb-1 block">종료일</span>
-              <input type="date" className={dateCls} value={endDateStr} min={startDateStr} onChange={(e) => setEndDateStr(e.target.value)} />
+              <DateInput className="w-full" value={endDateStr} min={startDateStr} onChange={setEndDateStr} />
             </label>
           </div>
         </div>

@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Select } from "@/components/shared/Select"
 import { Loading } from "@/components/shared/States"
+import { DateInput } from "@/components/shared/DateInput"
 import { fieldClass } from "@/components/shared/Modal"
 import { STATUS_BADGE } from "./status"
 
@@ -153,7 +154,7 @@ export function ExpensePanel() {
               <span className="text-sm font-semibold tabular-nums text-primary">₩{Number(amount).toLocaleString()}</span>
             )}
             <Select value={category} onChange={setCategory} options={CATEGORIES.map((c) => ({ value: c, label: c }))} className="h-9" />
-            <input type="date" className={cn(fieldClass, "w-auto")} value={spentOn} onChange={(e) => setSpentOn(e.target.value)} />
+            <DateInput className="w-36" value={spentOn} onChange={setSpentOn} />
           </div>
           <textarea
             className={cn(fieldClass, "h-16 resize-none py-2")}

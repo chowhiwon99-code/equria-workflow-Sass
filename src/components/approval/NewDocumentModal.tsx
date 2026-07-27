@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Modal, fieldClass } from "@/components/shared/Modal"
+import { DateInput } from "@/components/shared/DateInput"
 import { Select } from "@/components/shared/Select"
 import { DOC_TYPES, DOC_FIELDS, type DocType } from "./templates"
 import type { Person } from "./lib"
@@ -199,6 +200,8 @@ export function NewDocumentModal({
                   className="h-9"
                 />
               </div>
+            ) : f.type === "date" ? (
+              <DateInput className="mt-0.5 w-full" value={fields[f.key] ?? ""} onChange={(v) => setField(f.key, v)} />
             ) : (
               <input
                 type={f.type}
