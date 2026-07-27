@@ -427,6 +427,23 @@ function SlotCard({
             )}
           </select>
         </label>
+        {/* 장부 분류 — 이 슬롯으로 '기록'하면 내역에 이 분류로 찍힘(자유입력+제안). 미입력=슬롯명 */}
+        {!isHold && s.item_type !== "ledger" && (
+          <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
+            분류
+            <input
+              key={`${s.id}-${s.ledger_category ?? ""}`}
+              defaultValue={s.ledger_category ?? ""}
+              list={slotCategory(s.kind) === "income" ? "cf-cat-revenue" : "cf-cat-expense"}
+              placeholder="기록 시 분류(비우면 슬롯명)"
+              onBlur={(e) => {
+                const v = e.target.value.trim()
+                if (v !== (s.ledger_category ?? "")) onUpdateSlot(s.id, { ledger_category: v || null })
+              }}
+              className="min-w-0 flex-1 rounded border bg-background px-1 py-0.5 text-[10px] text-foreground outline-none focus:ring-1 focus:ring-ring"
+            />
+          </label>
+        )}
         {calc ? (
           <>
             <div className="flex flex-col gap-0.5 rounded-lg bg-muted/30 px-2 py-1.5">

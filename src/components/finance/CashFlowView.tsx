@@ -11,7 +11,7 @@ import { Loading, ErrorState } from "@/components/shared/States"
 import { Button } from "@/components/ui/button"
 import { downloadCsv, todayStamp } from "@/lib/csv"
 import { downloadPnlXlsx } from "@/lib/xlsx"
-import { money, CURRENCIES, computeSlotAmount } from "@/lib/finance"
+import { money, CURRENCIES, computeSlotAmount, EXPENSE_CATEGORIES, REVENUE_CATEGORIES } from "@/lib/finance"
 import { slotLabel, CASHFLOW_TEMPLATES, ITEM_TYPES, astOf } from "@/lib/cashAccounts"
 import { evalFormula, flowToKind, BUILTIN_FIELDS, QTY_AST, CHANNEL_AST, type CalcNode, type CalcField } from "@/lib/calcFormula"
 import { cn } from "@/lib/utils"
@@ -87,6 +87,11 @@ export function CashFlowView() {
   const [defaultCalcTypeId, setDefaultCalcTypeId] = useState<string | null>(null)
   const [ledgerTotals, setLedgerTotals] = useState<LedgerTotals>({}) // 이번 달 미귀속(잔여) 장부 합계 — ledger 슬롯 생성용
   const [recordSlot, setRecordSlot] = useState<CashAccount | null>(null) // "기록" 다이얼로그 대상 슬롯
+  // 분류 제안(datalist) — 기본 분류 + 실제 장부에 쓰인 분류(FinanceEntryModal과 같은 수집 패턴)
+  const [catSuggest, setCatSuggest] = useState<{ revenue: string[]; expense: string[] }>({
+    revenue: [...REVENUE_CATEGORIES],
+    expense: [...EXPENSE_CATEGORIES],
+  })
   const seededRef = useRef(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -94,13 +99,15 @@ export function CashFlowView() {
   const load = useCallback(async () => {
     try {
       const mr = currentMonthRange()
-      const [{ data: slotData, error: e }, { data: settings }, { data: types }, { data: grps }, { data: ledgerRows }] = await Promise.all([
+      const [{ data: slotData, error: e }, { data: settings }, { data: types }, { data: grps }, { data: ledgerRows }, { data: catRows }] = await Promise.all([
         supabase.from("cash_accounts").select("*").is("deleted_at", null).order("sort_order"),
         supabase.from("cashflow_settings").select("opening_cash, default_currency, pool_pos, default_calc_type_id").maybeSingle(),
         supabase.from("cash_calc_types").select("*").order("sort_order"),
         supabase.from("cash_categories").select("*").order("sort_order"),
         // 장부(원장=SSOT) 이번 달 기록 — 모든 매출·비용 슬롯 amount의 원천(내역 탭과 같은 데이터)
         supabase.from("finance_entries").select("kind, total_amount, currency, category, account_id").is("deleted_at", null).gte("entry_date", mr.start).lt("entry_date", mr.end),
+        // 분류 제안 수집(전 기간·경량) — 슬롯 분류 datalist용
+        supabase.from("finance_entries").select("category, kind").is("deleted_at", null).not("category", "is", null).limit(400),
       ])
       if (e) throw e
 
@@ -128,6 +135,15 @@ export function CashFlowView() {
         }
       }
       setLedgerTotals(unclaimed)
+      // 분류 제안 = 기본 목록 + 실제 쓰인 분류(구분별)
+      const rSet = new Set<string>(REVENUE_CATEGORIES)
+      const eSet = new Set<string>(EXPENSE_CATEGORIES)
+      for (const row of catRows ?? []) {
+        if (!row.category) continue
+        if (row.kind === "revenue") rSet.add(row.category)
+        else eSet.add(row.category)
+      }
+      setCatSuggest({ revenue: [...rSet], expense: [...eSet] })
       // 전 슬롯 동기화 — ledger=미귀속 잔여 / 매출·비용 일반 슬롯=자기 귀속 합계 / 보유금(reserve)=직접 입력 유지.
       const targetAmount = (s: CashAccount): number | null => {
         if (s.item_type === "ledger") return ledgerAmountFor(s, unclaimed)
@@ -295,7 +311,7 @@ export function CashFlowView() {
         kind: slot.kind === "revenue_src" ? "revenue" : "expense",
         entry_date: input.date,
         vendor: slot.name,
-        category: slot.name,
+        category: slot.ledger_category?.trim() || slot.name, // 슬롯에 정한 장부 분류(없으면 슬롯명)
         description: input.memo.trim() || null,
         amount: input.amount,
         tax_amount: 0,
@@ -607,6 +623,18 @@ export function CashFlowView() {
 
       {/* 슬롯 표 — 금액은 원장 파생(이번 달 기록 합계), 기록 버튼으로 장부에 쓴다 */}
       <CashGrid slots={slots} groups={groups} pool={graph.pool} calcTypes={calcTypes} defaultType={defaultType} onAddSlot={addSlot} onUpdateSlot={updateSlot} onDeleteSlot={deleteSlot} onUpdateCalcType={onUpdateCalcType} onEditColumns={editColumns} onRecord={setRecordSlot} />
+
+      {/* 슬롯 분류 자유입력 제안 — 캔버스/표의 input list가 참조(구분별) */}
+      <datalist id="cf-cat-revenue">
+        {catSuggest.revenue.map((c) => (
+          <option key={c} value={c} />
+        ))}
+      </datalist>
+      <datalist id="cf-cat-expense">
+        {catSuggest.expense.map((c) => (
+          <option key={c} value={c} />
+        ))}
+      </datalist>
 
       {showBuilder && <CalcTypeBuilder types={calcTypes} editType={editType} onClose={() => { setShowBuilder(false); setEditType(null) }} onSaved={load} />}
       {recordSlot && (

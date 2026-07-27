@@ -186,9 +186,15 @@ export function CashGrid({
               ))}
               {/* 계산값 = 기록 프리필용 도우미(진실 아님 — 진실은 금액 열의 이번 달 기록 합계) */}
               {slotCategory(s.kind) !== "hold" && (
-                <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] tabular-nums text-muted-foreground" title="수식 계산값 — '기록'을 누르면 이 값이 장부에 기록돼요">
-                  계산값 {money(shownAmount, s.currency)}
-                </span>
+                <>
+                  <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] tabular-nums text-muted-foreground" title="수식 계산값 — '기록'을 누르면 이 값이 장부에 기록돼요">
+                    계산값 {money(shownAmount, s.currency)}
+                  </span>
+                  <label className="flex items-center gap-1 text-xs text-muted-foreground">
+                    분류
+                    <CategoryInput slot={s} onUpdateSlot={onUpdateSlot} />
+                  </label>
+                </>
               )}
             </div>
           </td>
@@ -211,6 +217,14 @@ export function CashGrid({
                     <option value={s.ledger_category}>{s.ledger_category}</option>
                   )}
               </select>
+            </label>
+          </td>
+        ) : slotCategory(s.kind) !== "hold" ? (
+          // 직접 입력(fixed) 매출·비용 — 계산칸 대신 장부 분류 입력(기록 시 이 분류로 찍힘)
+          <td className="px-2 py-1" colSpan={Math.max(1, ncol)}>
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              분류
+              <CategoryInput slot={s} onUpdateSlot={onUpdateSlot} />
             </label>
           </td>
         ) : dfields.length > 0 ? (
@@ -356,6 +370,23 @@ export function CashGrid({
         </table>
       </div>
     </section>
+  )
+}
+
+/** 슬롯 장부 분류 자유입력(+datalist 제안, CashFlowView가 렌더) — '기록' 시 이 분류로 내역에 찍힘. 비우면 슬롯명. */
+function CategoryInput({ slot: s, onUpdateSlot }: { slot: CashAccount; onUpdateSlot: (id: string, patch: Partial<CashAccount>) => void }) {
+  return (
+    <input
+      key={`${s.id}-${s.ledger_category ?? ""}`}
+      defaultValue={s.ledger_category ?? ""}
+      list={slotCategory(s.kind) === "income" ? "cf-cat-revenue" : "cf-cat-expense"}
+      placeholder="기록 분류(비우면 슬롯명)"
+      onBlur={(e) => {
+        const v = e.target.value.trim()
+        if (v !== (s.ledger_category ?? "")) onUpdateSlot(s.id, { ledger_category: v || null })
+      }}
+      className="w-36 rounded border bg-background px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-ring"
+    />
   )
 }
 
