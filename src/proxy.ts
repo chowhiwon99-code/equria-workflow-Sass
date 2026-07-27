@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server"
 import type { Database } from "@/lib/supabase/types"
 
 /** 로그인 없이 접근 가능한 경로 */
-const PUBLIC_PATHS = ["/login", "/signup"]
+const PUBLIC_PATHS = ["/login", "/signup", "/privacy", "/terms"] // privacy·terms = 구글 브랜드 검증 요건(공개 필수)
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request })

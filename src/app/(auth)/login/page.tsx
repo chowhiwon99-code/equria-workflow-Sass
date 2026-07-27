@@ -66,7 +66,7 @@ export default function LoginPage() {
         <Link href="/signup" className="font-semibold text-foreground underline">가입하기</Link>
       </p>
       <p className="mx-auto mt-6 max-w-[320px] text-center text-xs leading-relaxed text-muted-foreground/70">
-        계속 진행하면 <a href="#" className="underline">이용약관</a> 및 <a href="#" className="underline">개인정보 보호정책</a>을
+        계속 진행하면 <Link href="/terms" className="underline">이용약관</Link> 및 <Link href="/privacy" className="underline">개인정보처리방침</Link>을
         이해했으며 이에 동의하는 것으로 간주됩니다.
       </p>
     </div>
