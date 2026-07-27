@@ -134,3 +134,8 @@ export const memoryOrganizeSchema = z.object({
     ),
 })
 export type MemoryOrganizeResult = z.infer<typeof memoryOrganizeSchema>
+
+// 자연어 → 계산 수식 변환(계산 유형 빌더 AI 폴백 — 파서 실패 시에만 호출·Haiku)
+export const formulaConvertSchema = z.object({
+  formula: z.string().describe("변환된 수식 한 줄 — 칸 이름(한국어)과 + − × ÷ ( ) 숫자 %만 사용"),
+})

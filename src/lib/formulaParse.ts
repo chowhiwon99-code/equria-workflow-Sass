@@ -149,6 +149,14 @@ export function parseFormulaText(text: string, known: CalcField[] = []): ParseRe
     if ("ok" in left) return left
     for (;;) {
       const tk = peek()
+      // 암묵 곱셈 — "급여 3.3%"·"판매수 단가"처럼 값이 연달아 오면 ×로 해석(계산기 관례).
+      // 해석 결과는 빌더가 "해석: …"으로 노출해 오해를 방지한다.
+      if (tk && (tk.t === "num" || tk.t === "field" || tk.t === "lparen")) {
+        const right = parseFactor()
+        if ("ok" in right) return right
+        left = { t: "op", op: "*", a: left, b: right }
+        continue
+      }
       if (!tk || tk.t !== "op" || (tk.op !== "*" && tk.op !== "/")) return left
       pos++
       const right = parseFactor()

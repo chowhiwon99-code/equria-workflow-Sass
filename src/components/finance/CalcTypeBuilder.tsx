@@ -90,6 +90,25 @@ export function CalcTypeBuilder({ types, editType, onClose, onSaved }: { types: 
 
   // 텍스트 → AST+칸 (편집 모드는 기존 칸의 key·kind 보존)
   const parsed = useMemo(() => parseFormulaText(formulaText, isEdit ? editFields : []), [formulaText, isEdit, editFields])
+  // 자연어 → 수식 AI 폴백(파서 실패 시에만 버튼 노출) — 결과는 다시 파서가 검증
+  const [aiBusy, setAiBusy] = useState(false)
+  const aiConvert = async () => {
+    setAiBusy(true)
+    try {
+      const res = await fetch("/api/finance/formula", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: formulaText }),
+      })
+      const j = (await res.json().catch(() => ({}))) as { formula?: string; error?: string }
+      if (!res.ok || !j.formula) throw new Error(j.error ?? "변환에 실패했어요.")
+      setFormulaText(j.formula)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "변환에 실패했어요.")
+    } finally {
+      setAiBusy(false)
+    }
+  }
   const customOk = parsed.ok && parsed.fields.length > 0
 
   const ast = mode === "template" ? templateAst : parsed.ok ? parsed.ast : null
@@ -261,18 +280,34 @@ export function CalcTypeBuilder({ types, editType, onClose, onSaved }: { types: 
 
                 {formulaText.trim() &&
                   (parsed.ok ? (
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-[11px] text-muted-foreground">인식된 칸</span>
-                      {parsed.fields.map((f) => (
-                        <span key={f.key} className="rounded-full bg-muted px-2 py-0.5 text-[11px]">
-                          {f.label}
-                          {f.kind === "percent" && <span className="ml-0.5 text-muted-foreground">%</span>}
-                        </span>
-                      ))}
-                      {parsed.fields.length === 0 && <span className="text-[11px] text-warning">숫자만 있어요 — 칸(이름)을 하나 이상 넣어주세요.</span>}
+                    <div className="flex flex-col gap-1">
+                      {/* 해석 — 암묵 곱셈("급여 3.3%"→급여 × 3.3%) 등 파서가 이해한 결과를 투명하게 */}
+                      <p className="text-[11px] text-muted-foreground">
+                        해석: <span className="font-medium text-foreground">{astToEditableText(parsed.ast, parsed.fields)}</span>
+                      </p>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[11px] text-muted-foreground">인식된 칸</span>
+                        {parsed.fields.map((f) => (
+                          <span key={f.key} className="rounded-full bg-muted px-2 py-0.5 text-[11px]">
+                            {f.label}
+                            {f.kind === "percent" && <span className="ml-0.5 text-muted-foreground">%</span>}
+                          </span>
+                        ))}
+                        {parsed.fields.length === 0 && <span className="text-[11px] text-warning">숫자만 있어요 — 칸(이름)을 하나 이상 넣어주세요.</span>}
+                      </div>
                     </div>
                   ) : (
-                    <p className="text-[11px] text-destructive">{parsed.error}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-[11px] text-destructive">{parsed.error}</p>
+                      {/* 자연어 폴백(대표 제안) — 파서가 못 읽을 때만 노출·Haiku 원샷, 결과는 다시 파서가 검증 */}
+                      <button
+                        onClick={aiConvert}
+                        disabled={aiBusy}
+                        className="inline-flex items-center gap-1 rounded border border-primary/40 px-1.5 py-0.5 text-[11px] font-medium text-primary transition-colors hover:bg-primary/10 disabled:opacity-50"
+                      >
+                        {aiBusy ? <Loader2 className="size-3 animate-spin" /> : null} 말로 쓴 것 같아요 — AI로 수식 바꾸기
+                      </button>
+                    </div>
                   ))}
               </div>
             )}
