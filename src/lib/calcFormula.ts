@@ -1,6 +1,8 @@
 // 사용자 정의 계산 — 하나의 AST에서 앱 계산(JS)과 엑셀 수식 문자열을 동시 생성 → 앱·엑셀이 절대 어긋나지 않음.
 
-export type CalcField = { key: string; label: string; kind: "number" | "percent" }
+/** def = 기본값(선택) — 유형을 슬롯에 붙일 때 자동으로 채워짐(%는 소수: 10.8% → 0.108).
+ *  법정 요율처럼 "알아서 들어가야 자연스러운" 값에만 쓴다(시장 수수료처럼 회사마다 다른 값은 비움). */
+export type CalcField = { key: string; label: string; kind: "number" | "percent"; def?: number }
 
 export type CalcNode =
   | { t: "field"; key: string }
@@ -76,11 +78,11 @@ export const CALC_TEMPLATES: CalcTemplate[] = [
   { id: "qty", label: "수량 비용 — 갯수 × 단가 (+ 정액)", flow: "expense", fields: BUILTIN_FIELDS.qty, ast: QTY_AST },
   // 급여 — 한국 급여 형태별(2026 요율 조사 반영). 요율은 매년 바뀌므로 수식에 박지 않고 %칸+안내로.
   // 2026 사업주 부담: 국민연금 4.75% + 건강 3.595%(+장기요양 12.95%) + 고용 1.15~1.75% + 산재(업종별) ≈ 약 10.8%
-  { id: "labor_ins", label: "정규직 월급 — 월급 × (1+사업주부담%) · 4대보험 사업주 약 10.8%(2026)", flow: "expense", fields: [{ key: "salary", label: "월급여", kind: "number" }, { key: "ins", label: "사업주부담", kind: "percent" }], ast: op("*", f("salary"), op("+", c(1), f("ins"))) },
-  { id: "salary_full", label: "정규직 총비용 — 월급 × (1+사업주부담%+퇴직적립%) · 퇴직적립 8.33%", flow: "expense", fields: [{ key: "salary", label: "월급여", kind: "number" }, { key: "ins", label: "사업주부담", kind: "percent" }, { key: "sev", label: "퇴직적립", kind: "percent" }], ast: op("*", f("salary"), op("+", op("+", c(1), f("ins")), f("sev"))) },
-  { id: "salary_annual", label: "연봉제 월 환산 — 연봉 ÷ 12 × (1+사업주부담%)", flow: "expense", fields: [{ key: "annual", label: "연봉", kind: "number" }, { key: "ins", label: "사업주부담", kind: "percent" }], ast: op("*", op("/", f("annual"), c(12)), op("+", c(1), f("ins"))) },
+  { id: "labor_ins", label: "정규직 월급 — 월급 × (1+사업주부담%) · 4대보험 사업주 약 10.8%(2026) 자동 적용", flow: "expense", fields: [{ key: "salary", label: "월급여", kind: "number" }, { key: "ins", label: "사업주부담", kind: "percent", def: 0.108 }], ast: op("*", f("salary"), op("+", c(1), f("ins"))) },
+  { id: "salary_full", label: "정규직 총비용 — 월급 × (1+사업주부담%+퇴직적립%) · 10.8%+8.33% 자동 적용", flow: "expense", fields: [{ key: "salary", label: "월급여", kind: "number" }, { key: "ins", label: "사업주부담", kind: "percent", def: 0.108 }, { key: "sev", label: "퇴직적립", kind: "percent", def: 0.0833 }], ast: op("*", f("salary"), op("+", op("+", c(1), f("ins")), f("sev"))) },
+  { id: "salary_annual", label: "연봉제 월 환산 — 연봉 ÷ 12 × (1+사업주부담%) · 10.8% 자동 적용", flow: "expense", fields: [{ key: "annual", label: "연봉", kind: "number" }, { key: "ins", label: "사업주부담", kind: "percent", def: 0.108 }], ast: op("*", op("/", f("annual"), c(12)), op("+", c(1), f("ins"))) },
   { id: "labor", label: "시급제 — 시급 × 시간 × 인원", flow: "expense", fields: [{ key: "wage", label: "시급", kind: "number" }, { key: "hours", label: "근무시간", kind: "number" }, { key: "people", label: "인원", kind: "number" }], ast: op("*", op("*", f("wage"), f("hours")), f("people")) },
-  { id: "parttime_week", label: "알바(주휴 포함) — 시급 × 월시간 × (1+주휴가산%) · 주15h↑ 약 20%", flow: "expense", fields: [{ key: "wage", label: "시급", kind: "number" }, { key: "hours", label: "월 근무시간", kind: "number" }, { key: "weekly", label: "주휴가산", kind: "percent" }], ast: op("*", op("*", f("wage"), f("hours")), op("+", c(1), f("weekly"))) },
+  { id: "parttime_week", label: "알바(주휴 포함) — 시급 × 월시간 × (1+주휴가산%) · 주15h↑ 20% 자동 적용", flow: "expense", fields: [{ key: "wage", label: "시급", kind: "number" }, { key: "hours", label: "월 근무시간", kind: "number" }, { key: "weekly", label: "주휴가산", kind: "percent", def: 0.2 }], ast: op("*", op("*", f("wage"), f("hours")), op("+", c(1), f("weekly"))) },
   { id: "daily_labor", label: "일용직 — 일당 × 근무일수 × 인원", flow: "expense", fields: [{ key: "daily", label: "일당", kind: "number" }, { key: "days", label: "근무일수", kind: "number" }, { key: "people", label: "인원", kind: "number" }], ast: op("*", op("*", f("daily"), f("days")), f("people")) },
   { id: "freelance", label: "프리랜서(3.3%) — 지급액 그대로 · 원천징수는 지급액에 포함(회사 추가부담 없음)", flow: "expense", fields: [{ key: "amount", label: "지급액", kind: "number" }], ast: f("amount") },
   { id: "incentive_pay", label: "기본급+성과급 — 기본급 + 매출 × 인센티브%", flow: "expense", fields: [{ key: "base", label: "기본급", kind: "number" }, { key: "rev", label: "대상 매출", kind: "number" }, { key: "rate", label: "인센티브", kind: "percent" }], ast: op("+", f("base"), op("*", f("rev"), f("rate"))) },

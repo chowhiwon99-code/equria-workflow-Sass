@@ -277,6 +277,24 @@ export function CashFlowView() {
       if (ct && ct.id !== defaultCalcTypeId) derived.kind = flowToKind(ct.flow)
     }
     const safePatch: Partial<CashAccount> = { ...patch }
+    // 계산 유형을 새로 붙일 때 기본값(def) 자동 채움 — "정규직 월급 골랐는데 10.8%가 알아서 안 들어감" 방지.
+    // 이미 값이 있는 칸은 덮지 않는다(사용자 입력 우선).
+    if (patch.calc_type_id) {
+      const ct = calcTypes.find((t) => t.id === patch.calc_type_id)
+      const cur = (merged.field_values as Record<string, number>) ?? {}
+      const seeded: Record<string, number> = { ...cur }
+      let touched = false
+      for (const fld of ((ct?.fields as unknown as CalcField[]) ?? [])) {
+        if (fld.def != null && seeded[fld.key] == null) {
+          seeded[fld.key] = fld.def
+          touched = true
+        }
+      }
+      if (touched) {
+        safePatch.field_values = seeded
+        merged.field_values = seeded // reserve 수식 재계산에도 반영
+      }
+    }
     let amountPatch: Partial<CashAccount> = {}
     if (merged.kind === "reserve") {
       if (merged.calc_type_id) {

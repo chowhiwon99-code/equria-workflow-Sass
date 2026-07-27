@@ -81,7 +81,12 @@ export function CalcTypeBuilder({ types, editType, onClose, onSaved }: { types: 
   const [tplQuery, setTplQuery] = useState("")
   // 직접 만들기/편집 — 수식 텍스트가 유일한 입력(칸은 파서가 자동 인식)
   const [formulaText, setFormulaText] = useState(() => (isEdit && editAst ? astToEditableText(editAst, editFields) : ""))
-  const [sampleVals, setSampleVals] = useState<Record<string, string>>({})
+  const [sampleVals, setSampleVals] = useState<Record<string, string>>(() =>
+    // 편집 진입 시 기본값(def) 칸은 미리 채워 보여준다(템플릿 pick과 동일 동작)
+    Object.fromEntries(
+      editFields.filter((x) => x.def != null).map((x) => [x.key, String(x.kind === "percent" ? +((x.def as number) * 100).toFixed(2) : (x.def as number))])
+    )
+  )
 
   // 텍스트 → AST+칸 (편집 모드는 기존 칸의 key·kind 보존)
   const parsed = useMemo(() => parseFormulaText(formulaText, isEdit ? editFields : []), [formulaText, isEdit, editFields])
@@ -104,6 +109,8 @@ export function CalcTypeBuilder({ types, editType, onClose, onSaved }: { types: 
     setFlow(t.flow)
     setFields(t.fields.map((x) => ({ ...x })))
     setTemplateAst(t.ast)
+    // 기본값(법정 요율 등)은 미리보기에 바로 채워 보여준다 — "자동 적용"이 눈에 보이게.
+    setSampleVals(Object.fromEntries(t.fields.filter((x) => x.def != null).map((x) => [x.key, String(x.kind === "percent" ? +((x.def as number) * 100).toFixed(2) : (x.def as number))])))
   }
   const updField = (key: string, patch: Partial<CalcField>) => setFields((fs) => fs.map((x) => (x.key === key ? { ...x, ...patch } : x)))
 
