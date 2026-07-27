@@ -1,25 +1,25 @@
 "use client"
 
 import { useState } from "react"
-import Link from "next/link"
 import Image from "next/image"
-import { ArrowRight, Bot, LineChart, MessagesSquare, Stamp, Plug, ShieldCheck, Sparkles, LayoutDashboard, Calendar, FolderKanban, Receipt, CheckCircle2 } from "lucide-react"
+import {
+  ArrowRight, Bot, LineChart, MessagesSquare, Stamp, Plug, ShieldCheck, Sparkles,
+  LayoutDashboard, Calendar, FolderKanban, Receipt, CheckCircle2, Check,
+  BookOpen, Wrench, Lock, Server, KeyRound,
+} from "lucide-react"
 import { LandingHeader } from "./LandingHeader"
+import { LandingFooter } from "./LandingFooter"
 import { AuthModal } from "./AuthModal"
 import { INK, CONTACT } from "./const"
 import type { AuthMode } from "@/components/auth/AuthForm"
 
 /**
  * Complow 랜딩(마케팅) 페이지 — 공개(로그인 불필요).
- * 미니멀리즘(대표 결정 2026-07-27): 타이포 중심·여백·모노톤(검정+회색), 목업/카드/컬러 밴드 제거.
- * GNB(LandingHeader)와 본문 완전 분리 + 로그인·가입은 노션식 모달(AuthModal)로(2026-07-28).
- * CTA = 무료로 사용하기(구독제) + 도입 문의 보조. 앱과 분리된 마케팅 표면.
+ * 잔디식 콘텐츠 구성(대표 결정 2026-07-28): 히어로 → 숫자 스트립 → AI 심화 →
+ * 기능 개요·심화 → 보안 → 가격(요금별 기능 비교) → FAQ → 마무리 → 다크 푸터.
+ * 톤은 미니멀 모노(검정+회색) 유지. GNB·푸터는 별도 컴포넌트(완전 분리).
+ * 로그인·가입 = 노션식 모달(AuthModal). CTA = 무료로 사용하기(구독제).
  */
-
-// 가로형 로고(심볼+워드마크 포함) — 대표 제공 브랜드 로고(2026-07-27)
-function Logo({ className = "" }: { className?: string }) {
-  return <Image src="/brand/logo-horizontal.png" alt="Complow" width={1046} height={256} className={`h-6 w-auto ${className}`} priority />
-}
 
 const FEATURES = [
   { icon: Bot, t: "AI 에이전트", d: "회사 지식을 학습하고 기억하는 전용 AI" },
@@ -28,6 +28,45 @@ const FEATURES = [
   { icon: Stamp, t: "전자결재·근태", d: "기안·결재선·출퇴근을 간단하게" },
   { icon: Plug, t: "외부 도구 연동", d: "구글·노션 등 쓰던 도구 그대로" },
   { icon: ShieldCheck, t: "보안·격리", d: "회사별 데이터 격리와 암호화" },
+]
+
+const STATS = [
+  { n: "8종", l: "바로 쓰는 기본 AI 에이전트" },
+  { n: "10+", l: "하나로 합친 업무 도구" },
+  { n: "100%", l: "회사별 데이터 격리" },
+]
+
+const AI_BLOCKS = [
+  { icon: BookOpen, t: "회사를 아는 AI", d: "회사 문서와 지식을 학습하고 대화를 기억합니다. 일반 챗봇이 아니라, 우리 회사 기준으로 답하는 AI입니다." },
+  { icon: Wrench, t: "직접 만드는 에이전트", d: "개발자 없이 직원이 빌더로 에이전트를 만듭니다. 세금계산서·CS·번역 등 8종은 기본 제공." },
+  { icon: Plug, t: "도구를 쓰는 AI", d: "구글 캘린더·메일 등 외부 도구를 AI가 직접 다룹니다. 에이전트를 이어 붙여 반복 업무를 자동화합니다." },
+]
+
+const SECURITY = [
+  { icon: Lock, t: "회사별 격리", d: "데이터베이스 단계에서 회사 간 데이터를 분리합니다." },
+  { icon: KeyRound, t: "암호화 저장", d: "외부 연동 토큰 등 민감 정보는 암호화해 보관합니다." },
+  { icon: ShieldCheck, t: "권한 관리", d: "대표·관리자·직원 역할별로 접근 범위를 나눕니다." },
+  { icon: Server, t: "국내 리전", d: "데이터는 국내(서울) 리전에 저장됩니다." },
+]
+
+/** 요금별 기능 비교 — 가격 확정 전 기능 축만 먼저 정리(대표 요청) */
+const PLAN_ROWS: { f: string; std: string | boolean; pro: string | boolean }[] = [
+  { f: "AI 에이전트 (기본 8종 + 직접 제작)", std: true, pro: true },
+  { f: "AI 사용량", std: "표준 포함", pro: "한도 상향" },
+  { f: "손익·현금흐름 (장부·세금계산서 연동)", std: true, pro: true },
+  { f: "팀 협업 (채팅·회의노트·캘린더·프로젝트)", std: true, pro: true },
+  { f: "전자결재·근태", std: true, pro: true },
+  { f: "외부 도구 연동 (구글·노션 등)", std: true, pro: true },
+  { f: "회사별 커스터마이징 (손익 수식·에이전트)", std: true, pro: true },
+  { f: "지원", std: "이메일", pro: "우선 지원·도입 컨설팅" },
+]
+
+const FAQS = [
+  { q: "정말 무료로 시작할 수 있나요?", a: "네. 14일 동안 모든 기능을 무료로 쓸 수 있습니다. 체험 중 기능 제한은 없습니다." },
+  { q: "가격은 언제 공개되나요?", a: "현재 준비 중입니다. 사전 신청한 회사에는 얼리버드 할인이 적용될 예정이니 도입 문의로 미리 알려주세요." },
+  { q: "우리 회사 데이터는 안전한가요?", a: "회사별로 데이터가 격리되고, 민감 정보는 암호화해 국내 리전에 저장합니다. 데이터의 소유권은 회사에 있습니다." },
+  { q: "우리 회사 방식에 맞출 수 있나요?", a: "그게 Complow의 출발점입니다. 손익 계산 수식, AI 에이전트, 결재선까지 회사 방식대로 직접 구성할 수 있습니다." },
+  { q: "도입은 어떻게 진행되나요?", a: "도입 문의를 남기면 세팅부터 온보딩까지 함께합니다. 쓰던 도구(구글·노션 등)는 연동으로 그대로 이어집니다." },
 ]
 
 export default function LandingPage() {
@@ -152,9 +191,48 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── 기능 — 선 없는 그리드 ── */}
-      <section id="features" className="mx-auto max-w-4xl border-t border-black/[0.06] px-6 py-24">
-        <div className="grid gap-x-10 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
+      {/* ── 숫자 스트립 ── */}
+      <section className="mx-auto max-w-4xl border-t border-black/[0.06] px-6 py-16">
+        <div className="grid grid-cols-1 gap-10 text-center sm:grid-cols-3">
+          {STATS.map((s) => (
+            <div key={s.l}>
+              <p className="text-4xl font-extrabold tracking-tight">{s.n}</p>
+              <p className="mt-2 text-[14px] text-black/45">{s.l}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── AI — 심화 ── */}
+      <section id="ai" className="mx-auto max-w-4xl scroll-mt-16 border-t border-black/[0.06] px-6 py-24">
+        <div className="text-center">
+          <h2 className="text-[clamp(1.6rem,4vw,2.2rem)] font-extrabold tracking-[-0.02em]">
+            AI가 따로 있지 않고,
+            <br />
+            업무 흐름 안에 있습니다.
+          </h2>
+          <p className="mx-auto mt-4 max-w-lg text-[15px] leading-relaxed text-black/45">
+            메뉴 하나가 아니라 바탕입니다. 손익을 묻고, 문서를 쓰고, 일정을 잡는 모든 순간에 AI가 함께 움직입니다.
+          </p>
+        </div>
+        <div className="mt-14 grid gap-x-10 gap-y-12 sm:grid-cols-3">
+          {AI_BLOCKS.map((b) => (
+            <div key={b.t}>
+              <b.icon className="size-5" strokeWidth={1.75} />
+              <h3 className="mt-3.5 text-[15px] font-semibold">{b.t}</h3>
+              <p className="mt-1.5 text-[14px] leading-relaxed text-black/45">{b.d}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── 기능 — 개요 그리드 + 심화 블록 ── */}
+      <section id="features" className="mx-auto max-w-4xl scroll-mt-16 border-t border-black/[0.06] px-6 py-24">
+        <div className="text-center">
+          <h2 className="text-[clamp(1.6rem,4vw,2.2rem)] font-extrabold tracking-[-0.02em]">일에 필요한 전부, 여기에.</h2>
+          <p className="mt-3 text-[15px] text-black/45">흩어져 있던 도구를 하나로 합쳤습니다.</p>
+        </div>
+        <div className="mt-14 grid gap-x-10 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((f) => (
             <div key={f.t}>
               <f.icon className="size-5" strokeWidth={1.75} />
@@ -163,10 +241,132 @@ export default function LandingPage() {
             </div>
           ))}
         </div>
+
+        {/* 심화 1 — 손익·현금흐름 */}
+        <div className="mt-24 grid items-center gap-10 sm:grid-cols-2">
+          <div>
+            <p className="text-[13px] font-bold text-black/40">손익·현금흐름</p>
+            <h3 className="mt-2 text-[22px] font-extrabold tracking-tight">기록 한 번에, 장부 전체가 움직입니다.</h3>
+            <ul className="mt-4 space-y-2.5 text-[14px] leading-relaxed text-black/55">
+              <li>캔버스에서 기록하면 내역·추세·손익에 즉시 반영</li>
+              <li>세금계산서를 확정하면 매출이 자동으로 잡힙니다</li>
+              <li>급여·수수료는 회사 수식대로 자동 계산 (자연어로 수식 생성)</li>
+            </ul>
+          </div>
+          <div className="rounded-2xl border border-black/[0.06] bg-[#fbfbfc] p-5">
+            <p className="text-[12px] font-semibold text-black/40">11월 손익</p>
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
+              <span className="rounded-full bg-black/[0.05] px-2.5 py-1 text-[11px] font-semibold">매출 ₩128,400,000</span>
+              <span className="rounded-full bg-black/[0.05] px-2.5 py-1 text-[11px] font-semibold">비용 ₩41,200,000</span>
+            </div>
+            <div className="mt-3 rounded-xl border border-black/[0.05] bg-white p-3.5 text-[12px] shadow-sm">
+              <div className="flex items-center justify-between font-medium">
+                <span>정규직 월급 · 4명</span>
+                <span className="tabular-nums text-black/60">₩11,080,000</span>
+              </div>
+              <p className="mt-1 text-[11px] text-black/35">월급 × (1 + 사업주 부담 10.8%) 자동 계산</p>
+            </div>
+          </div>
+        </div>
+
+        {/* 심화 2 — 팀 협업 */}
+        <div className="mt-20 grid items-center gap-10 sm:grid-cols-2">
+          <div className="order-last sm:order-first">
+            <div className="rounded-2xl border border-black/[0.06] bg-[#fbfbfc] p-5">
+              <p className="text-[12px] font-semibold text-black/40">전체방</p>
+              <div className="mt-2.5 w-fit rounded-2xl rounded-bl-sm bg-white px-3 py-1.5 text-[12px] text-black/70 shadow-sm">오늘 회의록 정리해서 올렸어요</div>
+              <div className="ml-auto mt-1.5 w-fit rounded-2xl rounded-br-sm px-3 py-1.5 text-[12px] font-medium text-white" style={{ background: INK }}>확인! 액션아이템은 프로젝트에 넣을게요</div>
+              <div className="mt-3 flex items-center gap-2 rounded-xl border border-black/[0.05] bg-white p-2.5 text-[12px] text-black/60 shadow-sm">
+                <Calendar className="size-3.5" /> 내일 10:00 — 신제품 킥오프 (팀 캘린더)
+              </div>
+            </div>
+          </div>
+          <div>
+            <p className="text-[13px] font-bold text-black/40">팀 협업</p>
+            <h3 className="mt-2 text-[22px] font-extrabold tracking-tight">말한 것이 일정이 되고, 일이 됩니다.</h3>
+            <ul className="mt-4 space-y-2.5 text-[14px] leading-relaxed text-black/55">
+              <li>전체방·개인 채팅으로 팀 대화를 한곳에</li>
+              <li>회의노트는 분류·중요도로 정리, AI가 요약</li>
+              <li>팀 캘린더와 프로젝트로 일정·할 일을 공유</li>
+            </ul>
+          </div>
+        </div>
+
+        {/* 심화 3 — 전자결재·근태 */}
+        <div className="mt-20 grid items-center gap-10 sm:grid-cols-2">
+          <div>
+            <p className="text-[13px] font-bold text-black/40">전자결재·근태</p>
+            <h3 className="mt-2 text-[22px] font-extrabold tracking-tight">종이 없이, 기다림 없이 승인.</h3>
+            <ul className="mt-4 space-y-2.5 text-[14px] leading-relaxed text-black/55">
+              <li>직원이 기안하면 결재선을 따라 관리자·대표가 승인</li>
+              <li>휴가·지출·구매 등 회사에 필요한 양식대로</li>
+              <li>출퇴근 기록까지 한 화면에서</li>
+            </ul>
+          </div>
+          <div className="rounded-2xl border border-black/[0.06] bg-[#fbfbfc] p-5">
+            <p className="text-[12px] font-semibold text-black/40">지출 결의 — 마케팅비</p>
+            <div className="mt-3 space-y-2">
+              {[
+                { l: "기안 — 김민지", done: true },
+                { l: "검토 — 팀장", done: true },
+                { l: "승인 — 대표", done: false },
+              ].map((s) => (
+                <div key={s.l} className="flex items-center gap-2.5 rounded-xl border border-black/[0.05] bg-white p-2.5 text-[12px] shadow-sm">
+                  <CheckCircle2 className={`size-4 ${s.done ? "text-emerald-500" : "text-black/20"}`} />
+                  <span className={s.done ? "text-black/70" : "font-semibold"}>{s.l}</span>
+                  {!s.done && <span className="ml-auto rounded-full bg-black/[0.05] px-2 py-0.5 text-[10px] font-semibold text-black/50">대기 중</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* 심화 4 — 외부 연동 */}
+        <div className="mt-20 grid items-center gap-10 sm:grid-cols-2">
+          <div className="order-last sm:order-first">
+            <div className="rounded-2xl border border-black/[0.06] bg-[#fbfbfc] p-5">
+              <p className="text-[12px] font-semibold text-black/40">연결된 도구</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {["구글 캘린더", "Gmail", "Notion", "Slack", "환율·세금계산서"].map((t) => (
+                  <span key={t} className="inline-flex items-center gap-1.5 rounded-full border border-black/[0.07] bg-white px-3 py-1.5 text-[12px] font-medium text-black/60 shadow-sm">
+                    <Plug className="size-3" /> {t}
+                  </span>
+                ))}
+              </div>
+              <p className="mt-3 text-[11px] text-black/35">연결하면 AI 에이전트가 도구를 직접 사용합니다.</p>
+            </div>
+          </div>
+          <div>
+            <p className="text-[13px] font-bold text-black/40">외부 도구 연동</p>
+            <h3 className="mt-2 text-[22px] font-extrabold tracking-tight">쓰던 도구는 버리지 않아도 됩니다.</h3>
+            <ul className="mt-4 space-y-2.5 text-[14px] leading-relaxed text-black/55">
+              <li>구글·노션 등 기존 도구를 계정 연결 한 번으로</li>
+              <li>AI가 일정을 읽고, 메일 초안을 쓰고, 문서를 찾습니다</li>
+              <li>회사가 허용한 도구만 연결되도록 관리자가 통제</li>
+            </ul>
+          </div>
+        </div>
       </section>
 
-      {/* ── 구독제 — UX 틀(가격은 토큰 원가 측정 후 확정, 프로모션 자리만 선반영) ── */}
-      <section id="pricing" className="mx-auto max-w-4xl border-t border-black/[0.06] px-6 py-24">
+      {/* ── 보안 ── */}
+      <section className="mx-auto max-w-4xl border-t border-black/[0.06] px-6 py-24">
+        <div className="text-center">
+          <h2 className="text-[clamp(1.6rem,4vw,2.2rem)] font-extrabold tracking-[-0.02em]">회사 데이터는 회사의 것.</h2>
+          <p className="mt-3 text-[15px] text-black/45">보안은 기능이 아니라 기본값입니다.</p>
+        </div>
+        <div className="mt-12 grid gap-x-10 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
+          {SECURITY.map((s) => (
+            <div key={s.t}>
+              <s.icon className="size-5" strokeWidth={1.75} />
+              <h3 className="mt-3 text-[15px] font-semibold">{s.t}</h3>
+              <p className="mt-1 text-[13px] leading-relaxed text-black/45">{s.d}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── 구독제 — 가격 카드 + 요금별 기능 비교(가격은 토큰 원가 측정 후 확정) ── */}
+      <section id="pricing" className="mx-auto max-w-4xl scroll-mt-16 border-t border-black/[0.06] px-6 py-24">
         <div className="text-center">
           <h2 className="text-[clamp(1.6rem,4vw,2.2rem)] font-extrabold tracking-[-0.02em]">간단한 구독제</h2>
           <p className="mt-3 text-[15px] text-black/45">회사 단위로 시작하고, 인원만큼만 내세요. 14일 무료 체험.</p>
@@ -210,8 +410,52 @@ export default function LandingPage() {
             <span className="mt-7 block rounded-lg border border-black/15 py-3 text-center text-[14px] font-bold text-black/35">준비 중</span>
           </div>
         </div>
+
+        {/* 요금별 기능 비교 표 */}
+        <div className="mx-auto mt-12 max-w-2xl overflow-x-auto rounded-2xl border border-black/[0.07]">
+          <table className="w-full min-w-[480px] text-left text-[13px]">
+            <thead>
+              <tr className="border-b border-black/[0.06] bg-[#fbfbfc] text-black/45">
+                <th className="px-4 py-3 font-semibold">기능</th>
+                <th className="w-28 px-4 py-3 text-center font-semibold">스탠다드</th>
+                <th className="w-40 px-4 py-3 text-center font-semibold">프로</th>
+              </tr>
+            </thead>
+            <tbody>
+              {PLAN_ROWS.map((r) => (
+                <tr key={r.f} className="border-b border-black/[0.04] last:border-0">
+                  <td className="px-4 py-3 text-black/70">{r.f}</td>
+                  {[r.std, r.pro].map((v, i) => (
+                    <td key={i} className="px-4 py-3 text-center">
+                      {v === true ? <Check className="mx-auto size-4" strokeWidth={2.25} /> : <span className="text-black/55">{v}</span>}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         {/* 프로모션 틀 — 연간·리퍼럴 자리 */}
         <p className="mt-6 text-center text-[13px] text-black/40">연간 결제 시 2개월 무료 · 추천한 회사가 시작하면 양쪽 모두 1개월 무료</p>
+      </section>
+
+      {/* ── FAQ ── */}
+      <section className="mx-auto max-w-2xl border-t border-black/[0.06] px-6 py-24">
+        <h2 className="text-center text-[clamp(1.6rem,4vw,2.2rem)] font-extrabold tracking-[-0.02em]">자주 묻는 질문</h2>
+        <div className="mt-10 divide-y divide-black/[0.06] border-y border-black/[0.06]">
+          {FAQS.map((f) => (
+            <details key={f.q} className="group py-4">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[15px] font-semibold [&::-webkit-details-marker]:hidden">
+                {f.q}
+                <ArrowRight className="size-4 shrink-0 text-black/30 transition-transform group-open:rotate-90" />
+              </summary>
+              <p className="mt-3 text-[14px] leading-relaxed text-black/50">{f.a}</p>
+            </details>
+          ))}
+        </div>
+        <p className="mt-6 text-center text-[13px] text-black/40">
+          더 궁금한 점은 <a href={CONTACT} className="font-semibold text-black/70 underline">이메일로 물어보세요</a>.
+        </p>
       </section>
 
       {/* ── 마무리 ── */}
@@ -224,20 +468,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── 푸터 ── */}
-      <footer className="border-t border-black/[0.06]">
-        <div className="mx-auto flex max-w-4xl flex-col items-center justify-between gap-4 px-6 py-10 sm:flex-row">
-          <Logo className="h-5 opacity-60" />
-          <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[13px] text-black/40">
-            <Link href="/login" className="hover:text-black">로그인</Link>
-            <Link href="/terms" className="hover:text-black">이용약관</Link>
-            <Link href="/privacy" className="hover:text-black">개인정보처리방침</Link>
-            <Link href="/refund" className="hover:text-black">환불정책</Link>
-            <a href={CONTACT} className="hover:text-black">도입 문의</a>
-          </nav>
-          <span className="text-[13px] text-black/30">© 2026 Complow</span>
-        </div>
-      </footer>
+      <LandingFooter />
 
       {/* ── 로그인·가입 모달(노션식) — 랜딩 위 블러 오버레이 ── */}
       {auth && <AuthModal mode={auth} onClose={() => setAuth(null)} onSwitchMode={setAuth} />}
