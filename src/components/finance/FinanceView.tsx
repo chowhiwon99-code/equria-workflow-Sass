@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { Upload, FileText, Loader2, Plus, Pencil, Download, Trash2, Receipt } from "lucide-react"
 import { Select } from "@/components/shared/Select"
 import { createClient } from "@/lib/supabase/client"
+import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { uploadImage } from "@/lib/upload"
 import { cn } from "@/lib/utils"
@@ -34,6 +35,7 @@ const PAGE_SIZE = 50
 export function FinanceView() {
   const supabase = createClient()
   const { push } = useUndo()
+  const me = useCurrentUserId() // 세금계산서 확정→매출 기록 created_by
   const [entries, setEntries] = useState<FinanceEntry[]>([])
   const [invoices, setInvoices] = useState<TaxInvoice[]>([])
   const [loading, setLoading] = useState(true)
@@ -112,6 +114,13 @@ export function FinanceView() {
 
   useEffect(() => {
     load()
+  }, [load])
+
+  // 손익 탭(CashFlowView)에서 기록·Undo 시 내역/집계 갱신 — 전역 reload 이벤트 수신(SSOT 정합)
+  useEffect(() => {
+    const h = () => load()
+    window.addEventListener("equria:reload", h)
+    return () => window.removeEventListener("equria:reload", h)
   }, [load])
 
   // 필터/검색/기간 변경 시 페이지 리셋
@@ -234,6 +243,61 @@ export function FinanceView() {
     const json = await res.json()
     if (!res.ok) return setError(json.error ?? "초안 생성 실패")
     setSelected(new Set())
+    load()
+  }
+
+  // 매출 세금계산서 확정 → 장부에 매출 자동 기록(대표 결정 2026-07-27 · SSOT 재설계).
+  // status 조건부 UPDATE(draft→ready)가 더블클릭·동시성 가드 — 빈 결과면 이미 처리된 것.
+  const confirmSalesInvoice = async (iv: TaxInvoice) => {
+    if (!me) return
+    const { data: updated } = await supabase
+      .from("tax_invoices")
+      .update({ status: "ready" })
+      .eq("id", iv.id)
+      .eq("status", "draft")
+      .select()
+    if (!updated || updated.length === 0) {
+      toast.error("이미 처리된 세금계산서예요.")
+      load()
+      return
+    }
+    const { data: inserted, error: insErr } = await supabase
+      .from("finance_entries")
+      .insert({
+        kind: "revenue",
+        entry_date: iv.issue_date ?? new Date().toISOString().slice(0, 10),
+        vendor: iv.buyer_name ?? iv.supplier_name ?? "세금계산서",
+        category: "세금계산서",
+        amount: iv.supply_amount,
+        tax_amount: iv.tax_amount,
+        fee_amount: 0,
+        total_amount: iv.total_amount,
+        currency: "KRW",
+        source: "invoice",
+        status: "confirmed",
+        metadata: { tax_invoice_id: iv.id },
+        created_by: me,
+      })
+      .select()
+      .single()
+    if (insErr || !inserted) {
+      // 기록 실패 시 status 롤백(반쪽 상태 방지)
+      await supabase.from("tax_invoices").update({ status: "draft" }).eq("id", iv.id)
+      toast.error("장부 기록에 실패했어요.")
+      return
+    }
+    push({
+      label: "세금계산서 확정·장부 기록",
+      undo: async () => {
+        await supabase.from("finance_entries").delete().eq("id", inserted.id)
+        await supabase.from("tax_invoices").update({ status: "draft" }).eq("id", iv.id)
+      },
+      redo: async () => {
+        await supabase.from("finance_entries").insert(inserted)
+        await supabase.from("tax_invoices").update({ status: "ready" }).eq("id", iv.id)
+      },
+    })
+    toast.success(`매출 ${won(iv.total_amount)} 장부에 기록됨`)
     load()
   }
 
@@ -699,6 +763,15 @@ export function FinanceView() {
                       <td className="px-3 py-2 text-right font-medium">{won(iv.total_amount)}</td>
                       <td className="px-3 py-2">
                         <div className="flex items-center justify-end gap-2">
+                          {/* 매출 초안 → 확정하면 장부에 매출 자동 기록(SSOT). ready면 완료 배지(중복 차단) */}
+                          {iv.direction === "sales" &&
+                            (iv.status === "ready" ? (
+                              <span className="rounded bg-success/10 px-1.5 py-0.5 text-[11px] font-medium text-success">장부 기록됨</span>
+                            ) : (
+                              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => confirmSalesInvoice(iv)}>
+                                확정·장부 기록
+                              </Button>
+                            ))}
                           <button onClick={() => setEditingTax(iv)} className="text-muted-foreground hover:text-foreground" aria-label="초안 수정">
                             <Pencil className="size-3.5" />
                           </button>
