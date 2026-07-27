@@ -99,7 +99,7 @@ export function LandingFooter() {
             <a href={CONTACT} aria-label="이메일 문의" className="text-white/40 transition-colors hover:text-white">
               <Mail className="size-5" />
             </a>
-            <a href="https://www.instagram.com/" target="_blank" rel="noreferrer" aria-label="인스타그램" className="text-white/40 transition-colors hover:text-white">
+            <a href="https://www.instagram.com/complow/" target="_blank" rel="noreferrer" aria-label="인스타그램" className="text-white/40 transition-colors hover:text-white">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-5" aria-hidden>
                 <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
                 <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
