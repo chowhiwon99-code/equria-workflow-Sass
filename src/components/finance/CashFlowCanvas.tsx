@@ -458,35 +458,60 @@ function SlotCard({
               <p className="text-right text-sm font-bold tabular-nums">{money(shownAmount, s.currency)}</p>
             ) : (
               <>
-                {/* 계산값 = 기록 프리필 도우미 · 굵은 금액 = 이번 달 장부 기록 합계(진실) */}
+                {/* 계산값 = 기록 프리필 도우미 · 아래 금액 = 이번 달 장부 기록 합계(진실) */}
                 <div className="flex items-center justify-between gap-1 text-[11px] text-muted-foreground">
                   <span className="tabular-nums" title="수식 계산값 — '기록'을 누르면 이 값이 장부에 기록돼요">계산값 {money(shownAmount, s.currency)}</span>
-                  <button onClick={() => onRecord(s)} className="rounded border px-1.5 py-0.5 font-medium transition-colors hover:border-primary/40 hover:text-primary" title="장부에 기록">
+                  <button
+                    onClick={() => onRecord(s)}
+                    className={cn(
+                      "rounded border px-1.5 py-0.5 font-medium transition-colors hover:border-primary/40 hover:text-primary",
+                      Number(s.amount) === 0 && shownAmount > 0 && "border-primary/40 text-primary" // 기록 전이면 다음 행동 강조
+                    )}
+                    title="장부에 기록 — 누르면 아래 '이번 달' 금액과 내역에 반영돼요"
+                  >
                     기록
                   </button>
                 </div>
-                <p className="text-right text-sm font-bold tabular-nums" title="이번 달 기록 합계 — 장부 기준">{money(Number(s.amount), s.currency)}</p>
+                <MonthAmount amount={Number(s.amount)} currency={s.currency} />
               </>
             )}
           </>
         ) : s.item_type === "ledger" ? (
           // 장부 연동(잔여 자동) — 슬롯 미연결 기록 합계 자동 반영(수정 불가, 삭제로 해제)
-          <p className="text-right text-sm font-bold tabular-nums" title="미연결 기록 잔여 합계 — 장부 자동">{money(Number(s.amount), s.currency)}</p>
+          <MonthAmount amount={Number(s.amount)} currency={s.currency} title="이번 달 미연결 기록 잔여 — 장부 자동" />
         ) : isHold ? (
           <div className="text-right">
             <InlineNumber value={Number(s.amount)} onCommit={(v) => onUpdateSlot(s.id, { amount: v })} width="w-full" />
           </div>
         ) : (
           <div className="flex items-center justify-between gap-1">
-            <button onClick={() => onRecord(s)} className="rounded border px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary" title="장부에 기록">
+            <button
+              onClick={() => onRecord(s)}
+              className={cn(
+                "rounded border px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary",
+                Number(s.amount) === 0 && "border-primary/40 text-primary"
+              )}
+              title="장부에 기록 — 누르면 '이번 달' 금액과 내역에 반영돼요"
+            >
               기록
             </button>
-            <p className="text-right text-sm font-bold tabular-nums" title="이번 달 기록 합계 — 장부 기준">{money(Number(s.amount), s.currency)}</p>
+            <MonthAmount amount={Number(s.amount)} currency={s.currency} />
           </div>
         )}
         <InlineText value={s.note ?? ""} onCommit={(v) => onUpdateSlot(s.id, { note: v })} className="w-full text-[11px] text-muted-foreground" placeholder="설명" />
       </div>
     </div>
+  )
+}
+
+/** "이번 달 ₩X" — 슬롯의 진실 금액(장부 파생). 라벨 없이 ₩0만 크게 떠서 고장처럼 보이던 것 해소.
+ *  기록 전(0)은 흐리게 — 다음 행동은 옆의 '기록' 버튼이 안내. */
+function MonthAmount({ amount, currency, title }: { amount: number; currency: string; title?: string }) {
+  return (
+    <p className="flex items-baseline justify-end gap-1 text-right" title={title ?? "이번 달 장부 기록 합계 — '기록'을 누르면 채워져요"}>
+      <span className="text-[10px] text-muted-foreground">이번 달</span>
+      <span className={cn("text-sm font-bold tabular-nums", amount === 0 && "font-medium text-muted-foreground")}>{money(amount, currency)}</span>
+    </p>
   )
 }
 
