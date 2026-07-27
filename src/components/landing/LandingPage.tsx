@@ -1,6 +1,8 @@
 import Link from "next/link"
 import Image from "next/image"
-import { ArrowRight, Check } from "lucide-react"
+import { ArrowRight, Bot, LineChart, MessagesSquare, Stamp, Plug, ShieldCheck } from "lucide-react"
+
+const CONTACT = "mailto:complow@complow.kr?subject=Complow 도입 문의"
 
 /**
  * Complow 랜딩(마케팅) 페이지 — 공개(로그인 불필요).
@@ -29,21 +31,17 @@ export default function LandingPage() {
       <header className="sticky top-0 z-30 border-b border-black/[0.06] bg-white/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5">
           <Logo />
-          <nav className="hidden items-center gap-7 text-sm font-medium text-black/60 md:flex">
-            <a href="#pricing" className="transition-colors hover:text-black">가격</a>
-            <a href="#download" className="transition-colors hover:text-black">다운로드</a>
-          </nav>
           <div className="flex items-center gap-2">
             <Link href="/login" className="rounded-lg px-3.5 py-2 text-sm font-semibold text-black/70 transition-colors hover:bg-black/[0.04]">
               로그인
             </Link>
-            <Link
-              href="/signup"
+            <a
+              href={CONTACT}
               className="rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-sm transition-transform hover:scale-[1.03]"
               style={{ background: RED }}
             >
-              무료로 시작하기
-            </Link>
+              도입 문의
+            </a>
           </div>
         </div>
       </header>
@@ -56,26 +54,26 @@ export default function LandingPage() {
             하나의 <span style={{ color: RED }}>워크스페이스</span>로.
           </h1>
           <p className="mx-auto mt-5 max-w-xl text-[17px] leading-relaxed text-black/55">
-            AI 에이전트·팀 협업·현금흐름까지 — 흩어진 업무 도구를
-            <br className="hidden sm:block" /> <b style={{ color: INK }}>Complow</b> 하나로 모으고, 일이 흐르게 만드세요.
+            AI 에이전트·팀 협업·손익 관리까지 — 흩어진 업무 도구를
+            <br className="hidden sm:block" /> <b style={{ color: INK }}>Complow</b> 하나로 모으고, 회사에 맞게 커스터마이징하세요.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link
-              href="/signup"
+            <a
+              href={CONTACT}
               className="inline-flex items-center gap-2 rounded-xl px-6 py-3.5 text-[15px] font-bold text-white shadow-lg transition-transform hover:scale-[1.03]"
               style={{ background: RED }}
             >
-              무료로 시작하기 <ArrowRight className="size-4" />
-            </Link>
-            <a
-              href="#download"
+              도입 문의하기 <ArrowRight className="size-4" />
+            </a>
+            <Link
+              href="/login"
               className="inline-flex items-center gap-2 rounded-xl border-2 px-6 py-3.5 text-[15px] font-bold transition-colors hover:bg-black/[0.03]"
               style={{ borderColor: INK, color: INK }}
             >
-              데스크톱 앱 다운로드
-            </a>
+              로그인
+            </Link>
           </div>
-          <p className="mt-4 text-[13px] text-black/40">신용카드 없이 시작 · 팀 초대 무료</p>
+          <p className="mt-4 text-[13px] text-black/40">도입부터 세팅까지 함께합니다 · 문의 후 1영업일 내 회신</p>
         </div>
 
         {/* ── 앱 목업 ── */}
@@ -118,35 +116,25 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── 가격(간단) ── */}
-      <section id="pricing" className="pt-40 pb-24">
-        <div className="mx-auto max-w-3xl px-5 text-center">
-          <h2 className="text-[clamp(1.8rem,4vw,2.4rem)] font-extrabold tracking-[-0.02em]">간단한 가격</h2>
-          <p className="mt-3 text-[16px] text-black/55">회사 단위로 시작하고, 필요한 만큼 자리를 추가하세요.</p>
-          <div className="mx-auto mt-10 grid max-w-2xl gap-5 sm:grid-cols-2">
+      {/* ── 핵심 기능 ── */}
+      <section className="pt-40 pb-16">
+        <div className="mx-auto max-w-5xl px-5">
+          <h2 className="text-center text-[clamp(1.8rem,4vw,2.4rem)] font-extrabold tracking-[-0.02em]">
+            회사 운영에 필요한 전부, <span style={{ color: RED }}>한 곳에</span>
+          </h2>
+          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {[
-              { name: "무료 체험", price: "₩0", items: ["소규모 팀", "핵심 협업 기능", "커뮤니티 지원"] },
-              { name: "비즈니스", price: "문의", items: ["AI 에이전트·워크플로우", "현금흐름·회의노트 전체", "우선 지원"], hot: true },
-            ].map((p) => (
-              <div key={p.name} className={`rounded-2xl border p-7 text-left ${p.hot ? "shadow-xl" : "border-black/[0.08] shadow-sm"}`}
-                   style={p.hot ? { borderColor: RED } : undefined}>
-                <div className="flex items-center justify-between">
-                  <span className="text-[15px] font-bold">{p.name}</span>
-                  {p.hot && <span className="rounded-full px-2.5 py-1 text-[11px] font-bold text-white" style={{ background: RED }}>추천</span>}
-                </div>
-                <div className="mt-3 text-3xl font-extrabold tracking-tight">{p.price}</div>
-                <ul className="mt-5 space-y-2.5">
-                  {p.items.map((it) => (
-                    <li key={it} className="flex items-center gap-2 text-[14px] text-black/70">
-                      <Check className="size-4" style={{ color: RED }} /> {it}
-                    </li>
-                  ))}
-                </ul>
-                <Link href="/signup"
-                      className={`mt-6 block rounded-xl py-3 text-center text-[14px] font-bold transition-transform hover:scale-[1.02] ${p.hot ? "text-white shadow-md" : "border-2"}`}
-                      style={p.hot ? { background: RED } : { borderColor: INK, color: INK }}>
-                  {p.hot ? "도입 문의하기" : "무료로 시작하기"}
-                </Link>
+              { icon: Bot, t: "AI 에이전트", d: "회사 지식을 학습하고 기억하는 우리 회사 전용 AI. 메일·문서·번역까지 회사 톤으로." },
+              { icon: LineChart, t: "손익·현금흐름", d: "영수증 올리면 장부·손익·추세가 하나로. 급여·수식 계산까지 자동." },
+              { icon: MessagesSquare, t: "팀 협업", d: "채팅·회의노트·캘린더·프로젝트 — 팀의 하루가 한 화면에서 돌아갑니다." },
+              { icon: Stamp, t: "전자결재·근태", d: "기안·결재선·승인과 출퇴근 기록을 카카오워크처럼 간단하게." },
+              { icon: Plug, t: "외부 도구 연동", d: "구글·노션·깃허브 등 쓰던 도구를 그대로 연결해 AI가 활용합니다." },
+              { icon: ShieldCheck, t: "보안·격리", d: "회사별 데이터 완전 격리(RLS)와 토큰 암호화. 내 대화는 나만 봅니다." },
+            ].map((f) => (
+              <div key={f.t} className="rounded-2xl border border-black/[0.07] bg-white p-6 shadow-sm">
+                <f.icon className="size-6" style={{ color: RED }} />
+                <h3 className="mt-3 text-[15px] font-bold">{f.t}</h3>
+                <p className="mt-1.5 text-[13.5px] leading-relaxed text-black/55">{f.d}</p>
               </div>
             ))}
           </div>
@@ -154,19 +142,16 @@ export default function LandingPage() {
       </section>
 
       {/* ── CTA 밴드 ── */}
-      <section id="download" className="px-5 py-8">
+      <section className="px-5 py-8">
         <div className="mx-auto max-w-6xl overflow-hidden rounded-3xl px-8 py-16 text-center" style={{ background: INK }}>
           <h2 className="text-[clamp(1.8rem,4vw,2.6rem)] font-extrabold tracking-[-0.02em] text-white">
             지금, 회사의 일을 <span style={{ color: RED }}>흐르게.</span>
           </h2>
-          <p className="mx-auto mt-4 max-w-md text-[16px] text-white/60">몇 분 만에 팀을 초대하고 AI 워크스페이스를 시작하세요.</p>
-          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link href="/signup" className="inline-flex items-center gap-2 rounded-xl px-6 py-3.5 text-[15px] font-bold text-white shadow-lg transition-transform hover:scale-[1.03]" style={{ background: RED }}>
-              무료로 시작하기 <ArrowRight className="size-4" />
-            </Link>
-            <span className="inline-flex items-center gap-2 rounded-xl border-2 border-white/20 px-6 py-3.5 text-[15px] font-bold text-white/50">
-              데스크톱 앱 (준비 중)
-            </span>
+          <p className="mx-auto mt-4 max-w-md text-[16px] text-white/60">회사에 맞춘 세팅부터 정착까지, 도입 전 과정을 함께합니다.</p>
+          <div className="mt-8 flex justify-center">
+            <a href={CONTACT} className="inline-flex items-center gap-2 rounded-xl px-6 py-3.5 text-[15px] font-bold text-white shadow-lg transition-transform hover:scale-[1.03]" style={{ background: RED }}>
+              도입 문의하기 <ArrowRight className="size-4" />
+            </a>
           </div>
         </div>
       </section>
@@ -176,10 +161,11 @@ export default function LandingPage() {
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 px-5 sm:flex-row">
           <Logo />
           <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[13px] font-medium text-black/50">
-            <a href="#pricing" className="hover:text-black">가격</a>
             <Link href="/login" className="hover:text-black">로그인</Link>
-            <span className="text-black/30">개인정보처리방침</span>
-            <span className="text-black/30">이용약관</span>
+            <Link href="/terms" className="hover:text-black">이용약관</Link>
+            <Link href="/privacy" className="hover:text-black">개인정보처리방침</Link>
+            <Link href="/refund" className="hover:text-black">환불정책</Link>
+            <a href={CONTACT} className="hover:text-black">도입 문의</a>
           </nav>
           <span className="text-[13px] text-black/40">© 2026 Complow</span>
         </div>

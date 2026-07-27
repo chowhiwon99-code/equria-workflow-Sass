@@ -2,8 +2,10 @@ import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 import type { Database } from "@/lib/supabase/types"
 
-/** 로그인 없이 접근 가능한 경로 */
-const PUBLIC_PATHS = ["/login", "/signup", "/privacy", "/terms", "/refund"] // privacy·terms=구글 검증 · refund=PG 심사 요건(공개 필수)
+/** 인증 화면 — 미로그인 공개, 로그인 상태면 앱(대시보드)으로 보냄. 루트(/) 랜딩도 동일 취급. */
+const AUTH_PATHS = ["/login", "/signup"]
+/** 법적 문서 — 로그인 여부와 무관하게 항상 접근(구글 검증·PG 심사 요건. 로그인 상태 리다이렉트 버그 픽스) */
+const OPEN_PATHS = ["/privacy", "/terms", "/refund"]
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request })
@@ -35,17 +37,19 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const { pathname } = request.nextUrl
-  const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p)) // 로그인·회원가입만 공개(랜딩은 아직 비공개)
+  const isRoot = pathname === "/" // 랜딩(공개)
+  const isAuthPage = AUTH_PATHS.some((p) => pathname.startsWith(p))
+  const isOpen = OPEN_PATHS.some((p) => pathname.startsWith(p))
 
-  // 미인증 사용자가 보호된 경로 접근 → 로그인으로
-  if (!user && !isPublic) {
+  // 미인증 사용자가 보호된 경로 접근 → 로그인으로 (랜딩·인증화면·법적문서는 공개)
+  if (!user && !isRoot && !isAuthPage && !isOpen) {
     const url = request.nextUrl.clone()
     url.pathname = "/login"
     return NextResponse.redirect(url)
   }
 
-  // 인증된 사용자가 로그인/회원가입 페이지 접근 → 대시보드로
-  if (user && isPublic) {
+  // 인증된 사용자가 랜딩/로그인/회원가입 접근 → 대시보드로 (법적문서는 로그인해도 그대로 열람)
+  if (user && (isRoot || isAuthPage)) {
     const url = request.nextUrl.clone()
     url.pathname = "/dashboard"
     return NextResponse.redirect(url)
