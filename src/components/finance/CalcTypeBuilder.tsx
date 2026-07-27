@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { X, Trash2, Loader2, Search } from "lucide-react"
+import { X, Trash2, Loader2, Search, Sparkles } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
@@ -275,14 +275,20 @@ export function CalcTypeBuilder({ types, editType, onClose, onSaved }: { types: 
                   </div>
                 )}
                 <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                  수식 — 그냥 적으면 돼요
-                  <input
-                    value={formulaText}
-                    onChange={(e) => setFormulaText(e.target.value)}
-                    className={cn(fieldClass, "h-10 text-[15px]")}
-                    placeholder="예: 판매수 × (단가 × (1 − 수수료%) − 택배비)"
-                    autoFocus={!isEdit}
-                  />
+                  수식 — 그냥 적으면 돼요 (말로 써도 AI가 바꿔줘요)
+                  <div className="flex gap-1.5">
+                    <input
+                      value={formulaText}
+                      onChange={(e) => setFormulaText(e.target.value)}
+                      className={cn(fieldClass, "h-10 flex-1 text-[15px]")}
+                      placeholder="예: 판매수 × (단가 × (1 − 수수료%) − 택배비)"
+                      autoFocus={!isEdit}
+                    />
+                    {/* 상시 노출(대표 결정) — 누를 때만 비용 발생(Haiku 원샷), 결과는 파서가 재검증 */}
+                    <Button size="sm" variant="outline" className="h-10 shrink-0" onClick={aiConvert} disabled={aiBusy || !formulaText.trim()}>
+                      {aiBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />} AI로 바꾸기
+                    </Button>
+                  </div>
                 </label>
                 <p className="text-[11px] text-muted-foreground">
                   수식에 쓴 이름이 그대로 입력 칸이 돼요 · % 칸은 이름 뒤에 <b className="text-foreground">%</b>(예: 수수료%) · 기호는 + − × ÷ ( ) 그리고 *, / 도 돼요
@@ -291,18 +297,9 @@ export function CalcTypeBuilder({ types, editType, onClose, onSaved }: { types: 
                 {formulaText.trim() &&
                   (parsed.ok ? (
                     <div className="flex flex-col gap-1">
-                      {/* 문장 같으면 — 해석이 엉터리일 수 있으니 AI 변환을 먼저 권함 */}
+                      {/* 문장 같으면 — 해석이 엉터리일 수 있으니 상시 버튼으로 안내 */}
                       {looksLikeSentence && (
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-[11px] text-warning">문장처럼 보여요 — 아래 해석이 이상하면:</span>
-                          <button
-                            onClick={aiConvert}
-                            disabled={aiBusy}
-                            className="inline-flex items-center gap-1 rounded border border-primary/40 px-1.5 py-0.5 text-[11px] font-medium text-primary transition-colors hover:bg-primary/10 disabled:opacity-50"
-                          >
-                            {aiBusy ? <Loader2 className="size-3 animate-spin" /> : null} AI로 수식 바꾸기
-                          </button>
-                        </div>
+                        <p className="text-[11px] text-warning">문장처럼 보여요 — 아래 해석이 이상하면 위 ‘AI로 바꾸기’를 눌러주세요.</p>
                       )}
                       {/* 해석 — 암묵 곱셈("급여 3.3%"→급여 × 3.3%) 등 파서가 이해한 결과를 투명하게 */}
                       <p className="text-[11px] text-muted-foreground">
@@ -320,17 +317,7 @@ export function CalcTypeBuilder({ types, editType, onClose, onSaved }: { types: 
                       </div>
                     </div>
                   ) : (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-[11px] text-destructive">{parsed.error}</p>
-                      {/* 자연어 폴백(대표 제안) — 파서가 못 읽을 때만 노출·Haiku 원샷, 결과는 다시 파서가 검증 */}
-                      <button
-                        onClick={aiConvert}
-                        disabled={aiBusy}
-                        className="inline-flex items-center gap-1 rounded border border-primary/40 px-1.5 py-0.5 text-[11px] font-medium text-primary transition-colors hover:bg-primary/10 disabled:opacity-50"
-                      >
-                        {aiBusy ? <Loader2 className="size-3 animate-spin" /> : null} 말로 쓴 것 같아요 — AI로 수식 바꾸기
-                      </button>
-                    </div>
+                    <p className="text-[11px] text-destructive">{parsed.error} <span className="text-muted-foreground">— 또는 위 ‘AI로 바꾸기’로 변환해보세요.</span></p>
                   ))}
               </div>
             )}
