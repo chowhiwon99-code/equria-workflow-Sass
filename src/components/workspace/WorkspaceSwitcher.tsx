@@ -82,7 +82,7 @@ export function WorkspaceSwitcher() {
       >
         <WsAvatar name={currentWorkspace.name} className="size-7 shrink-0 text-xs" />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-semibold">{currentWorkspace.name}</span>
+          <span className="block truncate font-pretendard text-sm font-semibold">{currentWorkspace.name}</span>
           <span className="block truncate text-[11px] text-muted-foreground">
             {ROLE_LABEL[currentWorkspace.role] ?? "멤버"} · 무료 요금제
           </span>
@@ -99,7 +99,7 @@ export function WorkspaceSwitcher() {
           <div className="flex items-center gap-2.5 px-3 py-2.5">
             <WsAvatar name={currentWorkspace.name} className="size-9 shrink-0 rounded-lg text-sm" />
             <span className="min-w-0">
-              <span className="block truncate text-sm font-semibold">{currentWorkspace.name}</span>
+              <span className="block truncate font-pretendard text-sm font-semibold">{currentWorkspace.name}</span>
               <span className="block truncate text-xs text-muted-foreground">
                 무료 요금제 · {ROLE_LABEL[currentWorkspace.role] ?? "멤버"}
               </span>
@@ -130,7 +130,7 @@ export function WorkspaceSwitcher() {
                 className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors hover:bg-muted"
               >
                 <WsAvatar name={w.name} className="size-6 shrink-0 rounded text-[11px]" />
-                <span className="min-w-0 flex-1 truncate">{w.name}</span>
+                <span className="min-w-0 flex-1 truncate font-pretendard">{w.name}</span>
                 {w.role === "guest" && (
                   <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">게스트</span>
                 )}
