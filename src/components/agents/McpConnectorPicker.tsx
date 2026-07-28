@@ -1,14 +1,15 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { Check, ExternalLink, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { MCP_CONNECTORS } from "@/lib/mcp"
 import { ConnectorLogo } from "@/components/mcp/ConnectorLogo"
 
-// 위저드 'MCP 연결' 스텝. 연결한 것 = 선택(바인딩), 안 한 것 = "연결하면 쓸 수 있는 도구"로 펼쳐 보여주고
-// 개인 계정이 필요한 건 먼저 /mcp에서 연결하도록 안내. (연결 OAuth는 위저드 밖 /mcp에서 진행)
+// 위저드 'MCP 연결' 스텝. 연결한 것 = 선택(바인딩).
+// OAuth 커넥터는 위저드를 떠나지 않고 팝업으로 연결(콜백이 postMessage 후 자동 닫힘 → 목록 갱신·자동 선택).
+// API 키 입력형(Exa 등)만 /mcp로 안내. (구 UX: 전부 /mcp 새 탭 → 위저드 이탈 — 대표 리포트로 개선 2026-07-28)
 const AVAILABLE = MCP_CONNECTORS.filter((c) => c.status === "available")
 
 export function McpConnectorPicker({
@@ -21,20 +22,47 @@ export function McpConnectorPicker({
   const [connectedIds, setConnectedIds] = useState<string[] | null>(null)
   const [showMore, setShowMore] = useState(false)
 
-  useEffect(() => {
-    let alive = true
-    fetch("/api/mcp/user-connections")
-      .then((r) => (r.ok ? r.json() : { connections: [] }))
-      .then((j: { connections?: { connector_id: string }[] }) => {
-        if (alive) setConnectedIds((j.connections ?? []).map((c) => c.connector_id))
-      })
-      .catch(() => {
-        if (alive) setConnectedIds([])
-      })
-    return () => {
-      alive = false
+  const load = useCallback(async () => {
+    try {
+      const r = await fetch("/api/mcp/user-connections")
+      const j = (r.ok ? await r.json() : { connections: [] }) as { connections?: { connector_id: string }[] }
+      setConnectedIds((j.connections ?? []).map((c) => c.connector_id))
+    } catch {
+      setConnectedIds((prev) => prev ?? [])
     }
   }, [])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 마운트 시 1회 연결 현황 로드
+    void load()
+  }, [load])
+
+  useEffect(() => {
+    // 팝업 연결 완료 신호 → 목록 갱신 + 방금 연결한 커넥터 자동 선택
+    const onMessage = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin) return
+      const d = e.data as { type?: string; ok?: boolean; connector?: string }
+      if (d?.type !== "mcp-oauth") return
+      void load()
+      if (d.ok && d.connector && !value.includes(d.connector)) onToggle(d.connector)
+    }
+    // 팝업이 postMessage 없이 닫힌 경우 폴백 — 창 포커스 복귀 시 재조회
+    const onFocus = () => void load()
+    window.addEventListener("message", onMessage)
+    window.addEventListener("focus", onFocus)
+    return () => {
+      window.removeEventListener("message", onMessage)
+      window.removeEventListener("focus", onFocus)
+    }
+  }, [load, value, onToggle])
+
+  const connectInPopup = (connectorId: string) => {
+    window.open(
+      `/api/mcp/oauth/${connectorId}/connect?popup=1`,
+      "mcp-connect",
+      "width=520,height=700,menubar=no,toolbar=no"
+    )
+  }
 
   const connected = connectedIds === null ? [] : AVAILABLE.filter((c) => connectedIds.includes(c.id))
   const notConnected = connectedIds === null ? [] : AVAILABLE.filter((c) => !connectedIds.includes(c.id))
@@ -85,11 +113,27 @@ export function McpConnectorPicker({
           {showMore && (
             <div className="mt-3 flex flex-col gap-2">
               <p className="text-center text-[11px] text-muted-foreground">
-                개인 계정이 필요한 도구(Notion 등)는 눌러서 <b>먼저 연결</b>한 뒤, 이 스텝에서 선택하세요.
+                누르면 <b>여기서 바로 연결</b>돼요(팝업). 연결이 끝나면 자동으로 선택됩니다.
               </p>
               <div className="flex flex-wrap justify-center gap-2">
                 {notConnected.map((c) => {
-                  const needsAccount = c.preset?.auth !== "none"
+                  const isOAuth = c.preset?.auth === "oauth"
+                  if (isOAuth) {
+                    return (
+                      <button
+                        type="button"
+                        key={c.id}
+                        onClick={() => connectInPopup(c.id)}
+                        title={c.description}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-dashed px-3 py-1.5 text-sm text-muted-foreground opacity-70 transition-all hover:bg-muted hover:opacity-100"
+                      >
+                        <ConnectorLogo domain={c.domain} emoji={c.emoji} imgClass="size-4" emojiClass="text-base" />
+                        {c.name}
+                        <span className="ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px]">연결하기</span>
+                      </button>
+                    )
+                  }
+                  // API 키 입력형(Exa·GitHub 등)은 /mcp에서 키 등록이 필요
                   return (
                     <Link
                       key={c.id}
@@ -100,9 +144,7 @@ export function McpConnectorPicker({
                     >
                       <ConnectorLogo domain={c.domain} emoji={c.emoji} imgClass="size-4" emojiClass="text-base" />
                       {c.name}
-                      <span className="ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px]">
-                        {needsAccount ? "계정 연결 필요" : "연결 필요"}
-                      </span>
+                      <span className="ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px]">API 키 필요</span>
                       <ExternalLink className="size-3" />
                     </Link>
                   )

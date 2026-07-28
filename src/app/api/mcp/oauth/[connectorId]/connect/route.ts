@@ -11,7 +11,8 @@ function appUrl(): string {
 }
 
 /** MCP OAuth 연결 시작 — 인가 서버 동의화면으로 redirect(DCR 자동 등록 포함). PKCE(state+codeVerifier)는 httpOnly 쿠키로 왕복. */
-export async function GET(_req: Request, { params }: { params: Promise<{ connectorId: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ connectorId: string }> }) {
+  const popup = new URL(req.url).searchParams.get("popup") === "1" // 위저드 내 팝업 연결(콜백이 자동 닫힘)
   const { connectorId } = await params
   const supabase = await createClient()
   const {
@@ -40,7 +41,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ connect
     }
 
     const payload = Buffer.from(
-      JSON.stringify({ connectorId, state: provider.savedState, codeVerifier: provider.savedCodeVerifier })
+      JSON.stringify({ connectorId, state: provider.savedState, codeVerifier: provider.savedCodeVerifier, popup })
     ).toString("base64url")
 
     const res = NextResponse.redirect(provider.savedAuthUrl)
