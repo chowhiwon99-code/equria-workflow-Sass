@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Check, SlidersHorizontal, ChevronDown } from "lucide-react"
 import { FEATURES, FEATURE_GROUPS } from "@/lib/config/features"
+import { useWorkspace } from "@/components/workspace/WorkspaceProvider"
 import { cn } from "@/lib/utils"
 import { useUnreadDms } from "@/hooks/useUnreadDms"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
@@ -61,6 +62,8 @@ export function Sidebar({
   badgeDesktopOnly?: boolean
 }) {
   const pathname = usePathname()
+  const { currentWorkspace } = useWorkspace()
+  const isGuest = currentWorkspace?.role === "guest" // 게스트=guestAllowed 항목만(보안은 RLS)
   const isDesktop = useMediaQuery("(min-width: 768px)")
   const [hidden, setHidden] = useState<string[]>([])
   const [collapsed, setCollapsed] = useState<string[]>([]) // 접은 폴더(그룹 id)
@@ -146,7 +149,7 @@ export function Sidebar({
 
       <nav ref={navRef} onKeyDown={onNavKeyDown} className="flex-1 space-y-3 overflow-y-auto p-2">
         {FEATURE_GROUPS.map((group) => {
-          const all = FEATURES.filter((f) => f.group === group.id && !f.hiddenFromNav)
+          const all = FEATURES.filter((f) => f.group === group.id && !f.hiddenFromNav && (!isGuest || f.guestAllowed))
           if (all.length === 0) return null
           const visibleCount = all.filter((f) => !hidden.includes(f.href)).length
           // 평소엔 가시 항목이 0이면 그룹 헤더까지 접고, 편집 중엔 항상 펼침

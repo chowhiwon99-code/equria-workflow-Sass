@@ -44,6 +44,8 @@ export interface Feature {
   group: FeatureGroup
   /** true면 사이드바 네비에서 숨김(라우트·제목은 유지 — 되돌리려면 이 값만 제거). */
   hiddenFromNav?: boolean
+  /** true면 게스트(프로젝트 단위 초대)에게 허용 — 나머지는 GuestGuard·네비에서 차단(보안은 RLS가 담당). */
+  guestAllowed?: boolean
 }
 
 /** 사이드바 그룹 순서 + 헤더 라벨 (label=null 이면 헤더 없이 최상단)
@@ -79,6 +81,7 @@ export const FEATURES: Feature[] = [
   },
   {
     href: "/projects",
+    guestAllowed: true,
     label: "프로젝트",
     description: "프로젝트 진행상황·담당자·일정 관리",
     icon: FolderKanban,
@@ -202,6 +205,7 @@ export const FEATURES: Feature[] = [
   // ── 계정 ──
   {
     href: "/mypage",
+    guestAllowed: true,
     label: "마이페이지",
     description: "내 프로필·내 에이전트·사용량",
     icon: UserCircle,

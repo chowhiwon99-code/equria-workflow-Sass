@@ -8,6 +8,7 @@ import { FloatingAgentChat } from "@/components/agent-chat/FloatingAgentChat"
 import { UndoProvider } from "@/components/undo/UndoProvider"
 import { CurrentUserProvider } from "@/components/auth/CurrentUserProvider"
 import { WorkspaceProvider, type WorkspaceSummary } from "@/components/workspace/WorkspaceProvider"
+import { GuestGuard } from "@/components/workspace/GuestGuard"
 import { PageTransition } from "@/components/layout/PageTransition"
 import { Toaster } from "@/components/ui/sonner"
 
@@ -57,6 +58,7 @@ export default async function AppLayout({
   return (
     <CurrentUserProvider userId={user.id}>
       <WorkspaceProvider workspaces={workspaces} initialWorkspaceId={initialWorkspaceId}>
+      <GuestGuard />
       <UndoProvider>
       <AgentChatProvider>
         {/* dvh: iOS 사파리 주소창이 가리는 만큼 실시간 보정(데스크톱은 vh와 동일) */}

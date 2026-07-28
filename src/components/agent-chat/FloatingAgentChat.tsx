@@ -10,6 +10,7 @@ import { ArrowUp, ArrowLeft, X, Plus, Maximize2, Minimize2, Copy, Check, Sparkle
 import { cn } from "@/lib/utils"
 import { renderAgentIcon } from "@/components/agents/AgentIcon"
 import { useAgentChat, type Agent, type WidgetPosition } from "./AgentChatContext"
+import { useWorkspace } from "@/components/workspace/WorkspaceProvider"
 import { AgentMemoryPanel } from "./AgentMemoryPanel"
 import { MEMORY_KINDS, MEMORY_KIND_LABEL, isMemoryKind, type AgentMemoryKind } from "@/lib/agentMemory"
 
@@ -133,6 +134,7 @@ function panelTopLeft(
 
 export function FloatingAgentChat() {
   const ctx = useAgentChat()
+  const { currentWorkspace } = useWorkspace()
   const [view, setView] = useState<"menu" | "chat">("menu")
   // 채팅 열기 morph(FLIP)의 출발 rect — 클릭한 에이전트 버블의 화면 좌표/크기
   const [morphRect, setMorphRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
@@ -166,6 +168,9 @@ export function FloatingAgentChat() {
 
   // 로딩 중에는 아무것도 그리지 않는다.
   if (ctx.loading) return null
+  // B2: 게스트(프로젝트 단위 초대)에겐 AI 위젯 미노출(보안은 RLS — UI는 UX 게이팅)
+  if (currentWorkspace?.role === "guest") return null
+
   // 핀한 에이전트가 0개 → 위젯을 숨기지 않고 같은 우하단에 빈 상태를 띄운다.
   if (ctx.agents.length === 0) return <EmptyAgentWidget />
 

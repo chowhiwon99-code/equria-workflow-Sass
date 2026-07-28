@@ -15,6 +15,7 @@ import { MANUAL_STATUSES } from "@/components/chat/StatusDot"
 import { Loading, ErrorState } from "@/components/shared/States"
 import { formatUsd } from "@/lib/pricing"
 import { McpCredentialsCard } from "./McpCredentialsCard"
+import { InviteLinksCard } from "./InviteLinksCard"
 
 const THEMES = [
   { value: "light", label: "라이트" },
@@ -143,10 +144,6 @@ export function SettingsView() {
   const [position, setPosition] = useState("")
   // 대표(오너) 전용 — 구성원 직급 일괄 관리
   const [isOwner, setIsOwner] = useState(false)
-  // 대표(오너) 전용 — 구글 이메일 초대
-  const [inviteEmail, setInviteEmail] = useState("")
-  const [inviteName, setInviteName] = useState("")
-  const [inviting, setInviting] = useState(false)
   const [memberList, setMemberList] = useState<{ id: string; name: string; department: string | null; position: string | null }[]>([])
   // 대표(오너) 전용 — 구성원별 AI 사용량(호출·토큰·비용). 내용은 없고 사용량 메타만(RPC가 오너 게이팅).
   const [usage, setUsage] = useState<
@@ -313,30 +310,6 @@ export function SettingsView() {
     }
   }
 
-  // 오너 전용 — 구글 이메일로 구성원 초대(계정 미리 생성 → 'Google로 계속하기'만 누르면 로그인).
-  const inviteMember = async () => {
-    setInviting(true)
-    try {
-      const res = await fetch("/api/members/invite", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: inviteEmail, name: inviteName }),
-      })
-      if (res.ok) {
-        toast.success("초대했어요. 이제 그 사람은 로그인 화면에서 'Google로 계속하기'만 누르면 돼요.")
-        setInviteEmail("")
-        setInviteName("")
-        await load()
-      } else {
-        toast.error((await res.text().catch(() => "")) || "초대에 실패했어요.")
-      }
-    } catch {
-      toast.error("초대에 실패했어요.")
-    } finally {
-      setInviting(false)
-    }
-  }
-
   // 오너 전용 — 구성원 계정 완전 삭제(개인 데이터 연쇄 삭제, 공유 자원은 보존).
   const deleteMember = async (id: string) => {
     setBusyId(id)
@@ -475,32 +448,14 @@ export function SettingsView() {
         </div>
       </Card>
 
-      {/* 대표: 구글 이메일로 구성원 초대 */}
+      {/* 대표: 초대 링크(노션식) — 링크 공유로 멤버/게스트 합류 */}
       {isOwner && (
         <Card>
           <SectionTitle
             title="구성원 초대"
-            desc="직원의 구글 이메일을 등록하면, 그 사람은 로그인 화면에서 'Google로 계속하기'만 눌러 바로 시작해요. (구글 앱이 테스트 모드인 동안은 구글 콘솔 '테스트 사용자'에도 같은 이메일을 추가해야 해요.)"
+            desc="초대 링크를 만들어 공유하면 받은 사람이 구글 로그인 후 바로 합류해요. 게스트는 고른 프로젝트만 볼 수 있어요. (구글 앱 테스트 모드 동안은 콘솔 '테스트 사용자' 등록도 필요)"
           />
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <input
-              type="text"
-              value={inviteName}
-              onChange={(e) => setInviteName(e.target.value)}
-              placeholder="이름"
-              className={cn(fieldClass, "sm:w-32")}
-            />
-            <input
-              type="email"
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              placeholder="구글 이메일 (example@gmail.com)"
-              className={cn(fieldClass, "flex-1")}
-            />
-            <Button onClick={inviteMember} disabled={inviting || !inviteEmail.trim() || !inviteName.trim()}>
-              {inviting ? "초대 중…" : "초대"}
-            </Button>
-          </div>
+          <InviteLinksCard />
         </Card>
       )}
 
