@@ -40,6 +40,8 @@ export type Connector = {
   credentialKey?: string
   /** OAuth 인가 스코프(space-separated). 구글처럼 스코프 자동발견이 안 되는 서비스에 명시. */
   oauthScope?: string
+  /** 에이전트 시스템 프롬프트에 자동 주입되는 사용 규칙(권한 한계 등 — 안 되는 걸 시도·오안내하지 않게) */
+  usageNote?: string
   /** 인가 URL에 덧붙일 추가 파라미터. 구글: access_type=offline·prompt=consent(refresh_token 발급). */
   authorizationParams?: Record<string, string>
   /** 사용자가 접속 URL을 직접 입력하는 커넥터(예: Zapier 계정별 MCP URL). preset.url은 폴백/미사용. */
@@ -117,7 +119,7 @@ export const MCP_CONNECTORS: Connector[] = [
   //    refresh_token 발급 위해 access_type=offline·prompt=consent 필요(연결 라우트에서 주입). 엔드포인트/스코프 실검증 2026-07-24.
   // Gmail = 작성(compose)만 — gmail.readonly(받은메일 읽기)는 '제한된 스코프'라 프로덕션 게시 시 CASA 검증 비용 발생 → 매출 후 추가.
   //         compose는 '민감' 스코프(검증 비용 없음) → AI가 회사 톤으로 새 메일 작성. 정책: 100명 넘겨도 돈 드는 건 안 켠다.
-  { id: "google-gmail", name: "Gmail", description: "AI가 메일 작성 (내 계정, 대표 앱 등록)", emoji: "📧", domain: "gmail.com", category: "커뮤니케이션", featured: true, status: "available", scope: "user", requiresAppCredential: true, credentialKey: "google", oauthScope: "https://www.googleapis.com/auth/gmail.compose", authorizationParams: { access_type: "offline", prompt: "consent" }, preset: { type: "http", url: "https://gmailmcp.googleapis.com/mcp/v1", auth: "oauth" } },
+  { id: "google-gmail", name: "Gmail", description: "AI가 메일 작성 (내 계정, 대표 앱 등록)", emoji: "📧", domain: "gmail.com", category: "커뮤니케이션", featured: true, status: "available", scope: "user", requiresAppCredential: true, credentialKey: "google", oauthScope: "https://www.googleapis.com/auth/gmail.compose", usageNote: "Gmail 도구는 작성 전용(gmail.compose 권한)이다. 초안 작성·수정·발송만 가능하며, 받은 메일 읽기·검색·요약(search_threads, get_message, get_thread, list_labels 등)은 권한이 없어 403으로 실패한다. 메일 읽기 요청을 받으면 읽기 도구를 시도하지 말고 '메일 읽기 권한은 아직 제공되지 않으며, 재인증으로도 해결되지 않는다'고 정중히 안내하라.", authorizationParams: { access_type: "offline", prompt: "consent" }, preset: { type: "http", url: "https://gmailmcp.googleapis.com/mcp/v1", auth: "oauth" } },
   { id: "google-calendar", name: "Google 캘린더", description: "일정 조회 (내 계정, 대표 앱 등록)", emoji: "📅", domain: "calendar.google.com", category: "생산성", status: "available", scope: "user", requiresAppCredential: true, credentialKey: "google", oauthScope: "https://www.googleapis.com/auth/calendar.events.readonly", authorizationParams: { access_type: "offline", prompt: "consent" }, preset: { type: "http", url: "https://calendarmcp.googleapis.com/mcp/v1", auth: "oauth" } },
   // Google 드라이브 = 지금은 뺌 — 유용한 drive.readonly가 '제한된 스코프'(CASA 비용)라 매출 후 추가. drive.file만으론 쓸모 적음.
   // 🆕 Slack·PayPal — 공식 원격 MCP·DCR 미지원 → 대표 앱 등록(client_id/secret) 후 연결. 엔드포인트 실검증 2026-07-24.

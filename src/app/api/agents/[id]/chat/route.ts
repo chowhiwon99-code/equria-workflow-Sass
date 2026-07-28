@@ -2,6 +2,7 @@ import { streamText, convertToModelMessages, stepCountIs, type UIMessage, type T
 import { anthropic } from "@/lib/claude/client"
 import { createClient } from "@/lib/supabase/server"
 import { connectMcp, resolveUserConnectionConfig } from "@/lib/mcp/connect"
+import { MCP_CONNECTORS } from "@/lib/mcp"
 import { buildMemoryBlock, type ExtractTurn } from "@/lib/agentMemory"
 import { OUTPUT_STYLE_RULE } from "@/lib/claude/style"
 import { extractAndStoreMemories } from "@/lib/agentMemoryExtract"
@@ -180,6 +181,11 @@ export async function POST(
   }
   // 에이전트에 바인딩된 개인 MCP 커넥터만 — 실행자(요청자) 본인의 연결로 해석(공유 에이전트도 쓰는 사람 계정 기준).
   const boundConnectors = agentVersion.mcp_connectors ?? []
+  // 커넥터 사용 규칙(권한 한계) 자동 주입 — 안 되는 도구를 시도하거나 "재인증하라"고 오안내하지 않게(예: Gmail=작성 전용)
+  const usageNotes = MCP_CONNECTORS.filter((c) => boundConnectors.includes(c.id) && c.usageNote).map(
+    (c) => `[${c.name} 사용 규칙] ${c.usageNote}`
+  )
+  if (usageNotes.length > 0) systemPrompt += `\n\n${usageNotes.join("\n")}`
   if (boundConnectors.length > 0) {
     const { data: myConnections } = await supabase
       .from("mcp_user_connections")
