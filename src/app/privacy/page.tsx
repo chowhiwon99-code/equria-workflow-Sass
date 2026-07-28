@@ -80,6 +80,42 @@ export default function PrivacyPage() {
         <p>참고: Anthropic API로 전송된 데이터는 수탁자의 API 정책상 <b>모델 학습에 사용되지 않습니다.</b> 정확한 정책은 수탁자 약관을 따릅니다.</p>
       </LegalSection>
 
+      <LegalSection title="제7조의2 (Google 사용자 데이터의 처리 — 제한적 사용)">
+        <p>
+          회사는 이용자가 자신의 Google 계정을 직접 연동한 경우에 한하여 다음 범위의 Google 사용자 데이터에 접근합니다:
+          ① <b>메일 초안 작성</b>(gmail.compose — 회사는 이용자의 메일함을 읽지 않습니다),
+          ② <b>캘린더 일정 조회</b>(calendar.events.readonly). 인증 토큰은 암호화(AES-256-GCM)하여 저장하며,
+          이용자는 언제든지 서비스 내에서 연동을 해제할 수 있고 해제 시 토큰은 즉시 삭제됩니다.
+        </p>
+        <p>
+          회사는 Google 사용자 데이터를 광고 목적으로 사용하지 않고, 제3자에게 판매·양도하지 않으며,
+          일반화된 인공지능(AI/ML) 모델 학습에 사용하지 않습니다. 사람이 해당 데이터를 열람하는 것은
+          이용자의 명시적 동의가 있는 경우, 보안 목적, 법령 준수를 위한 경우로 한정됩니다.
+        </p>
+        <p>
+          컴플로우가 Google API로부터 받은 정보의 사용 및 다른 앱으로의 전송은 <b>제한적 사용(Limited Use)</b> 요구사항을 포함한{" "}
+          <a
+            href="https://developers.google.com/terms/api-services-user-data-policy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline"
+          >
+            Google API 서비스 사용자 데이터 정책
+          </a>
+          을 준수합니다. (Complow&rsquo;s use and transfer of information received from Google APIs to any other app
+          will adhere to the{" "}
+          <a
+            href="https://developers.google.com/terms/api-services-user-data-policy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline"
+          >
+            Google API Services User Data Policy
+          </a>
+          , including the Limited Use requirements.)
+        </p>
+      </LegalSection>
+
       <LegalSection title="제8조 (정보주체의 권리·의무 및 행사방법)">
         <p>이용자는 언제든지 개인정보 <b>열람·정정·삭제·처리정지</b>를 요구할 수 있으며, 회사는 지체 없이 조치합니다. 권리 행사는 서비스 내 설정 또는 제12조의 보호책임자에게 이메일로 요청할 수 있습니다.</p>
       </LegalSection>
