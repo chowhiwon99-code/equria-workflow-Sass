@@ -53,7 +53,7 @@
 ### 🔴 Gmail·캘린더 MCP = 구글 개발자 프리뷰 전용 (2026-07-28 오후 발견 — 대기 트랙)
 - **증상**: 에이전트 Gmail 도구 전부 403("The caller does not have permission"). 우리 쪽 전부 정상 검증(토큰 복호화→tokeninfo: gmail.compose 부여 ✅ · API 사용 설정 ✅ · 클라이언트 ✅ · 서버 직접 JSON-RPC 호출로 재현).
 - **원인**: gmailmcp/calendarmcp.googleapis.com은 **Google Workspace Developer Preview Program 전용(Pre-GA)** — 미등록 프로젝트는 도구 호출 거부. 연결·tools/list는 등록 없이도 성공해서 7/24 검증(디스커버리까지)이 통과했던 것. **교훈: 연동 검증 = "실제 도구 호출 1회 성공"까지.**
-- **대표 액션**: 프리뷰 신청(개인 gmail 불가 — `complow@complow.kr`+프로젝트 353073448998, 폼 링크=WORKLOG) → 승인 며칠 → 승인 후 Workspace 계정으로 연결→서버 재검증→**데모 영상 촬영→스코프 심사 제출**.
+- **✅ 프리뷰 신청 제출 완료(2026-07-28, `complow@complow.kr`+프로젝트 353073448998·Gmail/Calendar 선택)** — 처리 약 1주, 미응답 시 workspace-dpp-mod@google.com. 승인 오면: Workspace 계정으로 연결→서버 재검증(+개인 gmail 최종사용자 지원 실측)→**데모 영상 촬영→스코프 심사 제출**.
 - **약관 제약(로드맵)**: Pre-GA 기능은 **GA 전 고객 제공 금지** — Gmail/캘린더 에이전트 기능의 B2B 판매는 구글 GA 후. 사내 사용 OK. 개인 gmail 최종사용자 지원 여부=승인 후 실측 예정. 폴백=네이티브 Gmail 통합(자체 googleapis, 개인 계정 지원, 메일 탭 숨김 상태).
 - **오늘 배포된 관련 개선**(각 tsc0·lint29/0·build0): 위저드 MCP 팝업 제자리 연결(`d82409b`)·목적 카드 중복 제거(`e20bbb8`)·Gmail 작성전용 usageNote 주입(`18deb72`)·**연결 직후 자동 점검**(tokeninfo 스코프 검사, `c0f4749`).
 
