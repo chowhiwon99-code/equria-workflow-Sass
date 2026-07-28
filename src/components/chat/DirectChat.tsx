@@ -6,6 +6,7 @@ import { ArrowLeft, Paperclip, Upload, NotebookPen, FileText, Loader2, Pencil, T
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
+import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { uploadImage } from "@/lib/upload"
 import { cn } from "@/lib/utils"
@@ -56,6 +57,7 @@ function fmtTime(iso: string): string {
 export function DirectChat({ otherUserId }: { otherUserId: string }) {
   const supabase = createClient()
   const meId = useCurrentUserId()
+  const wsId = useCurrentWorkspaceId() // B1-b: 쓰기에 워크스페이스 명시
   const { push } = useUndo()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState("")
@@ -170,12 +172,12 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
       if (existing) {
         await supabase.from("message_reactions").delete().eq("id", existing.id)
       } else {
-        await supabase.from("message_reactions").insert({ message_id: messageId, user_id: meId, emoji })
+        await supabase.from("message_reactions").insert({ ...(wsId ? { workspace_id: wsId } : {}), message_id: messageId, user_id: meId, emoji })
       }
       void loadReactions(conversationId)
       emitChat(conversationId)
     },
-    [supabase, meId, conversationId, reactions, loadReactions]
+    [supabase, meId, wsId, conversationId, reactions, loadReactions]
   )
 
   // 초기화
@@ -412,7 +414,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
         read_at: null,
         attachment_url: null,
         attachment_name: null,
-        workspace_id: "",
+        workspace_id: wsId ?? "",
       }
       setMessages((prev) => [...prev, optimistic])
       emitChat(conversationId) // 다른 창/탭 즉시 동기화
@@ -423,7 +425,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
         )
         const { data: msg, error: insErr } = await supabase
           .from("direct_messages")
-          .insert({ id, conversation_id: conversationId, sender_id: meId, content, body_json: bodyJ, parent_id: parentId, root_id: rootId })
+          .insert({ ...(wsId ? { workspace_id: wsId } : {}), id, conversation_id: conversationId, sender_id: meId, content, body_json: bodyJ, parent_id: parentId, root_id: rootId })
           .select("*")
           .single()
         if (insErr || !msg) throw insErr ?? new Error("전송에 실패했어요.")
@@ -432,6 +434,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
         if (uploaded.length) {
           const { error: attErr } = await supabase.from("message_attachments").insert(
             uploaded.map((u) => ({
+              ...(wsId ? { workspace_id: wsId } : {}),
               message_id: msg.id,
               storage_path: u.path,
               name: u.name,
@@ -452,7 +455,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
         setUploading(false)
       }
     },
-    [conversationId, meId, supabase, replyTo, stagedFiles, loadAttachments]
+    [conversationId, meId, wsId, supabase, replyTo, stagedFiles, loadAttachments]
   )
 
   // 파일 스테이징(즉시 업로드 X — 전송 시 일괄). 여러 개 누적. 모든 형식 허용, 50MB 초과만 제외.

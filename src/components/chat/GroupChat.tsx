@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils"
 import { fieldClass } from "@/components/shared/Modal"
 import { useUndo } from "@/components/undo/UndoProvider"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
+import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { MessageBody } from "@/components/chat/MessageBody"
 import { RichComposer, type ComposerPayload } from "@/components/chat/RichComposer"
@@ -43,6 +44,7 @@ function dayLabel(iso: string): string {
 export function GroupChat({ roomId: roomIdProp }: { roomId?: string }) {
   const supabase = createClient()
   const meId = useCurrentUserId()
+  const wsId = useCurrentWorkspaceId() // B1-b: 쓰기에 워크스페이스 명시
   const router = useRouter()
   const { push } = useUndo()
   const [roomId, setRoomId] = useState<string | null>(null)
@@ -247,7 +249,7 @@ export function GroupChat({ roomId: roomIdProp }: { roomId?: string }) {
         created_at: new Date().toISOString(),
         edited_at: null,
         deleted_at: null,
-        workspace_id: "",
+        workspace_id: wsId ?? "",
       }
       setMessages((prev) => [...prev, optimistic])
       if (files.length) setUploading(true)
@@ -257,14 +259,14 @@ export function GroupChat({ roomId: roomIdProp }: { roomId?: string }) {
         )
         const { data: msg, error: insErr } = await supabase
           .from("group_messages")
-          .insert({ id, room_id: roomId, sender_id: meId, content, body_json: bodyJ })
+          .insert({ ...(wsId ? { workspace_id: wsId } : {}), id, room_id: roomId, sender_id: meId, content, body_json: bodyJ })
           .select("*")
           .single()
         if (insErr || !msg) throw insErr ?? new Error("전송에 실패했어요.")
         setMessages((prev) => prev.map((mm) => (mm.id === id ? (msg as GMessage) : mm)))
         if (uploaded.length) {
           const { error: attErr } = await supabase.from("group_message_attachments").insert(
-            uploaded.map((u) => ({ message_id: msg.id, storage_path: u.path, name: u.name, mime_type: u.type || null, size: u.size }))
+            uploaded.map((u) => ({ ...(wsId ? { workspace_id: wsId } : {}), message_id: msg.id, storage_path: u.path, name: u.name, mime_type: u.type || null, size: u.size }))
           )
           if (attErr) throw attErr
           void loadAttachments(roomId)
@@ -278,7 +280,7 @@ export function GroupChat({ roomId: roomIdProp }: { roomId?: string }) {
         setUploading(false)
       }
     },
-    [roomId, meId, supabase, stagedFiles, loadAttachments]
+    [roomId, meId, wsId, supabase, stagedFiles, loadAttachments]
   )
 
   const addStagedFiles = useCallback((files: FileList | null) => {
@@ -322,7 +324,7 @@ export function GroupChat({ roomId: roomIdProp }: { roomId?: string }) {
     setReactingId(null)
     const existing = reactions.find((r) => r.message_id === messageId && r.user_id === meId && r.emoji === emoji)
     if (existing) await supabase.from("group_message_reactions").delete().eq("id", existing.id)
-    else await supabase.from("group_message_reactions").insert({ message_id: messageId, user_id: meId, emoji })
+    else await supabase.from("group_message_reactions").insert({ ...(wsId ? { workspace_id: wsId } : {}), message_id: messageId, user_id: meId, emoji })
     void loadReactions(roomId)
   }
 

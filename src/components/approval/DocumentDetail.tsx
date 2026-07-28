@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { ArrowLeft, Check, X, Undo2, Loader2, Send, Pencil, RotateCcw } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
+import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -21,6 +22,7 @@ type Comment = { id: string; user_id: string; body: string; created_at: string }
 export function DocumentDetail({ docId }: { docId: string }) {
   const supabase = createClient()
   const me = useCurrentUserId()
+  const wsId = useCurrentWorkspaceId() // B1-b
   const router = useRouter()
   const [doc, setDoc] = useState<Doc | null>(null)
   const [people, setPeople] = useState<Person[]>([])
@@ -148,7 +150,7 @@ export function DocumentDetail({ docId }: { docId: string }) {
   const addComment = () => {
     if (!newComment.trim()) return
     run(async () => {
-      await mustOk(supabase.from("approval_comments").insert({ document_id: doc.id, user_id: me, body: newComment.trim() }))
+      await mustOk(supabase.from("approval_comments").insert({ ...(wsId ? { workspace_id: wsId } : {}), document_id: doc.id, user_id: me, body: newComment.trim() }))
       setNewComment("")
     })
   }

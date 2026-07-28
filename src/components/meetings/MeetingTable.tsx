@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { Plus, Trash2, Settings2, Check } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
+import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
 import { cn } from "@/lib/utils"
 import { fieldClass } from "@/components/shared/Modal"
 import type { Tables } from "@/lib/supabase/types"
@@ -58,6 +59,7 @@ export function MeetingTable({
 }) {
   const supabase = createClient()
   const me = useCurrentUserId()
+  const wsId = useCurrentWorkspaceId() // B1-b
   const [sort, setSort] = useState<"date" | "importance">("date")
   const [manage, setManage] = useState(false)
   const [newName, setNewName] = useState("")
@@ -84,7 +86,7 @@ export function MeetingTable({
     if (!name) return
     const { error } = await supabase
       .from("meeting_categories")
-      .insert({ name, color: newColor, created_by: me, sort_order: categories.length })
+      .insert({ ...(wsId ? { workspace_id: wsId } : {}), name, color: newColor, created_by: me, sort_order: categories.length })
     if (error) return toast.error(error.message)
     setNewName("")
     onReload()

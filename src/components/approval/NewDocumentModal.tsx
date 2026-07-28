@@ -4,6 +4,7 @@ import { useMemo, useState } from "react"
 import { toast } from "sonner"
 import { Plus, X, ChevronUp, ChevronDown, Loader2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -46,6 +47,7 @@ export function NewDocumentModal({
   onDone: (newId?: string) => void
 }) {
   const supabase = createClient()
+  const wsId = useCurrentWorkspaceId() // B1-b: 쓰기에 워크스페이스 명시
   const [docType, setDocType] = useState<DocType>(editDoc?.docType ?? "일반기안")
   const [title, setTitle] = useState(editDoc?.title ?? "")
   const [fields, setFields] = useState<Record<string, string>>(editDoc?.fields ?? defaultFields(editDoc?.docType ?? "일반기안"))
@@ -103,7 +105,7 @@ export function NewDocumentModal({
         if (line.length > 0) {
           await mustOk(
             supabase.from("approval_steps").insert(
-              line.map((l, i) => ({ document_id: editDoc.id, step_order: i + 1, approver_id: l.approver_id, role: l.role }))
+              line.map((l, i) => ({ ...(wsId ? { workspace_id: wsId } : {}), document_id: editDoc.id, step_order: i + 1, approver_id: l.approver_id, role: l.role }))
             )
           )
         }
@@ -129,7 +131,7 @@ export function NewDocumentModal({
       const { data: doc } = await mustOk(
         supabase
           .from("approval_documents")
-          .insert({ drafter_id: me, doc_type: docType, title: title.trim(), body: fields })
+          .insert({ ...(wsId ? { workspace_id: wsId } : {}), drafter_id: me, doc_type: docType, title: title.trim(), body: fields })
           .select()
           .single()
       )
@@ -138,7 +140,7 @@ export function NewDocumentModal({
       if (line.length > 0) {
         await mustOk(
           supabase.from("approval_steps").insert(
-            line.map((l, i) => ({ document_id: id, step_order: i + 1, approver_id: l.approver_id, role: l.role }))
+            line.map((l, i) => ({ ...(wsId ? { workspace_id: wsId } : {}), document_id: id, step_order: i + 1, approver_id: l.approver_id, role: l.role }))
           )
         )
       }

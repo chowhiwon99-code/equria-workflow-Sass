@@ -5,6 +5,7 @@ import { Plus, NotebookPen, ChevronRight } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
+import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Select } from "@/components/shared/Select"
@@ -31,6 +32,7 @@ const SORT_OPTIONS = [
 export function MeetingsView() {
   const supabase = createClient()
   const me = useCurrentUserId()
+  const wsId = useCurrentWorkspaceId() // B1-b
   const [isAdmin, setIsAdmin] = useState(false)
   const [names, setNames] = useState<Record<string, string>>({})
   const [positions, setPositions] = useState<Record<string, string | null>>({})
@@ -94,7 +96,7 @@ export function MeetingsView() {
 
   const createFolder = async (name: string) => {
     if (!me) return
-    const { error } = await supabase.from("meeting_note_folders").insert({ name, created_by: me })
+    const { error } = await supabase.from("meeting_note_folders").insert({ ...(wsId ? { workspace_id: wsId } : {}), name, created_by: me })
     if (error) return toast.error("폴더를 만들지 못했어요.")
     toast.success("폴더를 만들었어요.")
     load()

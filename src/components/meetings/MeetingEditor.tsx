@@ -6,6 +6,7 @@ import { ArrowLeft, Trash2, Loader2, Calendar, Users, Sparkles, Plus, RefreshCw,
 import type { Editor } from "@tiptap/react"
 import type { JSONContent } from "@tiptap/core"
 import { createClient } from "@/lib/supabase/client"
+import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { tagBg } from "@/lib/meetingMeta"
@@ -111,6 +112,7 @@ export function MeetingEditor({
   onDeleted: () => void
 }) {
   const supabase = createClient()
+  const wsId = useCurrentWorkspaceId() // B1-b
   const canEdit = !note || note.user_id === me || isAdmin
 
   const init = useMemo(
@@ -426,7 +428,7 @@ export function MeetingEditor({
         )
         toast.success("회의록을 저장했어요.")
       } else {
-        await mustOk(supabase.from("meeting_notes").insert({ ...payload, user_id: me }))
+        await mustOk(supabase.from("meeting_notes").insert({ ...payload, user_id: me, ...(wsId ? { workspace_id: wsId } : {}) }))
         toast.success("회의록을 만들었어요.")
       }
       onSaved()
