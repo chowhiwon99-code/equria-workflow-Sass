@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Plus, FolderKanban, Check, Trash2 } from "lucide-react"
 import { Select } from "@/components/shared/Select"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
+import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
 import { createClient } from "@/lib/supabase/client"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
@@ -62,6 +63,7 @@ function ImportanceBadge({ value }: { value: number }) {
 export function ProjectsView() {
   const supabase = createClient()
   const me = useCurrentUserId()
+  const wsId = useCurrentWorkspaceId() // B1-b: 쓰기에 워크스페이스 명시
   const { push } = useUndo()
 
   // 프로젝트 삭제 = 하드삭제(기존 DELETE RLS=created_by, 마이그 불필요·즉시 동작).
@@ -72,7 +74,7 @@ export function ProjectsView() {
     push({
       label: "프로젝트 삭제",
       undo: async () => {
-        await mustOk(supabase.from("projects").insert(p))
+        await mustOk(supabase.from("projects").insert({ ...p, ...(wsId ? { workspace_id: wsId } : {}) }))
         load()
       },
       redo: async () => {
@@ -347,6 +349,7 @@ function CreateProjectModal({
 }) {
   const supabase = createClient()
   const me = useCurrentUserId()
+  const wsId = useCurrentWorkspaceId() // B1-b: 쓰기에 워크스페이스 명시
   const { push } = useUndo()
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
@@ -377,6 +380,7 @@ function CreateProjectModal({
     const { data: inserted, error: insErr } = await supabase
       .from("projects")
       .insert({
+        ...(wsId ? { workspace_id: wsId } : {}),
         name: name.trim(),
         description: description.trim() || null,
         status,
@@ -397,7 +401,7 @@ function CreateProjectModal({
     if (inserted && memberIds.length) {
       const { error: memErr } = await supabase
         .from("project_members")
-        .insert(memberIds.map((uid) => ({ project_id: inserted.id, user_id: uid })))
+        .insert(memberIds.map((uid) => ({ ...(wsId ? { workspace_id: wsId } : {}), project_id: inserted.id, user_id: uid })))
       if (memErr) {
         setSaving(false)
         setError("프로젝트는 만들었지만 참여 인원 등록에 실패했어요: " + memErr.message)
@@ -413,11 +417,11 @@ function CreateProjectModal({
           await supabase.from("projects").delete().eq("id", inserted.id)
         },
         redo: async () => {
-          await supabase.from("projects").insert(inserted)
+          await supabase.from("projects").insert({ ...inserted, ...(wsId ? { workspace_id: wsId } : {}) })
           if (memberIds.length) {
             await supabase
               .from("project_members")
-              .insert(memberIds.map((uid) => ({ project_id: inserted.id, user_id: uid })))
+              .insert(memberIds.map((uid) => ({ ...(wsId ? { workspace_id: wsId } : {}), project_id: inserted.id, user_id: uid })))
           }
         },
       })

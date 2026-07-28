@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { ChevronLeft, ChevronRight, Plus, X, Check, Trash2, CalendarDays, Pencil, Paperclip, Download, Loader2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
+import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useUndo } from "@/components/undo/UndoProvider"
@@ -464,6 +465,7 @@ function CreateEventModal({
 }) {
   const supabase = createClient()
   const me = useCurrentUserId()
+  const wsId = useCurrentWorkspaceId() // B1-b
   const { push } = useUndo()
   const isEdit = !!event
   const [title, setTitle] = useState(event?.title ?? "")
@@ -592,7 +594,7 @@ function CreateEventModal({
     }
     const { data: inserted, error: insErr } = await supabase
       .from("calendar_events")
-      .insert({ ...payload, created_by: me })
+      .insert({ ...payload, created_by: me, ...(wsId ? { workspace_id: wsId } : {}) })
       .select()
       .single()
     setSaving(false)
@@ -608,7 +610,7 @@ function CreateEventModal({
           reload()
         },
         redo: async () => {
-          await supabase.from("calendar_events").insert(inserted)
+          await supabase.from("calendar_events").insert({ ...inserted, ...(wsId ? { workspace_id: wsId } : {}) })
           reload()
         },
       })
@@ -738,6 +740,7 @@ function EventDetailModal({
   onEdit: () => void
 }) {
   const supabase = createClient()
+  const wsId = useCurrentWorkspaceId() // B1-b
   const { push } = useUndo()
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -796,7 +799,7 @@ function EventDetailModal({
     push({
       label: "일정 삭제",
       undo: async () => {
-        await supabase.from("calendar_events").insert(event)
+        await supabase.from("calendar_events").insert({ ...event, ...(wsId ? { workspace_id: wsId } : {}) })
         reload()
       },
       redo: async () => {

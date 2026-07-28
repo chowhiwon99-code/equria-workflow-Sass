@@ -19,6 +19,7 @@ import type { LucideIcon } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
+import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { useUndo } from "@/components/undo/UndoProvider"
@@ -106,6 +107,7 @@ function dateBucket(iso: string, now: Date): { key: string; label: string; order
 export function FilesView() {
   const supabase = createClient()
   const me = useCurrentUserId()
+  const wsId = useCurrentWorkspaceId() // B1-b: 쓰기에 워크스페이스 명시
   const { push } = useUndo()
   const inputRef = useRef<HTMLInputElement>(null)
   const [rows, setRows] = useState<FileRow[]>([])
@@ -192,6 +194,7 @@ export function FilesView() {
       for (const file of ok) {
         const up = await uploadFile(FILES_BUCKET, file)
         newRows.push({
+          ...(wsId ? { workspace_id: wsId } : {}),
           source: "local",
           name: up.name,
           mime_type: up.mimeType,
@@ -257,7 +260,7 @@ export function FilesView() {
 
   const createFolder = async (name: string) => {
     if (!me) return
-    const { error: e } = await supabase.from("file_folders").insert({ name, created_by: me })
+    const { error: e } = await supabase.from("file_folders").insert({ ...(wsId ? { workspace_id: wsId } : {}), name, created_by: me })
     if (e) return toast.error("폴더를 만들지 못했어요.")
     toast.success("폴더를 만들었어요.")
     load()
