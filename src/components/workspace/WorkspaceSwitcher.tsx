@@ -2,30 +2,40 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Check, ChevronsUpDown, Plus } from "lucide-react"
+import { Check, ChevronDown, Settings, Mail, LogOut, Plus } from "lucide-react"
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider"
+import { createClient } from "@/lib/supabase/client"
 import { writeActiveWsCookie } from "@/lib/workspace-cookie"
 import { cn } from "@/lib/utils"
+
+const ROLE_LABEL: Record<string, string> = { owner: "관리자", admin: "관리자", member: "멤버", guest: "게스트" }
 
 /** 워크스페이스(회사) 이니셜 아바타 — 첫 글자. */
 function WsAvatar({ name, className }: { name: string; className?: string }) {
   return (
-    <span className={cn("flex size-7 shrink-0 items-center justify-center rounded-md bg-foreground/10 text-xs font-semibold", className)}>
+    <span className={cn("flex items-center justify-center rounded-md bg-foreground/10 font-semibold", className)}>
       {name.trim().slice(0, 1) || "W"}
     </span>
   )
 }
 
 /**
- * 사이드바 상단 워크스페이스 전환기(노션식) — 현재 회사 이름 표시 + 드롭다운으로 전환.
- * 전환 = 활성 워크스페이스 쿠키 세팅 후 새로고침(서버/클라 Supabase가 x-workspace-id 헤더로 읽기 스코프).
- * 멤버십이 1개뿐이면 전환 목록 없이 회사 이름만(드롭다운 비활성).
+ * 사이드바 상단 워크스페이스 전환기(노션식 풀 패널) — 현재 회사 + 드롭다운.
+ * 클릭하면: 현재 회사 헤더 → 설정·멤버 초대 → 계정 이메일 → 워크스페이스 목록(체크·게스트 배지)
+ * → 새 워크스페이스 만들기 → 로그아웃. 전환 = 활성 워크스페이스 쿠키 세팅 후 새로고침(RLS 스코프 재적용).
  */
 export function WorkspaceSwitcher() {
   const { currentWorkspace, workspaces, currentWorkspaceId } = useWorkspace()
   const router = useRouter()
+  const supabase = createClient()
   const [open, setOpen] = useState(false)
+  const [email, setEmail] = useState<string | null>(null)
   const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open || email) return
+    supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? null))
+  }, [open, email, supabase])
 
   useEffect(() => {
     if (!open) return
@@ -42,63 +52,102 @@ export function WorkspaceSwitcher() {
   }, [open])
 
   if (!currentWorkspace) return null
-  const multi = workspaces.length > 1
 
   const switchTo = (id: string) => {
     setOpen(false)
     if (id === currentWorkspaceId) return
     writeActiveWsCookie(id)
-    // 활성 워크스페이스가 바뀌면 전 화면 데이터가 달라지므로 완전 새로고침(RLS 스코프 재적용)
-    window.location.assign("/dashboard")
+    window.location.assign("/dashboard") // 활성 회사 변경 → 전 화면 RLS 스코프 재적용
+  }
+
+  const go = (href: string) => {
+    setOpen(false)
+    router.push(href)
+  }
+
+  const signOut = async () => {
+    setOpen(false)
+    await supabase.auth.signOut()
+    window.location.assign("/login")
   }
 
   return (
     <div ref={ref} className="relative border-b px-2 py-2">
       <button
         type="button"
-        onClick={() => multi && setOpen((v) => !v)}
-        className={cn(
-          "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors",
-          multi ? "hover:bg-muted" : "cursor-default"
-        )}
-        aria-haspopup={multi}
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-muted"
+        aria-haspopup="menu"
         aria-expanded={open}
       >
-        <WsAvatar name={currentWorkspace.name} />
+        <WsAvatar name={currentWorkspace.name} className="size-7 shrink-0 text-xs" />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-semibold">{currentWorkspace.name}</span>
           <span className="block truncate text-[11px] text-muted-foreground">
-            {currentWorkspace.role === "owner" ? "관리자" : currentWorkspace.role === "guest" ? "게스트" : "멤버"}
+            {ROLE_LABEL[currentWorkspace.role] ?? "멤버"} · 무료 요금제
           </span>
         </span>
-        {multi && <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />}
+        <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
       </button>
 
       {open && (
-        <div className="absolute left-2 right-2 top-full z-30 mt-1 overflow-hidden rounded-lg border bg-popover shadow-lg">
-          <p className="px-3 py-2 text-[11px] text-muted-foreground">내 워크스페이스</p>
-          {workspaces.map((w) => (
-            <button
-              key={w.id}
-              type="button"
-              onClick={() => switchTo(w.id)}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted"
-            >
-              <WsAvatar name={w.name} className="size-6 rounded" />
-              <span className="min-w-0 flex-1 truncate">{w.name}</span>
-              {w.id === currentWorkspaceId && <Check className="size-4 shrink-0 text-foreground" />}
+        <div
+          role="menu"
+          className="absolute left-2 right-2 top-full z-30 mt-1 overflow-hidden rounded-xl border bg-popover py-1 shadow-lg"
+        >
+          {/* 현재 회사 헤더 */}
+          <div className="flex items-center gap-2.5 px-3 py-2.5">
+            <WsAvatar name={currentWorkspace.name} className="size-9 shrink-0 rounded-lg text-sm" />
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-semibold">{currentWorkspace.name}</span>
+              <span className="block truncate text-xs text-muted-foreground">
+                무료 요금제 · {ROLE_LABEL[currentWorkspace.role] ?? "멤버"}
+              </span>
+            </span>
+          </div>
+
+          {/* 액션 */}
+          <div className="border-t py-1">
+            <button type="button" role="menuitem" onClick={() => go("/settings")} className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors hover:bg-muted">
+              <Settings className="size-4 text-muted-foreground" /> 설정
             </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => {
-              setOpen(false)
-              router.push("/onboarding?new=1")
-            }}
-            className="flex w-full items-center gap-2 border-t px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-muted"
-          >
-            <Plus className="size-4" /> 새 워크스페이스 만들기
-          </button>
+            {currentWorkspace.role !== "guest" && (
+              <button type="button" role="menuitem" onClick={() => go("/settings")} className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors hover:bg-muted">
+                <Mail className="size-4 text-muted-foreground" /> 멤버 초대
+              </button>
+            )}
+          </div>
+
+          {/* 계정 이메일 + 워크스페이스 목록 */}
+          <div className="border-t py-1">
+            {email && <p className="truncate px-3 py-1.5 text-[11px] text-muted-foreground">{email}</p>}
+            {workspaces.map((w) => (
+              <button
+                key={w.id}
+                type="button"
+                role="menuitem"
+                onClick={() => switchTo(w.id)}
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors hover:bg-muted"
+              >
+                <WsAvatar name={w.name} className="size-6 shrink-0 rounded text-[11px]" />
+                <span className="min-w-0 flex-1 truncate">{w.name}</span>
+                {w.role === "guest" && (
+                  <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">게스트</span>
+                )}
+                {w.id === currentWorkspaceId && <Check className="size-4 shrink-0 text-foreground" />}
+              </button>
+            ))}
+            <button type="button" role="menuitem" onClick={() => go("/onboarding?new=1")} className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-muted">
+              <Plus className="size-4" /> 새 워크스페이스 만들기
+            </button>
+          </div>
+
+          {/* 로그아웃 */}
+          <div className="border-t py-1">
+            <button type="button" role="menuitem" onClick={signOut} className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors hover:bg-muted">
+              <LogOut className="size-4 text-muted-foreground" /> 로그아웃
+            </button>
+          </div>
         </div>
       )}
     </div>
