@@ -5,6 +5,26 @@
 
 ---
 
+## 2026-07-28 · 세션39 후속 — B2 노션식 초대 개방 (마이그 113~116 + 온보딩·조인·초대 링크·게스트)
+
+**무엇/왜:** 대표 지시 — 노션처럼 링크 초대·호스트/게스트·도입문의 별도 격리·다운로드 자리. 승인 플랜(`prancy-whistling-tome.md`) Phase B·C 실행. 각 단계 tsc0·lint29/0·build0·main-first. **컷오버 스위치(가입 ON)만 대표 대기.**
+
+**쪼갠 내용:**
+1. **마이그 113** 초대 링크: `workspace_invites`(192bit 토큰·만료·횟수·회수)+guest role+RPC 4종(발급/회수/미리보기[anon]/수락[FOR UPDATE·강등방지·owner 무주공산 승계·guest→project_members]). RLS 시뮬: 오너발급O·비관리자 거부·프로젝트 없는 guest 거부.
+2. **마이그 114** 게스트 RLS: 핵심 헬퍼 2개 guest 제외(fail-closed·45테이블 일괄 차단)+is_project_member/can_access_project로 프로젝트 경로만 개방+shares_workspace_with 재작성+notifications 자기행 완화. 시뮬: 멤버 회귀0·게스트 재무/회의록/DM 0건·초대 프로젝트만 1건.
+3. **마이그 115** create_workspace(slug·오너 멤버십·전체방·시드 8종 복제[이큐리아/EQURIA/K-뷰티 치환])+admin_create_workspace(운영자 셋업·owner 링크 반환)+create_group_room 픽스(guest 제외·p_workspace). 종합 시뮬: 생성→복제→타사 0건 격리→owner 승계.
+4. **앱 `9b74af8`(B-4a)**: /onboarding(만들기/참여 2카드)·/join/[token](미리보기·구글 로그인 복귀·명시적 수락)·proxy /join·layout 멤버십0→온보딩+role 로드. **types.ts 재생성 → workspace_id가 Insert 타입 필수화**(조건부 스프레드 49곳→필수 명시·전체행 wrap 14곳 원상·withWorkspace 필수 반환) — 🔥 ProjectDetail 일정 redo/복원이 좁은 select라 재삽입 실패했을 실버그 발견·픽스.
+5. **앱 `5f430af`(B-4b)**: 설정 'InviteLinksCard'(멤버/게스트·프로젝트 칩·발급 즉시 복사·회수)·구 이메일 초대 라우트 410(컷오버 R2 차단)·GuestGuard+Sidebar 필터+AI 위젯 게스트 미렌더(guestAllowed SSOT).
+6. **마이그 116** handle_new_user v2(equria 자동등록 제거 — 가입 ON 전 필수 선행) + **랜딩 푸터 다운로드 자리**(iOS&Android/Mac&Windows '준비 중', 5컬럼).
+
+**예상이슈 체크:**
+- 컷오버 순서 안전장치: 116을 앱 배포 뒤에 적용(체크리스트 준수)·구 초대 라우트 선차단. 가입 ON 전까지 신규 유저 진입 불가 상태 유지.
+- 게스트 링크 발급은 이미 가능하지만 수락은 구글 인증 가능 계정만(테스트 사용자) — 심사 통과 후 전면 개방.
+- 라이브 스모크: /join 미리보기 렌더·미로그인 온보딩 가드 307 확인.
+- **패스트팔로우**: Header 워크스페이스 스위처·마이그117(MCP 크리덴셜 회사별)·guest→member 승급 분기.
+
+---
+
 ## 2026-07-28 · 세션39 후속 — B1-b 쓰기 격리 Phase A-1~A-4 (클라 59+서버 5+가드 2+presence)
 
 **무엇/왜:** 대표 지시 "격리 공사 시작"(가입 개방·노션식 초대의 선행 차단막). 플랜모드 계획(`prancy-whistling-tome.md`) 승인 후 실행. Explore 2에이전트 조사로 **B1-b가 이미 1/3 진행**(WorkspaceProvider·lib/workspace 헬퍼·서버 32곳 기배선) 확인 → 잔여만 정밀 타격. 4묶음+1커밋 = 5회 main-first 배포(각 tsc0·lint29/0·build0). **최종 `3ec50d8`.**

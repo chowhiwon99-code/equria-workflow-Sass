@@ -37,6 +37,14 @@ const COLUMNS: { title: string; links: FootLink[] }[] = [
     ],
   },
   {
+    // 노션식 다운로드 자리(대표 지시 2026-07-28) — 앱 빌드(Electron·모바일)는 별도 트랙, 그 전까지 "준비 중"
+    title: "다운로드",
+    links: [
+      { l: "iOS & Android" },
+      { l: "Mac & Windows" },
+    ],
+  },
+  {
     title: "회사",
     links: [
       { l: "회사소개" },
@@ -56,7 +64,7 @@ export function LandingFooter() {
       <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
         <div className="flex flex-col gap-12 lg:flex-row lg:justify-between">
           <Image src="/brand/logo-horizontal.png" alt="Complow" width={1046} height={256} className="h-5 w-auto self-start brightness-0 invert" />
-          <div className="grid grid-cols-2 gap-x-10 gap-y-10 sm:grid-cols-4 lg:gap-x-16">
+          <div className="grid grid-cols-2 gap-x-10 gap-y-10 sm:grid-cols-5 lg:gap-x-16">
             {COLUMNS.map((c) => (
               <div key={c.title}>
                 <p className="text-[13px] text-white/40">{c.title}</p>
