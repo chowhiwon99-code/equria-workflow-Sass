@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
+import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -53,6 +54,7 @@ export function AgentBuilderForm({
 }) {
   const supabase = createClient()
   const me = useCurrentUserId()
+  const wsId = useCurrentWorkspaceId() // B1-b: 쓰기에 워크스페이스 명시
   const router = useRouter()
   const { push } = useUndo()
   const editing = !!initial
@@ -164,6 +166,7 @@ export function AgentBuilderForm({
       const { data: agent, error: aErr } = await supabase
         .from("agents")
         .insert({
+          ...(wsId ? { workspace_id: wsId } : {}),
           name: name.trim(),
           description: description.trim() || null,
           category,
@@ -179,6 +182,7 @@ export function AgentBuilderForm({
         return
       }
       const { error: vErr } = await supabase.from("agent_versions").insert({
+        ...(wsId ? { workspace_id: wsId } : {}),
         agent_id: agent.id,
         system_prompt: systemPrompt.trim(),
         model,
@@ -197,7 +201,7 @@ export function AgentBuilderForm({
       }
       // 만든 사람 위젯에 자동 핀 → 만들자마자 우하단 위젯에 등장(핀이 SSOT이므로).
       // 실패해도 생성 자체는 유지(best-effort).
-      await supabase.from("user_agent_pins").insert({ user_id: me, agent_id: agent.id })
+      await supabase.from("user_agent_pins").insert({ ...(wsId ? { workspace_id: wsId } : {}), user_id: me, agent_id: agent.id })
 
       // 지식파일(참고 자료) 반영 — best-effort(실패해도 생성은 유지)
       if (knowledge.length > 0) {
@@ -295,6 +299,7 @@ export function AgentBuilderForm({
       }
       const insertVersion = (version: number) =>
         supabase.from("agent_versions").insert({
+          ...(wsId ? { workspace_id: wsId } : {}),
           agent_id: initial.id,
           system_prompt: systemPrompt.trim(),
           model,

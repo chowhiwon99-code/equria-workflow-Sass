@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Plus, Workflow as WorkflowIcon, Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
+import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { Button } from "@/components/ui/button"
 import { normalizeGraph, type WorkflowGraph } from "@/lib/workflows"
@@ -24,6 +25,7 @@ type WorkflowRow = {
 export function WorkflowsView() {
   const supabase = createClient()
   const me = useCurrentUserId()
+  const wsId = useCurrentWorkspaceId() // B1-b: 쓰기에 워크스페이스 명시
   const router = useRouter()
   const { push } = useUndo()
   const [rows, setRows] = useState<WorkflowRow[]>([])
@@ -79,7 +81,7 @@ export function WorkflowsView() {
     setNewOpen(false)
     const { data, error } = await supabase
       .from("workflows")
-      .insert({ name: choice.name, description: choice.description, steps: choice.graph, created_by: me })
+      .insert({ ...(wsId ? { workspace_id: wsId } : {}), name: choice.name, description: choice.description, steps: choice.graph, created_by: me })
       .select("id")
       .single()
     setCreating(false)

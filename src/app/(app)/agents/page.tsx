@@ -7,6 +7,7 @@ import { Plus, Pin, Lock, Globe, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
+import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
 import { useUndo } from "@/components/undo/UndoProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
@@ -25,6 +26,7 @@ export default function AgentsPage() {
   const { push } = useUndo()
   const [agents, setAgents] = useState<AgentRow[]>([])
   const meId = useCurrentUserId()
+  const wsId = useCurrentWorkspaceId() // B1-b
   const [pins, setPins] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
 
@@ -73,7 +75,7 @@ export default function AgentsPage() {
       await mustOk(supabase.from("user_agent_pins").delete().eq("user_id", meId))
       if (next.size > 0) {
         await mustOk(
-          supabase.from("user_agent_pins").insert([...next].map((id) => ({ user_id: meId, agent_id: id })))
+          supabase.from("user_agent_pins").insert([...next].map((id) => ({ ...(wsId ? { workspace_id: wsId } : {}), user_id: meId, agent_id: id })))
         )
       }
       window.dispatchEvent(new Event("equria:agents-changed"))

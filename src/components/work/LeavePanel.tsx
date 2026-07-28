@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
+import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -29,6 +30,7 @@ const TYPES = ["연차", "반차", "병가", "경조사", "공가", "기타"] as
 export function LeavePanel() {
   const supabase = createClient()
   const me = useCurrentUserId()
+  const wsId = useCurrentWorkspaceId() // B1-b: 쓰기에 워크스페이스 명시
   const [isAdmin, setIsAdmin] = useState(false)
   const [names, setNames] = useState<Record<string, string>>({})
   const [positions, setPositions] = useState<Record<string, string | null>>({})
@@ -85,6 +87,7 @@ export function LeavePanel() {
     run(async () => {
       await mustOk(
         supabase.from("leave_requests").insert({
+          ...(wsId ? { workspace_id: wsId } : {}),
           user_id: me,
           leave_type: type,
           start_date: start,

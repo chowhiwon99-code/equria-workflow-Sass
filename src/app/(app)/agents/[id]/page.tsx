@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Pencil, Pin, Lock, Globe, Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
+import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
 import { useUndo } from "@/components/undo/UndoProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
@@ -26,6 +27,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
   const [agent, setAgent] = useState<AgentDetail | null>(null)
   const [version, setVersion] = useState<Version | null>(null)
   const meId = useCurrentUserId()
+  const wsId = useCurrentWorkspaceId() // B1-b
   const [pinned, setPinned] = useState(false)
   const [loading, setLoading] = useState(true)
   const [missing, setMissing] = useState(false)
@@ -71,13 +73,13 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
     const next = !pinned
     setPinned(next) // 낙관적
     try {
-      if (next) await mustOk(supabase.from("user_agent_pins").insert({ user_id: meId, agent_id: agent.id }))
+      if (next) await mustOk(supabase.from("user_agent_pins").insert({ ...(wsId ? { workspace_id: wsId } : {}), user_id: meId, agent_id: agent.id }))
       else await mustOk(supabase.from("user_agent_pins").delete().eq("user_id", meId).eq("agent_id", agent.id))
       window.dispatchEvent(new Event("equria:agents-changed"))
     } catch {
       setPinned(!next) // 실패 시 롤백
     }
-  }, [supabase, meId, agent, pinned])
+  }, [supabase, meId, wsId, agent, pinned])
 
   const remove = async () => {
     if (!agent) return

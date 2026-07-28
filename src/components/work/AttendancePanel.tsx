@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
+import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -54,6 +55,7 @@ export function workDuration(checkIn: string | null, checkOut: string | null): s
 export function AttendancePanel() {
   const supabase = createClient()
   const me = useCurrentUserId()
+  const wsId = useCurrentWorkspaceId() // B1-b: 쓰기에 워크스페이스 명시
   const [recs, setRecs] = useState<Rec[]>([]) // 선택한 달의 내 근태
   const [today, setToday] = useState<Rec | null>(null) // 오늘 기록(항상 오늘 — 월 이동과 무관)
   const [ym, setYm] = useState<YM>(currentYM)
@@ -104,7 +106,7 @@ export function AttendancePanel() {
         await mustOk(supabase.from("attendance_records").update({ check_in: now }).eq("id", today.id))
       } else {
         await mustOk(
-          supabase.from("attendance_records").insert({ user_id: me, work_date: todayStr(), check_in: now, status: "정상" })
+          supabase.from("attendance_records").insert({ ...(wsId ? { workspace_id: wsId } : {}), user_id: me, work_date: todayStr(), check_in: now, status: "정상" })
         )
       }
       toast.success("출근 기록됐어요.")
@@ -123,7 +125,7 @@ export function AttendancePanel() {
       if (today) {
         await mustOk(supabase.from("attendance_records").update({ status: s }).eq("id", today.id))
       } else {
-        await mustOk(supabase.from("attendance_records").insert({ user_id: me, work_date: todayStr(), status: s }))
+        await mustOk(supabase.from("attendance_records").insert({ ...(wsId ? { workspace_id: wsId } : {}), user_id: me, work_date: todayStr(), status: s }))
       }
     })
 

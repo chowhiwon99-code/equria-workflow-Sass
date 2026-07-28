@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { Megaphone, Pin, PinOff, Plus, Trash2, Loader2, ChevronDown } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
+import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -25,6 +26,7 @@ function fmtDate(iso: string): string {
 export function AnnouncementsBoard() {
   const supabase = createClient()
   const me = useCurrentUserId()
+  const wsId = useCurrentWorkspaceId() // B1-b: 쓰기에 워크스페이스 명시
   const [isOwner, setIsOwner] = useState(false)
   const [names, setNames] = useState<Record<string, string>>({})
   const [positions, setPositions] = useState<Record<string, string | null>>({})
@@ -91,7 +93,7 @@ export function AnnouncementsBoard() {
     }
     run(async () => {
       await mustOk(
-        supabase.from("announcements").insert({ user_id: me, title: title.trim(), content: content.trim(), pinned: pin })
+        supabase.from("announcements").insert({ ...(wsId ? { workspace_id: wsId } : {}), user_id: me, title: title.trim(), content: content.trim(), pinned: pin })
       )
       setTitle("")
       setContent("")
