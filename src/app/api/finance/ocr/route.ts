@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { generateObject } from "ai"
 import { createClient } from "@/lib/supabase/server"
+import { getUserWorkspaceId } from "@/lib/workspace"
 import { anthropic, MODELS } from "@/lib/claude/client"
 import { receiptSchema } from "@/lib/claude/schemas"
 import { buildOcrFilePart } from "@/lib/storage"
@@ -61,9 +62,11 @@ export async function POST(req: Request) {
     )
   }
 
+  const wsId = await getUserWorkspaceId(supabase, user.id) // B1-b: 쓰기에 워크스페이스 명시
   const { data: inserted, error: insErr } = await supabase
     .from("finance_entries")
     .insert({
+      ...(wsId ? { workspace_id: wsId } : {}),
       kind: "expense",
       entry_date: object.entry_date || new Date().toISOString().slice(0, 10),
       vendor: object.vendor || null,

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { getUserWorkspaceId } from "@/lib/workspace"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { discoverMcpTools } from "@/lib/mcp/connect"
 
@@ -20,11 +21,16 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: "관리자만 가능해요." }, { status: 403 })
   }
 
+  // B1-b: admin(service_role)은 RLS 우회 — 내 워크스페이스의 서버만 접근 허용
+  const wsId = await getUserWorkspaceId(supabase, user.id)
+  if (!wsId) return NextResponse.json({ error: "워크스페이스 멤버가 아니에요." }, { status: 403 })
+
   const admin = createAdminClient()
   const { data: server } = await admin
     .from("mcp_servers")
     .select("id, name, type, url, auth_type, encrypted_token")
     .eq("id", id)
+    .eq("workspace_id", wsId)
     .maybeSingle()
   if (!server) return NextResponse.json({ error: "서버를 찾을 수 없어요." }, { status: 404 })
 
@@ -36,6 +42,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     if (tools.length > 0) {
       await admin.from("mcp_tools").insert(
         tools.map((t) => ({
+          workspace_id: wsId,
           server_id: id,
           name: t.name,
           description: t.description || null,

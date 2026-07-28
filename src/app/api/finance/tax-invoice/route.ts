@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { getUserWorkspaceId } from "@/lib/workspace"
 
 export const runtime = "nodejs"
 
@@ -44,9 +45,11 @@ export async function POST(req: Request) {
     date: e.entry_date,
   }))
 
+  const wsId = await getUserWorkspaceId(supabase, user.id) // B1-b: 쓰기에 워크스페이스 명시
   const { data: inserted, error: insErr } = await supabase
     .from("tax_invoices")
     .insert({
+      ...(wsId ? { workspace_id: wsId } : {}),
       direction: direction ?? "purchase",
       supplier_name: entries[0].vendor || null,
       issue_date: new Date().toISOString().slice(0, 10),

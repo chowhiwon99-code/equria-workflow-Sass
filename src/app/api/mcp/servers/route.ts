@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { getUserWorkspaceId } from "@/lib/workspace"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { encryptToken } from "@/lib/google/crypto"
 
@@ -57,10 +58,15 @@ export async function POST(req: Request) {
   // bearer + 토큰이면 암호화해 저장(평문 금지). 없으면 null(env 폴백).
   const encrypted_token = authType === "bearer" && body.token?.trim() ? encryptToken(body.token.trim()) : null
 
+  // B1-b: admin(service_role)은 RLS 우회라 멤버십 가드 필수 + workspace 명시
+  const wsId = await getUserWorkspaceId(supabase, user.id)
+  if (!wsId) return NextResponse.json({ error: "워크스페이스 멤버가 아니에요." }, { status: 403 })
+
   const admin = createAdminClient()
   const { data, error } = await admin
     .from("mcp_servers")
     .insert({
+      workspace_id: wsId,
       name: body.name.trim(),
       type: body.type === "sse" ? "sse" : "http",
       url: body.url.trim(),
