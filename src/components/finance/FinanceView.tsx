@@ -6,6 +6,7 @@ import { Upload, FileText, Loader2, Plus, Pencil, Download, Trash2, Receipt } fr
 import { Select } from "@/components/shared/Select"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
+import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { uploadImage } from "@/lib/upload"
 import { cn } from "@/lib/utils"
@@ -36,6 +37,7 @@ export function FinanceView() {
   const supabase = createClient()
   const { push } = useUndo()
   const me = useCurrentUserId() // 세금계산서 확정→매출 기록 created_by
+  const wsId = useCurrentWorkspaceId() // B1-b: 쓰기에 워크스페이스 명시
   const [entries, setEntries] = useState<FinanceEntry[]>([])
   const [invoices, setInvoices] = useState<TaxInvoice[]>([])
   const [loading, setLoading] = useState(true)
@@ -264,6 +266,7 @@ export function FinanceView() {
     const { data: inserted, error: insErr } = await supabase
       .from("finance_entries")
       .insert({
+        ...(wsId ? { workspace_id: wsId } : {}),
         kind: "revenue",
         entry_date: iv.issue_date ?? new Date().toISOString().slice(0, 10),
         vendor: iv.buyer_name ?? iv.supplier_name ?? "세금계산서",
@@ -293,7 +296,7 @@ export function FinanceView() {
         await supabase.from("tax_invoices").update({ status: "draft" }).eq("id", iv.id)
       },
       redo: async () => {
-        await supabase.from("finance_entries").insert(inserted)
+        await supabase.from("finance_entries").insert({ ...inserted, ...(wsId ? { workspace_id: wsId } : {}) })
         await supabase.from("tax_invoices").update({ status: "ready" }).eq("id", iv.id)
       },
     })
@@ -783,7 +786,7 @@ export function FinanceView() {
                               push({
                                 label: "세금계산서 초안 삭제",
                                 undo: async () => {
-                                  await mustOk(supabase.from("tax_invoices").insert(iv))
+                                  await mustOk(supabase.from("tax_invoices").insert({ ...iv, ...(wsId ? { workspace_id: wsId } : {}) }))
                                   load()
                                 },
                                 redo: async () => {

@@ -5,6 +5,7 @@ import { X, Trash2, Loader2, Search, Sparkles } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
+import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { fieldClass } from "@/components/shared/Modal"
@@ -14,7 +15,6 @@ import { parseFormulaText, astToEditableText } from "@/lib/formulaParse"
 import { money } from "@/lib/finance"
 import type { CashCalcType } from "@/types"
 
-const WORKSPACE_ID = "00000000-0000-0000-0000-0000000000e1"
 const flowLabel = (flow: string) => (flow === "revenue" ? "매출" : flow === "reserve" ? "보유금" : "비용")
 // 템플릿 라벨 "이름 — 수식" 분리(표시용).
 const splitLabel = (label: string): [string, string] => {
@@ -66,6 +66,7 @@ function LivePreview({ ast, fields, vals, onChange }: { ast: CalcNode; fields: C
 export function CalcTypeBuilder({ types, editType, onClose, onSaved }: { types: CashCalcType[]; editType?: CashCalcType | null; onClose: () => void; onSaved: () => void }) {
   const supabase = createClient()
   const me = useCurrentUserId()
+  const wsId = useCurrentWorkspaceId() // B1-b: 쓰기에 워크스페이스 명시
   const isEdit = !!editType
   const editAst = (editType?.formula as { ast?: CalcNode } | null)?.ast ?? null
   const editFields = useMemo(() => ((editType?.fields as unknown as CalcField[]) ?? []), [editType])
@@ -166,7 +167,7 @@ export function CalcTypeBuilder({ types, editType, onClose, onSaved }: { types: 
         onClose()
         return
       }
-      await mustOk(supabase.from("cash_calc_types").insert({ workspace_id: WORKSPACE_ID, name: name.trim(), flow, fields: activeFields, formula: { ast }, created_by: me, sort_order: types.length }))
+      await mustOk(supabase.from("cash_calc_types").insert({ ...(wsId ? { workspace_id: wsId } : {}), name: name.trim(), flow, fields: activeFields, formula: { ast }, created_by: me, sort_order: types.length }))
       toast.success("계산 유형을 추가했어요.")
       setName("")
       setTemplateAst(null)

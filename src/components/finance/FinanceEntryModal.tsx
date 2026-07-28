@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
+import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -34,6 +35,7 @@ export function FinanceEntryModal({
 }) {
   const supabase = createClient()
   const me = useCurrentUserId()
+  const wsId = useCurrentWorkspaceId() // B1-b: 쓰기에 워크스페이스 명시
   const { push } = useUndo()
   const [kind, setKind] = useState<Kind>((entry?.kind as Kind) ?? defaultKind ?? "expense")
   const [entryDate, setEntryDate] = useState(entry?.entry_date ?? new Date().toISOString().slice(0, 10))
@@ -113,7 +115,7 @@ export function FinanceEntryModal({
     } else {
       const { data: inserted, error: err } = await supabase
         .from("finance_entries")
-        .insert({ ...payload, created_by: me, ...(projectId ? { project_id: projectId } : {}) })
+        .insert({ ...payload, created_by: me, ...(wsId ? { workspace_id: wsId } : {}), ...(projectId ? { project_id: projectId } : {}) })
         .select()
         .single()
       setSaving(false)
@@ -126,7 +128,7 @@ export function FinanceEntryModal({
             reload()
           },
           redo: async () => {
-            await mustOk(supabase.from("finance_entries").insert(inserted))
+            await mustOk(supabase.from("finance_entries").insert({ ...inserted, ...(wsId ? { workspace_id: wsId } : {}) }))
             reload()
           },
         })
