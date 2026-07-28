@@ -18,7 +18,7 @@ export function GoogleIcon({ className = "size-5" }: { className?: string }) {
  *  기존 멤버는 계정 이메일이 내부 합성 주소라 자동 연결이 안 됨 →
  *  마이페이지 '로그인 방법'에서 구글 계정을 연결한 뒤부터 사용 가능.
  *  (애플·카카오는 B6 포장 단계에 추가 예정 — 구 3버튼 UI는 git 히스토리 참조) */
-export default function SocialButtons() {
+export default function SocialButtons({ next }: { next?: string } = {}) {
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -28,7 +28,7 @@ export default function SocialButtons() {
     const supabase = createClient()
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo: `${window.location.origin}/auth/callback${next ? `?next=${encodeURIComponent(next)}` : ""}` },
     })
     if (error) {
       setError("구글 로그인을 시작하지 못했어요. 잠시 후 다시 시도해 주세요.")

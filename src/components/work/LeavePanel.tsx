@@ -87,7 +87,7 @@ export function LeavePanel() {
     run(async () => {
       await mustOk(
         supabase.from("leave_requests").insert({
-          ...(wsId ? { workspace_id: wsId } : {}),
+          workspace_id: wsId as string,
           user_id: me,
           leave_type: type,
           start_date: start,

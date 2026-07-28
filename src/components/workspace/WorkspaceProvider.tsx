@@ -7,7 +7,7 @@ import { createContext, useCallback, useContext, useMemo, useState } from "react
 // "지금 로그인한 회사"의 workspace_id를 명시할 수 있게 한다(sentinel DEFAULT 의존 제거의 선행조건).
 // ⚠️ 이 파일 자체는 어떤 쓰기도 바꾸지 않는다 — 소비처(INSERT 배선)는 Step 1+에서 추가.
 
-export type WorkspaceSummary = { id: string; name: string; slug: string }
+export type WorkspaceSummary = { id: string; name: string; slug: string; role: string }
 
 type WorkspaceCtx = {
   /** 현재 활성 워크스페이스 id. 멤버십이 없으면 null(사실상 발생 안 함 — handle_new_user가 자동 등록). */

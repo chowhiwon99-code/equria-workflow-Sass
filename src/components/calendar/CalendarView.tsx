@@ -594,7 +594,7 @@ function CreateEventModal({
     }
     const { data: inserted, error: insErr } = await supabase
       .from("calendar_events")
-      .insert({ ...payload, created_by: me, ...(wsId ? { workspace_id: wsId } : {}) })
+      .insert({ ...payload, created_by: me, workspace_id: wsId as string })
       .select()
       .single()
     setSaving(false)
@@ -610,7 +610,7 @@ function CreateEventModal({
           reload()
         },
         redo: async () => {
-          await supabase.from("calendar_events").insert({ ...inserted, ...(wsId ? { workspace_id: wsId } : {}) })
+          await supabase.from("calendar_events").insert(inserted)
           reload()
         },
       })
@@ -740,7 +740,6 @@ function EventDetailModal({
   onEdit: () => void
 }) {
   const supabase = createClient()
-  const wsId = useCurrentWorkspaceId() // B1-b
   const { push } = useUndo()
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -799,7 +798,7 @@ function EventDetailModal({
     push({
       label: "일정 삭제",
       undo: async () => {
-        await supabase.from("calendar_events").insert({ ...event, ...(wsId ? { workspace_id: wsId } : {}) })
+        await supabase.from("calendar_events").insert(event)
         reload()
       },
       redo: async () => {

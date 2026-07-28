@@ -6,7 +6,7 @@ import type { Database } from "@/lib/supabase/types"
 const AUTH_PATHS = ["/login", "/signup"]
 /** 법적 문서·검색엔진 파일·OAuth 콜백 — 로그인 여부와 무관하게 항상 접근.
  *  /auth/callback은 code 교환 "전"이라 세션이 없음 → 여기 없으면 프록시가 /login으로 튕겨 OAuth가 영원히 실패. */
-const OPEN_PATHS = ["/privacy", "/terms", "/refund", "/sitemap.xml", "/robots.txt", "/auth/callback"]
+const OPEN_PATHS = ["/privacy", "/terms", "/refund", "/sitemap.xml", "/robots.txt", "/auth/callback", "/join"]
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request })

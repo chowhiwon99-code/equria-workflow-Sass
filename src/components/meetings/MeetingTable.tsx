@@ -86,7 +86,7 @@ export function MeetingTable({
     if (!name) return
     const { error } = await supabase
       .from("meeting_categories")
-      .insert({ ...(wsId ? { workspace_id: wsId } : {}), name, color: newColor, created_by: me, sort_order: categories.length })
+      .insert({ workspace_id: wsId as string, name, color: newColor, created_by: me, sort_order: categories.length })
     if (error) return toast.error(error.message)
     setNewName("")
     onReload()

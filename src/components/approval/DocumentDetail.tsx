@@ -150,7 +150,7 @@ export function DocumentDetail({ docId }: { docId: string }) {
   const addComment = () => {
     if (!newComment.trim()) return
     run(async () => {
-      await mustOk(supabase.from("approval_comments").insert({ ...(wsId ? { workspace_id: wsId } : {}), document_id: doc.id, user_id: me, body: newComment.trim() }))
+      await mustOk(supabase.from("approval_comments").insert({ workspace_id: wsId as string, document_id: doc.id, user_id: me, body: newComment.trim() }))
       setNewComment("")
     })
   }

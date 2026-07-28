@@ -14,6 +14,114 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_knowledge: {
+        Row: {
+          agent_id: string
+          created_at: string
+          created_by: string | null
+          extracted_text: string | null
+          id: string
+          is_personal: boolean
+          mime_type: string | null
+          name: string
+          size: number | null
+          storage_path: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          created_by?: string | null
+          extracted_text?: string | null
+          id?: string
+          is_personal?: boolean
+          mime_type?: string | null
+          name: string
+          size?: number | null
+          storage_path: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          created_by?: string | null
+          extracted_text?: string | null
+          id?: string
+          is_personal?: boolean
+          mime_type?: string | null
+          name?: string
+          size?: number | null
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_knowledge_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_knowledge_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_memories: {
+        Row: {
+          agent_id: string
+          content: string
+          created_at: string
+          deleted_at: string | null
+          id: string
+          importance: number
+          kind: string
+          source_conversation_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agent_id: string
+          content: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          importance?: number
+          kind?: string
+          source_conversation_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agent_id?: string
+          content?: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          importance?: number
+          kind?: string
+          source_conversation_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_memories_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_memories_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_usage: {
         Row: {
           agent_id: string | null
@@ -43,7 +151,7 @@ export type Database = {
           tokens_input?: number
           tokens_output?: number
           user_id?: string | null
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           agent_id?: string | null
@@ -122,7 +230,7 @@ export type Database = {
           temperature?: number
           tools?: Json
           version?: number
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           agent_id?: string
@@ -189,7 +297,7 @@ export type Database = {
           is_public?: boolean
           name: string
           updated_at?: string
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           category?: string
@@ -240,7 +348,7 @@ export type Database = {
           title?: string
           updated_at?: string
           user_id: string
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           content?: string
@@ -277,7 +385,7 @@ export type Database = {
           document_id: string
           id?: string
           user_id: string
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           body?: string
@@ -339,7 +447,7 @@ export type Database = {
           submitted_at?: string | null
           title?: string
           updated_at?: string
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           attachment_name?: string | null
@@ -392,7 +500,7 @@ export type Database = {
           role?: string
           status?: string
           step_order: number
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           acted_at?: string | null
@@ -438,7 +546,7 @@ export type Database = {
           title?: string | null
           updated_at?: string
           user_id: string
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           created_at?: string
@@ -480,7 +588,7 @@ export type Database = {
           created_at?: string
           id?: string
           role: string
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           content?: string
@@ -528,7 +636,7 @@ export type Database = {
           status?: string
           user_id: string
           work_date?: string
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           check_in?: string | null
@@ -562,7 +670,7 @@ export type Database = {
           created_at?: string
           granted_by?: string | null
           viewer_user_id: string
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           created_at?: string
@@ -631,7 +739,7 @@ export type Database = {
           title?: string | null
           updated_at?: string
           website?: string | null
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           address?: string | null
@@ -704,7 +812,7 @@ export type Database = {
           status?: string
           title: string
           updated_at?: string
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           all_day?: boolean
@@ -801,7 +909,7 @@ export type Database = {
           unit_price?: number
           units?: number
           updated_at?: string
-          workspace_id?: string
+          workspace_id: string
           x?: number | null
           y?: number | null
         }
@@ -892,7 +1000,7 @@ export type Database = {
           id?: string
           name: string
           sort_order?: number
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           created_at?: string
@@ -945,7 +1053,7 @@ export type Database = {
           id?: string
           name: string
           sort_order?: number
-          workspace_id?: string
+          workspace_id: string
           x?: number | null
           y?: number | null
         }
@@ -1006,7 +1114,7 @@ export type Database = {
           memo?: string | null
           to_account_id: string
           transfer_date?: string
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           amount?: number
@@ -1070,7 +1178,7 @@ export type Database = {
           pool_pos?: Json | null
           updated_at?: string
           updated_by?: string | null
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           default_calc_type_id?: string | null
@@ -1126,7 +1234,7 @@ export type Database = {
           title?: string | null
           updated_at?: string
           user_id: string
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           agent_id?: string | null
@@ -1178,7 +1286,7 @@ export type Database = {
           last_message_at?: string | null
           user_a: string
           user_b: string
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           created_at?: string
@@ -1243,7 +1351,7 @@ export type Database = {
           read_at?: string | null
           root_id?: string | null
           sender_id: string
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           attachment_name?: string | null
@@ -1319,7 +1427,7 @@ export type Database = {
           status?: string
           title: string
           user_id: string
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           amount?: number
@@ -1367,7 +1475,7 @@ export type Database = {
           id?: string
           name: string
           sort?: number
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           created_at?: string
@@ -1429,7 +1537,7 @@ export type Database = {
           source?: string
           visibility?: string
           web_view_link?: string | null
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           created_at?: string
@@ -1531,7 +1639,7 @@ export type Database = {
           unit_price?: number | null
           updated_at?: string
           vendor?: string | null
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           account_id?: string | null
@@ -1689,7 +1797,7 @@ export type Database = {
           name?: string | null
           size?: number | null
           storage_path: string
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           created_at?: string
@@ -1733,7 +1841,7 @@ export type Database = {
           id?: string
           message_id: string
           user_id: string
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           created_at?: string
@@ -1792,7 +1900,7 @@ export type Database = {
           room_id: string
           root_id?: string | null
           sender_id: string
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           body_json?: Json | null
@@ -1888,7 +1996,7 @@ export type Database = {
           is_default?: boolean
           last_message_at?: string | null
           name?: string
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           created_at?: string
@@ -1941,7 +2049,7 @@ export type Database = {
           start_date?: string
           status?: string
           user_id: string
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           created_at?: string
@@ -2033,7 +2141,7 @@ export type Database = {
           name: string
           type: string
           url?: string | null
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           args?: string[] | null
@@ -2081,7 +2189,7 @@ export type Database = {
           input_schema?: Json
           name: string
           server_id: string
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           created_at?: string
@@ -2186,7 +2294,7 @@ export type Database = {
           id?: string
           name: string
           sort_order?: number
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           color?: string
@@ -2222,7 +2330,7 @@ export type Database = {
           id?: string
           name: string
           sort?: number
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           created_at?: string
@@ -2286,7 +2394,7 @@ export type Database = {
           title?: string
           updated_at?: string
           user_id: string
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           attachment_name?: string | null
@@ -2350,7 +2458,7 @@ export type Database = {
           name?: string | null
           size?: number | null
           storage_path: string
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           created_at?: string
@@ -2394,7 +2502,7 @@ export type Database = {
           id?: string
           message_id: string
           user_id: string
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           created_at?: string
@@ -2447,7 +2555,7 @@ export type Database = {
           model?: string | null
           role: string
           tokens_used?: number | null
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           content?: string
@@ -2499,7 +2607,7 @@ export type Database = {
           title: string
           type: string
           user_id: string
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           body?: string | null
@@ -2536,6 +2644,7 @@ export type Database = {
           done: boolean
           due_date: string | null
           id: string
+          reminded_at: string | null
           sort_order: number
           title: string
           updated_at: string
@@ -2546,6 +2655,7 @@ export type Database = {
           done?: boolean
           due_date?: string | null
           id?: string
+          reminded_at?: string | null
           sort_order?: number
           title: string
           updated_at?: string
@@ -2556,6 +2666,7 @@ export type Database = {
           done?: boolean
           due_date?: string | null
           id?: string
+          reminded_at?: string | null
           sort_order?: number
           title?: string
           updated_at?: string
@@ -2567,165 +2678,6 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      agent_memories: {
-        Row: {
-          agent_id: string
-          content: string
-          created_at: string
-          deleted_at: string | null
-          id: string
-          importance: number
-          kind: string
-          source_conversation_id: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          agent_id: string
-          content: string
-          created_at?: string
-          deleted_at?: string | null
-          id?: string
-          importance?: number
-          kind?: string
-          source_conversation_id?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          agent_id?: string
-          content?: string
-          created_at?: string
-          deleted_at?: string | null
-          id?: string
-          importance?: number
-          kind?: string
-          source_conversation_id?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "agent_memories_agent_id_fkey"
-            columns: ["agent_id"]
-            isOneToOne: false
-            referencedRelation: "agents"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "agent_memories_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      agent_knowledge: {
-        Row: {
-          agent_id: string
-          created_at: string
-          created_by: string | null
-          extracted_text: string | null
-          id: string
-          is_personal: boolean
-          mime_type: string | null
-          name: string
-          size: number | null
-          storage_path: string
-        }
-        Insert: {
-          agent_id: string
-          created_at?: string
-          created_by?: string | null
-          extracted_text?: string | null
-          id?: string
-          is_personal?: boolean
-          mime_type?: string | null
-          name: string
-          size?: number | null
-          storage_path: string
-        }
-        Update: {
-          agent_id?: string
-          created_at?: string
-          created_by?: string | null
-          extracted_text?: string | null
-          id?: string
-          is_personal?: boolean
-          mime_type?: string | null
-          name?: string
-          size?: number | null
-          storage_path?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "agent_knowledge_agent_id_fkey"
-            columns: ["agent_id"]
-            isOneToOne: false
-            referencedRelation: "agents"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "agent_knowledge_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      project_tasks: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          done: boolean
-          due_date: string | null
-          id: string
-          project_id: string
-          sort_order: number
-          title: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          done?: boolean
-          due_date?: string | null
-          id?: string
-          project_id: string
-          sort_order?: number
-          title: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          done?: boolean
-          due_date?: string | null
-          id?: string
-          project_id?: string
-          sort_order?: number
-          title?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "project_tasks_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "project_tasks_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -2793,7 +2745,7 @@ export type Database = {
           project_id: string
           role?: string
           user_id: string
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           created_at?: string
@@ -2827,56 +2779,107 @@ export type Database = {
           },
         ]
       }
+      project_tasks: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          done: boolean
+          due_date: string | null
+          id: string
+          project_id: string
+          sort_order: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          done?: boolean
+          due_date?: string | null
+          id?: string
+          project_id: string
+          sort_order?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          done?: boolean
+          due_date?: string | null
+          id?: string
+          project_id?: string
+          sort_order?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_tasks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_tasks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           created_at: string
           created_by: string | null
+          deleted_at: string | null
           description: string | null
           due_date: string | null
           id: string
           importance: number
           metadata: Json
           name: string
+          notes: string | null
           owner_id: string | null
           start_date: string | null
           status: string
           updated_at: string
-          deleted_at: string | null
-          notes: string | null
           workspace_id: string
         }
         Insert: {
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
           description?: string | null
           due_date?: string | null
           id?: string
           importance?: number
           metadata?: Json
           name: string
+          notes?: string | null
           owner_id?: string | null
           start_date?: string | null
           status?: string
           updated_at?: string
-          deleted_at?: string | null
-          notes?: string | null
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
           description?: string | null
           due_date?: string | null
           id?: string
           importance?: number
           metadata?: Json
           name?: string
+          notes?: string | null
           owner_id?: string | null
           start_date?: string | null
           status?: string
           updated_at?: string
-          deleted_at?: string | null
-          notes?: string | null
           workspace_id?: string
         }
         Relationships: [
@@ -2976,7 +2979,7 @@ export type Database = {
           tax_amount?: number
           total_amount?: number
           updated_at?: string
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           buyer_biz_no?: string | null
@@ -3032,7 +3035,7 @@ export type Database = {
           agent_id: string
           created_at?: string
           user_id: string
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           agent_id?: string
@@ -3091,7 +3094,7 @@ export type Database = {
           status?: string
           user_id: string
           workflow_id: string
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           created_at?: string
@@ -3156,7 +3159,7 @@ export type Database = {
           run_count?: number
           steps?: Json
           updated_at?: string
-          workspace_id?: string
+          workspace_id: string
         }
         Update: {
           created_at?: string
@@ -3181,6 +3184,63 @@ export type Database = {
           },
           {
             foreignKeyName: "workflows_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_invites: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          expires_at: string
+          id: string
+          max_uses: number | null
+          project_ids: string[]
+          revoked_at: string | null
+          role: string
+          token: string
+          use_count: number
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          max_uses?: number | null
+          project_ids?: string[]
+          revoked_at?: string | null
+          role?: string
+          token: string
+          use_count?: number
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          max_uses?: number | null
+          project_ids?: string[]
+          revoked_at?: string | null
+          role?: string
+          token?: string
+          use_count?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_invites_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_invites_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -3267,6 +3327,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_workspace_invite: { Args: { p_token: string }; Returns: Json }
       act_on_approval: {
         Args: { p_action: string; p_comment?: string; p_document_id: string }
         Returns: undefined
@@ -3275,26 +3336,61 @@ export type Database = {
         Args: { p_members: string[]; p_room: string }
         Returns: undefined
       }
+      admin_create_workspace: {
+        Args: { p_name: string; p_slug: string }
+        Returns: string
+      }
       admin_usage_by_member: {
         Args: never
         Returns: {
-          user_id: string
-          name: string
           calls: number
-          tokens_input: number
-          tokens_output: number
           cost_usd: number
           month_cost_usd: number
+          name: string
+          tokens_input: number
+          tokens_output: number
+          user_id: string
         }[]
       }
       auth_is_admin: { Args: never; Returns: boolean }
       auth_is_workspace_owner: { Args: { ws_id: string }; Returns: boolean }
       auth_user_department: { Args: never; Returns: string }
       auth_user_workspace_ids: { Args: never; Returns: string[] }
+      can_access_project: { Args: { p_project: string }; Returns: boolean }
       can_view_attendance: { Args: { ws: string }; Returns: boolean }
+      clone_seed_agents: { Args: { target_ws: string }; Returns: number }
       create_group_room: {
-        Args: { p_members: string[]; p_name: string }
+        Args: { p_members: string[]; p_name: string; p_workspace?: string }
         Returns: string
+      }
+      create_workspace: { Args: { p_name: string }; Returns: Json }
+      create_workspace_invite: {
+        Args: {
+          p_expires_days?: number
+          p_max_uses?: number
+          p_project_ids?: string[]
+          p_role: string
+          p_workspace: string
+        }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          expires_at: string
+          id: string
+          max_uses: number | null
+          project_ids: string[]
+          revoked_at: string | null
+          role: string
+          token: string
+          use_count: number
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workspace_invites"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       current_workspace_id: { Args: never; Returns: string }
       directory_contact: {
@@ -3305,21 +3401,36 @@ export type Database = {
           work_phone: string
         }[]
       }
+      get_invite_preview: {
+        Args: { p_token: string }
+        Returns: {
+          invite_role: string
+          valid: boolean
+          workspace_name: string
+        }[]
+      }
       get_or_create_direct_conversation: {
         Args: { other_user: string }
         Returns: string
       }
       grant_attendance_viewer: { Args: { target: string }; Returns: undefined }
       is_approval_participant: { Args: { doc_id: string }; Returns: boolean }
+      is_project_member: { Args: { p_project: string }; Returns: boolean }
       is_room_member: { Args: { p_room: string }; Returns: boolean }
+      is_workspace_admin: { Args: { ws_id: string }; Returns: boolean }
       is_workspace_member: { Args: { ws_id: string }; Returns: boolean }
       leave_group_room: { Args: { p_room: string }; Returns: undefined }
       mark_dm_read: { Args: { conv_id: string }; Returns: number }
       mark_room_read: { Args: { p_room: string }; Returns: undefined }
       owner_can_set_role: { Args: { target: string }; Returns: boolean }
       recall_document: { Args: { doc_id: string }; Returns: undefined }
+      remind_due_personal_tasks: { Args: never; Returns: number }
       revise_document: { Args: { doc_id: string }; Returns: undefined }
       revoke_attendance_viewer: { Args: { target: string }; Returns: undefined }
+      revoke_workspace_invite: {
+        Args: { p_invite: string }
+        Returns: undefined
+      }
       set_file_folder: {
         Args: { p_file: string; p_folder: string }
         Returns: undefined

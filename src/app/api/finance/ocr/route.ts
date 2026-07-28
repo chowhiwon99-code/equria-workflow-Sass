@@ -66,7 +66,7 @@ export async function POST(req: Request) {
   const { data: inserted, error: insErr } = await supabase
     .from("finance_entries")
     .insert({
-      ...(wsId ? { workspace_id: wsId } : {}),
+      workspace_id: wsId as string,
       kind: "expense",
       entry_date: object.entry_date || new Date().toISOString().slice(0, 10),
       vendor: object.vendor || null,

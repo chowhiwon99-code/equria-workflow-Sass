@@ -75,7 +75,7 @@ export default function AgentsPage() {
       await mustOk(supabase.from("user_agent_pins").delete().eq("user_id", meId))
       if (next.size > 0) {
         await mustOk(
-          supabase.from("user_agent_pins").insert([...next].map((id) => ({ ...(wsId ? { workspace_id: wsId } : {}), user_id: meId, agent_id: id })))
+          supabase.from("user_agent_pins").insert([...next].map((id) => ({ workspace_id: wsId as string, user_id: meId, agent_id: id })))
         )
       }
       window.dispatchEvent(new Event("equria:agents-changed"))

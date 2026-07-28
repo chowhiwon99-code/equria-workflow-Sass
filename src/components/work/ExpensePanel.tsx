@@ -89,7 +89,7 @@ export function ExpensePanel() {
     run(async () => {
       await mustOk(
         supabase.from("expense_reports").insert({
-          ...(wsId ? { workspace_id: wsId } : {}),
+          workspace_id: wsId as string,
           user_id: me,
           title: title.trim(),
           amount: Number(amount),

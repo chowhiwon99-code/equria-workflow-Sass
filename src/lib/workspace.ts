@@ -21,10 +21,10 @@ export async function getUserWorkspaceId(
 }
 
 /**
- * INSERT 페이로드에 workspace_id를 안전하게 덧붙인다.
- * wsId가 있으면 명시, null이면 필드를 아예 넣지 않아 컬럼 DEFAULT가 적용되게 한다
- * (null을 직접 넣으면 NOT NULL 위반이 되므로 "생략"이 정답).
+ * INSERT 페이로드에 workspace_id를 명시한다.
+ * 마이그 112(DEFAULT 제거) 이후 workspace_id는 전 테이블 필수 — wsId가 null이면(이론상)
+ * DB NOT NULL 위반으로 거부되는 것이 의도된 fail-closed 동작(조용한 오귀속보다 안전).
  */
-export function withWorkspace<T extends object>(row: T, wsId: string | null): T & { workspace_id?: string } {
-  return wsId ? { ...row, workspace_id: wsId } : row
+export function withWorkspace<T extends object>(row: T, wsId: string | null): T & { workspace_id: string } {
+  return { ...row, workspace_id: wsId as string }
 }

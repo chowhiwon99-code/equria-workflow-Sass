@@ -105,7 +105,7 @@ export function NewDocumentModal({
         if (line.length > 0) {
           await mustOk(
             supabase.from("approval_steps").insert(
-              line.map((l, i) => ({ ...(wsId ? { workspace_id: wsId } : {}), document_id: editDoc.id, step_order: i + 1, approver_id: l.approver_id, role: l.role }))
+              line.map((l, i) => ({ workspace_id: wsId as string, document_id: editDoc.id, step_order: i + 1, approver_id: l.approver_id, role: l.role }))
             )
           )
         }
@@ -131,7 +131,7 @@ export function NewDocumentModal({
       const { data: doc } = await mustOk(
         supabase
           .from("approval_documents")
-          .insert({ ...(wsId ? { workspace_id: wsId } : {}), drafter_id: me, doc_type: docType, title: title.trim(), body: fields })
+          .insert({ workspace_id: wsId as string, drafter_id: me, doc_type: docType, title: title.trim(), body: fields })
           .select()
           .single()
       )
@@ -140,7 +140,7 @@ export function NewDocumentModal({
       if (line.length > 0) {
         await mustOk(
           supabase.from("approval_steps").insert(
-            line.map((l, i) => ({ ...(wsId ? { workspace_id: wsId } : {}), document_id: id, step_order: i + 1, approver_id: l.approver_id, role: l.role }))
+            line.map((l, i) => ({ workspace_id: wsId as string, document_id: id, step_order: i + 1, approver_id: l.approver_id, role: l.role }))
           )
         )
       }

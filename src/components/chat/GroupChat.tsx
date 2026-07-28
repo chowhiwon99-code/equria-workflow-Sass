@@ -259,14 +259,14 @@ export function GroupChat({ roomId: roomIdProp }: { roomId?: string }) {
         )
         const { data: msg, error: insErr } = await supabase
           .from("group_messages")
-          .insert({ ...(wsId ? { workspace_id: wsId } : {}), id, room_id: roomId, sender_id: meId, content, body_json: bodyJ })
+          .insert({ workspace_id: wsId as string, id, room_id: roomId, sender_id: meId, content, body_json: bodyJ })
           .select("*")
           .single()
         if (insErr || !msg) throw insErr ?? new Error("전송에 실패했어요.")
         setMessages((prev) => prev.map((mm) => (mm.id === id ? (msg as GMessage) : mm)))
         if (uploaded.length) {
           const { error: attErr } = await supabase.from("group_message_attachments").insert(
-            uploaded.map((u) => ({ ...(wsId ? { workspace_id: wsId } : {}), message_id: msg.id, storage_path: u.path, name: u.name, mime_type: u.type || null, size: u.size }))
+            uploaded.map((u) => ({ workspace_id: wsId as string, message_id: msg.id, storage_path: u.path, name: u.name, mime_type: u.type || null, size: u.size }))
           )
           if (attErr) throw attErr
           void loadAttachments(roomId)
@@ -324,7 +324,7 @@ export function GroupChat({ roomId: roomIdProp }: { roomId?: string }) {
     setReactingId(null)
     const existing = reactions.find((r) => r.message_id === messageId && r.user_id === meId && r.emoji === emoji)
     if (existing) await supabase.from("group_message_reactions").delete().eq("id", existing.id)
-    else await supabase.from("group_message_reactions").insert({ ...(wsId ? { workspace_id: wsId } : {}), message_id: messageId, user_id: meId, emoji })
+    else await supabase.from("group_message_reactions").insert({ workspace_id: wsId as string, message_id: messageId, user_id: meId, emoji })
     void loadReactions(roomId)
   }
 

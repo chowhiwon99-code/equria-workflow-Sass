@@ -168,7 +168,7 @@ export function CashFlowView() {
         else {
           const { data: created } = await supabase
             .from("cash_calc_types")
-            .insert({ ...(wsId ? { workspace_id: wsId } : {}), name: DEFAULT_TYPE_NAME, flow: "revenue", fields: BUILTIN_FIELDS.channel, formula: { ast: CHANNEL_AST }, created_by: me, sort_order: -1 })
+            .insert({ workspace_id: wsId as string, name: DEFAULT_TYPE_NAME, flow: "revenue", fields: BUILTIN_FIELDS.channel, formula: { ast: CHANNEL_AST }, created_by: me, sort_order: -1 })
             .select()
             .single()
           if (created) {
@@ -176,7 +176,7 @@ export function CashFlowView() {
             defId = created.id
           }
         }
-        if (defId) await supabase.from("cashflow_settings").upsert({ ...(wsId ? { workspace_id: wsId } : {}), default_calc_type_id: defId, updated_by: me, updated_at: new Date().toISOString() }, { onConflict: "workspace_id" })
+        if (defId) await supabase.from("cashflow_settings").upsert({ workspace_id: wsId as string, default_calc_type_id: defId, updated_by: me, updated_at: new Date().toISOString() }, { onConflict: "workspace_id" })
       }
       setSlots(slotList)
       setGroups((grps as CashCategory[]) ?? [])
@@ -214,7 +214,7 @@ export function CashFlowView() {
     await mustOk(
       supabase
         .from("cashflow_settings")
-        .upsert({ ...(wsId ? { workspace_id: wsId } : {}), opening_cash: nextOpening, default_currency: nextCurrency, pool_pos: nextPool, updated_by: me, updated_at: new Date().toISOString() }, { onConflict: "workspace_id" })
+        .upsert({ workspace_id: wsId as string, opening_cash: nextOpening, default_currency: nextCurrency, pool_pos: nextPool, updated_by: me, updated_at: new Date().toISOString() }, { onConflict: "workspace_id" })
     )
   }
   // 캔버스 이동 — 슬롯은 x/y 직접 저장(재계산·reload 없음), pool은 설정에 낙관적 저장.
@@ -241,7 +241,7 @@ export function CashFlowView() {
     // 새 항목 기본 = "개수 × 단가"(빌트인 qty). 사용자가 유형에서 직접 입력/채널 판매로 바꿀 수 있음.
     const { error: e } = await supabase
       .from("cash_accounts")
-      .insert({ ...(wsId ? { workspace_id: wsId } : {}), name: "새 항목", kind, color, item_type: "qty", calc_type_id: null, created_by: me, sort_order: slots.length })
+      .insert({ workspace_id: wsId as string, name: "새 항목", kind, color, item_type: "qty", calc_type_id: null, created_by: me, sort_order: slots.length })
     if (e) return toast.error("항목을 추가하지 못했어요.")
     load()
   }
@@ -256,7 +256,7 @@ export function CashFlowView() {
     ].filter((w) => !existing.has(w.kind))
     if (wanted.length === 0) return toast.info("이미 장부와 연동돼 있어요.")
     const rows = wanted.map((w, i) => ({
-      ...(wsId ? { workspace_id: wsId } : {}),
+      workspace_id: wsId as string,
       name: w.name, kind: w.kind, color: w.color, item_type: "ledger", calc_type_id: null,
       amount: ledgerAmountFor({ kind: w.kind, currency: defaultCurrency }, ledgerTotals),
       currency: defaultCurrency, created_by: me, sort_order: slots.length + i,
@@ -327,7 +327,7 @@ export function CashFlowView() {
     const { data: inserted, error: e } = await supabase
       .from("finance_entries")
       .insert({
-        ...(wsId ? { workspace_id: wsId } : {}),
+        workspace_id: wsId as string,
         kind: slot.kind === "revenue_src" ? "revenue" : "expense",
         entry_date: input.date,
         vendor: slot.name,
@@ -355,7 +355,7 @@ export function CashFlowView() {
         await supabase.from("finance_entries").delete().eq("id", inserted.id)
       },
       redo: async () => {
-        await supabase.from("finance_entries").insert({ ...inserted, ...(wsId ? { workspace_id: wsId } : {}) })
+        await supabase.from("finance_entries").insert(inserted)
       },
     })
     toast.success(`${slot.name} ${money(input.amount, slot.currency)} 기록됨 — 내역·손익에 반영`)
@@ -381,7 +381,7 @@ export function CashFlowView() {
   // ── 그룹(cash_categories 재활용) — 조직화 레이어, 순이익 계산엔 무관 ──
   const addGroup = async () => {
     if (!me) return
-    const { error: e } = await supabase.from("cash_categories").insert({ ...(wsId ? { workspace_id: wsId } : {}), name: "새 그룹", color: "gray", created_by: me, sort_order: groups.length, x: 80, y: 80 })
+    const { error: e } = await supabase.from("cash_categories").insert({ workspace_id: wsId as string, name: "새 그룹", color: "gray", created_by: me, sort_order: groups.length, x: 80, y: 80 })
     if (e) return toast.error("그룹을 추가하지 못했어요.")
     load()
   }
@@ -418,7 +418,7 @@ export function CashFlowView() {
     if (!me) return
     const tpl = CASHFLOW_TEMPLATES.find((t) => t.id === tid)
     if (!tpl) return
-    const rows = tpl.slots.map((s, i) => ({ ...(wsId ? { workspace_id: wsId } : {}), name: s.name, kind: s.kind, color: s.color, amount: s.amount ?? 0, currency: defaultCurrency, created_by: me, sort_order: i }))
+    const rows = tpl.slots.map((s, i) => ({ workspace_id: wsId as string, name: s.name, kind: s.kind, color: s.color, amount: s.amount ?? 0, currency: defaultCurrency, created_by: me, sort_order: i }))
     const { error: e } = await supabase.from("cash_accounts").insert(rows)
     if (e) return toast.error("템플릿을 불러오지 못했어요.")
     toast.success(`${tpl.label} 템플릿을 불러왔어요.`)

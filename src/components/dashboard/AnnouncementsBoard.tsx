@@ -93,7 +93,7 @@ export function AnnouncementsBoard() {
     }
     run(async () => {
       await mustOk(
-        supabase.from("announcements").insert({ ...(wsId ? { workspace_id: wsId } : {}), user_id: me, title: title.trim(), content: content.trim(), pinned: pin })
+        supabase.from("announcements").insert({ workspace_id: wsId as string, user_id: me, title: title.trim(), content: content.trim(), pinned: pin })
       )
       setTitle("")
       setContent("")

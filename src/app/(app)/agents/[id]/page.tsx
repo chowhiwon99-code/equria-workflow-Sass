@@ -73,7 +73,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
     const next = !pinned
     setPinned(next) // 낙관적
     try {
-      if (next) await mustOk(supabase.from("user_agent_pins").insert({ ...(wsId ? { workspace_id: wsId } : {}), user_id: meId, agent_id: agent.id }))
+      if (next) await mustOk(supabase.from("user_agent_pins").insert({ workspace_id: wsId as string, user_id: meId, agent_id: agent.id }))
       else await mustOk(supabase.from("user_agent_pins").delete().eq("user_id", meId).eq("agent_id", agent.id))
       window.dispatchEvent(new Event("equria:agents-changed"))
     } catch {

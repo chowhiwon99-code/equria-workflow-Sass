@@ -172,7 +172,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
       if (existing) {
         await supabase.from("message_reactions").delete().eq("id", existing.id)
       } else {
-        await supabase.from("message_reactions").insert({ ...(wsId ? { workspace_id: wsId } : {}), message_id: messageId, user_id: meId, emoji })
+        await supabase.from("message_reactions").insert({ workspace_id: wsId as string, message_id: messageId, user_id: meId, emoji })
       }
       void loadReactions(conversationId)
       emitChat(conversationId)
@@ -425,7 +425,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
         )
         const { data: msg, error: insErr } = await supabase
           .from("direct_messages")
-          .insert({ ...(wsId ? { workspace_id: wsId } : {}), id, conversation_id: conversationId, sender_id: meId, content, body_json: bodyJ, parent_id: parentId, root_id: rootId })
+          .insert({ workspace_id: wsId as string, id, conversation_id: conversationId, sender_id: meId, content, body_json: bodyJ, parent_id: parentId, root_id: rootId })
           .select("*")
           .single()
         if (insErr || !msg) throw insErr ?? new Error("전송에 실패했어요.")
@@ -434,7 +434,7 @@ export function DirectChat({ otherUserId }: { otherUserId: string }) {
         if (uploaded.length) {
           const { error: attErr } = await supabase.from("message_attachments").insert(
             uploaded.map((u) => ({
-              ...(wsId ? { workspace_id: wsId } : {}),
+              workspace_id: wsId as string,
               message_id: msg.id,
               storage_path: u.path,
               name: u.name,

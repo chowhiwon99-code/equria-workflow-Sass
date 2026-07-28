@@ -34,18 +34,25 @@ export default async function AppLayout({
   // 멤버십 순서를 보존해 첫 번째를 현재 워크스페이스 기본값으로. (단일 테넌트면 equria 1개)
   const { data: mems } = await supabase
     .from("workspace_members")
-    .select("workspace_id")
+    .select("workspace_id, role")
     .eq("user_id", user.id)
     .order("created_at", { ascending: true })
   const orderedIds = (mems ?? []).map((m) => m.workspace_id)
+  const roleByWs = new Map((mems ?? []).map((m) => [m.workspace_id, m.role]))
   const { data: wss } = orderedIds.length
     ? await supabase.from("workspaces").select("id, name, slug").in("id", orderedIds)
     : { data: [] as WorkspaceSummary[] }
   const byId = new Map((wss ?? []).map((w) => [w.id, w]))
   const workspaces = orderedIds
-    .map((id) => byId.get(id))
+    .map((id) => {
+      const w = byId.get(id)
+      return w ? { ...w, role: roleByWs.get(id) ?? "member" } : undefined
+    })
     .filter((w): w is WorkspaceSummary => !!w)
   const initialWorkspaceId = workspaces[0]?.id ?? null
+
+  // B2: 멤버십이 하나도 없으면(가입 개방 후 신규 유저) 온보딩으로 — 워크스페이스를 만들거나 초대로 참여.
+  if (workspaces.length === 0) redirect("/onboarding")
 
   return (
     <CurrentUserProvider userId={user.id}>

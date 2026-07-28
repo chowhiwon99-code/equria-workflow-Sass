@@ -167,7 +167,7 @@ export function CalcTypeBuilder({ types, editType, onClose, onSaved }: { types: 
         onClose()
         return
       }
-      await mustOk(supabase.from("cash_calc_types").insert({ ...(wsId ? { workspace_id: wsId } : {}), name: name.trim(), flow, fields: activeFields, formula: { ast }, created_by: me, sort_order: types.length }))
+      await mustOk(supabase.from("cash_calc_types").insert({ workspace_id: wsId as string, name: name.trim(), flow, fields: activeFields, formula: { ast }, created_by: me, sort_order: types.length }))
       toast.success("계산 유형을 추가했어요.")
       setName("")
       setTemplateAst(null)

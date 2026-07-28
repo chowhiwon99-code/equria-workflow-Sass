@@ -127,7 +127,7 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
     push({
       label: "프로젝트 삭제",
       undo: async () => {
-        await mustOk(supabase.from("projects").insert({ ...row, ...(wsId ? { workspace_id: wsId } : {}) }))
+        await mustOk(supabase.from("projects").insert(row))
       },
       redo: async () => {
         await mustOk(supabase.from("projects").delete().eq("id", projectId))
@@ -139,7 +139,7 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
     if (!userId) return
     const { data: inserted } = await supabase
       .from("project_members")
-      .insert({ ...(wsId ? { workspace_id: wsId } : {}), project_id: projectId, user_id: userId })
+      .insert({ workspace_id: wsId as string, project_id: projectId, user_id: userId })
       .select()
       .single()
     load()
@@ -151,7 +151,7 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
           load()
         },
         redo: async () => {
-          await mustOk(supabase.from("project_members").insert({ ...inserted, ...(wsId ? { workspace_id: wsId } : {}) }))
+          await mustOk(supabase.from("project_members").insert(inserted))
           load()
         },
       })
@@ -166,7 +166,7 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
       push({
         label: "멤버 제거",
         undo: async () => {
-          await mustOk(supabase.from("project_members").insert({ ...(wsId ? { workspace_id: wsId } : {}), id: row.id, project_id: projectId, user_id: row.user_id, role: row.role }))
+          await mustOk(supabase.from("project_members").insert({ workspace_id: wsId as string, id: row.id, project_id: projectId, user_id: row.user_id, role: row.role }))
           load()
         },
         redo: async () => {
@@ -517,7 +517,6 @@ function ChecklistSection({ projectId }: { projectId: string }) {
 
 function FilesSection({ projectId }: { projectId: string }) {
   const supabase = createClient()
-  const wsId = useCurrentWorkspaceId()
   const { push } = useUndo()
   const [files, setFiles] = useState<DriveFile[]>([])
   const [showAdd, setShowAdd] = useState(false)
@@ -543,7 +542,7 @@ function FilesSection({ projectId }: { projectId: string }) {
       push({
         label: "파일/링크 삭제",
         undo: async () => {
-          await mustOk(supabase.from("files").insert({ ...row, ...(wsId ? { workspace_id: wsId } : {}) }))
+          await mustOk(supabase.from("files").insert(row))
           load()
         },
         redo: async () => {
@@ -644,7 +643,7 @@ function AddFileModal({
     const { data: inserted, error: insErr } = await supabase
       .from("files")
       .insert({
-        ...(wsId ? { workspace_id: wsId } : {}),
+        workspace_id: wsId as string,
         name: name.trim(),
         web_view_link: url.trim(),
         source,
@@ -663,7 +662,7 @@ function AddFileModal({
           reload()
         },
         redo: async () => {
-          await mustOk(supabase.from("files").insert({ ...inserted, ...(wsId ? { workspace_id: wsId } : {}) }))
+          await mustOk(supabase.from("files").insert(inserted))
           reload()
         },
       })
@@ -747,7 +746,7 @@ function ScheduleSection({ projectId, onCount }: { projectId: string; onCount: (
         all_day: true,
         project_id: projectId,
         created_by: me,
-        ...(wsId ? { workspace_id: wsId } : {}),
+        workspace_id: wsId as string,
       })
       .select(EVENT_COLS)
       .single()
@@ -759,7 +758,7 @@ function ScheduleSection({ projectId, onCount }: { projectId: string; onCount: (
       push({
         label: "일정 추가",
         undo: async () => { await mustOk(supabase.from("calendar_events").delete().eq("id", inserted.id)); load() },
-        redo: async () => { await mustOk(supabase.from("calendar_events").insert({ ...inserted, ...(wsId ? { workspace_id: wsId } : {}) })); load() },
+        redo: async () => { await mustOk(supabase.from("calendar_events").insert({ ...inserted, workspace_id: wsId as string })); load() },
       })
     }
   }
@@ -769,7 +768,7 @@ function ScheduleSection({ projectId, onCount }: { projectId: string; onCount: (
     load()
     push({
       label: "일정 삭제",
-      undo: async () => { await mustOk(supabase.from("calendar_events").insert({ ...ev, ...(wsId ? { workspace_id: wsId } : {}) })); load() },
+      undo: async () => { await mustOk(supabase.from("calendar_events").insert({ ...ev, workspace_id: wsId as string })); load() },
       redo: async () => { await mustOk(supabase.from("calendar_events").delete().eq("id", ev.id)); load() },
     })
   }

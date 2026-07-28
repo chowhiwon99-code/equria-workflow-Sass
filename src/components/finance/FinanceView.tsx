@@ -266,7 +266,7 @@ export function FinanceView() {
     const { data: inserted, error: insErr } = await supabase
       .from("finance_entries")
       .insert({
-        ...(wsId ? { workspace_id: wsId } : {}),
+        workspace_id: wsId as string,
         kind: "revenue",
         entry_date: iv.issue_date ?? new Date().toISOString().slice(0, 10),
         vendor: iv.buyer_name ?? iv.supplier_name ?? "세금계산서",
@@ -296,7 +296,7 @@ export function FinanceView() {
         await supabase.from("tax_invoices").update({ status: "draft" }).eq("id", iv.id)
       },
       redo: async () => {
-        await supabase.from("finance_entries").insert({ ...inserted, ...(wsId ? { workspace_id: wsId } : {}) })
+        await supabase.from("finance_entries").insert(inserted)
         await supabase.from("tax_invoices").update({ status: "ready" }).eq("id", iv.id)
       },
     })
@@ -786,7 +786,7 @@ export function FinanceView() {
                               push({
                                 label: "세금계산서 초안 삭제",
                                 undo: async () => {
-                                  await mustOk(supabase.from("tax_invoices").insert({ ...iv, ...(wsId ? { workspace_id: wsId } : {}) }))
+                                  await mustOk(supabase.from("tax_invoices").insert(iv))
                                   load()
                                 },
                                 redo: async () => {

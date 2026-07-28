@@ -428,7 +428,7 @@ export function MeetingEditor({
         )
         toast.success("회의록을 저장했어요.")
       } else {
-        await mustOk(supabase.from("meeting_notes").insert({ ...payload, user_id: me, ...(wsId ? { workspace_id: wsId } : {}) }))
+        await mustOk(supabase.from("meeting_notes").insert({ ...payload, user_id: me, workspace_id: wsId as string }))
         toast.success("회의록을 만들었어요.")
       }
       onSaved()

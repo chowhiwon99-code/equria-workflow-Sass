@@ -81,7 +81,7 @@ export function WorkflowsView() {
     setNewOpen(false)
     const { data, error } = await supabase
       .from("workflows")
-      .insert({ ...(wsId ? { workspace_id: wsId } : {}), name: choice.name, description: choice.description, steps: choice.graph, created_by: me })
+      .insert({ workspace_id: wsId as string, name: choice.name, description: choice.description, steps: choice.graph, created_by: me })
       .select("id")
       .single()
     setCreating(false)

@@ -96,7 +96,7 @@ export function MeetingsView() {
 
   const createFolder = async (name: string) => {
     if (!me) return
-    const { error } = await supabase.from("meeting_note_folders").insert({ ...(wsId ? { workspace_id: wsId } : {}), name, created_by: me })
+    const { error } = await supabase.from("meeting_note_folders").insert({ workspace_id: wsId as string, name, created_by: me })
     if (error) return toast.error("폴더를 만들지 못했어요.")
     toast.success("폴더를 만들었어요.")
     load()

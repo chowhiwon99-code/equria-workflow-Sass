@@ -115,7 +115,7 @@ export function FinanceEntryModal({
     } else {
       const { data: inserted, error: err } = await supabase
         .from("finance_entries")
-        .insert({ ...payload, created_by: me, ...(wsId ? { workspace_id: wsId } : {}), ...(projectId ? { project_id: projectId } : {}) })
+        .insert({ ...payload, created_by: me, workspace_id: wsId as string, ...(projectId ? { project_id: projectId } : {}) })
         .select()
         .single()
       setSaving(false)
@@ -128,7 +128,7 @@ export function FinanceEntryModal({
             reload()
           },
           redo: async () => {
-            await mustOk(supabase.from("finance_entries").insert({ ...inserted, ...(wsId ? { workspace_id: wsId } : {}) }))
+            await mustOk(supabase.from("finance_entries").insert(inserted))
             reload()
           },
         })

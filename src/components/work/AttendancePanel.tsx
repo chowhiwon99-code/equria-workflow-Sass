@@ -106,7 +106,7 @@ export function AttendancePanel() {
         await mustOk(supabase.from("attendance_records").update({ check_in: now }).eq("id", today.id))
       } else {
         await mustOk(
-          supabase.from("attendance_records").insert({ ...(wsId ? { workspace_id: wsId } : {}), user_id: me, work_date: todayStr(), check_in: now, status: "정상" })
+          supabase.from("attendance_records").insert({ workspace_id: wsId as string, user_id: me, work_date: todayStr(), check_in: now, status: "정상" })
         )
       }
       toast.success("출근 기록됐어요.")
@@ -125,7 +125,7 @@ export function AttendancePanel() {
       if (today) {
         await mustOk(supabase.from("attendance_records").update({ status: s }).eq("id", today.id))
       } else {
-        await mustOk(supabase.from("attendance_records").insert({ ...(wsId ? { workspace_id: wsId } : {}), user_id: me, work_date: todayStr(), status: s }))
+        await mustOk(supabase.from("attendance_records").insert({ workspace_id: wsId as string, user_id: me, work_date: todayStr(), status: s }))
       }
     })
 
