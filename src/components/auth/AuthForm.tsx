@@ -5,7 +5,6 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { nameToEmail } from "@/lib/auth"
-import { signupAction } from "@/app/(auth)/actions"
 import SocialButtons from "@/components/auth/SocialButtons"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -33,29 +32,18 @@ export function AuthForm({
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
+  // 이름+비밀번호 로그인(구글 미연결 기존 계정용 폴백). 가입은 구글 전용이라 signup 분기 없음.
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
     setLoading(true)
     try {
-      if (mode === "signup") {
-        const result = await signupAction(name, password)
-        if (result.error) {
-          setError(result.error)
-          setLoading(false)
-          return
-        }
-      }
       const supabase = createClient()
       const { error } = await supabase.auth.signInWithPassword({
         email: nameToEmail(name),
         password,
       })
       if (error) {
-        if (mode === "signup") {
-          router.push("/login")
-          return
-        }
         setError("이름 또는 비밀번호가 올바르지 않습니다.")
         setLoading(false)
         return
@@ -78,35 +66,48 @@ export function AuthForm({
         </p>
       )}
       <SocialButtons />
-      <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground/60">
-        <span className="h-px flex-1 bg-border" />
-        또는
-        <span className="h-px flex-1 bg-border" />
-      </div>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="auth-name">이름</Label>
-          <Input id="auth-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="이름을 입력하세요." autoComplete="username" autoFocus required className="h-11" />
-          <p className="text-xs text-muted-foreground">조직에서 사용하는 이름으로 팀원들과 협업하세요.</p>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="auth-password">{mode === "login" ? "비밀번호" : "공용 비밀번호"}</Label>
-          <Input
-            id="auth-password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder={mode === "signup" ? "관리자에게 받은 비밀번호" : undefined}
-            autoComplete={mode === "login" ? "current-password" : "new-password"}
-            required
-            className="h-11"
-          />
-        </div>
-        {error && <p className="text-sm text-destructive">{error}</p>}
-        <Button type="submit" className="h-11 w-full text-[15px]" disabled={loading}>
-          {loading ? (mode === "login" ? "로그인 중..." : "가입 중...") : "계속"}
-        </Button>
-      </form>
+      {mode === "signup" ? (
+        /* 가입 = 구글 전용(대표 결정 2026-07-28) — 이름+공용비번 폼 제거.
+           신규 멤버는 관리자가 설정 '구성원 초대'에 구글 이메일을 등록해야 로그인 가능. */
+        <p className="mt-5 rounded-lg bg-muted/60 px-4 py-3 text-center text-[13px] leading-relaxed text-muted-foreground">
+          Complow는 구글 계정으로 시작해요.
+          <br />
+          관리자가 회원님의 구글 이메일을 등록했다면 위 버튼으로 바로 로그인됩니다.
+          <br />
+          아직이라면 관리자에게 초대를 요청해 주세요.
+        </p>
+      ) : (
+        <>
+          <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground/60">
+            <span className="h-px flex-1 bg-border" />
+            또는
+            <span className="h-px flex-1 bg-border" />
+          </div>
+          {/* 이름+비밀번호 로그인 — 구글 미연결 기존 계정용 폴백 */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="auth-name">이름</Label>
+              <Input id="auth-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="이름을 입력하세요." autoComplete="username" required className="h-11" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="auth-password">비밀번호</Label>
+              <Input
+                id="auth-password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                required
+                className="h-11"
+              />
+            </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <Button type="submit" className="h-11 w-full text-[15px]" disabled={loading}>
+              {loading ? "로그인 중..." : "계속"}
+            </Button>
+          </form>
+        </>
+      )}
 
       <p className="mt-8 text-center text-sm text-muted-foreground">
         {mode === "login" ? "신규 사용자이신가요? " : "이미 계정이 있으신가요? "}
