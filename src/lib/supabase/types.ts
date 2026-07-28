@@ -1220,6 +1220,8 @@ export type Database = {
           id: string
           metadata: Json
           status: string
+          summary: string | null
+          summary_upto: number
           title: string | null
           updated_at: string
           user_id: string
@@ -1231,6 +1233,8 @@ export type Database = {
           id?: string
           metadata?: Json
           status?: string
+          summary?: string | null
+          summary_upto?: number
           title?: string | null
           updated_at?: string
           user_id: string
@@ -1242,6 +1246,8 @@ export type Database = {
           id?: string
           metadata?: Json
           status?: string
+          summary?: string | null
+          summary_upto?: number
           title?: string | null
           updated_at?: string
           user_id?: string

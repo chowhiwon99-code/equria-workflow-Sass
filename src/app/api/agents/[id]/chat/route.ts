@@ -6,6 +6,7 @@ import { MCP_CONNECTORS } from "@/lib/mcp"
 import { buildMemoryBlock, type ExtractTurn } from "@/lib/agentMemory"
 import { OUTPUT_STYLE_RULE } from "@/lib/claude/style"
 import { extractAndStoreMemories } from "@/lib/agentMemoryExtract"
+import { summaryBlock, turnsText, updateConversationSummary, SUMMARY_MIN_OVERFLOW } from "@/lib/conversationSummary"
 import { computeCostUsd } from "@/lib/pricing"
 import { checkBudget, BUDGET_EXCEEDED_MSG } from "@/lib/budget"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -105,6 +106,20 @@ export async function POST(
     withWorkspace({ conversation_id: conversationId, role: "user", content: lastUserText }, workspaceId),
   )
 
+  // 대화 요약 압축(트랙2): 기존 대화면 저장된 요약을 불러와 시스템 프롬프트에 주입.
+  // 갱신은 onFinish 백그라운드(다음 턴부터 반영) — 사용자 대기 0.
+  let convSummary: string | null = null
+  let summaryUpto = 0
+  if (body.conversationId) {
+    const { data: convRow } = await supabase
+      .from("conversations")
+      .select("summary, summary_upto")
+      .eq("id", body.conversationId)
+      .maybeSingle()
+    convSummary = convRow?.summary ?? null
+    summaryUpto = convRow?.summary_upto ?? 0
+  }
+
   const startedAt = Date.now()
   const windowed = messages.slice(-HISTORY_WINDOW)
   const modelMessages = await convertToModelMessages(windowed)
@@ -161,6 +176,9 @@ export async function POST(
       .limit(30)
     systemPrompt += buildMemoryBlock(mems ?? [])
   }
+
+  // 오래된 턴 압축 요약 주입 — HISTORY_WINDOW 밖으로 밀려난 맥락의 망각 방지(트랙2)
+  systemPrompt += summaryBlock(convSummary)
 
   // 에이전트에 연결된 MCP 서버의 도구 로드(있으면). 연결 실패 서버는 건너뜀.
   const mcpClients: Awaited<ReturnType<typeof connectMcp>>[] = []
@@ -290,6 +308,25 @@ export async function POST(
           })
         } catch {
           /* 기억 추출 실패는 채팅에 영향 주지 않음 */
+        }
+      }
+
+      // 대화 요약 압축(트랙2) — 윈도우 밖으로 밀려난 미요약 턴이 충분히 쌓이면 증분 갱신.
+      // 백그라운드(스트림 종료 후)·실패 무영향. summary_upto = 요약이 커버한 메시지 개수 커서.
+      const overflowEnd = messages.length - HISTORY_WINDOW
+      if (overflowEnd - summaryUpto >= SUMMARY_MIN_OVERFLOW) {
+        try {
+          await updateConversationSummary(supabase, {
+            conversationId: conversationId!,
+            agentId,
+            userId: user.id,
+            workspaceId,
+            prevSummary: convSummary,
+            olderText: turnsText(messages, summaryUpto, overflowEnd),
+            newUpto: overflowEnd,
+          })
+        } catch {
+          /* 요약 갱신 실패는 채팅에 영향 주지 않음 */
         }
       }
     },
