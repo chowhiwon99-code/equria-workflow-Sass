@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { writeActiveWsCookie } from "@/lib/workspace-cookie"
 
 /** 초대 링크/토큰에서 토큰만 추출 — 전체 URL을 붙여넣어도 동작. */
 function parseInviteToken(input: string): string | null {
@@ -36,14 +37,16 @@ export function OnboardingView() {
     if (!nm) return setError("워크스페이스(회사) 이름을 입력해 주세요.")
     setBusy(true)
     setError(null)
-    const { error: e } = await supabase.rpc("create_workspace", { p_name: nm })
+    const { data, error: e } = await supabase.rpc("create_workspace", { p_name: nm })
     if (e) {
       setError("워크스페이스를 만들지 못했어요. 잠시 후 다시 시도해 주세요.")
       setBusy(false)
       return
     }
-    router.replace("/dashboard")
-    router.refresh()
+    // 방금 만든 회사를 활성 워크스페이스로(전환기·RLS 헤더 정합)
+    const newId = (data as { id?: string } | null)?.id
+    if (newId) writeActiveWsCookie(newId)
+    window.location.assign("/dashboard")
   }
 
   const goJoin = () => {

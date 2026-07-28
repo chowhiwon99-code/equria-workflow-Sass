@@ -1,10 +1,10 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import SocialButtons from "@/components/auth/SocialButtons"
+import { writeActiveWsCookie } from "@/lib/workspace-cookie"
 
 const LINK_ERRORS: Record<string, string> = {
   signup_disabled: "아직 가입이 열리지 않았어요. 관리자에게 계정 등록을 요청해 주세요.",
@@ -28,7 +28,6 @@ export function JoinView({
   inviteRole: string | null
   valid: boolean
 }) {
-  const router = useRouter()
   const supabase = createClient()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -45,14 +44,16 @@ export function JoinView({
   const accept = async () => {
     setBusy(true)
     setError(null)
-    const { error: e } = await supabase.rpc("accept_workspace_invite", { p_token: token })
+    const { data, error: e } = await supabase.rpc("accept_workspace_invite", { p_token: token })
     if (e) {
       setError(/invalid or expired/i.test(e.message) ? "만료되었거나 회수된 초대예요. 관리자에게 새 링크를 요청해 주세요." : "참여에 실패했어요. 다시 시도해 주세요.")
       setBusy(false)
       return
     }
-    router.replace("/dashboard")
-    router.refresh()
+    // 참여한 회사를 활성 워크스페이스로
+    const joinedId = (data as { workspace_id?: string } | null)?.workspace_id
+    if (joinedId) writeActiveWsCookie(joinedId)
+    window.location.assign("/dashboard")
   }
 
   if (!workspaceName || !valid) {

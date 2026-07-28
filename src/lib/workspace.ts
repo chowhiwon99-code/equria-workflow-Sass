@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/supabase/types"
+import { ACTIVE_WS_COOKIE } from "@/lib/workspace-cookie"
 
 // B1-b: 서버 라우트에서 "현재 사용자의 워크스페이스(회사) id"를 구한다.
 // 클라이언트 컴포넌트의 useCurrentWorkspaceId()에 대응하는 서버측 소스.
@@ -8,12 +9,31 @@ import type { Database } from "@/lib/supabase/types"
 /** 플랫폼 운영자(우리) 워크스페이스 = equria sentinel. MCP 앱 크리덴셜 등 전역 공유 자원의 관리 게이트 기준. */
 export const OPERATOR_WORKSPACE_ID = "00000000-0000-0000-0000-0000000000e1"
 
-/** 현재 사용자의 정식 멤버십 워크스페이스 id(첫 멤버십). 게스트 멤버십은 제외(게스트는 쓰기 자원 귀속 대상이 아님 —
- *  B2 감사 V3: 게스트가 호스트 워크스페이스에 오귀속되어 예산 소진하는 것 방지). 없으면 null → 호출부가 값 있을 때만 명시. */
+/** 현재 사용자의 쓰기 대상 워크스페이스 id. 활성 워크스페이스 쿠키(전환한 회사)를 우선하되
+ *  "내 비게스트 멤버십"일 때만(스푸핑 방지) — 없으면 첫 비게스트 멤버십으로 폴백. 둘 다 없으면 null.
+ *  B2 감사 V3(게스트 오귀속 방지)·V5(클라 활성 워크스페이스↔서버 불일치 해소). 단일 워크스페이스면 동작 변화 0. */
 export async function getUserWorkspaceId(
   client: SupabaseClient<Database>,
   userId: string,
 ): Promise<string | null> {
+  // 활성 워크스페이스 쿠키 우선 — 전환한 회사로 쓰기 귀속. 쿠키 컨텍스트 밖(테스트 등)이면 무시.
+  let activeWs: string | undefined
+  try {
+    const { cookies } = await import("next/headers")
+    activeWs = (await cookies()).get(ACTIVE_WS_COOKIE)?.value
+  } catch {
+    /* 쿠키 없는 컨텍스트 — 폴백으로 진행 */
+  }
+  if (activeWs) {
+    const { data } = await client
+      .from("workspace_members")
+      .select("workspace_id")
+      .eq("user_id", userId)
+      .eq("workspace_id", activeWs)
+      .neq("role", "guest")
+      .maybeSingle()
+    if (data?.workspace_id) return data.workspace_id
+  }
   const { data } = await client
     .from("workspace_members")
     .select("workspace_id")

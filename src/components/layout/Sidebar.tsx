@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation"
 import { Check, SlidersHorizontal, ChevronDown } from "lucide-react"
 import { FEATURES, FEATURE_GROUPS } from "@/lib/config/features"
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider"
+import { WorkspaceSwitcher } from "@/components/workspace/WorkspaceSwitcher"
 import { cn } from "@/lib/utils"
 import { useUnreadDms } from "@/hooks/useUnreadDms"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
@@ -146,6 +147,9 @@ export function Sidebar({
           Complow
         </span>
       </Link>
+
+      {/* 워크스페이스 전환기 — 현재 회사 + 드롭다운(멤버십 2개+ 시). 게스트는 숨김(초대된 프로젝트만). */}
+      {!isGuest && <WorkspaceSwitcher />}
 
       <nav ref={navRef} onKeyDown={onNavKeyDown} className="flex-1 space-y-3 overflow-y-auto p-2">
         {FEATURE_GROUPS.map((group) => {

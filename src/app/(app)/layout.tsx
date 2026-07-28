@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation"
+import { cookies } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
+import { ACTIVE_WS_COOKIE } from "@/lib/workspace-cookie"
 import { Sidebar } from "@/components/layout/Sidebar"
 import { Header } from "@/components/layout/Header"
 import { AnnouncementBanner } from "@/components/layout/AnnouncementBanner"
@@ -50,7 +52,11 @@ export default async function AppLayout({
       return w ? { ...w, role: roleByWs.get(id) ?? "member" } : undefined
     })
     .filter((w): w is WorkspaceSummary => !!w)
-  const initialWorkspaceId = workspaces[0]?.id ?? null
+
+  // 활성 워크스페이스 쿠키가 내 멤버십이면 그걸 현재로(전환기·RLS 헤더와 정합). 아니면 첫 멤버십.
+  const cookieWs = (await cookies()).get(ACTIVE_WS_COOKIE)?.value
+  const initialWorkspaceId =
+    (cookieWs && workspaces.some((w) => w.id === cookieWs) ? cookieWs : null) ?? workspaces[0]?.id ?? null
 
   // B2: 멤버십이 하나도 없으면(가입 개방 후 신규 유저) 온보딩으로 — 워크스페이스를 만들거나 초대로 참여.
   if (workspaces.length === 0) redirect("/onboarding")
