@@ -23,7 +23,6 @@ type Phase = "gallery" | "input" | "interview" | "result"
 type InterviewQ = { id: string; question: string; hint?: string }
 
 // 한 화면에 한 질문씩 — 아이폰 초기 설정처럼 가로 슬라이드로 진행.
-const QUESTIONS = WIZARD_FIELDS
 
 // 진입 화면 배경에 떠다니는 에이전트 아이콘(장식·클릭 불가). 중앙 입력을 피해 가장자리에 흩뿌린다.
 const FLOAT_ICONS = [
@@ -52,6 +51,10 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
   const [interviewAns, setInterviewAns] = useState<Record<string, string>>({})
   const [clarifications, setClarifications] = useState("")
 
+  // 갤러리("어떤 일을 맡기고 싶으세요?")에서 이미 목적을 받았으면 '에이전트 목적' 카드는 생략(중복 질문 제거 — 대표 리포트 2026-07-28).
+  // /mcp 진입(mcpPrefill)은 갤러리를 건너뛰므로 목적 카드를 유지한다.
+  const questions = mcpPrefill?.length ? WIZARD_FIELDS : WIZARD_FIELDS.filter((f) => f.key !== "purpose")
+
   const setText = (key: string, v: string) => setInputs((p) => ({ ...p, [key]: v }))
   const toggleMulti = (key: string, opt: string) =>
     setInputs((p) => {
@@ -64,8 +67,8 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
     return Array.isArray(v) ? v.length > 0 : !!(v && String(v).trim())
   }
 
-  const current = QUESTIONS[index]
-  const isLast = index === QUESTIONS.length - 1
+  const current = questions[index]
+  const isLast = index === questions.length - 1
   const canNext = !current.required || filled(current)
 
   // 가드는 '다음' 버튼 disabled + 텍스트 Enter 인라인 검증으로 — 여기선 무가드(select 자동넘김의 stale 방지)
@@ -75,7 +78,7 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
       return
     }
     setDir(1)
-    setIndex((i) => Math.min(QUESTIONS.length - 1, i + 1))
+    setIndex((i) => Math.min(questions.length - 1, i + 1))
   }
   const goPrev = () => {
     setDir(-1)
@@ -336,14 +339,14 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
       <div className="flex w-full flex-col gap-2">
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span className="tabular-nums">
-            {index + 1} / {QUESTIONS.length}
+            {index + 1} / {questions.length}
           </span>
           <span>{current.step === 1 ? "기본 정보" : "상세 입력"}</span>
         </div>
         <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
           <div
             className="h-full rounded-full bg-primary transition-[width] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]"
-            style={{ width: `${((index + 1) / QUESTIONS.length) * 100}%` }}
+            style={{ width: `${((index + 1) / questions.length) * 100}%` }}
           />
         </div>
       </div>
