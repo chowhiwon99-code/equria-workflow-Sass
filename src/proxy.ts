@@ -4,8 +4,9 @@ import type { Database } from "@/lib/supabase/types"
 
 /** 인증 화면 — 미로그인 공개, 로그인 상태면 앱(대시보드)으로 보냄. 루트(/) 랜딩은 로그인해도 열람(2026-07-28 대표 결정). */
 const AUTH_PATHS = ["/login", "/signup"]
-/** 법적 문서·검색엔진 파일 — 로그인 여부와 무관하게 항상 접근(구글 검증·PG 심사·SEO 요건) */
-const OPEN_PATHS = ["/privacy", "/terms", "/refund", "/sitemap.xml", "/robots.txt"]
+/** 법적 문서·검색엔진 파일·OAuth 콜백 — 로그인 여부와 무관하게 항상 접근.
+ *  /auth/callback은 code 교환 "전"이라 세션이 없음 → 여기 없으면 프록시가 /login으로 튕겨 OAuth가 영원히 실패. */
+const OPEN_PATHS = ["/privacy", "/terms", "/refund", "/sitemap.xml", "/robots.txt", "/auth/callback"]
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request })

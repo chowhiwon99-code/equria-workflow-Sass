@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Loading, ErrorState } from "@/components/shared/States"
+import { SocialAccountsCard } from "@/components/mypage/SocialAccountsCard"
 import { renderAgentIcon } from "@/components/agents/AgentIcon"
 import { formatUsd } from "@/lib/pricing"
 
@@ -103,6 +104,9 @@ export function MyPageView() {
           프로필 수정 →
         </Link>
       </div>
+
+      {/* 로그인 방법 — 구글 계정 연결 */}
+      <SocialAccountsCard />
 
       {/* 통계 */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

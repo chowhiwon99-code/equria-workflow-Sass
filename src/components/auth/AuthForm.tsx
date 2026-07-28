@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { nameToEmail } from "@/lib/auth"
 import { signupAction } from "@/app/(auth)/actions"
+import SocialButtons from "@/components/auth/SocialButtons"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,8 +16,17 @@ export type AuthMode = "login" | "signup"
 /**
  * 로그인·가입 공용 폼 — (auth) 페이지와 랜딩 모달이 함께 쓴다(로직 단일화).
  * onSwitchMode가 있으면 모달 내 전환(페이지 이동 없음), 없으면 /login·/signup 링크.
+ * initialError는 OAuth 콜백이 /login?error=…로 돌려보낸 메시지(페이지에서 매핑해 전달).
  */
-export function AuthForm({ mode, onSwitchMode }: { mode: AuthMode; onSwitchMode?: (m: AuthMode) => void }) {
+export function AuthForm({
+  mode,
+  onSwitchMode,
+  initialError,
+}: {
+  mode: AuthMode
+  onSwitchMode?: (m: AuthMode) => void
+  initialError?: string | null
+}) {
   const router = useRouter()
   const [name, setName] = useState("")
   const [password, setPassword] = useState("")
@@ -62,6 +72,17 @@ export function AuthForm({ mode, onSwitchMode }: { mode: AuthMode; onSwitchMode?
 
   return (
     <div className="w-full">
+      {initialError && (
+        <p className="mb-4 rounded-lg bg-destructive/10 px-3 py-2.5 text-center text-sm text-destructive">
+          {initialError}
+        </p>
+      )}
+      <SocialButtons />
+      <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground/60">
+        <span className="h-px flex-1 bg-border" />
+        또는
+        <span className="h-px flex-1 bg-border" />
+      </div>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1.5">
           <Label htmlFor="auth-name">이름</Label>
