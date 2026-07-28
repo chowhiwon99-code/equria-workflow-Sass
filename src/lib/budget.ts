@@ -23,11 +23,14 @@ export async function checkBudget(userId: string): Promise<BudgetStatus> {
   const { data: prof } = await admin.from("profiles").select("role").eq("id", userId).maybeSingle()
   const isAdmin = prof?.role === "admin"
 
-  // 사용자의 워크스페이스(첫 멤버십).
+  // 사용자의 정식 멤버십 워크스페이스(첫 멤버십·게스트 제외). B2 감사 V3/S1: guest 제외 + order 명시로
+  // getUserWorkspaceId와 동일 워크스페이스를 가리키게(비결정 limit(1) → 오귀속 방지).
   const { data: mem } = await admin
     .from("workspace_members")
     .select("workspace_id")
     .eq("user_id", userId)
+    .neq("role", "guest")
+    .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle()
   const wsId = mem?.workspace_id

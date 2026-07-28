@@ -3,14 +3,18 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { MCP_CONNECTORS, appCredentialGroups } from "@/lib/mcp"
 import { oauthRedirectUrl } from "@/lib/mcp/oauth"
+import { isPlatformOperator } from "@/lib/workspace"
 
 export const runtime = "nodejs"
 
-/** 내가 이 워크스페이스 오너(대표)인지 — 크리덴셜 등록/삭제는 오너 전용. */
+// ⚠️ B2 감사 V1: mcp_oauth_clients는 전역 공유(connector_id PK, workspace_id 없음) — 여기 저장된
+// 구글/슬랙 OAuth 앱 크리덴셜은 모든 테넌트가 공유한다. 따라서 관리 권한은 "아무 워크스페이스 오너"가
+// 아니라 플랫폼 운영자(equria 오너)로 한정해야 한다. (가입 개방 후 "누구나 회사 만들면 오너"가 되므로,
+// 구 isOwner 게이트로는 임의 유저가 전역 크리덴셜을 탈취/삭제할 수 있었음.)
+// 회사별 크리덴셜 격리(마이그 B-5)가 완료되면 워크스페이스 스코프 오너 게이트로 전환.
 async function isOwner(userId: string): Promise<boolean> {
   const admin = createAdminClient()
-  const { data } = await admin.from("workspaces").select("id").eq("owner_id", userId).limit(1).maybeSingle()
-  return !!data
+  return isPlatformOperator(admin, userId)
 }
 
 /** MCP 앱 크리덴셜 그룹 현황.

@@ -34,11 +34,14 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "올바른 금액을 입력하세요." }, { status: 400 })
   }
 
+  // B2 감사 S1: guest 제외 + order 명시(비결정 limit(1) → 엉뚱한 워크스페이스 예산 변경 방지).
   const admin = createAdminClient()
   const { data: mem } = await admin
     .from("workspace_members")
     .select("workspace_id")
     .eq("user_id", user.id)
+    .neq("role", "guest")
+    .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle()
   if (!mem?.workspace_id) return NextResponse.json({ error: "워크스페이스를 찾을 수 없어요." }, { status: 404 })
