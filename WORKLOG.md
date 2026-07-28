@@ -5,6 +5,25 @@
 
 ---
 
+## 2026-07-28 · 세션39 후속 — 구글 로그인 1차 (버튼 + 마이페이지 계정 연결)
+
+**무엇/왜:** 대표 결정 — 소셜 로그인은 구글 먼저(애플·카카오=B6 포장 단계), B1-b 전이므로 **"로그인 수단 추가"와 "가입 개방"을 분리**(개방은 B1-b 후). DDL 0·RLS 변경 0·전부 추가형. tsc0·lint29/0(신규0)·build0·main-first. **배포 `d29f1fb`·롤백 `7f12fc6`.** ⚠️ 실동작은 대표 콘솔 설정 5단계 후(HANDOFF '구글 로그인 활성화').
+
+**쪼갠 내용:**
+1. **SocialButtons 개편** — 세션39에 만들어놓고 미사용이던 3버튼(구글·애플·카카오)을 구글 단독 'Google로 계속하기'로. `AuthForm` 상단에 연결 → 로그인·가입 페이지+랜딩 모달 3곳 동시 반영(공용화 덕).
+2. **콜백 라우트 보강**(`/auth/callback`) — Supabase 에러 파라미터 처리(`signup_disabled`→"등록된 멤버가 없어요" 안내·`access_denied`→취소), `next` 검증(`/`시작·`//`차단 = open redirect 방지), 연결 흐름 에러는 `?link_error=`로 원래 화면 전달. 로그인 페이지에 `?error=` 문구 매핑 표시.
+3. **🔥 잠복 버그 픽스** — proxy OPEN_PATHS에 `/auth/callback` 추가. 콜백은 code 교환 "전"이라 세션이 없는데 프록시가 /login으로 튕겨 **OAuth가 구조적으로 불가능**했음(세션39 sitemap 차단과 동류·라우트 미사용이라 미발현).
+4. **마이페이지 '로그인 방법' 카드**(`SocialAccountsCard`) — 멤버 계정 이메일이 합성 주소(`u<hex>@equria.local`)라 구글 자동 연결 불가 → `linkIdentity` 수동 연결/해제. supabase-js API(context7 문서 검증). 마지막 로그인 수단 해제 금지·해제 2단계 확인·`identity_already_exists` 안내.
+
+**예상이슈 체크:**
+- **보안 핵심**: `handle_new_user`(043)가 OAuth 신규 계정도 equria에 자동 등록 → **Supabase '신규가입 허용' OFF가 provider ON보다 선행 필수**(HANDOFF에 순서 명시). OFF해도 공용비번 가입은 `admin.createUser` 경유라 안 깨짐(코드 확인).
+- 미등록 구글 계정 로그인 시도 → `signup_disabled` → 로그인 화면 안내문("공용비번 가입 후 마이페이지에서 연결") 정상 유도.
+- lint 신규 1건(`set-state-in-effect`) → McpCredentialsCard와 동일한 disable 주석 규약으로 처리(29/0 유지).
+- /login이 searchParams로 dynamic 전환(기존 static) — proxy가 어차피 전 경로 실행이라 영향 없음.
+- **미검증(대표)**: 실 OAuth 왕복(연결→로그아웃→구글 재로그인)·미등록 계정 차단 확인. 콘솔 설정 전엔 버튼 클릭 시 "시작하지 못했어요" 에러가 정상.
+
+---
+
 ## 2026-07-28 · 세션39 후속 — 파비콘 둥근 사각형 새 로고 교체
 
 **무엇/왜:** 대표 리포트 — 새 로고(CP 마크)가 탭에서 각진 흰 정사각형으로 보임, "둥근 사각형으로" 요청. 1차=검정 둥근 사각형+흰 마크(`94775bf`) → **대표 피드백 "모양 OK, 색 반전" → 흰 둥근 사각형+검정 마크(#111) 확정(`7f12fc6`)**. + **favicon.ico(16/32/48) 신설** — 구글 등 검색엔진·외부 서비스가 `/favicon.ico`를 직접 가져가는 경우도 동일 아이콘 노출("다른 곳에서 검색해도 똑같이" 요청 대응). tsc0·lint29/0(신규0)·build0·main-first ×2. **배포 `7f12fc6`·롤백 `e4f2a1f`.**
