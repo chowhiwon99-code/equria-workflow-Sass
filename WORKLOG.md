@@ -5,6 +5,26 @@
 
 ---
 
+## 2026-07-28 · 세션39 후속 — B1-b 쓰기 격리 Phase A-1~A-4 (클라 59+서버 5+가드 2+presence)
+
+**무엇/왜:** 대표 지시 "격리 공사 시작"(가입 개방·노션식 초대의 선행 차단막). 플랜모드 계획(`prancy-whistling-tome.md`) 승인 후 실행. Explore 2에이전트 조사로 **B1-b가 이미 1/3 진행**(WorkspaceProvider·lib/workspace 헬퍼·서버 32곳 기배선) 확인 → 잔여만 정밀 타격. 4묶음+1커밋 = 5회 main-first 배포(각 tsc0·lint29/0·build0). **최종 `3ec50d8`.**
+
+**쪼갠 내용:**
+1. **묶음1 재무 15**(`b26fe62`): CashFlowView 9(**하드코딩 sentinel 상수 제거**)·FinanceView 3·FinanceEntryModal 2·CalcTypeBuilder 1(상수 제거).
+2. **묶음2 프로젝트·캘린더·파일 19**(`5eebc56`): ProjectDetail 9·ProjectsView 5·CalendarView 3·FilesView 2. project_tasks는 의도적 제외(부모 EXISTS 상속).
+3. **묶음3 채팅·결재·회의록 13**(`d79462d`): 채팅 낙관적 로컬 행 `workspace_id:""`→wsId 정합 포함.
+4. **묶음4 에이전트·근태·공지 12**(`5bc71d2`): 클라 59/59 완료.
+5. **A-2·A-3**(`3ec50d8`): OCR 3라우트 배선 + **mcp/servers 2라우트 admin(service_role) 멤버십 가드**(RLS 우회 구멍) + **presence 채널 워크스페이스 분리**(RLS 없는 유일한 실질 격리 위험).
+
+**A-4 검증(A-5 게이트):** ① 코드 grep 감사 — 스코프 테이블 insert/upsert 미명시 0건(오탐 2건=변수 행빌더, 육안 확인) ② DB 인벤토리 — sentinel DEFAULT 보유 **정확히 45개 테이블**(전부 NOT NULL) ③ **drop default 시뮬** — DO 루프 45개 무오류 실행→롤백 정상 ④ RPC 경유 쓰기(064 attendance_viewers 등) workspace 명시 확인·cash_transfers 앱 쓰기 없음.
+
+**예상이슈 체크:**
+- 명시값=현 DEFAULT와 동일이라 **동작 불변**·provider null(이론적)이면 스프레드 생략→DEFAULT 폴백.
+- useCallback 의존성 배열 5곳에 wsId 추가(신규 lint 경고 0 유지).
+- **다음 = A-5**(마이그 112: 45테이블 drop default) — 파괴적·대표 승인 게이트. 이후 Phase B(마이그 112~116 재번호 조정 필요).
+
+---
+
 ## 2026-07-28 · 세션39 후속 — 가입=구글 전용 전환 + 오너 '구성원 초대'
 
 **무엇/왜:** 대표 결정 — "공용비번 가입 폼 빼고, 다들 구글로 로그인하게". 함정 보고: 가입 OFF 상태라 탈퇴 후 구글 재가입 경로가 없음 → **초대 방식**(오너가 구글 이메일 사전등록)으로 해결. 가입 차단 유지=외부인 차단 그대로. DDL 0. tsc0·lint29/0·build0·main-first. **배포 `35813ed`·롤백 `d29f1fb`.**
