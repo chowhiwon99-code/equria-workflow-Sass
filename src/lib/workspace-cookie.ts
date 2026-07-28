@@ -14,3 +14,9 @@ export function writeActiveWsCookie(id: string): void {
   if (typeof document === "undefined") return
   document.cookie = `${ACTIVE_WS_COOKIE}=${encodeURIComponent(id)}; path=/; max-age=31536000; samesite=lax`
 }
+
+/** 활성 워크스페이스 쿠키 제거 — 로그아웃 시 호출(공용 PC에서 다음 사용자에게 스코프 잔존 방지). */
+export function clearActiveWsCookie(): void {
+  if (typeof document === "undefined") return
+  document.cookie = `${ACTIVE_WS_COOKIE}=; path=/; max-age=0; samesite=lax`
+}
