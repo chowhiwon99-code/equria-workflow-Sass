@@ -21,6 +21,7 @@ export function McpConnectorPicker({
 }) {
   const [connectedIds, setConnectedIds] = useState<string[] | null>(null)
   const [showMore, setShowMore] = useState(false)
+  const [verifyMsg, setVerifyMsg] = useState<string | null>(null) // 연결 직후 자동 점검 결과(권한 누락 등)
 
   const load = useCallback(async () => {
     try {
@@ -44,7 +45,18 @@ export function McpConnectorPicker({
       const d = e.data as { type?: string; ok?: boolean; connector?: string }
       if (d?.type !== "mcp-oauth") return
       void load()
-      if (d.ok && d.connector && !value.includes(d.connector)) onToggle(d.connector)
+      if (d.ok && d.connector) {
+        if (!value.includes(d.connector)) onToggle(d.connector)
+        // 연결 직후 자동 점검 — "연결 성공·권한 없음"(동의 체크박스 미체크)을 그 자리에서 잡는다
+        const name = MCP_CONNECTORS.find((c) => c.id === d.connector)?.name ?? d.connector
+        setVerifyMsg(`${name} 연결 점검 중…`)
+        void fetch(`/api/mcp/user-connections/${d.connector}/test`, { method: "POST" })
+          .then((r) => r.json())
+          .then((j: { ok?: boolean; error?: string }) => {
+            setVerifyMsg(j.ok ? `${name} 연결 확인 완료 — 도구가 정상 작동해요.` : `⚠️ ${name}: ${j.error ?? "연결 점검에 실패했어요."}`)
+          })
+          .catch(() => setVerifyMsg(null))
+      }
     }
     // 팝업이 postMessage 없이 닫힌 경우 폴백 — 창 포커스 복귀 시 재조회
     const onFocus = () => void load()
@@ -98,6 +110,10 @@ export function McpConnectorPicker({
             )
           })}
         </div>
+      )}
+
+      {verifyMsg && (
+        <p className={cn("text-center text-xs", verifyMsg.startsWith("⚠️") ? "text-destructive" : "text-muted-foreground")}>{verifyMsg}</p>
       )}
 
       {/* 연결하면 쓸 수 있는 도구 — 클릭하면 밑으로 펼쳐짐 */}
