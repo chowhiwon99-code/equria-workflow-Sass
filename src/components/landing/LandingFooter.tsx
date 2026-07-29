@@ -90,9 +90,10 @@ export function LandingFooter() {
           </div>
         </div>
 
-        {/* 회사 정보 — 사업자등록번호·통신판매업신고번호·주소는 대표 확인 후 기재(PG 심사 요건) */}
+        {/* 회사 정보(통신판매업자 표시 — 전자상거래법 §10·PG 심사 요건). 통신판매업신고번호는 신고 후 추가. */}
         <div className="mt-16 text-[13px] leading-relaxed text-white/40">
-          <p>Complow(컴플로우) · 대표: 조휘원 · 이메일: complow@complow.kr</p>
+          <p>컴플로우(Complow) · 대표 조휘원 · 사업자등록번호 592-58-00892 · 주소 인천광역시 계양구 형제봉길 1, 301동 1103호(귤현동, 계양센트레빌3단지)</p>
+          <p className="mt-1">전화 010-4163-1974 · 이메일 complow@complow.kr</p>
         </div>
 
         <div className="mt-6 flex flex-col items-start justify-between gap-4 border-t border-white/10 pt-6 sm:flex-row sm:items-center">
