@@ -51,21 +51,33 @@ const SECURITY = [
   { icon: Server, t: "국내 리전", d: "데이터는 국내(서울) 리전에 저장됩니다." },
 ]
 
-/** 요금별 기능 비교 — 가격 확정 전 기능 축만 먼저 정리(대표 요청) */
-const PLAN_ROWS: { f: string; std: string | boolean; pro: string | boolean }[] = [
-  { f: "AI 에이전트 (기본 8종 + 직접 제작)", std: true, pro: true },
-  { f: "AI 사용량", std: "표준 포함", pro: "한도 상향" },
-  { f: "손익·현금흐름 (장부·세금계산서 연동)", std: true, pro: true },
-  { f: "팀 협업 (채팅·회의노트·캘린더·프로젝트)", std: true, pro: true },
-  { f: "전자결재·근태", std: true, pro: true },
-  { f: "외부 도구 연동 (구글·노션 등)", std: true, pro: true },
-  { f: "회사별 커스터마이징 (손익 수식·에이전트)", std: true, pro: true },
-  { f: "지원", std: "이메일", pro: "우선 지원·도입 컨설팅" },
+/** 4티어 요금 카드 (2026-07-29 대표 확정 — 워크스페이스 정액 + 초과 시트 + AI 크레딧) */
+const PLANS: { name: string; price: string; unit: string; credits: string; highlight: boolean; cta: string; desc: string[] }[] = [
+  { name: "Basic", price: "₩0", unit: "3명 포함 · 영구 무료", credits: "월 500 크레딧 (AI 맛보기)", highlight: false, cta: "무료로 시작", desc: ["팀 협업 (채팅·캘린더·프로젝트)", "AI 에이전트 맛보기", "회사별 데이터 격리"] },
+  { name: "Standard", price: "₩29,000", unit: "/월 · 5명 포함", credits: "월 3,000 크레딧 · Sonnet", highlight: true, cta: "시작하기", desc: ["모든 업무 기능 (+결재·근태·회의·재무)", "AI 에이전트 전체 사용", "초과 시트 ₩4,000/인 · 이메일 지원"] },
+  { name: "Pro", price: "₩49,000", unit: "/월 · 10명 포함", credits: "월 7,000 크레딧 · +Opus", highlight: false, cta: "시작하기", desc: ["스탠다드 전체 + 워크플로우·전용 에이전트", "고급 AI 모델(Opus)·대형 지식파일", "초과 시트 ₩4,000/인 · 우선 지원"] },
+  { name: "Premium", price: "문의", unit: "무제한 인원 · 맞춤", credits: "초대량 크레딧 · Fable·미디어", highlight: false, cta: "도입 문의", desc: ["전 기능 + 이미지·영상 생성", "API·SSO·전용 온보딩/컨설팅", "맞춤 크레딧·전용 셋업"] },
+]
+
+/** 요금별 기능 비교 (4티어) — false=미포함(—), true=체크, 문자열=값 표기 */
+const PLAN_ROWS: { f: string; basic: string | boolean; std: string | boolean; pro: string | boolean; prem: string | boolean }[] = [
+  { f: "팀 협업 (채팅·캘린더·프로젝트·구성원·파일)", basic: true, std: true, pro: true, prem: true },
+  { f: "전자결재·근태", basic: false, std: true, pro: true, prem: true },
+  { f: "회의노트(AI 요약)·명함(OCR)·비용·매출", basic: false, std: true, pro: true, prem: true },
+  { f: "AI 에이전트 (기본 8종 + 직접 제작)", basic: "맛보기", std: true, pro: true, prem: true },
+  { f: "포함 크레딧 / 월", basic: "500", std: "3,000", pro: "7,000", prem: "초대량" },
+  { f: "AI 모델", basic: "Sonnet", std: "Sonnet", pro: "+Opus", prem: "+Fable" },
+  { f: "지식파일 첨부", basic: "소형", std: "중형", pro: "대형", prem: "무제한" },
+  { f: "워크플로우·MCP 연동", basic: false, std: false, pro: true, prem: true },
+  { f: "사이드바 기능별 전용 에이전트", basic: false, std: false, pro: true, prem: true },
+  { f: "미디어 생성 (이미지·영상)", basic: false, std: false, pro: false, prem: true },
+  { f: "API·SSO·전용 온보딩", basic: false, std: false, pro: false, prem: true },
+  { f: "포함 시트 / 초과", basic: "3명", std: "5명 / +₩4,000", pro: "10명 / +₩4,000", prem: "무제한" },
 ]
 
 const FAQS = [
-  { q: "정말 무료로 시작할 수 있나요?", a: "네. 14일 동안 모든 기능을 무료로 쓸 수 있습니다. 체험 중 기능 제한은 없습니다." },
-  { q: "가격은 언제 공개되나요?", a: "현재 준비 중입니다. 사전 신청한 회사에는 얼리버드 할인이 적용될 예정이니 도입 문의로 미리 알려주세요." },
+  { q: "정말 무료로 시작할 수 있나요?", a: "네. Basic 플랜은 별도 카드 등록 없이 영구 무료입니다. 팀 협업 기능과 매달 AI 크레딧(맛보기)이 포함돼요. 더 쓰려면 유료 플랜으로 올리면 됩니다." },
+  { q: "요금은 어떻게 되나요?", a: "회사 단위 정액(Basic 무료 · Standard ₩29,000 · Pro ₩49,000)에 포함 인원을 넘으면 1인당 ₩4,000이 붙습니다. AI는 포함 크레딧으로 쓰고, 더 필요하면 추가 구매하거나 상위 플랜으로 올리면 됩니다. 연간 결제 시 2개월 무료." },
   { q: "우리 회사 데이터는 안전한가요?", a: "회사별로 데이터가 격리되고, 민감 정보는 암호화해 국내 리전에 저장합니다. 데이터의 소유권은 회사에 있습니다." },
   { q: "우리 회사 방식에 맞출 수 있나요?", a: "그게 컴플로우(Complow)의 출발점입니다. 손익 계산 수식, AI 에이전트, 결재선까지 회사 방식대로 직접 구성할 수 있습니다." },
   { q: "도입은 어떻게 진행되나요?", a: "도입 문의를 남기면 세팅부터 온보딩까지 함께합니다. 쓰던 도구(구글·노션 등)는 연동으로 그대로 이어집니다." },
@@ -128,7 +140,7 @@ export default function LandingPage() {
               도입 문의하기
             </a>
           </div>
-          <span className="text-[13px] text-black/35">14일 무료 체험 · 도입부터 세팅까지 함께합니다</span>
+          <span className="text-[13px] text-black/35">별도 카드 없이 무료로 시작 · 도입부터 세팅까지 함께합니다</span>
         </div>
 
         {/* ── 제품 화면(실제 디자인 재현·데모 숫자) — 스르륵 등장 ── */}
@@ -380,68 +392,75 @@ export default function LandingPage() {
       </section>
 
       {/* ── 구독제 — 가격 카드 + 요금별 기능 비교(가격은 토큰 원가 측정 후 확정) ── */}
-      <section id="pricing" className="mx-auto max-w-4xl scroll-mt-16 border-t border-black/[0.06] px-6 py-24">
+      <section id="pricing" className="mx-auto max-w-5xl scroll-mt-16 border-t border-black/[0.06] px-6 py-24">
         <div className="text-center">
           <h2 className="text-[clamp(1.6rem,4vw,2.2rem)] font-extrabold tracking-[-0.02em]">간단한 구독제</h2>
-          <p className="mt-3 text-[15px] text-black/45">회사 단위로 시작하고, 인원만큼만 내세요. 14일 무료 체험.</p>
+          <p className="mt-3 text-[15px] text-black/45">회사 단위로 시작하고, 인원만큼만 내세요. AI는 쓴 만큼 크레딧으로.</p>
           {/* 얼리버드 스트립(프로모션 틀) */}
           <span className="mt-5 inline-flex items-center gap-1.5 rounded-full border border-black/[0.08] bg-black/[0.03] px-3.5 py-1.5 text-[12px] font-semibold text-black/60">
             <Sparkles className="size-3.5" /> 얼리버드 — 사전 신청 회사 한정 할인 예정
           </span>
         </div>
-        <div className="mx-auto mt-10 grid max-w-2xl gap-4 sm:grid-cols-2">
-          {/* 스탠다드 */}
-          <div className="rounded-2xl border p-7" style={{ borderColor: INK }}>
-            <div className="flex items-center justify-between">
-              <span className="text-[15px] font-bold">스탠다드</span>
-              <span className="rounded-full px-2.5 py-1 text-[11px] font-bold text-white" style={{ background: INK }}>추천</span>
+        <div className="mx-auto mt-10 grid max-w-5xl gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {PLANS.map((p) => (
+            <div key={p.name} className={`flex flex-col rounded-2xl border p-6 ${p.highlight ? "" : "border-black/[0.08]"}`} style={p.highlight ? { borderColor: INK } : undefined}>
+              <div className="flex items-center justify-between">
+                <span className="text-[15px] font-bold">{p.name}</span>
+                {p.highlight && <span className="rounded-full px-2.5 py-1 text-[11px] font-bold text-white" style={{ background: INK }}>추천</span>}
+              </div>
+              <div className="mt-3 flex items-baseline gap-1">
+                <span className="text-[26px] font-extrabold tracking-tight">{p.price}</span>
+                <span className="text-[12px] text-black/40">{p.unit}</span>
+              </div>
+              <p className="mt-1.5 text-[12px] font-semibold text-black/55">{p.credits}</p>
+              <ul className="mt-4 flex-1 space-y-2 text-[13px] leading-relaxed text-black/55">
+                {p.desc.map((d) => (
+                  <li key={d} className="flex gap-1.5">
+                    <Check className="mt-0.5 size-3.5 shrink-0 text-black/40" strokeWidth={2.25} /> {d}
+                  </li>
+                ))}
+              </ul>
+              {p.cta === "도입 문의" ? (
+                <a href={CONTACT} className="mt-6 block rounded-lg border border-black/15 py-2.5 text-center text-[13px] font-bold text-black/70 transition-colors hover:bg-black/[0.04]">{p.cta}</a>
+              ) : (
+                <button
+                  type="button"
+                  onClick={startFree}
+                  className={`mt-6 block w-full rounded-lg py-2.5 text-center text-[13px] font-bold transition-opacity hover:opacity-85 ${p.highlight ? "text-white" : "border border-black/15 text-black/70"}`}
+                  style={p.highlight ? { background: INK } : undefined}
+                >
+                  {p.cta}
+                </button>
+              )}
             </div>
-            <div className="mt-4 flex items-baseline gap-1.5">
-              <span className="text-3xl font-extrabold tracking-tight">₩ —</span>
-              <span className="text-[13px] text-black/40">/인/월 · 가격 공개 예정</span>
-            </div>
-            <ul className="mt-5 space-y-2 text-[14px] text-black/60">
-              <li>모든 기능 (AI 에이전트·손익·협업·결재)</li>
-              <li>AI 표준 사용량 포함</li>
-              <li>이메일 지원</li>
-            </ul>
-            <button type="button" onClick={startFree} className="mt-7 block w-full rounded-lg py-3 text-center text-[14px] font-bold text-white transition-opacity hover:opacity-85" style={{ background: INK }}>
-              무료로 시작하기
-            </button>
-          </div>
-          {/* 프로 */}
-          <div className="rounded-2xl border border-black/[0.08] p-7">
-            <span className="text-[15px] font-bold">프로</span>
-            <div className="mt-4 flex items-baseline gap-1.5">
-              <span className="text-3xl font-extrabold tracking-tight text-black/70">₩ —</span>
-              <span className="text-[13px] text-black/40">/인/월 · 준비 중</span>
-            </div>
-            <ul className="mt-5 space-y-2 text-[14px] text-black/60">
-              <li>스탠다드 전체 포함</li>
-              <li>AI 사용량 한도 상향</li>
-              <li>우선 지원·도입 컨설팅</li>
-            </ul>
-            <span className="mt-7 block rounded-lg border border-black/15 py-3 text-center text-[14px] font-bold text-black/35">준비 중</span>
-          </div>
+          ))}
         </div>
 
-        {/* 요금별 기능 비교 표 */}
-        <div className="mx-auto mt-12 max-w-2xl overflow-x-auto rounded-2xl border border-black/[0.07]">
-          <table className="w-full min-w-[480px] text-left text-[13px]">
+        {/* 요금별 기능 비교 표 (4티어) */}
+        <div className="mx-auto mt-12 max-w-3xl overflow-x-auto rounded-2xl border border-black/[0.07]">
+          <table className="w-full min-w-[640px] text-left text-[13px]">
             <thead>
               <tr className="border-b border-black/[0.06] bg-[#fbfbfc] text-black/45">
                 <th className="px-4 py-3 font-semibold">기능</th>
-                <th className="w-28 px-4 py-3 text-center font-semibold">스탠다드</th>
-                <th className="w-40 px-4 py-3 text-center font-semibold">프로</th>
+                <th className="w-24 px-3 py-3 text-center font-semibold">Basic</th>
+                <th className="w-28 px-3 py-3 text-center font-semibold">Standard</th>
+                <th className="w-24 px-3 py-3 text-center font-semibold">Pro</th>
+                <th className="w-28 px-3 py-3 text-center font-semibold">Premium</th>
               </tr>
             </thead>
             <tbody>
               {PLAN_ROWS.map((r) => (
                 <tr key={r.f} className="border-b border-black/[0.04] last:border-0">
                   <td className="px-4 py-3 text-black/70">{r.f}</td>
-                  {[r.std, r.pro].map((v, i) => (
-                    <td key={i} className="px-4 py-3 text-center">
-                      {v === true ? <Check className="mx-auto size-4" strokeWidth={2.25} /> : <span className="text-black/55">{v}</span>}
+                  {[r.basic, r.std, r.pro, r.prem].map((v, i) => (
+                    <td key={i} className="px-3 py-3 text-center">
+                      {v === true ? (
+                        <Check className="mx-auto size-4" strokeWidth={2.25} />
+                      ) : v === false ? (
+                        <span className="text-black/20">—</span>
+                      ) : (
+                        <span className="text-black/55">{v}</span>
+                      )}
                     </td>
                   ))}
                 </tr>
