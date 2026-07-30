@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
-import { Download, FileDown, Settings, X, Sheet, Calculator, Sparkles, Link2 } from "lucide-react"
+import { Download, FileDown, Settings, X, Sheet, Calculator, Sparkles } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
@@ -85,7 +85,6 @@ export function CashFlowView() {
   const [editType, setEditType] = useState<CashCalcType | null>(null)
   const [poolPos, setPoolPos] = useState<{ x: number; y: number } | null>(null)
   const [defaultCalcTypeId, setDefaultCalcTypeId] = useState<string | null>(null)
-  const [ledgerTotals, setLedgerTotals] = useState<LedgerTotals>({}) // 이번 달 미귀속(잔여) 장부 합계 — ledger 슬롯 생성용
   const [recordSlot, setRecordSlot] = useState<CashAccount | null>(null) // "기록" 다이얼로그 대상 슬롯
   // 분류 제안(datalist) — 기본 분류 + 실제 장부에 쓰인 분류(FinanceEntryModal과 같은 수집 패턴)
   const [catSuggest, setCatSuggest] = useState<{ revenue: string[]; expense: string[] }>({
@@ -134,7 +133,6 @@ export function CashFlowView() {
           if (cat) cat.expense += amt
         }
       }
-      setLedgerTotals(unclaimed)
       // 분류 목록 — 회사가 '분류 관리'(마이그122)로 편집했으면 그 마스터만, 아니면 기본+실사용 합집합(기존 동작)
       const customCats = (settings?.ledger_categories ?? null) as { revenue?: string[]; expense?: string[] } | null
       if (customCats && (customCats.revenue || customCats.expense)) {
@@ -255,27 +253,8 @@ export function CashFlowView() {
     if (e) return toast.error("항목을 추가하지 못했어요.")
     load()
   }
-  // 장부 연동 — "요약(실제 장부)과 계산기가 안 맞는" 문제의 정면 해결. 이번 달 내역 합계가
-  // 자동 반영되는 슬롯 2개(매출·비용)를 만든다. 이후 amount는 load()가 항상 최신 장부로 동기화.
-  const linkLedger = async () => {
-    if (!me) return
-    const existing = new Set(slots.filter((s) => s.item_type === "ledger").map((s) => s.kind))
-    const wanted = [
-      { kind: "revenue_src", color: "green", name: "장부 매출(이번 달)" },
-      { kind: "expense_dst", color: "red", name: "장부 비용(이번 달)" },
-    ].filter((w) => !existing.has(w.kind))
-    if (wanted.length === 0) return toast.info("이미 장부와 연동돼 있어요.")
-    const rows = wanted.map((w, i) => ({
-      workspace_id: wsId as string,
-      name: w.name, kind: w.kind, color: w.color, item_type: "ledger", calc_type_id: null,
-      amount: ledgerAmountFor({ kind: w.kind, currency: defaultCurrency }, ledgerTotals),
-      currency: defaultCurrency, created_by: me, sort_order: slots.length + i,
-    }))
-    const { error: e } = await supabase.from("cash_accounts").insert(rows)
-    if (e) return toast.error("장부 연동에 실패했어요.")
-    toast.success("장부와 연동됐어요 — 내역이 바뀌면 자동 반영돼요.")
-    load()
-  }
+  // (세션41 대표 결정) '장부 연동' 기능 제거 — 계산값 자동 동기화로 슬롯이 장부에 직접 기록되면서 존재 의미 소멸.
+  // 기존 ledger 슬롯의 렌더/집계 분기는 데이터 관용을 위해 유지(휴지통 복구 시에도 안 깨짐).
   const updateSlot = async (id: string, patch: Partial<CashAccount>) => {
     // SSOT 재설계: 매출·비용 슬롯의 amount는 원장(finance_entries) 파생이라 여기서 쓰지 않는다(load()가 동기화).
     // 보유금(reserve)만 직접 입력/수식 재계산 유지. 수식 값은 '계산 도우미'(기록 프리필)로만 쓰인다.
@@ -657,11 +636,6 @@ export function CashFlowView() {
               <Sparkles className="size-3.5" /> AI 코칭
             </Button>
             {/* 요약·내역(실제 장부)과 계산기를 잇는 자동 슬롯 — 이미 연동돼 있으면 숨김 */}
-            {!slots.some((s) => s.item_type === "ledger") && (
-              <Button size="sm" variant="outline" onClick={linkLedger}>
-                <Link2 className="size-3.5" /> 장부 연동
-              </Button>
-            )}
             <Button size="sm" variant="outline" onClick={() => setShowBuilder(true)}>
               <Calculator className="size-3.5" /> 계산 유형
             </Button>
