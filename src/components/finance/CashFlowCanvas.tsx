@@ -9,6 +9,7 @@ import { POOL_ID, slotCategory, type CashSummary } from "@/lib/cashflowGraph"
 import { SLOT_TYPES, ITEM_TYPES, slotLabel, slotColor, fieldsOf, astOf } from "@/lib/cashAccounts"
 import { evalFormula } from "@/lib/calcFormula"
 import { InlineText, InlineNumber, InlinePercent } from "./inline"
+import { CategorySelect } from "./CashGrid"
 import type { CashAccount, CashCalcType, CashCategory } from "@/types"
 
 const NODE_W = 210
@@ -31,6 +32,7 @@ export function CashFlowCanvas({
   poolPos,
   calcTypes,
   defaultCalcTypeId,
+  categoryOptions,
   onUpdateSlot,
   onDeleteSlot,
   onAddSlot,
@@ -49,6 +51,7 @@ export function CashFlowCanvas({
   poolPos: { x: number; y: number } | null
   calcTypes: CashCalcType[]
   defaultCalcTypeId: string | null
+  categoryOptions: { revenue: string[]; expense: string[] }
   onUpdateSlot: (id: string, patch: Partial<CashAccount>) => void
   onDeleteSlot: (slot: CashAccount) => void
   onAddSlot: (kind: string, color: string) => void
@@ -230,6 +233,7 @@ export function CashFlowCanvas({
     slot: s,
     calcTypes,
     defaultCalcTypeId,
+    categoryOptions,
     onUpdateSlot,
     onDeleteSlot,
     onRecord,
@@ -336,6 +340,7 @@ function SlotCard({
   slot: s,
   calcTypes,
   defaultCalcTypeId,
+  categoryOptions,
   mode,
   pos,
   dragging,
@@ -350,6 +355,7 @@ function SlotCard({
   slot: CashAccount
   calcTypes: CashCalcType[]
   defaultCalcTypeId: string | null
+  categoryOptions: { revenue: string[]; expense: string[] }
   mode: "flex" | "absolute"
   pos?: { x: number; y: number }
   dragging?: boolean
@@ -427,20 +433,15 @@ function SlotCard({
             )}
           </select>
         </label>
-        {/* 장부 분류 — 이 슬롯으로 '기록'하면 내역에 이 분류로 찍힘(자유입력+제안). 미입력=슬롯명 */}
+        {/* 장부 분류 — 이 슬롯으로 '기록'하면 내역에 이 분류로 찍힘. 미리 만든 분류만 선택(세션41 — 자유입력 제거, 표와 동일) */}
         {!isHold && s.item_type !== "ledger" && (
           <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
             분류
-            <input
-              key={`${s.id}-${s.ledger_category ?? ""}`}
-              defaultValue={s.ledger_category ?? ""}
-              list={slotCategory(s.kind) === "income" ? "cf-cat-revenue" : "cf-cat-expense"}
-              placeholder="기록 시 분류(비우면 슬롯명)"
-              onBlur={(e) => {
-                const v = e.target.value.trim()
-                if (v !== (s.ledger_category ?? "")) onUpdateSlot(s.id, { ledger_category: v || null })
-              }}
-              className="min-w-0 flex-1 rounded border bg-background px-1 py-0.5 text-[10px] text-foreground outline-none focus:ring-1 focus:ring-ring"
+            <CategorySelect
+              slot={s}
+              options={categoryOptions}
+              onUpdateSlot={onUpdateSlot}
+              className="min-w-0 flex-1 cursor-pointer rounded border bg-background px-1 py-0.5 text-[10px] text-foreground outline-none focus:ring-1 focus:ring-ring"
             />
           </label>
         )}

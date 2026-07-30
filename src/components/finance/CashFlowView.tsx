@@ -617,6 +617,7 @@ export function CashFlowView() {
             poolPos={poolPos}
             calcTypes={calcTypes}
             defaultCalcTypeId={defaultCalcTypeId}
+            categoryOptions={catSuggest}
             onUpdateSlot={updateSlot}
             onDeleteSlot={deleteSlot}
             onAddSlot={addSlot}
@@ -633,19 +634,7 @@ export function CashFlowView() {
       </div>
 
       {/* 슬롯 표 — 금액은 원장 파생(이번 달 기록 합계), 기록 버튼으로 장부에 쓴다 */}
-      <CashGrid slots={slots} groups={groups} pool={graph.pool} calcTypes={calcTypes} defaultType={defaultType} onAddSlot={addSlot} onUpdateSlot={updateSlot} onDeleteSlot={deleteSlot} onEditColumns={editColumns} onRecord={setRecordSlot} />
-
-      {/* 슬롯 분류 자유입력 제안 — 캔버스/표의 input list가 참조(구분별) */}
-      <datalist id="cf-cat-revenue">
-        {catSuggest.revenue.map((c) => (
-          <option key={c} value={c} />
-        ))}
-      </datalist>
-      <datalist id="cf-cat-expense">
-        {catSuggest.expense.map((c) => (
-          <option key={c} value={c} />
-        ))}
-      </datalist>
+      <CashGrid slots={slots} groups={groups} pool={graph.pool} calcTypes={calcTypes} defaultType={defaultType} categoryOptions={catSuggest} onAddSlot={addSlot} onUpdateSlot={updateSlot} onDeleteSlot={deleteSlot} onEditColumns={editColumns} onRecord={setRecordSlot} />
 
       {showBuilder && <CalcTypeBuilder types={calcTypes} editType={editType} onClose={() => { setShowBuilder(false); setEditType(null) }} onSaved={load} />}
       {recordSlot && (

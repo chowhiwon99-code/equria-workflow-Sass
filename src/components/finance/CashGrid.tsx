@@ -2,7 +2,7 @@
 
 import { Fragment, useMemo, useState } from "react"
 import { Trash2, Plus, Search, ArrowUpDown, ArrowUp, ArrowDown, SlidersHorizontal, ChevronDown, ChevronRight, PenLine } from "lucide-react"
-import { CURRENCIES, EXPENSE_CATEGORIES, REVENUE_CATEGORIES, money } from "@/lib/finance"
+import { CURRENCIES, money } from "@/lib/finance"
 import { SLOT_TYPES, ITEM_TYPES, slotLabel, slotColor, fieldsOf, astOf } from "@/lib/cashAccounts"
 import { tagBg, swatch, CATEGORY_COLORS } from "@/lib/meetingMeta"
 import { evalFormula, type CalcField } from "@/lib/calcFormula"
@@ -22,6 +22,7 @@ export function CashGrid({
   pool,
   calcTypes,
   defaultType,
+  categoryOptions,
   onAddSlot,
   onUpdateSlot,
   onDeleteSlot,
@@ -33,6 +34,7 @@ export function CashGrid({
   pool: CashSummary
   calcTypes: CashCalcType[]
   defaultType: CashCalcType | null
+  categoryOptions: { revenue: string[]; expense: string[] }
   onAddSlot: () => void
   onUpdateSlot: (id: string, patch: Partial<CashAccount>) => void
   onDeleteSlot: (slot: CashAccount) => void
@@ -112,9 +114,9 @@ export function CashGrid({
     const isLedger = s.item_type === "ledger"
     const open = expanded.has(s.id)
     const typeName = isLedger ? "장부 자동" : (customType?.name ?? ITEM_TYPES.find((t) => t.value === s.item_type)?.label ?? "직접 입력")
-    // 요약 한 줄 — 입력칸을 늘어놓는 대신 유형·핵심 값만. 분류는 항목명 옆 태그로 상시 표시(대표 요청).
+    // 요약 한 줄 — 유형·핵심 값만. 분류·통화·입력칸은 펼친 편집 행에서(대표 요청 — 최대한 심플하게).
     const summary = isLedger
-      ? `${typeName}${s.ledger_category ? "" : " · 전체"}`
+      ? `${typeName} · ${s.ledger_category || "전체"}`
       : calc && !isHold
         ? `${typeName} · 계산값 ${money(shownAmount, s.currency)}`
         : typeName
@@ -124,6 +126,10 @@ export function CashGrid({
           {/* min-w: 항목명 열이 자동 배분에서 쪼그라들어 이름이 잘리는 것 방지(입력칸이 w-full이라 고유폭 0) */}
           <td className="min-w-36 px-2 py-1.5">
             <div className="relative flex items-center gap-1.5">
+              {/* 펼침 화살표 — 그룹 헤더와 같은 왼쪽 정렬(대표 요청 UX 통일) */}
+              <button onClick={() => toggleExpand(s.id)} className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground" title={open ? "접기" : "펼쳐서 편집"}>
+                {open ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+              </button>
               <button onClick={() => setColorFor(colorFor === s.id ? null : s.id)} className="size-3.5 shrink-0 rounded-full ring-1 ring-border transition-transform hover:scale-110" style={{ backgroundColor: swatch(s.color) }} title="색 변경" />
               {colorFor === s.id && (
                 <div className="absolute left-0 top-6 z-20 flex gap-1 rounded-lg border bg-popover p-1.5 shadow-md">
@@ -142,16 +148,6 @@ export function CashGrid({
                 </div>
               )}
               <InlineText value={s.name} onCommit={(v) => onUpdateSlot(s.id, { name: v })} />
-              {/* 분류 태그 — 접힌 상태에서도 한눈에(누르면 편집 행이 열림) */}
-              {!isHold && s.ledger_category && (
-                <button
-                  onClick={() => toggleExpand(s.id)}
-                  className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
-                  title="기록 분류 — 누르면 편집"
-                >
-                  {s.ledger_category}
-                </button>
-              )}
             </div>
           </td>
           <td className="px-2 py-1.5">
@@ -165,14 +161,13 @@ export function CashGrid({
               </select>
             )}
           </td>
-          {/* 계산 요약 — 누르면 아래에 편집 행이 열린다 */}
+          {/* 계산 요약 — 누르면 아래에 편집 행이 열린다(화살표는 행 왼쪽) */}
           <td className="px-2 py-1.5">
             <button
               onClick={() => toggleExpand(s.id)}
-              className="flex w-full items-center gap-1.5 rounded px-1 py-0.5 text-left text-xs text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+              className="flex w-full items-center rounded px-1 py-0.5 text-left text-xs text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
               title={open ? "접기" : "펼쳐서 편집"}
             >
-              {open ? <ChevronDown className="size-3 shrink-0" /> : <ChevronRight className="size-3 shrink-0" />}
               <span className="truncate tabular-nums">{summary}</span>
             </button>
           </td>
@@ -210,20 +205,7 @@ export function CashGrid({
                   // 장부 연동 슬롯 — 어떤 분류를 합산할지 선택(전체/식비/…). 바꾸면 다음 로드에서 금액 동기화.
                   <label className="flex items-center gap-1.5">
                     분류
-                    <select
-                      value={s.ledger_category ?? ""}
-                      onChange={(e) => onUpdateSlot(s.id, { ledger_category: e.target.value || null })}
-                      className="cursor-pointer rounded border bg-background px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-ring"
-                    >
-                      <option value="">전체</option>
-                      {(slotCategory(s.kind) === "income" ? REVENUE_CATEGORIES : EXPENSE_CATEGORIES).map((c) => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                      {s.ledger_category &&
-                        !((slotCategory(s.kind) === "income" ? REVENUE_CATEGORIES : EXPENSE_CATEGORIES) as readonly string[]).includes(s.ledger_category) && (
-                          <option value={s.ledger_category}>{s.ledger_category}</option>
-                        )}
-                    </select>
+                    <CategorySelect slot={s} options={categoryOptions} emptyLabel="전체" onUpdateSlot={onUpdateSlot} />
                   </label>
                 ) : (
                   <>
@@ -265,9 +247,9 @@ export function CashGrid({
                       </span>
                     )}
                     {!isHold && (
-                      <label className="flex items-center gap-1">
+                      <label className="flex items-center gap-1.5">
                         분류
-                        <CategoryInput slot={s} onUpdateSlot={onUpdateSlot} />
+                        <CategorySelect slot={s} options={categoryOptions} onUpdateSlot={onUpdateSlot} />
                       </label>
                     )}
                   </>
@@ -378,20 +360,35 @@ export function CashGrid({
   )
 }
 
-/** 슬롯 장부 분류 자유입력(+datalist 제안, CashFlowView가 렌더) — '기록' 시 이 분류로 내역에 찍힘. 비우면 슬롯명. */
-function CategoryInput({ slot: s, onUpdateSlot }: { slot: CashAccount; onUpdateSlot: (id: string, patch: Partial<CashAccount>) => void }) {
+/** 슬롯 장부 분류 선택 — 미리 만든 분류(기본+실제 장부 사용분)만 드롭다운으로(세션41 — 자유입력·datalist 제거, 대표 요청).
+ *  그리드 편집 행·캔버스 카드 공용. 현재값이 목록에 없어도 잃지 않게 옵션으로 보존. */
+export function CategorySelect({
+  slot: s,
+  options,
+  emptyLabel = "없음(슬롯명)",
+  onUpdateSlot,
+  className,
+}: {
+  slot: CashAccount
+  options: { revenue: string[]; expense: string[] }
+  emptyLabel?: string
+  onUpdateSlot: (id: string, patch: Partial<CashAccount>) => void
+  className?: string
+}) {
+  const list = slotCategory(s.kind) === "income" ? options.revenue : options.expense
+  const cur = s.ledger_category ?? ""
   return (
-    <input
-      key={`${s.id}-${s.ledger_category ?? ""}`}
-      defaultValue={s.ledger_category ?? ""}
-      list={slotCategory(s.kind) === "income" ? "cf-cat-revenue" : "cf-cat-expense"}
-      placeholder="기록 분류(비우면 슬롯명)"
-      onBlur={(e) => {
-        const v = e.target.value.trim()
-        if (v !== (s.ledger_category ?? "")) onUpdateSlot(s.id, { ledger_category: v || null })
-      }}
-      className="w-36 rounded border bg-background px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-ring"
-    />
+    <select
+      value={cur}
+      onChange={(e) => onUpdateSlot(s.id, { ledger_category: e.target.value || null })}
+      className={className ?? "cursor-pointer rounded border bg-background px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-ring"}
+    >
+      <option value="">{emptyLabel}</option>
+      {list.map((c) => (
+        <option key={c} value={c}>{c}</option>
+      ))}
+      {cur && !list.includes(cur) && <option value={cur}>{cur}</option>}
+    </select>
   )
 }
 
