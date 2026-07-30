@@ -134,9 +134,9 @@ export function DashboardAssistant() {
         <div className="p-2">
           <button
             onClick={newChat}
-            className="flex w-full items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
+            className="flex h-8 w-full items-center gap-1.5 rounded-lg border bg-card px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
-            <SquarePen className="size-4" /> 새 대화
+            <SquarePen className="size-3.5" /> 새 대화
           </button>
         </div>
         <p className="px-3 pb-1 pt-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
@@ -189,12 +189,12 @@ export function DashboardAssistant() {
         </div>
 
         {!hasChat ? (
-          <div className="flex flex-1 flex-col items-center justify-center px-4">
+          <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
             <div className="grid size-14 place-items-center rounded-[var(--radius-xl)] bg-primary/8 text-primary shadow-[var(--shadow-sm)]">
               <Sparkles className="size-6" />
             </div>
-            <p className="mt-4 text-xl font-semibold tracking-tight">무엇을 도와드릴까요?</p>
-            <p className="mt-1.5 text-sm text-muted-foreground">Complow 어시스턴트에게 무엇이든 물어보세요.</p>
+            <p className="mt-4 break-keep text-lg font-semibold tracking-tight">무엇을 도와드릴까요?</p>
+            <p className="mt-1.5 max-w-60 break-keep text-sm leading-relaxed text-muted-foreground">Complow 어시스턴트에게 무엇이든 물어보세요.</p>
           </div>
         ) : (
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-5 [scrollbar-gutter:stable] [scrollbar-width:thin]">

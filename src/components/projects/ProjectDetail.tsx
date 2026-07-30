@@ -460,6 +460,10 @@ function ChecklistSection({ projectId }: { projectId: string }) {
         load()
       },
     })
+    // 날짜가 바뀐 드래그만 알림(실수 방지) — 제목/색 편집은 조용히
+    if (patch.start_date !== undefined || patch.due_date !== undefined) {
+      toast.success(`'${t.title}' 일정이 바뀌었어요 — ⌘Z로 되돌릴 수 있어요.`)
+    }
   }
 
   const doneCount = tasks.filter((t) => t.done).length

@@ -101,13 +101,13 @@ export function ProjectTimeline({
     const startX = e.clientX
     const onMoveEv = (ev: PointerEvent) => {
       const dx = ev.clientX - startX
-      setDrag({ id: p.id, mode, startX, dDays: Math.round(dx / PPD), moved: Math.abs(dx) > 4 })
+      setDrag({ id: p.id, mode, startX, dDays: Math.round(dx / PPD), moved: Math.abs(dx) > 8 })
     }
     const onUp = (ev: PointerEvent) => {
       window.removeEventListener("pointermove", onMoveEv)
       window.removeEventListener("pointerup", onUp)
       const dDays = Math.round((ev.clientX - startX) / PPD)
-      const moved = Math.abs(ev.clientX - startX) > 4
+      const moved = Math.abs(ev.clientX - startX) > 8
       setDrag(null)
       if (!moved) {
         if (mode === "move") router.push(`/projects/${p.id}`)
@@ -258,12 +258,30 @@ function TimelineRow({
   const dday = Math.round((d0(d) - d0(today)) / DAY)
   const ddayLabel = p.status === "done" ? null : dday > 0 ? `D-${dday}` : dday === 0 ? "D-DAY" : `${-dday}일 지남`
 
+  // 라벨 — 바가 넉넉하면 안(말줄임), 좁으면 통째로 바 오른쪽에(글씨 삐져나옴 방지 — 애플/토스 결)
+  const labelInside = w >= 260
+  const label = (
+    <>
+      {ddayLabel && (
+        <span className={cn("shrink-0 rounded px-1 py-0.5 text-[10px] font-semibold tabular-nums", dday < 0 ? "bg-rose-500/15 text-rose-600" : "bg-background/80 text-foreground")}>
+          {ddayLabel}
+        </span>
+      )}
+      <span className="truncate font-semibold">{p.name}</span>
+      {leftN > 0 && <span className="shrink-0 rounded bg-muted px-1 py-0.5 text-[10px] text-muted-foreground tabular-nums">{leftN} 남음</span>}
+      {todayN > 0 && <span className="shrink-0 rounded bg-info-bg px-1 py-0.5 text-[10px] text-info tabular-nums">{todayN} 오늘</span>}
+      {overdue > 0 && <span className="shrink-0 rounded bg-warning-bg px-1 py-0.5 text-[10px] text-warning-foreground tabular-nums">{overdue} 지남</span>}
+      {doneN > 0 && <span className="shrink-0 rounded bg-success-bg px-1 py-0.5 text-[10px] text-success tabular-nums">{doneN} 완료</span>}
+      {pct != null && <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">{pct}%</span>}
+    </>
+  )
+
   return (
     <div className="relative" style={{ height: ROW_H }}>
-      <div className="absolute top-1.5 flex items-center" style={{ left }}>
+      <div className="absolute top-1.5 flex items-center gap-1.5" style={{ left }}>
         <div
           onPointerDown={(e) => onStartDrag(e, p, "move")}
-          className={cn("group relative h-8 rounded-lg border shadow-sm", drag ? "cursor-grabbing" : "cursor-grab")}
+          className={cn("group relative h-8 shrink-0 rounded-lg border shadow-sm", drag ? "cursor-grabbing" : "cursor-grab")}
           style={{ width: w, backgroundColor: `${st.dot}1f`, borderColor: `${st.dot}66` }}
           title={`${p.name} · ${s} ~ ${d} — 드래그로 이동, 양끝으로 기간 조절, 클릭=상세`}
         >
@@ -278,21 +296,9 @@ function TimelineRow({
           {/* 양끝 리사이즈 핸들 */}
           <div onPointerDown={(e) => onStartDrag(e, p, "start")} className="absolute inset-y-0 left-0 z-10 w-2 cursor-ew-resize rounded-l-lg" title="시작일 조절" />
           <div onPointerDown={(e) => onStartDrag(e, p, "due")} className="absolute inset-y-0 right-0 z-10 w-2 cursor-ew-resize rounded-r-lg" title="종료일 조절" />
-          {/* 라벨 — 바가 좁으면 오른쪽으로 흘러넘침(노션식) */}
-          <div className="absolute inset-y-0 left-2 z-[5] flex items-center gap-1.5 whitespace-nowrap text-xs">
-            {ddayLabel && (
-              <span className={cn("rounded px-1 py-0.5 text-[10px] font-semibold tabular-nums", dday < 0 ? "bg-rose-500/15 text-rose-600" : "bg-background/80 text-foreground")}>
-                {ddayLabel}
-              </span>
-            )}
-            <span className="font-semibold">{p.name}</span>
-            {leftN > 0 && <span className="rounded bg-muted px-1 py-0.5 text-[10px] text-muted-foreground tabular-nums">{leftN} 남음</span>}
-            {todayN > 0 && <span className="rounded bg-info-bg px-1 py-0.5 text-[10px] text-info tabular-nums">{todayN} 오늘</span>}
-            {overdue > 0 && <span className="rounded bg-warning-bg px-1 py-0.5 text-[10px] text-warning-foreground tabular-nums">{overdue} 지남</span>}
-            {doneN > 0 && <span className="rounded bg-success-bg px-1 py-0.5 text-[10px] text-success tabular-nums">{doneN} 완료</span>}
-            {pct != null && <span className="text-[10px] text-muted-foreground tabular-nums">{pct}%</span>}
-          </div>
+          {labelInside && <div className="absolute inset-y-0 left-2 right-1.5 z-[5] flex items-center gap-1.5 overflow-hidden whitespace-nowrap text-xs">{label}</div>}
         </div>
+        {!labelInside && <div className="flex items-center gap-1.5 whitespace-nowrap text-xs">{label}</div>}
       </div>
     </div>
   )

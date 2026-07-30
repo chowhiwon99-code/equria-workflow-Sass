@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { Plus, FolderKanban, Check, Trash2 } from "lucide-react"
+import { toast } from "sonner"
 import { Select } from "@/components/shared/Select"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
@@ -184,6 +185,8 @@ export function ProjectsView() {
         load()
       },
     })
+    // 실수 드래그 방지 — 무엇이 어떻게 바뀌었는지 즉시 알리고 되돌리는 길 안내(대표 요청: 의도치 않은 날짜 변경 사고)
+    toast.success(`'${p.name}' 기간을 ${newStart} ~ ${newDue}(으)로 옮겼어요 — ⌘Z로 되돌릴 수 있어요.`)
   }
 
   return (

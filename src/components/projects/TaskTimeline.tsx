@@ -143,13 +143,13 @@ export function TaskTimeline({
     const startX = e.clientX
     const onMoveEv = (ev: PointerEvent) => {
       const dx = ev.clientX - startX
-      setDrag({ id: t.id, mode, startX, dDays: Math.round(dx / PPD), moved: Math.abs(dx) > 4 })
+      setDrag({ id: t.id, mode, startX, dDays: Math.round(dx / PPD), moved: Math.abs(dx) > 8 })
     }
     const onUp = (ev: PointerEvent) => {
       window.removeEventListener("pointermove", onMoveEv)
       window.removeEventListener("pointerup", onUp)
       const dDays = Math.round((ev.clientX - startX) / PPD)
-      const moved = Math.abs(ev.clientX - startX) > 4
+      const moved = Math.abs(ev.clientX - startX) > 8
       setDrag(null)
       const s = t.start_date ?? (t.due_date as string)
       const d = t.due_date as string
