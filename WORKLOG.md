@@ -5,6 +5,26 @@
 
 ---
 
+## 2026-07-30 · 세션41 — 앱 ↔ 랜딩 디자인 통일("밝은 미니멀" 리디자인, 마이그 121)
+
+**무엇/왜:** 대표 지시 — 랜딩 목업(불투명 흰 카드·헤어라인·파스텔 필)과 실제 앱(세션31 글래스모피즘)의 통일감 부재. 가입 개방·가격표 라이브 상태라 신규 유저가 랜딩에서 본 것과 다른 첫 화면을 만나는 문제. 플랜모드(Explore 3+Plan 1) 계획 대표 승인(`gleaming-chasing-tiger.md`). **대표 결정 5:** ①글래스 완전 제거 ②다크모드 유지 ③대시보드 목업 정합 포함 ④손익 필=기본 관리자/오너 전용+공개 토글(오너·관리자 제어) ⑤어시스턴트 축소 유지. **로컬 커밋 4개(`bbe5b00`→`0fdbcb7`)·미푸시(배포는 대표 결정 대기).**
+
+**쪼갠 내용:**
+1. **커밋① 토큰 리프레시(`bbe5b00`, globals.css 단일 파일)**: 글래스 토큰 불투명화(.force-light 방식 :root/.dark 승격 — `.glass` 소비처 20파일 무수정으로 솔리드화) · @supports backdrop-filter 블록 삭제(blur 0도 fixed containing block 형성 — 세션32 드로어 사고 근원 제거) · 배경 0.961→0.977(#f7f8fa) · 보더 검정 알파 헤어라인(0/0.08) · primary INK #111 근사 · 신호색 hue 정합(success 150→163 emerald · info 250→263 blue, 라이트/다크) · .app-ambient 평탄화(마운트 div 유지) · .force-light 싱크.
+2. **커밋② 셸 디테일(`954d2a5`)**: Sidebar 필 rounded-full→lg 3곳 · FloatingAgentChat FAB `bg-primary/85+blur`→solid 3곳 · SelectionBar solid. 오버레이 스크림(Modal 등) blur는 유지(랜딩 AuthModal과 같은 오버레이 언어 — 표면 재질 아님).
+3. **커밋③ 백엔드(`b43f625`)**: 마이그 **121** `workspaces.finance_snapshot_open`(추가형·멱등·MCP 적용+파일·advisors 신규 0) · `/api/finance-snapshot` GET/PATCH(/api/budget 패턴 미러·관리자/오너 재검증) · types 수동 반영.
+4. **커밋④ 대시보드 UI(`0fdbcb7`)**: `FinanceSnapshot` 신설 — 이번 달 손익 필 3개(KRW만·financeAgg.aggregateByCurrency 재사용)+최근 기록 5건 · 게이팅(게스트 숨김/관리자 항상/멤버=토글 ON) · dashboard/page.tsx 재배치(공지→필→2열→어시스턴트 26rem 고정) · 설정 '대시보드 손익 공개' 스위치.
+
+**예상이슈 체크:** 각 커밋 tsc0·lint29/0(신규 1건은 기존 disable 선례로 처리)·build0 · 랜딩은 리터럴 하드코딩이라 픽셀 무변화(실소비 토큰=radius·모션뿐, 둘 다 미변경) · 알파 보더 중첩 진해 보이면 solid 근사 폴백 1줄 · info 채도 과하면 0.16 후퇴 1줄 · 마이그121은 DB 적용됨(기본 false라 구 코드에 무해). **⚠️ 대표 육안 미검증(라이트/다크/모바일 3벌·대시보드 필 값↔재무 탭 대조·토글 동작) — 배포(/deploy)는 대표 확인 후.** 후속 기록: app-ambient div 완전 제거·Surface glass variant 정리·랜딩 리터럴 토큰화·rounded-xl>2xl 역전.
+
+---
+
+## 2026-07-30 · 세션40 — 결제/가격 B3 트랙 (요약 — 상세는 HANDOFF 세션40 블록·git)
+
+**무엇/왜:** B3 슬라이스(대표 "에바 아님" 승인). 4티어 가격 확정(Basic ₩0/Standard ₩29k·5석/Pro ₩49k·10석/Premium 문의·초과 ₩4k/석·연 2개월 무료) → 랜딩 가격표 공개(`503166f`) · 푸터 사업자정보(`ea3d5dc`) · X 링크(`185a93f`) · 사이드바 로고 이미지(`a761bd3`). 비용 조사(Claude 단가·agent_usage 실측 — 입력이 원가 93~99%·유저당 월 ~$2) · DB 멀티테넌트 재감사 통과(47테이블 구멍 0). 산출물: 가격 논의자료 PDF·회사소개서 PDF(Desktop/complow). 행정: PortOne PG 검토중·통신판매업 신고번호 발급 대기. 신규 마이그 0.
+
+---
+
 ## 2026-07-28 · 세션39 후속 — 트랙2: 대화 요약 압축 (마이그 117)
 
 **무엇/왜:** 대표 지시. HISTORY_WINDOW(10턴) 슬라이딩 윈도우라 오래된 턴이 뚝 잘려 "질문하다 앞 내용 까먹음" — 윈도우 밖으로 밀려난 턴을 Haiku로 압축 요약해 시스템 프롬프트에 주입("멍청 게이지" 반려의 정직한 대안, HANDOFF 트랙2 원안 그대로). **배포 `9f77e33`·롤백=직전 SHA+마이그117 컬럼 drop.**
