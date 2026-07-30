@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { X, Plus, ExternalLink, Frame, FileText, Trash2, CalendarClock, Receipt, TrendingUp, ListChecks, Check, Loader2, type LucideIcon } from "lucide-react"
+import { X, Plus, ExternalLink, Frame, FileText, Trash2, CalendarClock, Bot, Workflow as WorkflowIcon, ListChecks, Check, Loader2 } from "lucide-react"
+import Link from "next/link"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
@@ -21,11 +22,8 @@ import { IMPORTANCE, importanceLabel, importanceColor, tagBg } from "@/lib/meeti
 import { isFigmaUrl, toFigmaDesktopUrl } from "@/lib/figma"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
-import { money } from "@/lib/finance"
-import { aggregateByCurrency } from "@/components/finance/financeAgg"
-import { FinanceEntryModal } from "@/components/finance/FinanceEntryModal"
 import { combineDateTimeToIso, toDateInputValue } from "@/lib/calendar"
-import type { Tables } from "@/lib/supabase/types"
+import type { Tables, Json } from "@/lib/supabase/types"
 import type { Project, ProjectStatus, Profile, DriveFile } from "@/types"
 
 type ProjectTask = Tables<"project_tasks">
@@ -41,9 +39,6 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
   const [project, setProject] = useState<(Project & { owner: { name: string; position: string | null } | null }) | null>(null)
   const [members, setMembers] = useState<MemberRow[]>([])
   const [profiles, setProfiles] = useState<Pick<Profile, "id" | "name" | "position">[]>([])
-  const [eventCount, setEventCount] = useState(0)
-  // 통화별 {비용,매출} — 하위 FinanceSection이 로드/변경 시 콜백으로 올려준다(통화 섞임 방지).
-  const [financeByCur, setFinanceByCur] = useState<Record<string, { revenue: number; expense: number }>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -103,6 +98,27 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
       },
       redo: async () => {
         await mustOk(supabase.from("projects").update({ importance }).eq("id", projectId))
+        load()
+      },
+    })
+  }
+
+  // 시작일·종료 예정일 편집(세션41 대표 요청) — 멤버 수정 가능(105 RLS), Undo 지원.
+  const changeDate = async (field: "start_date" | "due_date", value: string) => {
+    const prev = project?.[field] ?? null
+    const next = value || null
+    if (prev === next) return
+    const patchOf = (v: string | null) => (field === "start_date" ? { start_date: v } : { due_date: v })
+    await mustOk(supabase.from("projects").update(patchOf(next)).eq("id", projectId))
+    load()
+    push({
+      label: field === "start_date" ? "시작일 변경" : "종료 예정일 변경",
+      undo: async () => {
+        await mustOk(supabase.from("projects").update(patchOf(prev)).eq("id", projectId))
+        load()
+      },
+      redo: async () => {
+        await mustOk(supabase.from("projects").update(patchOf(next)).eq("id", projectId))
         load()
       },
     })
@@ -185,12 +201,6 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
   const addable = profiles.filter((p) => !memberIds.has(p.id))
   const st = PROJECT_STATUS[project.status as ProjectStatus]
 
-  // 요약 카드용 재무 집계 — 대표 통화(KRW 우선, 없으면 첫 통화). 전체 통화 분해는 아래 정산 섹션이 보여준다.
-  const finCurs = Object.keys(financeByCur)
-  const primaryCur = finCurs.includes("KRW") ? "KRW" : finCurs[0] ?? "KRW"
-  const finPrimary = financeByCur[primaryCur] ?? { revenue: 0, expense: 0 }
-  const scrollToId = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" })
-
   return (
     <div className="flex flex-col gap-5">
       {/* 헤더 — 제목 + 상태 배지 + (생성자) 삭제 */}
@@ -248,17 +258,19 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
           <MetaItem label="담당자">
             {project.owner ? [project.owner.name, project.owner.position].filter(Boolean).join(" · ") : "미지정"}
           </MetaItem>
-          <MetaItem label="시작일">{project.start_date ?? "—"}</MetaItem>
-          <MetaItem label="종료예정">{project.due_date ?? "—"}</MetaItem>
+          <MetaItem label="시작일">
+            <DateInput className="w-full" value={project.start_date ?? ""} onChange={(v) => changeDate("start_date", v)} />
+          </MetaItem>
+          <MetaItem label="종료 예정">
+            <DateInput className="w-full" value={project.due_date ?? ""} onChange={(v) => changeDate("due_date", v)} />
+          </MetaItem>
         </div>
+        {/* 기간 시각화 — 시작~종료 진행 바 + 오늘까지 경과 + D-day(대표 요청) */}
+        <PeriodBar start={project.start_date} due={project.due_date} />
       </div>
 
-      {/* 요약 카드 — 클릭 시 해당 섹션으로 스크롤(살아있는 진입점) */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <SummaryCard icon={CalendarClock} label="연결된 일정" value={`${eventCount}건`} accent="bg-muted text-foreground" onClick={() => scrollToId("project-schedule")} />
-        <SummaryCard icon={Receipt} label="비용 합계" value={money(finPrimary.expense, primaryCur)} accent="bg-rose-100 text-rose-600" onClick={() => scrollToId("project-finance")} />
-        <SummaryCard icon={TrendingUp} label="매출 합계" value={money(finPrimary.revenue, primaryCur)} accent="bg-emerald-100 text-emerald-600" onClick={() => scrollToId("project-finance")} />
-      </div>
+      {/* 연결된 AI 도구 — 에이전트·워크플로우 바로가기(metadata 저장·DDL 0, 대표 요청으로 재무 요약 카드 대체) */}
+      <LinkedToolsSection projectId={projectId} metadata={project.metadata} onChanged={load} />
 
       {/* 멤버 카드 */}
       <section className="rounded-2xl glass p-5">
@@ -301,10 +313,7 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
       </section>
 
       {/* 연결된 일정 — 이 프로젝트에 회의·마감 일정 연결(캘린더 project_id) */}
-      <ScheduleSection projectId={projectId} onCount={setEventCount} />
-
-      {/* 비용·매출 정산 — 이 프로젝트에 든 비용/나온 매출 연결(재무 project_id) + 통화별 순익 */}
-      <FinanceSection projectId={projectId} onSummary={setFinanceByCur} />
+      <ScheduleSection projectId={projectId} />
 
       {/* 체크리스트 — 프로젝트를 세부 할 일로 쪼갠다(팀 협업) */}
       <ChecklistSection projectId={projectId} />
@@ -706,7 +715,7 @@ function MetaItem({ label, children }: { label: string; children: React.ReactNod
 type ProjectEvent = Pick<Tables<"calendar_events">, "id" | "title" | "start_time" | "created_by" | "project_id" | "all_day">
 const EVENT_COLS = "id, title, start_time, created_by, project_id, all_day"
 
-function ScheduleSection({ projectId, onCount }: { projectId: string; onCount: (n: number) => void }) {
+function ScheduleSection({ projectId }: { projectId: string }) {
   const supabase = createClient()
   const me = useCurrentUserId()
   const wsId = useCurrentWorkspaceId()
@@ -725,8 +734,7 @@ function ScheduleSection({ projectId, onCount }: { projectId: string; onCount: (
       .order("start_time", { ascending: true })
     const rows = (data as ProjectEvent[]) ?? []
     setEvents(rows)
-    onCount(rows.length)
-  }, [supabase, projectId, onCount])
+  }, [supabase, projectId])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -808,130 +816,137 @@ function ScheduleSection({ projectId, onCount }: { projectId: string; onCount: (
   )
 }
 
-/**
- * 비용·매출 정산 — 이 프로젝트에 든 비용/나온 매출을 연결(finance_entries.project_id).
- * FinanceEntryModal 재사용(projectId 주입) + 통화별 합계·순익(financeAgg.aggregateByCurrency).
- */
-type ProjectFinance = Pick<Tables<"finance_entries">, "id" | "kind" | "category" | "total_amount" | "currency" | "entry_date">
-
-function FinanceSection({ projectId, onSummary }: { projectId: string; onSummary: (byCur: Record<string, { revenue: number; expense: number }>) => void }) {
-  const supabase = createClient()
-  const { push } = useUndo()
-  const [rows, setRows] = useState<ProjectFinance[]>([])
-  const [modal, setModal] = useState<null | "expense" | "revenue">(null)
-
-  const load = useCallback(async () => {
-    const { data } = await supabase
-      .from("finance_entries")
-      .select("id, kind, category, total_amount, currency, entry_date")
-      .eq("project_id", projectId)
-      .is("deleted_at", null)
-      .order("entry_date", { ascending: false })
-    const list = (data as ProjectFinance[]) ?? []
-    setRows(list)
-    onSummary(aggregateByCurrency(list))
-  }, [supabase, projectId, onSummary])
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load()
-  }, [load])
-
-  const remove = async (r: ProjectFinance) => {
-    const now = new Date().toISOString()
-    await mustOk(supabase.from("finance_entries").update({ deleted_at: now }).eq("id", r.id))
-    load()
-    push({
-      label: "정산 항목 삭제",
-      undo: async () => { await mustOk(supabase.from("finance_entries").update({ deleted_at: null }).eq("id", r.id)); load() },
-      redo: async () => { await mustOk(supabase.from("finance_entries").update({ deleted_at: now }).eq("id", r.id)); load() },
-    })
+/** 기간 시각화 — 시작~종료 진행 바 + D-day + 경과율(세션41 대표 요청). 날짜가 없으면 안내만. */
+function PeriodBar({ start, due }: { start: string | null; due: string | null }) {
+  if (!start || !due) {
+    return <p className="mt-4 border-t pt-3 text-xs text-muted-foreground">시작일·종료 예정일을 모두 정하면 기간 진행 바가 표시돼요.</p>
   }
-
-  const byCur = aggregateByCurrency(rows)
-  const curs = Object.keys(byCur)
-
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const s = new Date(`${start}T00:00:00`)
+  const d = new Date(`${due}T00:00:00`)
+  const total = Math.max(1, d.getTime() - s.getTime())
+  const pct = Math.min(100, Math.max(0, ((today.getTime() - s.getTime()) / total) * 100))
+  const dday = Math.round((d.getTime() - today.getTime()) / 86400000)
+  const ddayLabel = dday > 0 ? `D-${dday}` : dday === 0 ? "D-DAY" : `${-dday}일 지남`
   return (
-    <section id="project-finance" className="scroll-mt-20 rounded-2xl glass p-5">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="flex items-center gap-1.5 text-sm font-semibold">
-          <Receipt className="size-4 text-primary" /> 비용·매출 정산
-        </h2>
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => setModal("expense")}><Plus className="size-3.5" /> 비용</Button>
-          <Button size="sm" variant="outline" onClick={() => setModal("revenue")}><Plus className="size-3.5" /> 매출</Button>
-        </div>
+    <div className="mt-4 border-t pt-4">
+      <div className="mb-1.5 flex items-center justify-between text-xs text-muted-foreground">
+        <span className="tabular-nums">{start}</span>
+        <span
+          className={cn(
+            "rounded-full px-2 py-0.5 font-semibold",
+            dday < 0 ? "bg-rose-500/10 text-rose-500" : dday <= 7 ? "bg-warning-bg text-warning-foreground" : "bg-muted text-foreground"
+          )}
+        >
+          {ddayLabel}
+        </span>
+        <span className="tabular-nums">{due}</span>
       </div>
-
-      {curs.length === 0 ? (
-        <p className="mt-3 text-sm text-muted-foreground">아직 연결된 비용·매출이 없어요. 오른쪽 위 버튼으로 추가하세요.</p>
-      ) : (
-        <div className="mt-3 flex flex-col gap-1.5">
-          {curs.map((cur) => {
-            const s = byCur[cur]
-            const net = s.revenue - s.expense
-            return (
-              <div key={cur} className="flex flex-wrap items-center justify-between gap-1 rounded-lg border bg-card px-3 py-2 text-sm tabular-nums">
-                <span className="text-muted-foreground">비용 {money(s.expense, cur)} · 매출 {money(s.revenue, cur)}</span>
-                <span className={cn("font-semibold", net >= 0 ? "text-emerald-600" : "text-rose-600")}>순익 {net >= 0 ? "+" : ""}{money(net, cur)}</span>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {rows.length > 0 && (
-        <ul className="mt-2 flex flex-col gap-0.5">
-          {rows.map((r) => (
-            <li key={r.id} className="flex items-center justify-between px-1 py-1 text-sm">
-              <span className="min-w-0 truncate">
-                <span className={cn("mr-1.5 inline-block size-1.5 rounded-full align-middle", r.kind === "revenue" ? "bg-emerald-500" : "bg-rose-500")} />
-                {r.category || (r.kind === "revenue" ? "매출" : "비용")}
-                <span className="ml-1.5 text-xs text-muted-foreground">{r.entry_date}</span>
-              </span>
-              <div className="flex shrink-0 items-center gap-2 tabular-nums">
-                <span className={r.kind === "revenue" ? "text-emerald-600" : "text-rose-600"}>
-                  {r.kind === "revenue" ? "+" : "−"}{money(Number(r.total_amount), r.currency || "KRW")}
-                </span>
-                <button onClick={() => remove(r)} className="text-muted-foreground hover:text-destructive" aria-label="삭제"><Trash2 className="size-3.5" /></button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {modal && (
-        <FinanceEntryModal
-          entry={null}
-          projectId={projectId}
-          defaultKind={modal}
-          reload={load}
-          onClose={() => setModal(null)}
-          onSaved={() => setModal(null)}
-        />
-      )}
-    </section>
+      <div className="relative h-2 overflow-hidden rounded-full bg-muted">
+        <div className="absolute inset-y-0 left-0 rounded-full bg-primary/70" style={{ width: `${pct}%` }} />
+      </div>
+      <p className="mt-1 text-right text-[11px] text-muted-foreground tabular-nums">기간 경과 {Math.round(pct)}%</p>
+    </div>
   )
 }
 
-function SummaryCard({ icon: Icon, label, value, accent, onClick }: { icon: LucideIcon; label: string; value: string; accent: string; onClick?: () => void }) {
-  const inner = (
-    <>
-      <div className="flex items-center gap-2">
-        <span className={cn("grid size-7 shrink-0 place-items-center rounded-lg", accent)}>
-          <Icon className="size-4" />
-        </span>
-        <span className="text-xs font-medium text-muted-foreground">{label}</span>
-      </div>
-      <p className="mt-2.5 text-2xl font-semibold tabular-nums">{value}</p>
-    </>
-  )
-  if (onClick) {
-    return (
-      <button type="button" onClick={onClick} className="hover-grow rounded-2xl glass p-4 text-left transition-transform">
-        {inner}
-      </button>
-    )
+/** 연결된 에이전트·워크플로우 — projects.metadata(jsonb) 링크 저장(DDL 0, 세션41 대표 요청).
+ *  이 프로젝트에서 쓰는 AI 도구 바로가기. 클릭=해당 페이지 이동, ×=연결 해제. */
+type ToolLinks = { linked_agents?: string[]; linked_workflows?: string[] }
+
+function LinkedToolsSection({ projectId, metadata, onChanged }: { projectId: string; metadata: Json; onChanged: () => void }) {
+  const supabase = createClient()
+  const [agents, setAgents] = useState<{ id: string; name: string; icon: string | null }[]>([])
+  const [workflows, setWorkflows] = useState<{ id: string; name: string }[]>([])
+
+  useEffect(() => {
+    const loadTools = async () => {
+      const [{ data: ag }, { data: wf }] = await Promise.all([
+        supabase.from("agents").select("id, name, icon").eq("is_active", true).order("name"),
+        supabase.from("workflows").select("id, name").order("name"),
+      ])
+      setAgents(ag ?? [])
+      setWorkflows(wf ?? [])
+    }
+    loadTools()
+  }, [supabase])
+
+  const links = (metadata as ToolLinks | null) ?? {}
+  const linkedAgents = links.linked_agents ?? []
+  const linkedWorkflows = links.linked_workflows ?? []
+
+  const save = async (patch: ToolLinks) => {
+    const base = (metadata as Record<string, unknown> | null) ?? {}
+    await mustOk(supabase.from("projects").update({ metadata: { ...base, ...patch } as Json }).eq("id", projectId))
+    onChanged()
   }
-  return <div className="rounded-2xl glass p-4">{inner}</div>
+
+  const agentById = new Map(agents.map((a) => [a.id, a]))
+  const wfById = new Map(workflows.map((w) => [w.id, w]))
+  const addableAgents = agents.filter((a) => !linkedAgents.includes(a.id))
+  const addableWfs = workflows.filter((w) => !linkedWorkflows.includes(w.id))
+
+  return (
+    <section className="rounded-2xl glass p-5">
+      <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+        <Bot className="size-4 text-primary" /> 연결된 AI 도구
+      </h2>
+      <div className="mt-3 flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="w-20 shrink-0 text-xs font-medium text-muted-foreground">에이전트</span>
+          {linkedAgents.length === 0 && addableAgents.length === 0 && <span className="text-sm text-muted-foreground">연결할 에이전트가 없어요.</span>}
+          {linkedAgents.map((id) => {
+            const a = agentById.get(id)
+            return (
+              <span key={id} className="inline-flex items-center gap-1 rounded-full border bg-card py-0.5 pl-2 pr-1.5 text-xs shadow-[var(--shadow-sm)]">
+                <Link href={`/agents/${id}`} className="font-medium hover:underline">
+                  {a ? `${a.icon ?? "🤖"} ${a.name}` : "삭제된 에이전트"}
+                </Link>
+                <button onClick={() => save({ linked_agents: linkedAgents.filter((x) => x !== id) })} className="text-muted-foreground hover:text-destructive" aria-label="연결 해제">
+                  <X className="size-3" />
+                </button>
+              </span>
+            )
+          })}
+          {addableAgents.length > 0 && (
+            <Select
+              value=""
+              onChange={(v) => save({ linked_agents: [...linkedAgents, v] })}
+              options={addableAgents.map((a) => ({ value: a.id, label: `${a.icon ?? "🤖"} ${a.name}` }))}
+              placeholder="+ 에이전트 연결"
+              className="h-7 rounded-full"
+            />
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="w-20 shrink-0 text-xs font-medium text-muted-foreground">워크플로우</span>
+          {linkedWorkflows.length === 0 && addableWfs.length === 0 && <span className="text-sm text-muted-foreground">연결할 워크플로우가 없어요.</span>}
+          {linkedWorkflows.map((id) => {
+            const w = wfById.get(id)
+            return (
+              <span key={id} className="inline-flex items-center gap-1 rounded-full border bg-card py-0.5 pl-2 pr-1.5 text-xs shadow-[var(--shadow-sm)]">
+                <WorkflowIcon className="size-3 text-muted-foreground" />
+                <Link href={`/workflows/${id}`} className="font-medium hover:underline">
+                  {w ? w.name : "삭제된 워크플로우"}
+                </Link>
+                <button onClick={() => save({ linked_workflows: linkedWorkflows.filter((x) => x !== id) })} className="text-muted-foreground hover:text-destructive" aria-label="연결 해제">
+                  <X className="size-3" />
+                </button>
+              </span>
+            )
+          })}
+          {addableWfs.length > 0 && (
+            <Select
+              value=""
+              onChange={(v) => save({ linked_workflows: [...linkedWorkflows, v] })}
+              options={addableWfs.map((w) => ({ value: w.id, label: w.name }))}
+              placeholder="+ 워크플로우 연결"
+              className="h-7 rounded-full"
+            />
+          )}
+        </div>
+      </div>
+    </section>
+  )
 }
