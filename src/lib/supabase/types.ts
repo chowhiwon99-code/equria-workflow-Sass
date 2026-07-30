@@ -1524,6 +1524,7 @@ export type Database = {
           name: string
           owner_id: string | null
           project_id: string | null
+          project_task_id: string | null
           size_bytes: number | null
           source: string
           visibility: string
@@ -1542,6 +1543,7 @@ export type Database = {
           name: string
           owner_id?: string | null
           project_id?: string | null
+          project_task_id?: string | null
           size_bytes?: number | null
           source?: string
           visibility?: string
@@ -1560,6 +1562,7 @@ export type Database = {
           name?: string
           owner_id?: string | null
           project_id?: string | null
+          project_task_id?: string | null
           size_bytes?: number | null
           source?: string
           visibility?: string
@@ -2797,6 +2800,7 @@ export type Database = {
           id: string
           project_id: string
           sort_order: number
+          start_date: string | null
           title: string
           updated_at: string
         }
@@ -2808,6 +2812,7 @@ export type Database = {
           id?: string
           project_id: string
           sort_order?: number
+          start_date?: string | null
           title: string
           updated_at?: string
         }
@@ -2819,6 +2824,7 @@ export type Database = {
           id?: string
           project_id?: string
           sort_order?: number
+          start_date?: string | null
           title?: string
           updated_at?: string
         }

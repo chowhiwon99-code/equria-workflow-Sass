@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { X, Plus, ExternalLink, Frame, FileText, Trash2, CalendarClock, Bot, Workflow as WorkflowIcon, ListChecks, Check, Loader2 } from "lucide-react"
 import Link from "next/link"
@@ -23,6 +23,7 @@ import { isFigmaUrl, toFigmaDesktopUrl } from "@/lib/figma"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
 import { combineDateTimeToIso, toDateInputValue } from "@/lib/calendar"
+import { TaskTimeline } from "./TaskTimeline"
 import type { Tables, Json } from "@/lib/supabase/types"
 import type { Project, ProjectStatus, Profile, DriveFile } from "@/types"
 
@@ -238,7 +239,7 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
 
       {/* 메타 카드 — 상태/담당자/일정 */}
       <div className="rounded-2xl glass p-5">
-        <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3 xl:grid-cols-5">
           <MetaItem label="상태">
             <Select
               value={project.status}
@@ -349,6 +350,7 @@ function ChecklistSection({ projectId }: { projectId: string }) {
   const { push } = useUndo()
   const [tasks, setTasks] = useState<ProjectTask[]>([])
   const [title, setTitle] = useState("")
+  const [start, setStart] = useState("") // 시작일(선택) — 타임라인 기간 바(마이그123)
   const [due, setDue] = useState("")
   const [busy, setBusy] = useState(false)
   const submitting = useRef(false) // 한글 IME Enter 이중발동·연타 방지
@@ -378,10 +380,11 @@ function ChecklistSection({ projectId }: { projectId: string }) {
     try {
       const { data: inserted } = await supabase
         .from("project_tasks")
-        .insert({ project_id: projectId, title: t, due_date: due || null, created_by: me })
+        .insert({ project_id: projectId, title: t, start_date: start || null, due_date: due || null, created_by: me })
         .select()
         .single()
       setTitle("")
+      setStart("")
       setDue("")
       await load()
       if (inserted) {
@@ -440,6 +443,24 @@ function ChecklistSection({ projectId }: { projectId: string }) {
     }
   }
 
+  // 타임라인 드래그 이동/기간 조절 — Undo 지원
+  const moveTask = async (t: ProjectTask, newStart: string | null, newDue: string) => {
+    const prev = { start_date: t.start_date, due_date: t.due_date }
+    await mustOk(supabase.from("project_tasks").update({ start_date: newStart, due_date: newDue }).eq("id", t.id))
+    load()
+    push({
+      label: "할 일 기간 변경",
+      undo: async () => {
+        await mustOk(supabase.from("project_tasks").update(prev).eq("id", t.id))
+        load()
+      },
+      redo: async () => {
+        await mustOk(supabase.from("project_tasks").update({ start_date: newStart, due_date: newDue }).eq("id", t.id))
+        load()
+      },
+    })
+  }
+
   const doneCount = tasks.filter((t) => t.done).length
   const pct = tasks.length ? Math.round((doneCount / tasks.length) * 100) : 0
 
@@ -472,11 +493,15 @@ function ChecklistSection({ projectId }: { projectId: string }) {
             if (e.key === "Enter" && !e.nativeEvent.isComposing) add()
           }}
         />
-        <DateInput className="w-36" value={due} onChange={setDue} title="기한(선택)" placeholder="기한 선택" />
+        <DateInput className="w-36" value={start} onChange={setStart} title="시작일(선택)" placeholder="시작일" />
+        <DateInput className="w-36" value={due} onChange={setDue} title="기한(선택)" placeholder="기한" min={start || undefined} />
         <Button size="sm" onClick={add} disabled={busy || !title.trim()}>
           {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />} 추가
         </Button>
       </div>
+
+      {/* 태스크 타임라인 — 기한 있는 할 일을 기간 바로(드래그 이동·양끝 조절·📎 일정별 파일) */}
+      <TaskTimeline projectId={projectId} tasks={tasks} onMoveTask={moveTask} />
 
       {/* 목록 */}
       {tasks.length === 0 ? (
@@ -851,8 +876,8 @@ function PeriodBar({ start, due }: { start: string | null; due: string | null })
   )
 }
 
-/** 연결된 에이전트·워크플로우 — projects.metadata(jsonb) 링크 저장(DDL 0, 세션41 대표 요청).
- *  이 프로젝트에서 쓰는 AI 도구 바로가기. 클릭=해당 페이지 이동, ×=연결 해제. */
+/** 연결된 AI 도구 — 연동은 프로젝트 생성 시(대표 확정), 상세는 표시+해제만.
+ *  연동 없으면 '연동된 AI 없음' 한 줄. projects.metadata(jsonb) 저장(DDL 0). */
 type ToolLinks = { linked_agents?: string[]; linked_workflows?: string[] }
 
 function LinkedToolsSection({ projectId, metadata, onChanged }: { projectId: string; metadata: Json; onChanged: () => void }) {
@@ -860,21 +885,23 @@ function LinkedToolsSection({ projectId, metadata, onChanged }: { projectId: str
   const [agents, setAgents] = useState<{ id: string; name: string; icon: string | null }[]>([])
   const [workflows, setWorkflows] = useState<{ id: string; name: string }[]>([])
 
+  const links = (metadata as ToolLinks | null) ?? {}
+  const linkedAgents = useMemo(() => links.linked_agents ?? [], [links.linked_agents])
+  const linkedWorkflows = useMemo(() => links.linked_workflows ?? [], [links.linked_workflows])
+  const hasLinks = linkedAgents.length > 0 || linkedWorkflows.length > 0
+
   useEffect(() => {
+    if (!hasLinks) return
     const loadTools = async () => {
       const [{ data: ag }, { data: wf }] = await Promise.all([
-        supabase.from("agents").select("id, name, icon").eq("is_active", true).order("name"),
-        supabase.from("workflows").select("id, name").order("name"),
+        linkedAgents.length ? supabase.from("agents").select("id, name, icon").in("id", linkedAgents) : Promise.resolve({ data: [] }),
+        linkedWorkflows.length ? supabase.from("workflows").select("id, name").in("id", linkedWorkflows) : Promise.resolve({ data: [] }),
       ])
       setAgents(ag ?? [])
       setWorkflows(wf ?? [])
     }
     loadTools()
-  }, [supabase])
-
-  const links = (metadata as ToolLinks | null) ?? {}
-  const linkedAgents = links.linked_agents ?? []
-  const linkedWorkflows = links.linked_workflows ?? []
+  }, [supabase, hasLinks, linkedAgents, linkedWorkflows])
 
   const save = async (patch: ToolLinks) => {
     const base = (metadata as Record<string, unknown> | null) ?? {}
@@ -884,68 +911,46 @@ function LinkedToolsSection({ projectId, metadata, onChanged }: { projectId: str
 
   const agentById = new Map(agents.map((a) => [a.id, a]))
   const wfById = new Map(workflows.map((w) => [w.id, w]))
-  const addableAgents = agents.filter((a) => !linkedAgents.includes(a.id))
-  const addableWfs = workflows.filter((w) => !linkedWorkflows.includes(w.id))
 
   return (
     <section className="rounded-2xl glass p-5">
-      <h2 className="flex items-center gap-1.5 text-sm font-semibold">
-        <Bot className="size-4 text-primary" /> 연결된 AI 도구
-      </h2>
-      <div className="mt-3 flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="w-20 shrink-0 text-xs font-medium text-muted-foreground">에이전트</span>
-          {linkedAgents.length === 0 && addableAgents.length === 0 && <span className="text-sm text-muted-foreground">연결할 에이전트가 없어요.</span>}
-          {linkedAgents.map((id) => {
-            const a = agentById.get(id)
-            return (
-              <span key={id} className="inline-flex items-center gap-1 rounded-full border bg-card py-0.5 pl-2 pr-1.5 text-xs shadow-[var(--shadow-sm)]">
-                <Link href={`/agents/${id}`} className="font-medium hover:underline">
-                  {a ? `${a.icon ?? "🤖"} ${a.name}` : "삭제된 에이전트"}
-                </Link>
-                <button onClick={() => save({ linked_agents: linkedAgents.filter((x) => x !== id) })} className="text-muted-foreground hover:text-destructive" aria-label="연결 해제">
-                  <X className="size-3" />
-                </button>
-              </span>
-            )
-          })}
-          {addableAgents.length > 0 && (
-            <Select
-              value=""
-              onChange={(v) => save({ linked_agents: [...linkedAgents, v] })}
-              options={addableAgents.map((a) => ({ value: a.id, label: `${a.icon ?? "🤖"} ${a.name}` }))}
-              placeholder="+ 에이전트 연결"
-              className="h-7 rounded-full"
-            />
-          )}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="w-20 shrink-0 text-xs font-medium text-muted-foreground">워크플로우</span>
-          {linkedWorkflows.length === 0 && addableWfs.length === 0 && <span className="text-sm text-muted-foreground">연결할 워크플로우가 없어요.</span>}
-          {linkedWorkflows.map((id) => {
-            const w = wfById.get(id)
-            return (
-              <span key={id} className="inline-flex items-center gap-1 rounded-full border bg-card py-0.5 pl-2 pr-1.5 text-xs shadow-[var(--shadow-sm)]">
-                <WorkflowIcon className="size-3 text-muted-foreground" />
-                <Link href={`/workflows/${id}`} className="font-medium hover:underline">
-                  {w ? w.name : "삭제된 워크플로우"}
-                </Link>
-                <button onClick={() => save({ linked_workflows: linkedWorkflows.filter((x) => x !== id) })} className="text-muted-foreground hover:text-destructive" aria-label="연결 해제">
-                  <X className="size-3" />
-                </button>
-              </span>
-            )
-          })}
-          {addableWfs.length > 0 && (
-            <Select
-              value=""
-              onChange={(v) => save({ linked_workflows: [...linkedWorkflows, v] })}
-              options={addableWfs.map((w) => ({ value: w.id, label: w.name }))}
-              placeholder="+ 워크플로우 연결"
-              className="h-7 rounded-full"
-            />
-          )}
-        </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+          <Bot className="size-4 text-primary" /> 연동된 AI
+        </h2>
+        {!hasLinks ? (
+          <span className="text-sm text-muted-foreground">연동된 AI 없음 — 프로젝트 생성 시 연동할 수 있어요.</span>
+        ) : (
+          <>
+            {linkedAgents.map((id) => {
+              const a = agentById.get(id)
+              return (
+                <span key={id} className="inline-flex items-center gap-1 rounded-full border bg-card py-0.5 pl-2 pr-1.5 text-xs shadow-[var(--shadow-sm)]">
+                  <Link href={`/agents/${id}`} className="font-medium hover:underline">
+                    {a ? `${a.icon ?? "🤖"} ${a.name}` : "…"}
+                  </Link>
+                  <button onClick={() => save({ linked_agents: linkedAgents.filter((x) => x !== id) })} className="text-muted-foreground hover:text-destructive" aria-label="연동 해제">
+                    <X className="size-3" />
+                  </button>
+                </span>
+              )
+            })}
+            {linkedWorkflows.map((id) => {
+              const w = wfById.get(id)
+              return (
+                <span key={id} className="inline-flex items-center gap-1 rounded-full border bg-card py-0.5 pl-2 pr-1.5 text-xs shadow-[var(--shadow-sm)]">
+                  <WorkflowIcon className="size-3 text-muted-foreground" />
+                  <Link href={`/workflows/${id}`} className="font-medium hover:underline">
+                    {w ? w.name : "…"}
+                  </Link>
+                  <button onClick={() => save({ linked_workflows: linkedWorkflows.filter((x) => x !== id) })} className="text-muted-foreground hover:text-destructive" aria-label="연동 해제">
+                    <X className="size-3" />
+                  </button>
+                </span>
+              )
+            })}
+          </>
+        )}
       </div>
     </section>
   )
