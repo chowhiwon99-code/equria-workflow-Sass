@@ -164,6 +164,9 @@ export function SettingsView() {
   const [budget, setBudget] = useState<{ spent: number; limit: number | null; isAdmin: boolean } | null>(null)
   const [budgetInput, setBudgetInput] = useState("")
   const [savingBudget, setSavingBudget] = useState(false)
+  // 대시보드 손익 공개(마이그 121) — 관리자/오너만 토글 노출
+  const [snap, setSnap] = useState<{ open: boolean; isManager: boolean } | null>(null)
+  const [savingSnap, setSavingSnap] = useState(false)
 
   // 테마는 클라이언트에서만 확정(hydration mismatch 방지)
   useEffect(() => setMounted(true), [])
@@ -218,6 +221,16 @@ export function SettingsView() {
         }
       } catch {
         /* 예산 조회 실패는 설정 로드를 막지 않음 */
+      }
+      // 대시보드 손익 공개 상태(조회 실패는 무시 — 토글만 숨김)
+      try {
+        const sRes = await fetch("/api/finance-snapshot")
+        if (sRes.ok) {
+          const s = (await sRes.json()) as { open: boolean; isManager: boolean }
+          setSnap({ open: s.open, isManager: s.isManager })
+        }
+      } catch {
+        /* 무시 */
       }
       setError(null)
     } catch {
@@ -279,6 +292,28 @@ export function SettingsView() {
       toast.error(e instanceof Error ? e.message : "저장에 실패했어요.")
     } finally {
       setSavingBudget(false)
+    }
+  }
+
+  // 대시보드 손익 공개 토글 (관리자/오너만 — 서버가 재검증)
+  const toggleSnapshot = async () => {
+    if (!snap || savingSnap) return
+    setSavingSnap(true)
+    const next = !snap.open
+    try {
+      const res = await fetch("/api/finance-snapshot", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ open: next }),
+      })
+      const j = await res.json()
+      if (!res.ok) throw new Error(j.error ?? "저장 실패")
+      setSnap((s) => (s ? { ...s, open: next } : s))
+      toast.success(next ? "손익 요약을 전 직원에게 공개했어요." : "손익 요약을 관리자/오너만 보도록 변경했어요.")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "변경에 실패했어요.")
+    } finally {
+      setSavingSnap(false)
     }
   }
 
@@ -609,6 +644,36 @@ export function SettingsView() {
           </div>
         )}
       </Card>
+
+      {/* 대시보드 손익 공개 (관리자/오너만 — 마이그 121) */}
+      {snap?.isManager && (
+        <Card>
+          <div className="flex items-center justify-between gap-4">
+            <SectionTitle
+              title="대시보드 손익 공개"
+              desc="끄면 대시보드의 이번 달 손익 요약·최근 기록을 관리자/오너만 봐요. 켜면 전 직원에게 보여요(게스트 제외)."
+            />
+            <button
+              type="button"
+              role="switch"
+              aria-checked={snap.open}
+              onClick={toggleSnapshot}
+              disabled={savingSnap}
+              className={cn(
+                "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50",
+                snap.open ? "bg-primary" : "bg-muted-foreground/30"
+              )}
+            >
+              <span
+                className={cn(
+                  "absolute left-0.5 size-5 rounded-full bg-card shadow-[var(--shadow-sm)] transition-transform",
+                  snap.open ? "translate-x-5" : "translate-x-0"
+                )}
+              />
+            </button>
+          </div>
+        </Card>
+      )}
 
       {/* 계정 */}
       <Card>
