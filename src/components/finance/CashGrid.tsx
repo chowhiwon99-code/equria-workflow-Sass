@@ -98,7 +98,7 @@ export function CashGrid({
       return next
     })
 
-  const NCOL = 5 // 항목명·구분·계산·이번 달 금액·액션 — 헤더 컬럼 수와 일치
+  const NCOL = 6 // 항목명·분류·구분·계산·이번 달 금액·액션 — 헤더 컬럼 수와 일치
 
   const renderRow = (s: CashAccount) => {
     const customType = s.calc_type_id ? calcTypes.find((t) => t.id === s.calc_type_id) : undefined
@@ -145,17 +145,19 @@ export function CashGrid({
                 </div>
               )}
               <InlineText value={s.name} onCommit={(v) => onUpdateSlot(s.id, { name: v })} />
-              {/* 분류 — 항목명 바로 옆에서 선택(대표 요청). 비우면 기록 시 슬롯명으로 찍힘 */}
-              {!isHold && (
-                <CategorySelect
-                  slot={s}
-                  options={categoryOptions}
-                  emptyLabel={isLedger ? "전체" : "분류 없음"}
-                  onUpdateSlot={onUpdateSlot}
-                  className="shrink-0 cursor-pointer rounded border-0 bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground outline-none focus:ring-1 focus:ring-ring"
-                />
-              )}
             </div>
+          </td>
+          {/* 분류 — 독립 컬럼(컬럼 경계 = 편집 행 '유형' 시작점과 정렬, 대표 요청). 비우면 기록 시 슬롯명 */}
+          <td className="px-2 py-1.5">
+            {!isHold && (
+              <CategorySelect
+                slot={s}
+                options={categoryOptions}
+                emptyLabel={isLedger ? "전체" : "분류 없음"}
+                onUpdateSlot={onUpdateSlot}
+                className="cursor-pointer rounded border-0 bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground outline-none focus:ring-1 focus:ring-ring"
+              />
+            )}
           </td>
           <td className="px-2 py-1.5">
             {isOtherCustom ? (
@@ -291,6 +293,7 @@ export function CashGrid({
           <thead className="border-b bg-muted/30 text-xs text-muted-foreground">
             <tr>
               <th className={th}><button onClick={() => toggleSort("name")} className="inline-flex items-center gap-1 hover:text-foreground">항목명 {sortIcon("name")}</button></th>
+              <th className={th}>분류</th>
               <th className={th}><button onClick={() => toggleSort("kind")} className="inline-flex items-center gap-1 hover:text-foreground">구분 {sortIcon("kind")}</button></th>
               <th className={th} title="누르면 유형·입력칸·분류가 펼쳐져요">계산</th>
               <th className={thR}><button onClick={() => toggleSort("amount")} className="inline-flex items-center gap-1 hover:text-foreground" title="매출·비용 = 이번 달 장부 기록 합계(자동) · 보유금 = 직접 입력">이번 달 금액 {sortIcon("amount")}</button></th>
