@@ -483,13 +483,17 @@ export function FinanceView() {
           {/* 기록 집계(구 요약 흡수) — 이 기간 내역의 합계·추세·분류. 회사 손익의 기준은 '손익' 탭. */}
           {currencyRows.length > 0 && (
           <div className="flex flex-col gap-4">
-            {/* 기록 합계 — 작은 한 줄. 큰 KPI 카드·'순수익' 표기는 손익 탭과 헷갈려 제거(손익=손익 탭이 유일 기준). */}
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">
+            {/* 기록 합계 — 파스텔 필(대시보드·랜딩과 동일 언어). 큰 KPI 카드·'순수익' 표기는 손익 탭과 헷갈려 제거(손익=손익 탭이 유일 기준). */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
               <span className="font-medium text-foreground">이 기간 기록 합계</span>
               {currencyRows.map(([cur, v]) => (
-                <span key={cur} className="tabular-nums">
-                  {currencyRows.length > 1 ? `${cur} ` : ""}매출 <b className="font-medium text-success">{money(v.revenue, cur)}</b> · 지출{" "}
-                  <b className="font-medium text-destructive">{money(v.expense, cur)}</b>
+                <span key={cur} className="flex flex-wrap items-center gap-1.5">
+                  <span className="rounded-full bg-success-bg px-2.5 py-1 font-semibold text-success tabular-nums">
+                    {currencyRows.length > 1 ? `${cur} ` : ""}매출 {money(v.revenue, cur)}
+                  </span>
+                  <span className="rounded-full bg-rose-500/10 px-2.5 py-1 font-semibold text-rose-500 tabular-nums">
+                    {currencyRows.length > 1 ? `${cur} ` : ""}지출 {money(v.expense, cur)}
+                  </span>
                 </span>
               ))}
               {fxConverted?.usedFx && (
@@ -503,7 +507,7 @@ export function FinanceView() {
             {/* 월간 추세(작게·좌 2/5) + 분류 분해(우 3/5) — 한눈에 */}
             <div className="grid gap-4 lg:grid-cols-5">
               {/* 월간 추세 — 좌측, 작게 */}
-              <div className="rounded-lg border p-4 lg:col-span-2">
+              <div className="rounded-xl border bg-card p-4 shadow-[var(--shadow-sm)] lg:col-span-2">
                 <div className="mb-1 flex items-center justify-between">
                   <h2 className="text-sm font-semibold">
                     월간 추세 <span className="font-normal text-muted-foreground">· 최근 6개월</span>
@@ -533,13 +537,13 @@ export function FinanceView() {
 
               {/* 분류 분해 — 우측, 지출/매출 나란히(KRW) */}
               <div className="grid gap-4 sm:grid-cols-2 lg:col-span-3">
-                <div className="rounded-lg border p-4">
+                <div className="rounded-xl border bg-card p-4 shadow-[var(--shadow-sm)]">
                   <h2 className="mb-3 text-sm font-semibold">
                     지출 분류 <span className="font-normal text-muted-foreground">· 원화(KRW) 기준</span>
                   </h2>
                   <BreakdownBars items={expenseBreakdown} format={won} />
                 </div>
-                <div className="rounded-lg border p-4">
+                <div className="rounded-xl border bg-card p-4 shadow-[var(--shadow-sm)]">
                   <h2 className="mb-3 text-sm font-semibold">
                     매출 분류 <span className="font-normal text-muted-foreground">· 원화(KRW) 기준</span>
                   </h2>
@@ -593,7 +597,7 @@ export function FinanceView() {
               <p className="text-sm">이 조건에 해당하는 내역이 없어요.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-lg border">
+            <div className="overflow-x-auto rounded-xl border bg-card shadow-[var(--shadow-sm)]">
               <table className="w-full min-w-[860px] text-sm tabular-nums [&_td]:align-middle [&_th]:align-middle">
                 <thead className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
                   <tr>
@@ -742,7 +746,7 @@ export function FinanceView() {
           <div className="flex flex-col gap-2">
             <p className="text-xs text-muted-foreground">전체 초안 (기간 무관)</p>
             {/* 모바일 = 가로 스크롤(7열 표 짜부 방지 — 내역 탭 표와 동일 패턴) */}
-            <div className="overflow-x-auto rounded-lg border">
+            <div className="overflow-x-auto rounded-xl border bg-card shadow-[var(--shadow-sm)]">
               <table className="w-full min-w-[640px] text-sm tabular-nums [&_td]:align-middle [&_th]:align-middle">
                 <thead className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
                   <tr>
