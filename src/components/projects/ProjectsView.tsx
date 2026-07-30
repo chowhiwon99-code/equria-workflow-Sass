@@ -17,6 +17,7 @@ import { Loading, EmptyState, ErrorState } from "@/components/shared/States"
 import { useUndo } from "@/components/undo/UndoProvider"
 import { PROJECT_STATUS, PROJECT_STATUS_ORDER } from "@/lib/projects"
 import { IMPORTANCE, importanceLabel, importanceColor, tagBg } from "@/lib/meetingMeta"
+import { ProjectTimeline, type TaskLite } from "./ProjectTimeline"
 import type { Project, ProjectStatus, Profile } from "@/types"
 
 type ProjectRow = Project
@@ -93,6 +94,9 @@ export function ProjectsView() {
   const [statusFilter, setStatusFilter] = useState<string>("")
   const [pageCount, setPageCount] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
+  // 노션식 타임라인(세션41 대표 요청) — 기본 뷰. 할 일 통계는 project_tasks에서.
+  const [view, setView] = useState<"timeline" | "list">("timeline")
+  const [tasksByProject, setTasksByProject] = useState<Record<string, TaskLite[]>>({})
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -113,18 +117,22 @@ export function ProjectsView() {
       if (projRes.error) throw projRes.error
       if (profRes.error) throw profRes.error
       const projData = (projRes.data as ProjectRow[]) ?? []
-      // 참여 인원(project_members) → 프로젝트별 user_id 목록
+      // 참여 인원(project_members) → 프로젝트별 user_id 목록 + 할 일 통계(타임라인 배지용)
       const ids = projData.map((p) => p.id)
       if (ids.length) {
-        const { data: pm } = await supabase
-          .from("project_members")
-          .select("project_id, user_id")
-          .in("project_id", ids)
+        const [{ data: pm }, { data: pt }] = await Promise.all([
+          supabase.from("project_members").select("project_id, user_id").in("project_id", ids),
+          supabase.from("project_tasks").select("project_id, done, due_date").in("project_id", ids),
+        ])
         const map: Record<string, string[]> = {}
         for (const row of pm ?? []) (map[row.project_id] ??= []).push(row.user_id)
         setMemberMap(map)
+        const tmap: Record<string, TaskLite[]> = {}
+        for (const row of pt ?? []) (tmap[row.project_id] ??= []).push({ done: row.done, due_date: row.due_date })
+        setTasksByProject(tmap)
       } else {
         setMemberMap({})
+        setTasksByProject({})
       }
       // 소프트삭제 제외는 클라 필터 — deleted_at 컬럼이 아직 없어도(마이그105 전) 안 깨지게(방어).
       setProjects(projData.filter((p) => !p.deleted_at))
@@ -155,13 +163,50 @@ export function ProjectsView() {
   const hasMore = projects.length < totalCount
   const profileById = new Map(profiles.map((pf) => [pf.id, pf] as const))
 
+  // 타임라인 드래그 이동/기간 조절 — 낙관 반영 + Undo(멤버 수정권한 RLS·마이그105)
+  const moveProject = async (p: ProjectRow, newStart: string, newDue: string) => {
+    const prev = { start_date: p.start_date, due_date: p.due_date }
+    setProjects((list) => list.map((x) => (x.id === p.id ? { ...x, start_date: newStart, due_date: newDue } : x)))
+    try {
+      await mustOk(supabase.from("projects").update({ start_date: newStart, due_date: newDue }).eq("id", p.id))
+    } catch {
+      setProjects((list) => list.map((x) => (x.id === p.id ? { ...x, ...prev } : x)))
+      return
+    }
+    push({
+      label: "프로젝트 기간 이동",
+      undo: async () => {
+        await mustOk(supabase.from("projects").update(prev).eq("id", p.id))
+        load()
+      },
+      redo: async () => {
+        await mustOk(supabase.from("projects").update({ start_date: newStart, due_date: newDue }).eq("id", p.id))
+        load()
+      },
+    })
+  }
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <h1 className="text-lg font-semibold">프로젝트</h1>
-        <Button size="sm" onClick={() => setShowCreate(true)}>
-          <Plus /> 새 프로젝트
-        </Button>
+        <div className="flex items-center gap-1.5">
+          {/* 타임라인 | 리스트 뷰 전환(노션식) */}
+          <div className="mr-1 flex items-center rounded-lg border bg-card p-0.5 text-xs">
+            {(["timeline", "list"] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className={cn("rounded-md px-2.5 py-1 font-medium transition-colors", view === v ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}
+              >
+                {v === "timeline" ? "타임라인" : "리스트"}
+              </button>
+            ))}
+          </div>
+          <Button size="sm" onClick={() => setShowCreate(true)}>
+            <Plus /> 새 프로젝트
+          </Button>
+        </div>
       </div>
 
       {/* 필터·검색 바 */}
@@ -210,6 +255,8 @@ export function ProjectsView() {
           icon={FolderKanban}
           title="아직 프로젝트가 없습니다. 첫 프로젝트를 만들어 보세요."
         />
+      ) : view === "timeline" ? (
+        <ProjectTimeline projects={projects} tasksByProject={tasksByProject} onMove={moveProject} />
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {projects.map((p) => {
