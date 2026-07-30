@@ -109,8 +109,8 @@ export function CashGrid({
     const setLiveVal = (k: string, v: number) => setLive((p) => ({ ...p, [s.id]: { ...p[s.id], [k]: v } }))
     const ast = astOf(s, calcTypes)
     const shownAmount = calc && ast ? evalFormula(ast, { ...Object.fromEntries(fields.map((f) => [f.key, getVal(f.key)])), ...(live[s.id] ?? {}) }) : Number(s.amount)
-    // 편집 행 입력 = 테두리 보이는 컴팩트 박스·왼쪽 정렬(투명 입력의 빈 꼬리가 흩어져 보이던 문제 해소, 대표 요청)
-    const editor = (f: CalcField) => (f.kind === "percent" ? <InlinePercent boxed value={getVal(f.key)} onCommit={(v) => setVal(f.key, v)} onLive={(v) => setLiveVal(f.key, v)} /> : <InlineNumber width="w-24" align="left" boxed value={getVal(f.key)} onCommit={(v) => setVal(f.key, v)} onLive={(v) => setLiveVal(f.key, v)} />)
+    // 편집 행 입력 = 테두리 없는 심플 왼쪽 정렬(대표 확정 — 칸 없이)
+    const editor = (f: CalcField) => (f.kind === "percent" ? <InlinePercent value={getVal(f.key)} onCommit={(v) => setVal(f.key, v)} onLive={(v) => setLiveVal(f.key, v)} /> : <InlineNumber width="w-20" align="left" value={getVal(f.key)} onCommit={(v) => setVal(f.key, v)} onLive={(v) => setLiveVal(f.key, v)} />)
     const isHold = slotCategory(s.kind) === "hold"
     const isLedger = s.item_type === "ledger"
     const open = expanded.has(s.id)
@@ -212,8 +212,8 @@ export function CashGrid({
           <tr className="bg-muted/10">
             {/* 첫 컬럼(항목명)은 비우고 분류 칸 위치(컬럼 경계)부터 시작 — 분류 네모칸 왼쪽 끝 정렬(대표 요청) */}
             <td aria-hidden />
-            <td colSpan={NCOL - 1} className="px-2 pb-2.5 pt-0.5">
-              <div className="flex w-fit max-w-full flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+            <td colSpan={NCOL - 1} className="px-2 pb-2 pt-0.5">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
                 {isLedger ? (
                   // 장부 연동 슬롯 — 분류 선택은 항목명 옆으로 이동(위 요약 행). 여기는 통화만.
                   <span className="text-muted-foreground/70">이번 달 내역 합계가 자동 반영돼요</span>
@@ -413,7 +413,7 @@ function InlineText({ value, onCommit }: { value: string; onCommit: (v: string) 
   )
 }
 
-function InlineNumber({ value, onCommit, onLive, width = "w-28", align = "right", boxed = false }: { value: number; onCommit: (v: number) => void; onLive?: (v: number) => void; width?: string; align?: "left" | "right"; boxed?: boolean }) {
+function InlineNumber({ value, onCommit, onLive, width = "w-28", align = "right" }: { value: number; onCommit: (v: number) => void; onLive?: (v: number) => void; width?: string; align?: "left" | "right" }) {
   const fmt = (v: number) => (v ? v.toLocaleString() : "")
   return (
     <input
@@ -434,15 +434,15 @@ function InlineNumber({ value, onCommit, onLive, width = "w-28", align = "right"
       onKeyDown={(e) => {
         if (e.key === "Enter" && !e.nativeEvent.isComposing) e.currentTarget.blur()
       }}
-      className={`${width} rounded ${boxed ? "border bg-background px-1.5" : "border-0 bg-transparent px-1 focus:bg-background"} py-0.5 ${align === "left" ? "text-left" : "text-right"} tabular-nums outline-none focus:ring-1 focus:ring-ring`}
+      className={`${width} rounded border-0 bg-transparent px-1 py-0.5 ${align === "left" ? "text-left" : "text-right"} tabular-nums outline-none focus:bg-background focus:ring-1 focus:ring-ring`}
     />
   )
 }
 
-function InlinePercent({ value, onCommit, onLive, boxed = false }: { value: number; onCommit: (v: number) => void; onLive?: (v: number) => void; boxed?: boolean }) {
+function InlinePercent({ value, onCommit, onLive }: { value: number; onCommit: (v: number) => void; onLive?: (v: number) => void }) {
   const fmt = (v: number) => (v ? String(+(v * 100).toFixed(2)) : "")
   return (
-    <span className={boxed ? "inline-flex items-center rounded border bg-background px-1.5 py-0.5" : "inline-flex items-center"}>
+    <span className="inline-flex items-center">
       <input
         key={value}
         defaultValue={fmt(value)}
