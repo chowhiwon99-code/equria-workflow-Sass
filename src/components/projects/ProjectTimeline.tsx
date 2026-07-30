@@ -285,11 +285,17 @@ function TimelineRow({
           style={{ width: w, backgroundColor: `${st.dot}1f`, borderColor: `${st.dot}66` }}
           title={`${p.name} · ${s} ~ ${d} — 드래그로 이동, 양끝으로 기간 조절, 클릭=상세`}
         >
-          {/* 진행률 채움(할 일 완료율 없으면 기간 경과율) */}
+          {/* 진행률 채움 — 예정/취소=0(시작 전) · 완료=100 · 진행 중=할 일 완료율(없으면 기간 경과율) */}
           <div
             className="absolute inset-y-0 left-0 rounded-lg opacity-40"
             style={{
-              width: `${pct ?? Math.min(100, Math.max(0, ((d0(today) - d0(s)) / Math.max(1, d0(d) - d0(s))) * 100))}%`,
+              width: `${
+                p.status === "planned" || p.status === "canceled"
+                  ? 0
+                  : p.status === "done"
+                    ? 100
+                    : (pct ?? Math.min(100, Math.max(0, ((d0(today) - d0(s)) / Math.max(1, d0(d) - d0(s))) * 100)))
+              }%`,
               backgroundColor: st.dot,
             }}
           />

@@ -243,14 +243,15 @@ export function DashboardAssistant() {
               </div>
             )}
 
-            <div className="flex items-center gap-2 rounded-2xl border bg-card px-3 py-2.5 shadow-lg shadow-primary/5 transition-all focus-within:border-ring focus-within:shadow-primary/10 focus-within:ring-4 focus-within:ring-ring/15">
+            {/* 컴포저 — 좁은 대시보드 컬럼에 맞춘 컴팩트 사이즈(세션41 대표 피드백) */}
+            <div className="flex items-center gap-1.5 rounded-xl border bg-card px-2 py-1.5 shadow-md shadow-primary/5 transition-all focus-within:border-ring focus-within:shadow-primary/10 focus-within:ring-2 focus-within:ring-ring/15">
               <div className="relative shrink-0">
                 <button
                   onClick={() => setMenuOpen((o) => !o)}
                   aria-label="추가"
-                  className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  className="flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
-                  <Plus className="size-5" />
+                  <Plus className="size-4" />
                 </button>
                 {menuOpen && (
                   <>
@@ -302,9 +303,9 @@ export function DashboardAssistant() {
                 onClick={submit}
                 disabled={status !== "ready" || (!input.trim() && files.length === 0)}
                 aria-label="전송"
-                className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:hover:scale-100"
+                className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:hover:scale-100"
               >
-                {status === "streaming" ? <Loader2 className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
+                {status === "streaming" ? <Loader2 className="size-3.5 animate-spin" /> : <ArrowUp className="size-3.5" />}
               </button>
             </div>
           </div>
