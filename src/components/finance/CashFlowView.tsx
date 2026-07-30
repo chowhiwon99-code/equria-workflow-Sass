@@ -752,16 +752,14 @@ export function CashFlowView() {
               onSetOpening={setOpeningFor}
               onRecord={setRecordSlot}
             />
-            {/* 작업공간 리사이즈 핸들 — 드래그로 캔버스 높이 조절(아래 손익 항목 표와의 공간 배분) */}
+            {/* 작업공간 리사이즈 — 보이는 핸들 없이 캔버스 아래 경계에 커서만 대면 조절(대표 확정) */}
             <div
               role="separator"
               aria-orientation="horizontal"
               title="드래그해서 작업공간 높이 조절"
               onPointerDown={startCanvasResize}
-              className="group -my-1.5 flex h-4 cursor-ns-resize touch-none items-center justify-center"
-            >
-              <div className="h-1 w-16 rounded-full bg-border transition-colors group-hover:bg-muted-foreground/50" />
-            </div>
+              className="-my-1.5 h-4 cursor-ns-resize touch-none"
+            />
           </>
         )}
       </div>
