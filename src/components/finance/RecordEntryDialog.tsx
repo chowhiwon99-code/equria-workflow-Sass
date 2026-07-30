@@ -94,7 +94,7 @@ export function RecordEntryDialog({
         </label>
         <p className="rounded-lg bg-muted/30 px-2.5 py-2 text-[11px] text-muted-foreground">
           분류 <b className="font-medium text-foreground">{slot.ledger_category?.trim() || slot.name}</b>(으)로 장부(내역)에 기록되고
-          손익·추세에 바로 반영돼요. 되돌리려면 ⌘Z.
+          손익·추세에 바로 반영돼요. 같은 달에 이 항목의 기록이 이미 있으면 <b className="font-medium text-foreground">이 값으로 갱신</b>돼요(누적 아님). 되돌리려면 ⌘Z.
         </p>
         <div className="flex justify-end gap-1.5">
           <Button size="sm" variant="ghost" onClick={onClose} disabled={busy}>

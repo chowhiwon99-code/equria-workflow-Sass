@@ -321,44 +321,98 @@ export function CashFlowView() {
     return evalFormula(ast, vals)
   }
 
-  /** 슬롯에서 장부(원장)에 기록 — 캔버스 편집이 내역·추세·손익 전체에 반영되는 핵심 경로(SSOT 재설계). */
+  /** 슬롯에서 장부(원장)에 기록 — 캔버스 편집이 내역·추세·손익 전체에 반영되는 핵심 경로(SSOT 재설계).
+   *  세션41(대표 요청): 같은 달 이 슬롯의 기존 기록이 있으면 **갱신**(계산한 대로 바뀜 — 누적 방지),
+   *  둘 이상이면 최신 하나만 남기고 나머지는 휴지통(soft-delete·Undo 가능). 없으면 새로 추가. */
   const recordEntry = async (slot: CashAccount, input: { date: string; amount: number; memo: string }) => {
     if (!me) return
-    const { data: inserted, error: e } = await supabase
-      .from("finance_entries")
-      .insert({
-        workspace_id: wsId as string,
-        kind: slot.kind === "revenue_src" ? "revenue" : "expense",
-        entry_date: input.date,
-        vendor: slot.name,
-        category: slot.ledger_category?.trim() || slot.name, // 슬롯에 정한 장부 분류(없으면 슬롯명)
-        description: input.memo.trim() || null,
-        amount: input.amount,
-        tax_amount: 0,
-        fee_amount: 0,
-        total_amount: input.amount,
-        currency: slot.currency,
-        account_id: slot.id, // 슬롯 귀속 — load()의 claimed 집계가 이 기록을 슬롯 금액으로 파생
-        source: "manual",
-        status: "confirmed",
-        created_by: me,
-      })
-      .select()
-      .single()
-    if (e || !inserted) {
-      toast.error("기록에 실패했어요.")
-      return
+    const patch = {
+      kind: slot.kind === "revenue_src" ? "revenue" : "expense",
+      entry_date: input.date,
+      vendor: slot.name,
+      category: slot.ledger_category?.trim() || slot.name, // 슬롯에 정한 장부 분류(없으면 슬롯명)
+      description: input.memo.trim() || null,
+      amount: input.amount,
+      total_amount: input.amount,
+      currency: slot.currency,
     }
-    push({
-      label: `${slot.name} 기록`,
-      undo: async () => {
-        await supabase.from("finance_entries").delete().eq("id", inserted.id)
-      },
-      redo: async () => {
-        await supabase.from("finance_entries").insert(inserted)
-      },
-    })
-    toast.success(`${slot.name} ${money(input.amount, slot.currency)} 기록됨 — 내역·손익에 반영`)
+    // 입력 날짜가 속한 달의 이 슬롯 기록(활성) — 갱신 대상
+    const y = Number(input.date.slice(0, 4))
+    const m = Number(input.date.slice(5, 7))
+    const mStart = `${y}-${String(m).padStart(2, "0")}-01`
+    const mEnd = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`
+    const { data: existing } = await supabase
+      .from("finance_entries")
+      .select("*")
+      .eq("account_id", slot.id)
+      .is("deleted_at", null)
+      .gte("entry_date", mStart)
+      .lt("entry_date", mEnd)
+      .order("created_at", { ascending: false })
+
+    if (existing && existing.length > 0) {
+      // 갱신 경로 — 최신 기록을 계산값으로 덮고, 중복(과거 누적분)은 휴지통으로
+      const target = existing[0]
+      const restIds = existing.slice(1).map((r) => r.id)
+      const prev = {
+        kind: target.kind,
+        entry_date: target.entry_date,
+        vendor: target.vendor,
+        category: target.category,
+        description: target.description,
+        amount: target.amount,
+        total_amount: target.total_amount,
+        currency: target.currency,
+      }
+      const now = new Date().toISOString()
+      const { error: e } = await supabase.from("finance_entries").update(patch).eq("id", target.id)
+      if (e) {
+        toast.error("기록 갱신에 실패했어요.")
+        return
+      }
+      if (restIds.length > 0) await supabase.from("finance_entries").update({ deleted_at: now }).in("id", restIds)
+      push({
+        label: `${slot.name} 기록 갱신`,
+        undo: async () => {
+          await supabase.from("finance_entries").update(prev).eq("id", target.id)
+          if (restIds.length > 0) await supabase.from("finance_entries").update({ deleted_at: null }).in("id", restIds)
+        },
+        redo: async () => {
+          await supabase.from("finance_entries").update(patch).eq("id", target.id)
+          if (restIds.length > 0) await supabase.from("finance_entries").update({ deleted_at: now }).in("id", restIds)
+        },
+      })
+      toast.success(`${slot.name} 이번 기록을 ${money(input.amount, slot.currency)}(으)로 갱신 — 내역·손익에 반영`)
+    } else {
+      const { data: inserted, error: e } = await supabase
+        .from("finance_entries")
+        .insert({
+          workspace_id: wsId as string,
+          ...patch,
+          tax_amount: 0,
+          fee_amount: 0,
+          account_id: slot.id, // 슬롯 귀속 — load()의 claimed 집계가 이 기록을 슬롯 금액으로 파생
+          source: "manual",
+          status: "confirmed",
+          created_by: me,
+        })
+        .select()
+        .single()
+      if (e || !inserted) {
+        toast.error("기록에 실패했어요.")
+        return
+      }
+      push({
+        label: `${slot.name} 기록`,
+        undo: async () => {
+          await supabase.from("finance_entries").delete().eq("id", inserted.id)
+        },
+        redo: async () => {
+          await supabase.from("finance_entries").insert(inserted)
+        },
+      })
+      toast.success(`${slot.name} ${money(input.amount, slot.currency)} 기록됨 — 내역·손익에 반영`)
+    }
     setRecordSlot(null)
     // 자체 load() 대신 전역 reload — 이 뷰(리스너 보유)와 내역(FinanceView) 모두 갱신.
     window.dispatchEvent(new Event("equria:reload"))

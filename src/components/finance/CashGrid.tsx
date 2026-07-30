@@ -114,12 +114,8 @@ export function CashGrid({
     const isLedger = s.item_type === "ledger"
     const open = expanded.has(s.id)
     const typeName = isLedger ? "장부 자동" : (customType?.name ?? ITEM_TYPES.find((t) => t.value === s.item_type)?.label ?? "직접 입력")
-    // 요약 한 줄 — 유형·핵심 값만. 분류·통화·입력칸은 펼친 편집 행에서(대표 요청 — 최대한 심플하게).
-    const summary = isLedger
-      ? `${typeName} · ${s.ledger_category || "전체"}`
-      : calc && !isHold
-        ? `${typeName} · 계산값 ${money(shownAmount, s.currency)}`
-        : typeName
+    // 요약 한 줄 — 유형·핵심 값만. 분류는 항목명 옆 셀렉트, 통화·입력칸은 펼친 편집 행에서(대표 요청 — 최대한 심플하게).
+    const summary = calc && !isHold ? `${typeName} · 계산값 ${money(shownAmount, s.currency)}` : typeName
     return (
       <Fragment key={s.id}>
         <tr className="group hover:bg-muted/20">
@@ -148,6 +144,16 @@ export function CashGrid({
                 </div>
               )}
               <InlineText value={s.name} onCommit={(v) => onUpdateSlot(s.id, { name: v })} />
+              {/* 분류 — 항목명 바로 옆에서 선택(대표 요청). 비우면 기록 시 슬롯명으로 찍힘 */}
+              {!isHold && (
+                <CategorySelect
+                  slot={s}
+                  options={categoryOptions}
+                  emptyLabel={isLedger ? "전체" : "분류 없음"}
+                  onUpdateSlot={onUpdateSlot}
+                  className="shrink-0 cursor-pointer rounded border-0 bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground outline-none focus:ring-1 focus:ring-ring"
+                />
+              )}
             </div>
           </td>
           <td className="px-2 py-1.5">
@@ -202,11 +208,8 @@ export function CashGrid({
             <td colSpan={NCOL} className="px-3 pb-2.5 pt-0.5">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
                 {isLedger ? (
-                  // 장부 연동 슬롯 — 어떤 분류를 합산할지 선택(전체/식비/…). 바꾸면 다음 로드에서 금액 동기화.
-                  <label className="flex items-center gap-1.5">
-                    분류
-                    <CategorySelect slot={s} options={categoryOptions} emptyLabel="전체" onUpdateSlot={onUpdateSlot} />
-                  </label>
+                  // 장부 연동 슬롯 — 분류 선택은 항목명 옆으로 이동(위 요약 행). 여기는 통화만.
+                  <span className="text-muted-foreground/70">이번 달 내역 합계가 자동 반영돼요</span>
                 ) : (
                   <>
                     <label className="flex items-center gap-1.5">
@@ -245,12 +248,6 @@ export function CashGrid({
                       <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] tabular-nums" title="수식 계산값 — '기록'을 누르면 이 값이 장부에 기록돼요">
                         계산값 {money(shownAmount, s.currency)}
                       </span>
-                    )}
-                    {!isHold && (
-                      <label className="flex items-center gap-1.5">
-                        분류
-                        <CategorySelect slot={s} options={categoryOptions} onUpdateSlot={onUpdateSlot} />
-                      </label>
                     )}
                   </>
                 )}
