@@ -23,7 +23,7 @@ import { isFigmaUrl, toFigmaDesktopUrl } from "@/lib/figma"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
 import { combineDateTimeToIso, toDateInputValue } from "@/lib/calendar"
-import { TaskTimeline } from "./TaskTimeline"
+import { TaskTimeline, type TaskPatch } from "./TaskTimeline"
 import type { Tables, Json } from "@/lib/supabase/types"
 import type { Project, ProjectStatus, Profile, DriveFile } from "@/types"
 
@@ -443,19 +443,20 @@ function ChecklistSection({ projectId }: { projectId: string }) {
     }
   }
 
-  // 타임라인 드래그 이동/기간 조절 — Undo 지원
-  const moveTask = async (t: ProjectTask, newStart: string | null, newDue: string) => {
-    const prev = { start_date: t.start_date, due_date: t.due_date }
-    await mustOk(supabase.from("project_tasks").update({ start_date: newStart, due_date: newDue }).eq("id", t.id))
+  // 타임라인 드래그/편집 패널 공용 — 제목·기간·색상 등 부분 수정(Undo 지원)
+  const updateTask = async (t: ProjectTask, patch: TaskPatch) => {
+    const prev: TaskPatch = {}
+    for (const k of Object.keys(patch) as (keyof TaskPatch)[]) prev[k] = t[k] as never
+    await mustOk(supabase.from("project_tasks").update(patch).eq("id", t.id))
     load()
     push({
-      label: "할 일 기간 변경",
+      label: "할 일 수정",
       undo: async () => {
         await mustOk(supabase.from("project_tasks").update(prev).eq("id", t.id))
         load()
       },
       redo: async () => {
-        await mustOk(supabase.from("project_tasks").update({ start_date: newStart, due_date: newDue }).eq("id", t.id))
+        await mustOk(supabase.from("project_tasks").update(patch).eq("id", t.id))
         load()
       },
     })
@@ -500,8 +501,8 @@ function ChecklistSection({ projectId }: { projectId: string }) {
         </Button>
       </div>
 
-      {/* 태스크 타임라인 — 기한 있는 할 일을 기간 바로(드래그 이동·양끝 조절·📎 일정별 파일) */}
-      <TaskTimeline projectId={projectId} tasks={tasks} onMoveTask={moveTask} />
+      {/* 태스크 타임라인 — 기한 있는 할 일을 기간 바로(드래그 이동·양끝 조절·클릭 편집·📎 일정별 파일) */}
+      <TaskTimeline projectId={projectId} tasks={tasks} onUpdateTask={updateTask} />
 
       {/* 목록 */}
       {tasks.length === 0 ? (
