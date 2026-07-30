@@ -26,14 +26,16 @@ export function RecordEntryDialog({
 }: {
   slot: CashAccount
   prefillAmount?: number | null
-  onSubmit: (input: { date: string; amount: number; memo: string }) => Promise<void>
+  onSubmit: (input: { date: string; amount: number; tax: number; memo: string }) => Promise<void>
   onClose: () => void
 }) {
   const isRevenue = slot.kind === "revenue_src"
   const [date, setDate] = useState(todayStr())
   const [amount, setAmount] = useState(prefillAmount && prefillAmount > 0 ? String(Math.round(prefillAmount)) : "")
+  const [tax, setTax] = useState("") // 부가세(VAT) — 비용 기록만(내역 모달과 동일 규칙: total = 금액 + 부가세)
   const [memo, setMemo] = useState("")
   const [busy, setBusy] = useState(false)
+  const taxN = isRevenue ? 0 : Number(tax || 0)
 
   const save = async () => {
     const n = Number(amount)
@@ -47,7 +49,7 @@ export function RecordEntryDialog({
     }
     setBusy(true)
     try {
-      await onSubmit({ date, amount: n, memo })
+      await onSubmit({ date, amount: n, tax: taxN, memo })
     } finally {
       setBusy(false)
     }
@@ -79,6 +81,34 @@ export function RecordEntryDialog({
         </div>
         {prefillAmount != null && prefillAmount > 0 && (
           <p className="text-[11px] text-muted-foreground">수식 계산값 {money(prefillAmount, slot.currency)}을 채워뒀어요 — 수정 가능.</p>
+        )}
+        {/* 부가세(VAT) — 비용 기록만. 10% 버튼으로 자동 계산, 합계 = 금액 + 부가세 */}
+        {!isRevenue && (
+          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              부가세 <span className="font-normal text-muted-foreground/60">(선택)</span>
+              <button
+                type="button"
+                onClick={() => setTax(String(Math.round(Number(amount || 0) * 0.1)))}
+                className="rounded border px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:border-primary/40 hover:text-primary"
+                title="금액의 10%로 채우기"
+              >
+                10%
+              </button>
+              {taxN > 0 && <span className="ml-auto tabular-nums">합계 {money(Number(amount || 0) + taxN, slot.currency)}</span>}
+            </span>
+            <input
+              type="number"
+              inputMode="numeric"
+              className={fieldClass}
+              value={tax}
+              onChange={(e) => setTax(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !busy) save()
+              }}
+              placeholder="0"
+            />
+          </label>
         )}
         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
           메모 <span className="font-normal text-muted-foreground/60">(선택)</span>

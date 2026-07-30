@@ -109,7 +109,8 @@ export function CashGrid({
     const setLiveVal = (k: string, v: number) => setLive((p) => ({ ...p, [s.id]: { ...p[s.id], [k]: v } }))
     const ast = astOf(s, calcTypes)
     const shownAmount = calc && ast ? evalFormula(ast, { ...Object.fromEntries(fields.map((f) => [f.key, getVal(f.key)])), ...(live[s.id] ?? {}) }) : Number(s.amount)
-    const editor = (f: CalcField) => (f.kind === "percent" ? <InlinePercent value={getVal(f.key)} onCommit={(v) => setVal(f.key, v)} onLive={(v) => setLiveVal(f.key, v)} /> : <InlineNumber width="w-20" value={getVal(f.key)} onCommit={(v) => setVal(f.key, v)} onLive={(v) => setLiveVal(f.key, v)} />)
+    // 편집 행 입력은 왼쪽 정렬 — 값이 라벨 바로 옆에 붙게(분류 셀렉트와 같은 결, 대표 요청)
+    const editor = (f: CalcField) => (f.kind === "percent" ? <InlinePercent value={getVal(f.key)} onCommit={(v) => setVal(f.key, v)} onLive={(v) => setLiveVal(f.key, v)} /> : <InlineNumber width="w-20" align="left" value={getVal(f.key)} onCommit={(v) => setVal(f.key, v)} onLive={(v) => setLiveVal(f.key, v)} />)
     const isHold = slotCategory(s.kind) === "hold"
     const isLedger = s.item_type === "ledger"
     const open = expanded.has(s.id)
@@ -407,7 +408,7 @@ function InlineText({ value, onCommit }: { value: string; onCommit: (v: string) 
   )
 }
 
-function InlineNumber({ value, onCommit, onLive, width = "w-28" }: { value: number; onCommit: (v: number) => void; onLive?: (v: number) => void; width?: string }) {
+function InlineNumber({ value, onCommit, onLive, width = "w-28", align = "right" }: { value: number; onCommit: (v: number) => void; onLive?: (v: number) => void; width?: string; align?: "left" | "right" }) {
   const fmt = (v: number) => (v ? v.toLocaleString() : "")
   return (
     <input
@@ -428,7 +429,7 @@ function InlineNumber({ value, onCommit, onLive, width = "w-28" }: { value: numb
       onKeyDown={(e) => {
         if (e.key === "Enter" && !e.nativeEvent.isComposing) e.currentTarget.blur()
       }}
-      className={`${width} rounded border-0 bg-transparent px-1 py-0.5 text-right tabular-nums outline-none focus:bg-background focus:ring-1 focus:ring-ring`}
+      className={`${width} rounded border-0 bg-transparent px-1 py-0.5 ${align === "left" ? "text-left" : "text-right"} tabular-nums outline-none focus:bg-background focus:ring-1 focus:ring-ring`}
     />
   )
 }
@@ -455,7 +456,7 @@ function InlinePercent({ value, onCommit, onLive }: { value: number; onCommit: (
         onKeyDown={(e) => {
           if (e.key === "Enter" && !e.nativeEvent.isComposing) e.currentTarget.blur()
         }}
-        className="w-12 rounded border-0 bg-transparent px-1 py-0.5 text-right tabular-nums outline-none focus:bg-background focus:ring-1 focus:ring-ring"
+        className="w-12 rounded border-0 bg-transparent px-1 py-0.5 text-left tabular-nums outline-none focus:bg-background focus:ring-1 focus:ring-ring"
       />
       <span className="text-xs text-muted-foreground">%</span>
     </span>

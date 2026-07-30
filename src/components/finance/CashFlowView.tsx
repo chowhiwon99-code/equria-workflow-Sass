@@ -332,7 +332,7 @@ export function CashFlowView() {
     const category = slot.ledger_category?.trim() || slot.name
     const { data: existing } = await supabase
       .from("finance_entries")
-      .select("id")
+      .select("id, tax_amount")
       .eq("account_id", slot.id)
       .is("deleted_at", null)
       .gte("entry_date", mStart)
@@ -342,7 +342,9 @@ export function CashFlowView() {
     if (existing && existing.length > 0) {
       const [target, ...rest] = existing
       if (v > 0) {
-        await supabase.from("finance_entries").update({ kind, vendor: slot.name, category, amount: v, total_amount: v, currency: slot.currency }).eq("id", target.id)
+        // 부가세는 보존(기록 다이얼로그에서 넣은 값) — total = 계산값 + 부가세
+        const tax = Number(target.tax_amount ?? 0)
+        await supabase.from("finance_entries").update({ kind, vendor: slot.name, category, amount: v, total_amount: v + tax, currency: slot.currency }).eq("id", target.id)
       } else {
         await supabase.from("finance_entries").update({ deleted_at: now }).eq("id", target.id)
       }
@@ -381,7 +383,7 @@ export function CashFlowView() {
   /** 슬롯에서 장부(원장)에 기록 — 캔버스 편집이 내역·추세·손익 전체에 반영되는 핵심 경로(SSOT 재설계).
    *  세션41(대표 요청): 같은 달 이 슬롯의 기존 기록이 있으면 **갱신**(계산한 대로 바뀜 — 누적 방지),
    *  둘 이상이면 최신 하나만 남기고 나머지는 휴지통(soft-delete·Undo 가능). 없으면 새로 추가. */
-  const recordEntry = async (slot: CashAccount, input: { date: string; amount: number; memo: string }) => {
+  const recordEntry = async (slot: CashAccount, input: { date: string; amount: number; tax: number; memo: string }) => {
     if (!me) return
     const patch = {
       kind: slot.kind === "revenue_src" ? "revenue" : "expense",
@@ -390,7 +392,8 @@ export function CashFlowView() {
       category: slot.ledger_category?.trim() || slot.name, // 슬롯에 정한 장부 분류(없으면 슬롯명)
       description: input.memo.trim() || null,
       amount: input.amount,
-      total_amount: input.amount,
+      tax_amount: input.tax, // 부가세(VAT) — 비용만(내역 모달 규칙), total = 금액 + 부가세
+      total_amount: input.amount + input.tax,
       currency: slot.currency,
     }
     // 입력 날짜가 속한 달의 이 슬롯 기록(활성) — 갱신 대상
@@ -418,6 +421,7 @@ export function CashFlowView() {
         category: target.category,
         description: target.description,
         amount: target.amount,
+        tax_amount: target.tax_amount,
         total_amount: target.total_amount,
         currency: target.currency,
       }
@@ -446,7 +450,6 @@ export function CashFlowView() {
         .insert({
           workspace_id: wsId as string,
           ...patch,
-          tax_amount: 0,
           fee_amount: 0,
           account_id: slot.id, // 슬롯 귀속 — load()의 claimed 집계가 이 기록을 슬롯 금액으로 파생
           source: "manual",
