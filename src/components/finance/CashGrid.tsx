@@ -208,9 +208,10 @@ export function CashGrid({
         {/* 편집 행 — 유형·입력칸·분류·통화(요약을 눌렀을 때만) */}
         {open && (
           <tr className="bg-muted/10">
-            <td colSpan={NCOL} className="px-2 pb-2.5 pt-0.5">
-              {/* w-fit: 내용만큼만 차지 — 전체 폭으로 흩어지지 않게 왼쪽 밀착(대표 요청). ml-7 ≈ 항목명 시작점 정렬 */}
-              <div className="ml-7 flex w-fit max-w-full flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+            {/* 첫 컬럼(항목명)은 비우고 분류 칸 위치(컬럼 경계)부터 시작 — 분류 네모칸 왼쪽 끝 정렬(대표 요청) */}
+            <td aria-hidden />
+            <td colSpan={NCOL - 1} className="px-2 pb-2.5 pt-0.5">
+              <div className="flex w-fit max-w-full flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
                 {isLedger ? (
                   // 장부 연동 슬롯 — 분류 선택은 항목명 옆으로 이동(위 요약 행). 여기는 통화만.
                   <span className="text-muted-foreground/70">이번 달 내역 합계가 자동 반영돼요</span>
