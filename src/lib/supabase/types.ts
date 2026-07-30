@@ -1165,6 +1165,7 @@ export type Database = {
         Row: {
           default_calc_type_id: string | null
           default_currency: string
+          ledger_categories: Json | null
           opening_cash: Json
           pool_pos: Json | null
           updated_at: string
@@ -1174,6 +1175,7 @@ export type Database = {
         Insert: {
           default_calc_type_id?: string | null
           default_currency?: string
+          ledger_categories?: Json | null
           opening_cash?: Json
           pool_pos?: Json | null
           updated_at?: string
@@ -1183,6 +1185,7 @@ export type Database = {
         Update: {
           default_calc_type_id?: string | null
           default_currency?: string
+          ledger_categories?: Json | null
           opening_cash?: Json
           pool_pos?: Json | null
           updated_at?: string

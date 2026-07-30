@@ -101,7 +101,7 @@ export function CashFlowView() {
       const mr = currentMonthRange()
       const [{ data: slotData, error: e }, { data: settings }, { data: types }, { data: grps }, { data: ledgerRows }, { data: catRows }] = await Promise.all([
         supabase.from("cash_accounts").select("*").is("deleted_at", null).order("sort_order"),
-        supabase.from("cashflow_settings").select("opening_cash, default_currency, pool_pos, default_calc_type_id").maybeSingle(),
+        supabase.from("cashflow_settings").select("opening_cash, default_currency, pool_pos, default_calc_type_id, ledger_categories").maybeSingle(),
         supabase.from("cash_calc_types").select("*").order("sort_order"),
         supabase.from("cash_categories").select("*").order("sort_order"),
         // 장부(원장=SSOT) 이번 달 기록 — 모든 매출·비용 슬롯 amount의 원천(내역 탭과 같은 데이터)
@@ -135,15 +135,20 @@ export function CashFlowView() {
         }
       }
       setLedgerTotals(unclaimed)
-      // 분류 제안 = 기본 목록 + 실제 쓰인 분류(구분별)
-      const rSet = new Set<string>(REVENUE_CATEGORIES)
-      const eSet = new Set<string>(EXPENSE_CATEGORIES)
-      for (const row of catRows ?? []) {
-        if (!row.category) continue
-        if (row.kind === "revenue") rSet.add(row.category)
-        else eSet.add(row.category)
+      // 분류 목록 — 회사가 '분류 관리'(마이그122)로 편집했으면 그 마스터만, 아니면 기본+실사용 합집합(기존 동작)
+      const customCats = (settings?.ledger_categories ?? null) as { revenue?: string[]; expense?: string[] } | null
+      if (customCats && (customCats.revenue || customCats.expense)) {
+        setCatSuggest({ revenue: customCats.revenue ?? [], expense: customCats.expense ?? [] })
+      } else {
+        const rSet = new Set<string>(REVENUE_CATEGORIES)
+        const eSet = new Set<string>(EXPENSE_CATEGORIES)
+        for (const row of catRows ?? []) {
+          if (!row.category) continue
+          if (row.kind === "revenue") rSet.add(row.category)
+          else eSet.add(row.category)
+        }
+        setCatSuggest({ revenue: [...rSet], expense: [...eSet] })
       }
-      setCatSuggest({ revenue: [...rSet], expense: [...eSet] })
       // 전 슬롯 동기화 — ledger=미귀속 잔여 / 매출·비용 일반 슬롯=자기 귀속 합계 / 보유금(reserve)=직접 입력 유지.
       const targetAmount = (s: CashAccount): number | null => {
         if (s.item_type === "ledger") return ledgerAmountFor(s, unclaimed)
@@ -233,6 +238,16 @@ export function CashFlowView() {
   const setDefaultCur = (currency: string) => {
     setDefaultCurrency(currency)
     saveSettings(opening, currency)
+  }
+  // 분류 마스터 저장(마이그122) — 설정 '분류 관리'에서 편집. 저장 즉시 그리드·캔버스 분류 셀렉트에 반영.
+  // 첫 수정 시 현재 목록(기본+실사용) 스냅샷이 마스터로 굳는다. 삭제해도 기존 기록의 분류는 보존.
+  const saveCategories = async (next: { revenue: string[]; expense: string[] }) => {
+    setCatSuggest(next)
+    await mustOk(
+      supabase
+        .from("cashflow_settings")
+        .upsert({ workspace_id: wsId as string, ledger_categories: next, updated_by: me, updated_at: new Date().toISOString() }, { onConflict: "workspace_id" })
+    )
   }
 
   // ── 슬롯 CRUD ──
@@ -713,6 +728,44 @@ export function CashFlowView() {
               ))}
             </div>
             <p className="mt-2 text-xs text-muted-foreground">시작 보유현금에 매출을 더하고 비용·보유를 빼서 가용현금·순이익을 계산해요. 입력하면 흐름도에 바로 반영됩니다.</p>
+            {/* 분류 관리 — 매출/비용별 마스터 편집(마이그122·대표 요청). 드롭다운 목록이 여기서 정해진다 */}
+            <div className="mt-3 border-t pt-3">
+              <p className="mb-2 text-xs font-medium">
+                분류 관리 <span className="font-normal text-muted-foreground">— 항목의 분류 드롭다운에 나오는 목록이에요. 지워도 기존 기록은 그대로 남아요.</span>
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {(["revenue", "expense"] as const).map((k) => (
+                  <div key={k} className="rounded-lg bg-muted/30 p-2.5">
+                    <p className={`mb-1.5 text-[11px] font-medium ${k === "revenue" ? "text-success" : "text-rose-500"}`}>{k === "revenue" ? "매출 분류" : "비용 분류"}</p>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {catSuggest[k].map((c) => (
+                        <span key={c} className="inline-flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-xs">
+                          {c}
+                          <button
+                            onClick={() => saveCategories({ ...catSuggest, [k]: catSuggest[k].filter((x) => x !== c) })}
+                            className="text-muted-foreground transition-colors hover:text-destructive"
+                            aria-label={`${c} 삭제`}
+                          >
+                            <X className="size-3" />
+                          </button>
+                        </span>
+                      ))}
+                      <input
+                        placeholder="추가 후 Enter"
+                        className="h-7 w-28 rounded-lg border bg-background px-2 text-xs outline-none focus:ring-1 focus:ring-ring"
+                        onKeyDown={(e) => {
+                          if (e.key !== "Enter" || e.nativeEvent.isComposing) return
+                          const v = e.currentTarget.value.trim()
+                          if (!v || catSuggest[k].includes(v)) return
+                          saveCategories({ ...catSuggest, [k]: [...catSuggest[k], v] })
+                          e.currentTarget.value = ""
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
         {showCoach && slots.length > 0 && (
