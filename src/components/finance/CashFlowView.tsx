@@ -12,7 +12,7 @@ import { Loading, ErrorState } from "@/components/shared/States"
 import { Button } from "@/components/ui/button"
 import { downloadCsv, todayStamp } from "@/lib/csv"
 import { downloadPnlXlsx } from "@/lib/xlsx"
-import { money, CURRENCIES, computeSlotAmount, EXPENSE_CATEGORIES, REVENUE_CATEGORIES } from "@/lib/finance"
+import { money, computeSlotAmount, EXPENSE_CATEGORIES, REVENUE_CATEGORIES } from "@/lib/finance"
 import { slotLabel, CASHFLOW_TEMPLATES, ITEM_TYPES, astOf } from "@/lib/cashAccounts"
 import { evalFormula, flowToKind, BUILTIN_FIELDS, QTY_AST, CHANNEL_AST, type CalcNode, type CalcField } from "@/lib/calcFormula"
 import { cn } from "@/lib/utils"
@@ -211,7 +211,6 @@ export function CashFlowView() {
   }, [load])
 
   const graph = useMemo(() => buildSlotGraph(slots, opening, defaultCurrency, poolPos), [slots, opening, defaultCurrency, poolPos])
-  const currencies = useMemo(() => Array.from(new Set([defaultCurrency, ...slots.map((s) => s.currency)])), [defaultCurrency, slots])
   const defaultType = useMemo(() => calcTypes.find((t) => t.id === defaultCalcTypeId) ?? null, [calcTypes, defaultCalcTypeId])
 
   // ── 설정(보유현금·기본통화) — 입력 즉시 흐름도 반영 + 저장(upsert) ──
@@ -234,10 +233,6 @@ export function CashFlowView() {
     const next = { ...opening, [currency]: value }
     setOpening(next)
     saveSettings(next, defaultCurrency)
-  }
-  const setDefaultCur = (currency: string) => {
-    setDefaultCurrency(currency)
-    saveSettings(opening, currency)
   }
   // 분류 마스터 저장(마이그122) — 설정 '분류 관리'에서 편집. 저장 즉시 그리드·캔버스 분류 셀렉트에 반영.
   // 첫 수정 시 현재 목록(기본+실사용) 스냅샷이 마스터로 굳는다. 삭제해도 기존 기록의 분류는 보존.
@@ -687,52 +682,15 @@ export function CashFlowView() {
         </div>
         {showSettings && (
           <div className="rounded-lg border bg-card p-3">
+            {/* 세션41(대표): 기본 통화·시작 보유현금 UI 제거 — 시작보유는 캔버스 pool 박스 인라인 편집으로 충분. 패널=분류 관리만 */}
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-sm font-medium">현금흐름 설정</span>
+              <span className="text-sm font-medium">분류 관리</span>
               <button onClick={() => setShowSettings(false)} className="text-muted-foreground hover:text-foreground" aria-label="닫기">
                 <X className="size-4" />
               </button>
             </div>
-            <div className="flex flex-wrap items-end gap-3">
-              <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                기본 통화
-                <select
-                  value={defaultCurrency}
-                  onChange={(e) => setDefaultCur(e.target.value)}
-                  className="h-8 rounded-lg border bg-background px-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring"
-                >
-                  {CURRENCIES.map((c) => (
-                    <option key={c.code} value={c.code}>{c.code}</option>
-                  ))}
-                </select>
-              </label>
-              {currencies.map((cur) => (
-                <label key={cur} className="flex flex-col gap-1 text-xs text-muted-foreground">
-                  시작 보유현금 ({cur})
-                  <input
-                    key={`${cur}:${opening[cur] ?? 0}`}
-                    defaultValue={opening[cur] ? opening[cur].toLocaleString() : ""}
-                    inputMode="decimal"
-                    placeholder="0"
-                    onFocus={(e) => {
-                      e.currentTarget.value = opening[cur] ? String(opening[cur]) : ""
-                      e.currentTarget.select()
-                    }}
-                    onBlur={(e) => setOpeningFor(cur, Number(e.target.value.replace(/,/g, "")) || 0)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") e.currentTarget.blur()
-                    }}
-                    className="h-8 w-32 rounded-lg border bg-background px-2 text-right text-sm tabular-nums text-foreground outline-none focus:ring-1 focus:ring-ring"
-                  />
-                </label>
-              ))}
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground">시작 보유현금에 매출을 더하고 비용·보유를 빼서 가용현금·순이익을 계산해요. 입력하면 흐름도에 바로 반영됩니다.</p>
-            {/* 분류 관리 — 매출/비용별 마스터 편집(마이그122·대표 요청). 드롭다운 목록이 여기서 정해진다 */}
-            <div className="mt-3 border-t pt-3">
-              <p className="mb-2 text-xs font-medium">
-                분류 관리 <span className="font-normal text-muted-foreground">— 항목의 분류 드롭다운에 나오는 목록이에요. 지워도 기존 기록은 그대로 남아요.</span>
-              </p>
+            <div>
+              <p className="mb-2 text-xs text-muted-foreground">항목의 분류 드롭다운에 나오는 목록이에요. 지워도 기존 기록은 그대로 남아요.</p>
               <div className="grid gap-3 sm:grid-cols-2">
                 {(["revenue", "expense"] as const).map((k) => (
                   <div key={k} className="rounded-lg bg-muted/30 p-2.5">
