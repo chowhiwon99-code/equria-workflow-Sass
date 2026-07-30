@@ -103,7 +103,15 @@ export function ProjectTimeline({
       const dx = ev.clientX - startX
       setDrag({ id: p.id, mode, startX, dDays: Math.round(dx / PPD), moved: Math.abs(dx) > 8 })
     }
+    // 리뷰 F1: pointercancel 시 커밋 없이 정리(터치 스크롤 → 리스너 잔류 → 유령 날짜 이동 방지)
+    const onCancel = () => {
+      window.removeEventListener("pointermove", onMoveEv)
+      window.removeEventListener("pointerup", onUp)
+      window.removeEventListener("pointercancel", onCancel)
+      setDrag(null)
+    }
     const onUp = (ev: PointerEvent) => {
+      window.removeEventListener("pointercancel", onCancel)
       window.removeEventListener("pointermove", onMoveEv)
       window.removeEventListener("pointerup", onUp)
       const dDays = Math.round((ev.clientX - startX) / PPD)
@@ -126,6 +134,7 @@ export function ProjectTimeline({
     }
     window.addEventListener("pointermove", onMoveEv)
     window.addEventListener("pointerup", onUp)
+    window.addEventListener("pointercancel", onCancel)
     setDrag({ id: p.id, mode, startX, dDays: 0, moved: false })
   }
 
@@ -281,7 +290,7 @@ function TimelineRow({
       <div className="absolute top-1.5 flex items-center gap-1.5" style={{ left }}>
         <div
           onPointerDown={(e) => onStartDrag(e, p, "move")}
-          className={cn("group relative h-8 shrink-0 rounded-lg border shadow-sm", drag ? "cursor-grabbing" : "cursor-grab")}
+          className={cn("group relative h-8 shrink-0 touch-none rounded-lg border shadow-sm", drag ? "cursor-grabbing" : "cursor-grab")}
           style={{ width: w, backgroundColor: `${st.dot}1f`, borderColor: `${st.dot}66` }}
           title={`${p.name} · ${s} ~ ${d} — 드래그로 이동, 양끝으로 기간 조절, 클릭=상세`}
         >

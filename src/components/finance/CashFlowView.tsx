@@ -109,10 +109,12 @@ export function CashFlowView() {
     const onUp = (ev: PointerEvent) => {
       window.removeEventListener("pointermove", onMove)
       window.removeEventListener("pointerup", onUp)
+      window.removeEventListener("pointercancel", onUp)
       localStorage.setItem("equria:cashflow-canvas-height", String(clamp(startH + (ev.clientY - startY))))
     }
     window.addEventListener("pointermove", onMove)
     window.addEventListener("pointerup", onUp)
+    window.addEventListener("pointercancel", onUp) // 리뷰 F5: cancel 시 리스너 정리(리사이즈는 값 커밋 무해)
   }
   const [error, setError] = useState<string | null>(null)
 
@@ -319,14 +321,46 @@ export function CashFlowView() {
       delete safePatch.amount // 매출·비용 슬롯 amount 직접 쓰기 차단(파생값 보호)
     }
     await mustOk(supabase.from("cash_accounts").update({ ...safePatch, ...derived, ...amountPatch, updated_at: new Date().toISOString() }).eq("id", id))
-    // 세션41(대표): 계산값=결과값 단일화 — 계산 슬롯(매출·비용)의 계산 관련 변경은 이번 달 장부 기록을 자동 갱신.
-    // 위치/색/그룹 이동 등은 제외(불필요한 장부 쓰기 방지).
-    const SYNC_KEYS = ["field_values", "units", "unit_price", "rate", "extra", "calc_type_id", "item_type", "kind", "ledger_category", "name", "currency"]
-    if (merged.kind !== "reserve" && merged.item_type !== "ledger" && Object.keys(patch).some((k) => SYNC_KEYS.includes(k))) {
+    // 세션41(대표): 계산값=결과값 단일화 — 계산 "값" 변경만 금액 동기화(리뷰 H2: 유형 전환·이름 변경이 수동 기록을 덮던 사고 방지).
+    // - 값 키(field_values 등)·kind: 금액 재동기화
+    // - 유형 전환(item_type/calc_type_id): 필드가 비어 계산값 0이 되므로 동기화 스킵(값을 채우면 그때 동기화)
+    // - 메타(name/분류/통화): 금액 건드리지 않고 라벨만 동기화
+    const isLedgerSlot = merged.kind === "reserve" || merged.item_type === "ledger"
+    const VALUE_KEYS = ["field_values", "units", "unit_price", "rate", "extra", "kind"]
+    const META_KEYS = ["name", "ledger_category", "currency"]
+    const keys = Object.keys(patch)
+    if (!isLedgerSlot && keys.some((k) => VALUE_KEYS.includes(k))) {
       const v = calcPreview(merged)
-      if (v != null) await syncSlotRecord(merged, Math.round(v))
+      if (v != null) await enqueueSync(merged, Math.round(v))
+    } else if (!isLedgerSlot && keys.some((k) => META_KEYS.includes(k))) {
+      await syncSlotMeta(merged)
     }
     load()
+  }
+
+  // 리뷰 M1: blur 연타로 sync가 병렬 실행되면 존재조회→insert 경합으로 이번 달 기록이 중복된다 → 슬롯별 직렬화
+  const syncChainRef = useRef(new Map<string, Promise<void>>())
+  const enqueueSync = (slot: CashAccount, v: number) => {
+    const prev = syncChainRef.current.get(slot.id) ?? Promise.resolve()
+    const next = prev.then(() => syncSlotRecord(slot, v)).catch(() => {})
+    syncChainRef.current.set(slot.id, next)
+    return next
+  }
+
+  /** 메타(이름·분류·통화)만 장부 라벨에 반영 — 금액·부가세는 보존(리뷰 H2). */
+  const syncSlotMeta = async (slot: CashAccount) => {
+    const today = new Date()
+    const y = today.getFullYear()
+    const m = today.getMonth() + 1
+    const mStart = `${y}-${String(m).padStart(2, "0")}-01`
+    const mEnd = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`
+    await supabase
+      .from("finance_entries")
+      .update({ vendor: slot.name, category: slot.ledger_category?.trim() || slot.name, currency: slot.currency })
+      .eq("account_id", slot.id)
+      .is("deleted_at", null)
+      .gte("entry_date", mStart)
+      .lt("entry_date", mEnd)
   }
 
   /** 세션41: 계산 슬롯의 이번 달 장부 기록을 계산값으로 동기화(금액=계산값 항등 — "계산한 대로 바뀌어야").
@@ -434,6 +468,11 @@ export function CashFlowView() {
         tax_amount: target.tax_amount,
         total_amount: target.total_amount,
         currency: target.currency,
+      }
+      // 리뷰 M2: 다이얼로그 tax는 프리필이 없어 비워두면 0 — 기존 부가세를 덮지 않게 미입력(0) 시 보존
+      if (input.tax === 0 && Number(target.tax_amount ?? 0) > 0) {
+        patch.tax_amount = Number(target.tax_amount)
+        patch.total_amount = input.amount + patch.tax_amount
       }
       const now = new Date().toISOString()
       const { error: e } = await supabase.from("finance_entries").update(patch).eq("id", target.id)

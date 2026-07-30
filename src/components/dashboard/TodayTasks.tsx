@@ -47,6 +47,13 @@ export function TodayTasks() {
     load()
   }, [load])
 
+  // 작업 제안 [+추가] 등 외부 등록 반영(리뷰 F3 — personal_tasks는 realtime publication 미등록이라 이벤트로 갱신)
+  useEffect(() => {
+    const h = () => load()
+    window.addEventListener("equria:reload", h)
+    return () => window.removeEventListener("equria:reload", h)
+  }, [load])
+
   useEffect(() => {
     if (!me) return
     const ch = supabase

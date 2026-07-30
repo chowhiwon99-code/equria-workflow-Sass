@@ -58,12 +58,14 @@ export function TaskSuggestions() {
 
   const addOne = async (s: Suggestion) => {
     if (!me) return
+    // 리뷰 F4: 낙관 제거 먼저 — insert 대기 중 제목을 고치면 참조가 바뀌어 제거 실패·중복 등록되던 문제. 실패 시 복원.
+    setItems((prev) => (prev ?? []).filter((x) => x !== s))
     try {
       await mustOk(supabase.from("personal_tasks").insert({ user_id: me, title: s.title, due_date: s.suggested_due }))
-      setItems((prev) => (prev ?? []).filter((x) => x !== s))
       toast.success("오늘 할 일에 추가했어요.")
       window.dispatchEvent(new Event("equria:reload")) // TodayTasks 갱신
     } catch {
+      setItems((prev) => [...(prev ?? []), s])
       toast.error("추가에 실패했어요.")
     }
   }

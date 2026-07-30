@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { cn } from "@/lib/utils"
 import { Surface } from "@/components/shared/Surface"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { AnnouncementsBoard } from "./AnnouncementsBoard"
@@ -35,10 +36,12 @@ export function DashboardLayout() {
     const onUp = (ev: PointerEvent) => {
       window.removeEventListener("pointermove", onMove)
       window.removeEventListener("pointerup", onUp)
+      window.removeEventListener("pointercancel", onUp)
       localStorage.setItem("equria:dashboard-ai-w", String(clamp(startW - (ev.clientX - startX))))
     }
     window.addEventListener("pointermove", onMove)
     window.addEventListener("pointerup", onUp)
+    window.addEventListener("pointercancel", onUp) // 리뷰 F5: cancel 시 리스너 정리(리사이즈는 값 커밋 무해)
   }
   const startHeightResize = (e: React.PointerEvent) => {
     e.preventDefault()
@@ -49,10 +52,12 @@ export function DashboardLayout() {
     const onUp = (ev: PointerEvent) => {
       window.removeEventListener("pointermove", onMove)
       window.removeEventListener("pointerup", onUp)
+      window.removeEventListener("pointercancel", onUp)
       localStorage.setItem("equria:assistant-h", String(clamp(startH - (ev.clientY - startY))))
     }
     window.addEventListener("pointermove", onMove)
     window.addEventListener("pointerup", onUp)
+    window.addEventListener("pointercancel", onUp) // 리뷰 F5: cancel 시 리스너 정리(리사이즈는 값 커밋 무해)
   }
 
   return (
@@ -69,23 +74,19 @@ export function DashboardLayout() {
           <WorkOverview />
         </div>
 
+        {/* 경계 핸들만 분기, 어시스턴트는 단일 렌더(리뷰 F2 — 브레이크포인트 통과 시 리마운트로 채팅 상태 소실 방지) */}
         {isDesktop ? (
-          <>
-            {/* 좌우 경계 — 커서 대면 AI 폭 조절 */}
-            <div onPointerDown={startWidthResize} className="-mx-1 w-2 shrink-0 cursor-ew-resize touch-none" title="드래그해서 AI 채팅 폭 조절" />
-            <Surface padding="none" className="min-h-0 max-w-[50%] shrink-0 overflow-hidden rounded-xl" style={{ width: aiW }}>
-              <DashboardAssistant />
-            </Surface>
-          </>
+          <div onPointerDown={startWidthResize} className="-mx-1 w-2 shrink-0 cursor-ew-resize touch-none" title="드래그해서 AI 채팅 폭 조절" />
         ) : (
-          <>
-            {/* 모바일: 위 경계 드래그로 높이 조절 */}
-            <div onPointerDown={startHeightResize} className="-my-1.5 h-4 shrink-0 cursor-ns-resize touch-none" title="드래그해서 AI 채팅 높이 조절" />
-            <Surface padding="none" className="shrink-0 overflow-hidden rounded-xl" style={{ height: aiH }}>
-              <DashboardAssistant />
-            </Surface>
-          </>
+          <div onPointerDown={startHeightResize} className="-my-1.5 h-4 shrink-0 cursor-ns-resize touch-none" title="드래그해서 AI 채팅 높이 조절" />
         )}
+        <Surface
+          padding="none"
+          className={cn("shrink-0 overflow-hidden rounded-xl", isDesktop && "min-h-0 max-w-[50%]")}
+          style={isDesktop ? { width: aiW } : { height: aiH }}
+        >
+          <DashboardAssistant />
+        </Surface>
       </div>
     </div>
   )

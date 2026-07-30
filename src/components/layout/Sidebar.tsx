@@ -88,10 +88,12 @@ export function Sidebar({
     const onUp = (ev: PointerEvent) => {
       window.removeEventListener("pointermove", onMove)
       window.removeEventListener("pointerup", onUp)
+      window.removeEventListener("pointercancel", onUp)
       localStorage.setItem("equria:sidebar-w", String(clamp(startW + (ev.clientX - startX))))
     }
     window.addEventListener("pointermove", onMove)
     window.addEventListener("pointerup", onUp)
+    window.addEventListener("pointercancel", onUp) // 리뷰 F5: cancel 시 리스너 정리(리사이즈는 값 커밋 무해)
   }
   const unreadDms = useUnreadDms(badgeDesktopOnly ? isDesktop : true) // "직원 채팅" 빨간 배지
 

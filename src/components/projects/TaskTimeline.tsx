@@ -145,7 +145,15 @@ export function TaskTimeline({
       const dx = ev.clientX - startX
       setDrag({ id: t.id, mode, startX, dDays: Math.round(dx / PPD), moved: Math.abs(dx) > 8 })
     }
+    // 리뷰 F1: 터치 스크롤 등으로 pointercancel이 오면 커밋 없이 정리(리스너 잔류→유령 날짜 이동 방지)
+    const onCancel = () => {
+      window.removeEventListener("pointermove", onMoveEv)
+      window.removeEventListener("pointerup", onUp)
+      window.removeEventListener("pointercancel", onCancel)
+      setDrag(null)
+    }
     const onUp = (ev: PointerEvent) => {
+      window.removeEventListener("pointercancel", onCancel)
       window.removeEventListener("pointermove", onMoveEv)
       window.removeEventListener("pointerup", onUp)
       const dDays = Math.round((ev.clientX - startX) / PPD)
@@ -169,6 +177,7 @@ export function TaskTimeline({
     }
     window.addEventListener("pointermove", onMoveEv)
     window.addEventListener("pointerup", onUp)
+    window.addEventListener("pointercancel", onCancel)
     setDrag({ id: t.id, mode, startX, dDays: 0, moved: false })
   }
 
@@ -222,7 +231,12 @@ export function TaskTimeline({
   }
 
   const removeFile = async (f: TaskFile) => {
-    await mustOk(supabase.from("files").update({ project_task_id: null }).eq("id", f.id)) // 연결만 해제(파일 보존)
+    // 연결만 해제(파일 보존). files_update RLS가 소유자 한정 — 남의 파일이면 0행 no-op이라 행 수로 확인(리뷰 M3)
+    const { data, error } = await supabase.from("files").update({ project_task_id: null }).eq("id", f.id).select("id")
+    if (error || !data?.length) {
+      toast.error("본인이 올린 파일만 뺄 수 있어요.")
+      return
+    }
     loadFiles()
   }
 
@@ -299,7 +313,7 @@ export function TaskTimeline({
                   <div
                     onPointerDown={(e) => startDrag(e, t, "move")}
                     className={cn(
-                      "group relative h-7 shrink-0 rounded-lg border shadow-sm",
+                      "group relative h-7 shrink-0 touch-none rounded-lg border shadow-sm",
                       isDrag ? "cursor-grabbing" : "cursor-grab",
                       !custom && (t.done ? "border-success/40 bg-success-bg" : overdue ? "border-rose-300 bg-rose-500/10" : "border-info/40 bg-info-bg")
                     )}

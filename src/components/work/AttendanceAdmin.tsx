@@ -144,8 +144,14 @@ export function AttendanceAdmin() {
   // 사유 기입(본인만 — RLS insert가 본인 한정) — 선택 날짜에 상태+메모 upsert
   const saveReason = async (date: string, status: string, note: string) => {
     if (!meId || !wsId) return
-    const existing = dayRecs.find((r) => r.user_id === meId && r.work_date === date) ?? recs.find((r) => r.user_id === meId && r.work_date === date)
     try {
+      // 리뷰 M4: 로드된 달 밖 날짜도 안전하게 — (본인, 날짜)로 직접 조회 후 분기(unique(user_id, work_date) 충돌 방지)
+      const { data: existing } = await supabase
+        .from("attendance_records")
+        .select("id")
+        .eq("user_id", meId)
+        .eq("work_date", date)
+        .maybeSingle()
       if (existing) {
         await mustOk(supabase.from("attendance_records").update({ status, note: note.trim() || null }).eq("id", existing.id))
       } else {

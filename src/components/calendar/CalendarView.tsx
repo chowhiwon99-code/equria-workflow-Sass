@@ -127,6 +127,7 @@ export function CalendarView() {
           .or(`end_time.gte.${startIso},and(end_time.is.null,start_time.gte.${startIso})`)
           .order("start_time", { ascending: true }),
         // 프로젝트 기간 — 가시 범위와 겹치는 것(취소 제외). 캘린더에 이름 막대로 표시(세션41)
+        // 리뷰 L3: 42칸 그리드 패딩(최대 ±14일)을 덮도록 로컬 날짜로 ±14일 여유(UTC slice는 하루 어긋남)
         supabase
           .from("projects")
           .select("id, name, start_date, due_date, status")
@@ -134,8 +135,8 @@ export function CalendarView() {
           .neq("status", "canceled")
           .not("start_date", "is", null)
           .not("due_date", "is", null)
-          .lte("start_date", endIso.slice(0, 10))
-          .gte("due_date", startIso.slice(0, 10)),
+          .lte("start_date", toDateInputValue(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 15)))
+          .gte("due_date", toDateInputValue(new Date(viewDate.getFullYear(), viewDate.getMonth(), -14))),
       ])
       if (qErr) throw new Error(qErr.message)
       setEvents(data ?? [])
@@ -272,7 +273,15 @@ export function CalendarView() {
         document.body.style.cursor = "grabbing"
       }
     }
+    // 리뷰 F1: 터치 스크롤 등 pointercancel 시 커밋 없이 정리(리스너 잔류 → 다음 탭에서 유령 날짜 이동 방지)
+    const onCancel = () => {
+      window.removeEventListener("pointermove", onMove)
+      window.removeEventListener("pointerup", onUp)
+      window.removeEventListener("pointercancel", onCancel)
+      document.body.style.cursor = ""
+    }
     const onUp = (ev: PointerEvent) => {
+      window.removeEventListener("pointercancel", onCancel)
       window.removeEventListener("pointermove", onMove)
       window.removeEventListener("pointerup", onUp)
       document.body.style.cursor = ""
@@ -290,6 +299,7 @@ export function CalendarView() {
     }
     window.addEventListener("pointermove", onMove)
     window.addEventListener("pointerup", onUp)
+    window.addEventListener("pointercancel", onCancel)
   }
 
   // 드래그 선택 범위(정렬된) 안에 day가 포함되는지
@@ -446,7 +456,7 @@ export function CalendarView() {
                       onPointerDown={(ev) => startBarDrag(ev, b, day)}
                       title={`${label} — 드래그=날짜 이동 · 클릭=${b.kind === "project" ? "프로젝트 상세" : "일정 상세"}`}
                       className={cn(
-                        "relative cursor-grab truncate py-0.5 text-[11px] leading-[1.2] text-white",
+                        "relative cursor-grab touch-none truncate py-0.5 text-[11px] leading-[1.2] text-white",
                         roundLeft ? "rounded-l" : "rounded-l-none",
                         roundRight ? "rounded-r" : "rounded-r-none",
                         showLabel ? "pl-1.5 pr-1" : "px-1",
