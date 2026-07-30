@@ -33,6 +33,7 @@ export function CashFlowCanvas({
   calcTypes,
   defaultCalcTypeId,
   categoryOptions,
+  height = 600,
   onUpdateSlot,
   onDeleteSlot,
   onAddSlot,
@@ -52,6 +53,7 @@ export function CashFlowCanvas({
   calcTypes: CashCalcType[]
   defaultCalcTypeId: string | null
   categoryOptions: { revenue: string[]; expense: string[] }
+  height?: number
   onUpdateSlot: (id: string, patch: Partial<CashAccount>) => void
   onDeleteSlot: (slot: CashAccount) => void
   onAddSlot: (kind: string, color: string) => void
@@ -251,8 +253,9 @@ export function CashFlowCanvas({
     <div
       ref={wrapRef}
       onPointerDown={(e) => setDrag({ kind: "pan", sx: e.clientX, sy: e.clientY, tx0: view.tx, ty0: view.ty })}
+      style={{ height }} // 작업공간 높이 — 부모(CashFlowView)의 리사이즈 핸들이 조절(세션41 대표 요청)
       className={cn(
-        "relative h-[600px] w-full select-none overflow-hidden rounded-2xl border bg-muted/15",
+        "relative w-full select-none overflow-hidden rounded-2xl border bg-muted/15",
         "[background-image:radial-gradient(var(--color-border)_1px,transparent_1px)] [background-size:20px_20px]",
         drag?.kind === "pan" ? "cursor-grabbing" : "cursor-grab"
       )}

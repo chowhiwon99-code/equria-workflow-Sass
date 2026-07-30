@@ -93,6 +93,27 @@ export function CashFlowView() {
   })
   const seededRef = useRef(false)
   const [loading, setLoading] = useState(true)
+  // 작업공간(캔버스) 높이 — 드래그 리사이즈(세션41 대표 요청) · 기기별 기억(localStorage)
+  const [canvasH, setCanvasH] = useState(600)
+  useEffect(() => {
+    const saved = Number(localStorage.getItem("equria:cashflow-canvas-height"))
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 마운트 시 1회 저장된 높이 복원(SSR 초기값 600과의 하이드레이션 정합)
+    if (saved >= 240 && saved <= 1600) setCanvasH(saved)
+  }, [])
+  const startCanvasResize = (e: React.PointerEvent) => {
+    e.preventDefault()
+    const startY = e.clientY
+    const startH = canvasH
+    const clamp = (n: number) => Math.min(1600, Math.max(240, n))
+    const onMove = (ev: PointerEvent) => setCanvasH(clamp(startH + (ev.clientY - startY)))
+    const onUp = (ev: PointerEvent) => {
+      window.removeEventListener("pointermove", onMove)
+      window.removeEventListener("pointerup", onUp)
+      localStorage.setItem("equria:cashflow-canvas-height", String(clamp(startH + (ev.clientY - startY))))
+    }
+    window.addEventListener("pointermove", onMove)
+    window.addEventListener("pointerup", onUp)
+  }
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -709,26 +730,39 @@ export function CashFlowView() {
           흐름도(캔버스)는 PC에서 볼 수 있어요. 폰에서는 아래 표로 입력·확인하세요.
         </p>
         {isDesktop && (
-          <CashFlowCanvas
-            slots={slots}
-            groups={groups}
-            pool={graph.pool}
-            poolPos={poolPos}
-            calcTypes={calcTypes}
-            defaultCalcTypeId={defaultCalcTypeId}
-            categoryOptions={catSuggest}
-            onUpdateSlot={updateSlot}
-            onDeleteSlot={deleteSlot}
-            onAddSlot={addSlot}
-            onAddGroup={addGroup}
-            onMoveGroup={moveGroup}
-            onUpdateGroup={updateGroup}
-            onDeleteGroup={deleteGroup}
-            onMoveAccount={moveAccount}
-            onMovePool={movePool}
-            onSetOpening={setOpeningFor}
-            onRecord={setRecordSlot}
-          />
+          <>
+            <CashFlowCanvas
+              slots={slots}
+              groups={groups}
+              pool={graph.pool}
+              poolPos={poolPos}
+              calcTypes={calcTypes}
+              defaultCalcTypeId={defaultCalcTypeId}
+              categoryOptions={catSuggest}
+              height={canvasH}
+              onUpdateSlot={updateSlot}
+              onDeleteSlot={deleteSlot}
+              onAddSlot={addSlot}
+              onAddGroup={addGroup}
+              onMoveGroup={moveGroup}
+              onUpdateGroup={updateGroup}
+              onDeleteGroup={deleteGroup}
+              onMoveAccount={moveAccount}
+              onMovePool={movePool}
+              onSetOpening={setOpeningFor}
+              onRecord={setRecordSlot}
+            />
+            {/* 작업공간 리사이즈 핸들 — 드래그로 캔버스 높이 조절(아래 손익 항목 표와의 공간 배분) */}
+            <div
+              role="separator"
+              aria-orientation="horizontal"
+              title="드래그해서 작업공간 높이 조절"
+              onPointerDown={startCanvasResize}
+              className="group -my-1.5 flex h-4 cursor-ns-resize touch-none items-center justify-center"
+            >
+              <div className="h-1 w-16 rounded-full bg-border transition-colors group-hover:bg-muted-foreground/50" />
+            </div>
+          </>
         )}
       </div>
 
