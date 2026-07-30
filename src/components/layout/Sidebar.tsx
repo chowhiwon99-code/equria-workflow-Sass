@@ -72,6 +72,27 @@ export function Sidebar({
   const [editing, setEditing] = useState(false)
   // 첫 페인트에선 transition을 끄고(정확한 초기 상태) 이후 토글만 애니메이션 — 하이드레이션 깜빡임 방지
   const [mounted, setMounted] = useState(false)
+  // 사이드바 폭 — 우측 경계 커서 드래그로 조절(세션41 대표 요청), 기기별 기억. null=기본(--sidebar-width)
+  const [sidebarW, setSidebarW] = useState<number | null>(null)
+  useEffect(() => {
+    const saved = Number(localStorage.getItem("equria:sidebar-w"))
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 마운트 1회 저장 폭 복원(SSR 기본폭과 하이드레이션 정합)
+    if (saved >= 180 && saved <= 400) setSidebarW(saved)
+  }, [])
+  const startSidebarResize = (e: React.PointerEvent) => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startW = sidebarW ?? 240 // 기본 15rem
+    const clamp = (n: number) => Math.min(400, Math.max(180, n))
+    const onMove = (ev: PointerEvent) => setSidebarW(clamp(startW + (ev.clientX - startX)))
+    const onUp = (ev: PointerEvent) => {
+      window.removeEventListener("pointermove", onMove)
+      window.removeEventListener("pointerup", onUp)
+      localStorage.setItem("equria:sidebar-w", String(clamp(startW + (ev.clientX - startX))))
+    }
+    window.addEventListener("pointermove", onMove)
+    window.addEventListener("pointerup", onUp)
+  }
   const unreadDms = useUnreadDms(badgeDesktopOnly ? isDesktop : true) // "직원 채팅" 빨간 배지
 
   // localStorage는 클라이언트에서만 — 마운트 후 로드(하이드레이션 불일치 방지)
@@ -138,10 +159,13 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        "glass-panel flex h-full w-[var(--sidebar-width)] shrink-0 flex-col border-r border-[var(--glass-border)] text-sidebar-foreground",
+        "glass-panel relative flex h-full w-[var(--sidebar-width)] shrink-0 flex-col border-r border-[var(--glass-border)] text-sidebar-foreground",
         className
       )}
+      style={sidebarW != null ? { width: sidebarW } : undefined}
     >
+      {/* 우측 경계 — 커서 대면 폭 조절(보이는 핸들 없음, 세션41) */}
+      <div onPointerDown={startSidebarResize} className="absolute inset-y-0 -right-1 z-30 w-2 cursor-ew-resize touch-none" title="드래그해서 사이드바 폭 조절" />
       <Link href="/dashboard" className="flex h-[var(--header-height)] items-center border-b px-4">
         {/* 브랜드 로고 — 라이트=원본(다크 로고), 다크 테마=흰색 반전 */}
         <Image src="/brand/logo-horizontal.png" alt="Complow" width={1046} height={256} priority className="h-5 w-auto dark:brightness-0 dark:invert" />
