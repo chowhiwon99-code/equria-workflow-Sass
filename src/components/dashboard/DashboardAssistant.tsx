@@ -41,6 +41,27 @@ export function DashboardAssistant() {
   const [files, setFiles] = useState<File[]>([])
   const [menuOpen, setMenuOpen] = useState(false)
   const [convos, setConvos] = useState<Convo[]>([])
+  // 대화 사이드바 폭 — 경계 드래그로 조절(세션41), 기기별 기억
+  const [sidebarW, setSidebarW] = useState(240)
+  useEffect(() => {
+    const saved = Number(localStorage.getItem("equria:assistant-sidebar-w"))
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 마운트 1회 저장 폭 복원(SSR 240과 하이드레이션 정합)
+    if (saved >= 160 && saved <= 420) setSidebarW(saved)
+  }, [])
+  const startSidebarResize = (e: React.PointerEvent) => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startW = sidebarW
+    const clamp = (n: number) => Math.min(420, Math.max(160, n))
+    const onMove = (ev: PointerEvent) => setSidebarW(clamp(startW + (ev.clientX - startX)))
+    const onUp = (ev: PointerEvent) => {
+      window.removeEventListener("pointermove", onMove)
+      window.removeEventListener("pointerup", onUp)
+      localStorage.setItem("equria:assistant-sidebar-w", String(clamp(startW + (ev.clientX - startX))))
+    }
+    window.addEventListener("pointermove", onMove)
+    window.addEventListener("pointerup", onUp)
+  }
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const hasChat = messages.length > 0
@@ -108,8 +129,8 @@ export function DashboardAssistant() {
 
   return (
     <div className="flex h-full">
-      {/* 좌측: 대화 사이드바 */}
-      <aside className="hidden w-60 shrink-0 flex-col border-r bg-muted/20 md:flex">
+      {/* 좌측: 대화 사이드바 — 폭 드래그 조절(세션41 대표 요청·기기별 기억) */}
+      <aside className="hidden shrink-0 flex-col border-r bg-muted/20 md:flex" style={{ width: sidebarW }}>
         <div className="p-2">
           <button
             onClick={newChat}
@@ -155,6 +176,8 @@ export function DashboardAssistant() {
           )}
         </div>
       </aside>
+      {/* 사이드바↔채팅 경계 — 커서 대면 폭 조절(보이는 핸들 없음) */}
+      <div onPointerDown={startSidebarResize} className="-mx-1 hidden w-2 shrink-0 cursor-ew-resize touch-none md:block" title="드래그해서 사이드바 폭 조절" />
 
       {/* 우측: 채팅 */}
       <div className="flex min-w-0 flex-1 flex-col">

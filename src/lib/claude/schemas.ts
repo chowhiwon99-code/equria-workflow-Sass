@@ -139,3 +139,20 @@ export type MemoryOrganizeResult = z.infer<typeof memoryOrganizeSchema>
 export const formulaConvertSchema = z.object({
   formula: z.string().describe("변환된 수식 한 줄 — 칸 이름(한국어)과 + − × ÷ ( ) 숫자 %만 사용"),
 })
+
+// 대시보드 작업 제안(세션41) — 연동 소스(앱 내부·Gmail)를 읽고 해야 할 일을 우선순위·출처와 함께 제안
+export const taskSuggestionsSchema = z.object({
+  suggestions: z
+    .array(
+      z.object({
+        title: z.string().describe("실행형 할 일 제목 한 줄(한국어). 예: 'PortOne 구비서류 제출'"),
+        reason: z.string().describe("왜 지금 해야 하는지 1~2문장 — 데이터의 실제 근거(날짜·이름) 포함"),
+        priority: z.enum(["urgent", "high", "medium"]).describe("긴급=오늘 안 하면 문제 / 높음=수일 내 / 중간=여유"),
+        source_type: z.enum(["gmail", "project", "calendar", "notification", "workflow", "app"]).describe("근거가 된 소스"),
+        source_label: z.string().describe("출처 구체 표기. 예: '메일: PortOne 심사팀' '프로젝트: 결제 연동' '일정: 채용 면접'"),
+        suggested_due: z.string().nullable().describe("권장 기한 YYYY-MM-DD, 특정 못 하면 null"),
+      })
+    )
+    .max(8)
+    .describe("가장 중요한 것부터 3~8개. 근거 없는 일반론 금지"),
+})
