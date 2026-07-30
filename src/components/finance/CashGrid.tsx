@@ -212,7 +212,7 @@ export function CashGrid({
           <tr className="bg-muted/10">
             {/* 첫 컬럼(항목명)은 비우고 분류 칸 위치(컬럼 경계)부터 시작 — 분류 네모칸 왼쪽 끝 정렬(대표 요청) */}
             <td aria-hidden />
-            <td colSpan={NCOL - 1} className="px-2 pb-2 pt-0.5">
+            <td colSpan={NCOL - 1} className="px-2 py-2">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
                 {isLedger ? (
                   // 장부 연동 슬롯 — 분류 선택은 항목명 옆으로 이동(위 요약 행). 여기는 통화만.
