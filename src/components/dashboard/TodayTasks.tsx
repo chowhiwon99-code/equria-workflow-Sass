@@ -110,7 +110,7 @@ export function TodayTasks() {
   const remaining = tasks.filter((t) => !t.done).length
 
   return (
-    <Surface variant="glass" padding="none" className="shrink-0 rounded-xl p-3">
+    <Surface padding="none" className="flex min-h-0 flex-col rounded-xl p-3">
       <div className="mb-1.5 flex items-center justify-between">
         <h2 className="inline-flex items-center gap-2 text-sm font-semibold">
           <ListTodo className="size-4 text-primary" /> 오늘 할 일
@@ -140,7 +140,7 @@ export function TodayTasks() {
       {tasks.length === 0 ? (
         <p className="py-2 text-sm text-muted-foreground">할 일을 추가해 하루를 시작해보세요.</p>
       ) : (
-        <div className="flex max-h-56 flex-col divide-y overflow-y-auto">
+        <div className="flex min-h-0 flex-1 flex-col divide-y overflow-y-auto">
           {tasks.map((t) => {
             const d = t.due_date ? dueBadge(t.due_date) : null
             return (
