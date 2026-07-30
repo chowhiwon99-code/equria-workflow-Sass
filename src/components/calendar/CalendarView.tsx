@@ -1,8 +1,13 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { ChevronLeft, ChevronRight, Plus, X, Check, Trash2, CalendarDays, Pencil, Paperclip, Download, Loader2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { mustOk } from "@/lib/supabase/mustOk"
+import { PROJECT_STATUS } from "@/lib/projects"
+import type { ProjectStatus } from "@/types"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
 import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
 import { cn } from "@/lib/utils"
@@ -65,10 +70,18 @@ function parseAttachments(raw: Json | null | undefined): CalendarAttachment[] {
   return out
 }
 
+/** 캘린더에 얹는 프로젝트 기간(세션41 대표 요청 — 프로젝트 일정도 팀 캘린더에) */
+type ProjLite = { id: string; name: string; start_date: string; due_date: string; status: string }
+/** 이벤트·프로젝트 공용 막대 — 레인 배치·렌더·드래그가 한 시스템을 쓴다 */
+type Bar = { id: string; kind: "event" | "project"; title: string; color: string; startMs: number; endMs: number; event?: CalendarEvent; project?: ProjLite }
+
 export function CalendarView() {
   const supabase = createClient()
+  const router = useRouter()
+  const { push } = useUndo()
   const [viewDate, setViewDate] = useState(() => new Date())
   const [events, setEvents] = useState<CalendarEvent[]>([])
+  const [projects, setProjects] = useState<ProjLite[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<CalendarEvent | null>(null)
@@ -106,14 +119,27 @@ export function CalendarView() {
     // - 범위에 걸치려면: 종료가 범위 시작 이후거나(멀티데이가 안쪽으로 이어짐),
     //   종료가 없고 시작이 범위 시작 이후(단일일 이벤트)
     try {
-      const { data, error: qErr } = await supabase
-        .from("calendar_events")
-        .select("*")
-        .lt("start_time", endIso)
-        .or(`end_time.gte.${startIso},and(end_time.is.null,start_time.gte.${startIso})`)
-        .order("start_time", { ascending: true })
+      const [{ data, error: qErr }, { data: projRows }] = await Promise.all([
+        supabase
+          .from("calendar_events")
+          .select("*")
+          .lt("start_time", endIso)
+          .or(`end_time.gte.${startIso},and(end_time.is.null,start_time.gte.${startIso})`)
+          .order("start_time", { ascending: true }),
+        // 프로젝트 기간 — 가시 범위와 겹치는 것(취소 제외). 캘린더에 이름 막대로 표시(세션41)
+        supabase
+          .from("projects")
+          .select("id, name, start_date, due_date, status")
+          .is("deleted_at", null)
+          .neq("status", "canceled")
+          .not("start_date", "is", null)
+          .not("due_date", "is", null)
+          .lte("start_date", endIso.slice(0, 10))
+          .gte("due_date", startIso.slice(0, 10)),
+      ])
       if (qErr) throw new Error(qErr.message)
       setEvents(data ?? [])
+      setProjects((projRows as ProjLite[]) ?? [])
       setError(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : "일정을 불러오지 못했습니다.")
@@ -129,55 +155,142 @@ export function CalendarView() {
   // 날짜(시:분 무시) 비교용 epoch
   const dayMs = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
 
-  // 멀티데이 이벤트는 시작~종료 사이 모든 날에 표시 (가로 막대 효과)
-  const eventsOn = (day: Date) =>
-    events.filter((e) => {
+  // 이벤트 + 프로젝트를 하나의 막대 목록으로(레인·렌더·드래그 공용)
+  const bars = useMemo<Bar[]>(() => {
+    const dayStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+    const evBars: Bar[] = events.map((e) => {
       const s = new Date(e.start_time)
       const end = e.end_time ? new Date(e.end_time) : s
-      return dayMs(day) >= dayMs(s) && dayMs(day) <= dayMs(end)
+      return { id: e.id, kind: "event", title: e.title, color: e.color, startMs: dayStart(s), endMs: Math.max(dayStart(s), dayStart(end)), event: e }
     })
+    const pjBars: Bar[] = projects.map((p) => ({
+      id: `proj:${p.id}`,
+      kind: "project",
+      title: p.name,
+      color: PROJECT_STATUS[p.status as ProjectStatus]?.dot ?? "#94A3B8",
+      startMs: new Date(`${p.start_date}T00:00:00`).getTime(),
+      endMs: new Date(`${p.due_date}T00:00:00`).getTime(),
+      project: p,
+    }))
+    return [...evBars, ...pjBars]
+  }, [events, projects])
+
+  // 멀티데이 막대는 시작~종료 사이 모든 날에 표시 (가로 막대 효과)
+  const barsOn = (day: Date) => bars.filter((b) => dayMs(day) >= b.startMs && dayMs(day) <= b.endMs)
 
   // 셀에 보이는 막대 레인(행) 개수 — 초과분은 "+N개"로 표시
   const LANE_CAP = 3
 
-  // 각 이벤트에 '레인(행) 인덱스'를 고정 배정한다.
-  // 같은 이벤트는 자신이 걸친 모든 날에서 동일한 행에 그려져 가로 막대가 끊기지 않고 이어진다.
-  // 알고리즘: 시작일 오름차순 → 기간 길이 내림차순으로 정렬한 뒤,
-  // 이미 배치된 이벤트 중 날짜 범위가 겹치는 것이 차지한 레인을 피해 가장 낮은 빈 레인을 그리디로 부여.
-  const laneByEventId = useMemo(() => {
-    // 이벤트의 [시작일, 종료일] epoch(시:분 무시)
-    const rangeOf = (e: CalendarEvent): { start: number; end: number } => {
-      const s = new Date(e.start_time)
-      const end = e.end_time ? new Date(e.end_time) : s
-      const startMs = new Date(s.getFullYear(), s.getMonth(), s.getDate()).getTime()
-      const endMs = new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime()
-      return { start: startMs, end: Math.max(startMs, endMs) }
-    }
-    const sorted = [...events].sort((a, b) => {
-      const ra = rangeOf(a)
-      const rb = rangeOf(b)
-      if (ra.start !== rb.start) return ra.start - rb.start
-      const durA = ra.end - ra.start
-      const durB = rb.end - rb.start
+  // 각 막대에 '레인(행) 인덱스'를 고정 배정 — 같은 막대는 걸친 모든 날에서 동일 행(끊김 없는 가로 막대).
+  // 시작일 오름차순 → 기간 길이 내림차순 정렬 후, 겹치는 막대의 레인을 피해 가장 낮은 빈 레인을 그리디 부여.
+  const laneByBarId = useMemo(() => {
+    const sorted = [...bars].sort((a, b) => {
+      if (a.startMs !== b.startMs) return a.startMs - b.startMs
+      const durA = a.endMs - a.startMs
+      const durB = b.endMs - b.startMs
       if (durA !== durB) return durB - durA // 긴 일정 먼저 (낮은 레인 선점)
       return a.id < b.id ? -1 : a.id > b.id ? 1 : 0 // 안정적 tie-break
     })
     const placed: { start: number; end: number; lane: number }[] = []
     const map = new Map<string, number>()
-    for (const e of sorted) {
-      const r = rangeOf(e)
-      // 이 이벤트와 날짜 범위가 겹치는, 이미 배치된 이벤트들의 레인 집합
+    for (const b of sorted) {
       const taken = new Set<number>()
       for (const p of placed) {
-        if (r.start <= p.end && r.end >= p.start) taken.add(p.lane)
+        if (b.startMs <= p.end && b.endMs >= p.start) taken.add(p.lane)
       }
       let lane = 0
       while (taken.has(lane)) lane++
-      map.set(e.id, lane)
-      placed.push({ start: r.start, end: r.end, lane })
+      map.set(b.id, lane)
+      placed.push({ start: b.startMs, end: b.endMs, lane })
     }
     return map
-  }, [events])
+  }, [bars])
+
+  // ── 막대 드래그 이동(세션41 대표 요청) — 일정·프로젝트 공통. 클릭(6px 미만)=기존 동작(상세/이동) ──
+  const shiftIso = (iso: string, days: number) => {
+    const d = new Date(iso)
+    d.setDate(d.getDate() + days)
+    return d.toISOString()
+  }
+  const shiftDateStr = (s: string, days: number) => {
+    const d = new Date(`${s}T00:00:00`)
+    d.setDate(d.getDate() + days)
+    return toDateInputValue(d)
+  }
+  const shiftBar = async (bar: Bar, delta: number) => {
+    try {
+      if (bar.kind === "event" && bar.event) {
+        const e0 = bar.event
+        const patch = { start_time: shiftIso(e0.start_time, delta), end_time: e0.end_time ? shiftIso(e0.end_time, delta) : null }
+        const prev = { start_time: e0.start_time, end_time: e0.end_time }
+        await mustOk(supabase.from("calendar_events").update(patch).eq("id", e0.id))
+        loadEvents()
+        push({
+          label: "일정 이동",
+          undo: async () => {
+            await mustOk(supabase.from("calendar_events").update(prev).eq("id", e0.id))
+            loadEvents()
+          },
+          redo: async () => {
+            await mustOk(supabase.from("calendar_events").update(patch).eq("id", e0.id))
+            loadEvents()
+          },
+        })
+        toast.success(`'${e0.title}' 일정을 옮겼어요 — ⌘Z로 되돌릴 수 있어요.`)
+      } else if (bar.project) {
+        const p = bar.project
+        const patch = { start_date: shiftDateStr(p.start_date, delta), due_date: shiftDateStr(p.due_date, delta) }
+        const prev = { start_date: p.start_date, due_date: p.due_date }
+        await mustOk(supabase.from("projects").update(patch).eq("id", p.id))
+        loadEvents()
+        push({
+          label: "프로젝트 기간 이동",
+          undo: async () => {
+            await mustOk(supabase.from("projects").update(prev).eq("id", p.id))
+            loadEvents()
+          },
+          redo: async () => {
+            await mustOk(supabase.from("projects").update(patch).eq("id", p.id))
+            loadEvents()
+          },
+        })
+        toast.success(`'${p.name}' 프로젝트 기간을 ${patch.start_date} ~ ${patch.due_date}(으)로 옮겼어요 — ⌘Z로 되돌릴 수 있어요.`)
+      }
+    } catch {
+      toast.error("이동에 실패했어요 — 권한이나 네트워크를 확인해 주세요.")
+    }
+  }
+  const startBarDrag = (e: React.PointerEvent, bar: Bar, grabDay: Date) => {
+    e.stopPropagation()
+    e.preventDefault()
+    const sx = e.clientX
+    const sy = e.clientY
+    let moved = false
+    const onMove = (ev: PointerEvent) => {
+      if (!moved && (Math.abs(ev.clientX - sx) > 6 || Math.abs(ev.clientY - sy) > 6)) {
+        moved = true
+        document.body.style.cursor = "grabbing"
+      }
+    }
+    const onUp = (ev: PointerEvent) => {
+      window.removeEventListener("pointermove", onMove)
+      window.removeEventListener("pointerup", onUp)
+      document.body.style.cursor = ""
+      if (!moved) {
+        // 클릭 — 일정=상세 모달 · 프로젝트=상세 페이지
+        if (bar.kind === "event" && bar.event) setSelected(bar.event)
+        else if (bar.project) router.push(`/projects/${bar.project.id}`)
+        return
+      }
+      const el = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest("[data-day]") as HTMLElement | null
+      const target = el?.dataset.day
+      if (!target) return
+      const delta = Math.round((new Date(`${target}T00:00:00`).getTime() - dayMs(grabDay)) / 86400000)
+      if (delta !== 0) shiftBar(bar, delta)
+    }
+    window.addEventListener("pointermove", onMove)
+    window.addEventListener("pointerup", onUp)
+  }
 
   // 드래그 선택 범위(정렬된) 안에 day가 포함되는지
   const inDragRange = (day: Date) => {
@@ -275,11 +388,12 @@ export function CalendarView() {
           const isToday = isSameDay(day, today)
           const isHighlighted = highlightDate ? isSameDay(day, highlightDate) : false
           const isDragged = inDragRange(day)
-          const dayEvents = eventsOn(day)
+          const dayBars = barsOn(day)
           return (
             <button
               key={i}
               type="button"
+              data-day={toDateInputValue(day)}
               onMouseDown={() => {
                 setDragStart(day)
                 setDragEnd(day)
@@ -306,8 +420,8 @@ export function CalendarView() {
                 {/* 레인(행) 단위 렌더 — 같은 이벤트가 매 칸 동일 행에 놓여 가로 막대가 끊김 없이 이어진다.
                     레인 0..LANE_CAP-1 만 표시하고, 빈 레인은 같은 높이의 spacer로 채워 칸끼리 행을 정렬한다. */}
                 {Array.from({ length: LANE_CAP }, (_, lane) => {
-                  const e = dayEvents.find((ev) => laneByEventId.get(ev.id) === lane)
-                  if (!e) {
+                  const b = dayBars.find((bb) => laneByBarId.get(bb.id) === lane)
+                  if (!b) {
                     // 빈 레인 — 막대와 동일 높이(py-0.5 + text-[11px]/leading)의 자리 표시
                     return (
                       <span key={`spacer-${lane}`} className="py-0.5 text-[11px] leading-[1.2]">
@@ -315,8 +429,8 @@ export function CalendarView() {
                       </span>
                     )
                   }
-                  const es = new Date(e.start_time)
-                  const ee = e.end_time ? new Date(e.end_time) : es
+                  const es = new Date(b.startMs)
+                  const ee = new Date(b.endMs)
                   const dow = day.getDay()
                   const isStart = isSameDay(day, es)
                   const isEnd = isSameDay(day, ee)
@@ -324,23 +438,23 @@ export function CalendarView() {
                   const roundLeft = isStart || dow === 0
                   const roundRight = isEnd || dow === 6
                   const showLabel = isStart || dow === 0 // 라벨은 막대 시작·각 주 시작에만
+                  const label = b.kind === "project" ? `📁 ${b.title}` : b.title
                   return (
                     <span
-                      key={e.id}
+                      key={b.id}
                       onMouseDown={(ev) => ev.stopPropagation()}
-                      onClick={(ev) => {
-                        ev.stopPropagation()
-                        setSelected(e)
-                      }}
+                      onPointerDown={(ev) => startBarDrag(ev, b, day)}
+                      title={`${label} — 드래그=날짜 이동 · 클릭=${b.kind === "project" ? "프로젝트 상세" : "일정 상세"}`}
                       className={cn(
-                        "relative truncate py-0.5 text-[11px] leading-[1.2] text-white",
+                        "relative cursor-grab truncate py-0.5 text-[11px] leading-[1.2] text-white",
                         roundLeft ? "rounded-l" : "rounded-l-none",
                         roundRight ? "rounded-r" : "rounded-r-none",
                         showLabel ? "pl-1.5 pr-1" : "px-1",
-                        e.status === "done" && "line-through opacity-60"
+                        b.kind === "event" && b.event?.status === "done" && "line-through opacity-60",
+                        b.kind === "project" && "opacity-90"
                       )}
                       style={{
-                        backgroundColor: e.color,
+                        backgroundColor: b.color,
                         // 연결되는 쪽은 칸 패딩(6px)+그리드 간격(1px)을 음수 마진으로 메움
                         marginLeft: roundLeft ? undefined : "-7px",
                         marginRight: roundRight ? undefined : "-7px",
@@ -349,8 +463,8 @@ export function CalendarView() {
                       {/* 폰(<sm)은 칸이 좁아 제목의 첫 단어만(대표 확정) — sm+는 전체 제목 */}
                       {showLabel ? (
                         <>
-                          <span className="sm:hidden">{e.title.trim().split(/\s+/)[0]}</span>
-                          <span className="hidden sm:inline">{e.title}</span>
+                          <span className="sm:hidden">{label.trim().split(/\s+/)[0]}</span>
+                          <span className="hidden sm:inline">{label}</span>
                         </>
                       ) : (
                         " "
@@ -358,10 +472,10 @@ export function CalendarView() {
                     </span>
                   )
                 })}
-                {/* 초과분은 레인 기준으로 계산 — 레인 < LANE_CAP 인 이벤트는 자신이 걸친 모든 날에
+                {/* 초과분은 레인 기준으로 계산 — 레인 < LANE_CAP 인 막대는 걸친 모든 날에
                     빠짐없이 보이므로 가로 막대 중간에 구멍이 생기지 않는다. */}
                 {(() => {
-                  const overflow = dayEvents.filter((ev) => (laneByEventId.get(ev.id) ?? 0) >= LANE_CAP).length
+                  const overflow = dayBars.filter((bb) => (laneByBarId.get(bb.id) ?? 0) >= LANE_CAP).length
                   return overflow > 0 ? (
                     <span className="px-1 text-[10px] text-muted-foreground">+{overflow}개</span>
                   ) : null
