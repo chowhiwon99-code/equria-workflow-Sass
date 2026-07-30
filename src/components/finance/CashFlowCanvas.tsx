@@ -407,7 +407,14 @@ function SlotCard({
             <InlineText value={s.name} onCommit={(v) => onUpdateSlot(s.id, { name: v })} className="w-full text-sm font-semibold" />
           </div>
         </div>
-        {/* 유형(계산 방식) — 표와 동일. 정액→수량/채널/커스텀 전환 시 아래 계산칸 등장. */}
+        {/* 유형(계산 방식) — 표와 동일. 장부 자동 슬롯은 유형 선택 대신 설명(세션41 — "직접 입력"으로 보이던 오해 해소) */}
+        {s.item_type === "ledger" ? (
+          <p className="text-[10px] leading-relaxed text-muted-foreground">
+            <span className="mr-1 rounded bg-muted px-1 py-0.5 font-medium">장부 자동</span>
+            내역(장부)의 이번 달 기록 중 다른 항목에 안 잡힌 <b className="font-medium text-foreground">나머지 합계</b>가 자동으로 채워져요.
+            내역이 바뀌면 따라 바뀌고, 직접 수정은 안 해요. 연동을 끊으려면 이 카드를 삭제하세요.
+          </p>
+        ) : (
         <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
           유형
           <select
@@ -433,13 +440,15 @@ function SlotCard({
             )}
           </select>
         </label>
-        {/* 장부 분류 — 이 슬롯으로 '기록'하면 내역에 이 분류로 찍힘. 미리 만든 분류만 선택(세션41 — 자유입력 제거, 표와 동일) */}
-        {!isHold && s.item_type !== "ledger" && (
+        )}
+        {/* 장부 분류 — 일반 슬롯='기록' 시 찍힐 분류 · 장부 자동 슬롯=합산할 분류 선택(전체/특정). 미리 만든 분류만(세션41) */}
+        {!isHold && (
           <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
             분류
             <CategorySelect
               slot={s}
               options={categoryOptions}
+              emptyLabel={s.item_type === "ledger" ? "전체" : "없음(슬롯명)"}
               onUpdateSlot={onUpdateSlot}
               className="min-w-0 flex-1 cursor-pointer rounded border bg-background px-1 py-0.5 text-[10px] text-foreground outline-none focus:ring-1 focus:ring-ring"
             />
