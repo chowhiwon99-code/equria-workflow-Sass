@@ -190,11 +190,11 @@ export function DashboardAssistant() {
 
         {!hasChat ? (
           <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
-            <div className="grid size-14 place-items-center rounded-[var(--radius-xl)] bg-primary/8 text-primary shadow-[var(--shadow-sm)]">
-              <Sparkles className="size-6" />
+            <div className="grid size-9 place-items-center rounded-xl bg-primary/8 text-primary shadow-[var(--shadow-sm)]">
+              <Sparkles className="size-4" />
             </div>
-            <p className="mt-4 break-keep text-lg font-semibold tracking-tight">무엇을 도와드릴까요?</p>
-            <p className="mt-1.5 max-w-60 break-keep text-sm leading-relaxed text-muted-foreground">Complow 어시스턴트에게 무엇이든 물어보세요.</p>
+            <p className="mt-2.5 break-keep text-sm font-semibold tracking-tight">무엇을 도와드릴까요?</p>
+            <p className="mt-1 max-w-56 break-keep text-xs leading-relaxed text-muted-foreground">Complow 어시스턴트에게 무엇이든 물어보세요.</p>
           </div>
         ) : (
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-5 [scrollbar-gutter:stable] [scrollbar-width:thin]">
