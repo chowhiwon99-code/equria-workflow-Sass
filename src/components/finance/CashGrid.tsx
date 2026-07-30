@@ -12,8 +12,9 @@ import { slotCategory, type CashSummary } from "@/lib/cashflowGraph"
 type SortKey = "name" | "kind" | "amount"
 
 /**
- * 손익 계산기 표 — 행마다 유형(정액/수량/채널)에 따라 입력칸이 달라지고 금액이 자동 계산.
- * 그룹(cash_categories)이 있으면 그룹별 섹션 + 소계로 표시. 입력 즉시 부모(SSOT)가 amount 재계산.
+ * 손익 계산기 표 — 세션41 심플 UX: 행 기본 = 한 줄 요약(이름·구분·계산 요약·금액),
+ * 유형 선택·입력칸·분류·통화는 행을 펼쳤을 때만(편집 행). 데이터 모델·계산은 무변경(표현만).
+ * 그룹(cash_categories)이 있으면 그룹별 섹션 + 소계. 입력 즉시 부모(SSOT)가 amount 재계산.
  */
 export function CashGrid({
   slots,
@@ -24,7 +25,6 @@ export function CashGrid({
   onAddSlot,
   onUpdateSlot,
   onDeleteSlot,
-  onUpdateCalcType,
   onEditColumns,
   onRecord,
 }: {
@@ -36,7 +36,6 @@ export function CashGrid({
   onAddSlot: () => void
   onUpdateSlot: (id: string, patch: Partial<CashAccount>) => void
   onDeleteSlot: (slot: CashAccount) => void
-  onUpdateCalcType: (id: string, patch: Partial<CashCalcType>) => void
   onEditColumns: () => void
   onRecord: (slot: CashAccount) => void
 }) {
@@ -87,14 +86,17 @@ export function CashGrid({
   const th = "px-2 py-2 text-left font-medium whitespace-nowrap"
   const thR = "px-2 py-2 text-right font-medium whitespace-nowrap"
 
-  // 표 계산 컬럼 = 회사 "기본 계산 유형"의 필드(동적). 라벨 인라인 수정 → 유형 갱신.
-  const dfields = (defaultType?.fields as unknown as CalcField[]) ?? []
-  const ncol = Math.max(1, dfields.length) // 표의 계산 필드 컬럼 수(필드 없으면 '계산' 1칸)
-  const NCOL = ncol + 6 // 항목명·구분·유형 + 필드(ncol) + 금액·통화·삭제 — 헤더 컬럼 수와 일치
-  const renameField = (i: number, label: string) => {
-    if (!defaultType) return
-    onUpdateCalcType(defaultType.id, { fields: dfields.map((f, j) => (j === i ? { ...f, label } : f)) as unknown as CashCalcType["fields"] })
-  }
+  // 펼친 편집 행(뷰 전용) — 기본은 요약 한 줄, 계산 칸을 누르면 입력칸이 열린다.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const toggleExpand = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+
+  const NCOL = 5 // 항목명·구분·계산·이번 달 금액·액션 — 헤더 컬럼 수와 일치
 
   const renderRow = (s: CashAccount) => {
     const customType = s.calc_type_id ? calcTypes.find((t) => t.id === s.calc_type_id) : undefined
@@ -106,170 +108,175 @@ export function CashGrid({
     const ast = astOf(s, calcTypes)
     const shownAmount = calc && ast ? evalFormula(ast, { ...Object.fromEntries(fields.map((f) => [f.key, getVal(f.key)])), ...(live[s.id] ?? {}) }) : Number(s.amount)
     const editor = (f: CalcField) => (f.kind === "percent" ? <InlinePercent value={getVal(f.key)} onCommit={(v) => setVal(f.key, v)} onLive={(v) => setLiveVal(f.key, v)} /> : <InlineNumber width="w-20" value={getVal(f.key)} onCommit={(v) => setVal(f.key, v)} onLive={(v) => setLiveVal(f.key, v)} />)
+    const isHold = slotCategory(s.kind) === "hold"
+    const isLedger = s.item_type === "ledger"
+    const open = expanded.has(s.id)
+    const typeName = isLedger ? "장부 자동" : (customType?.name ?? ITEM_TYPES.find((t) => t.value === s.item_type)?.label ?? "직접 입력")
+    // 요약 한 줄 — 입력칸을 늘어놓는 대신 유형·핵심 값만. 자세한 편집은 펼쳐서.
+    const summary = isLedger
+      ? `${typeName} · ${s.ledger_category || "전체"}`
+      : calc && !isHold
+        ? `${typeName} · 계산값 ${money(shownAmount, s.currency)}`
+        : s.ledger_category
+          ? `${typeName} · ${s.ledger_category}`
+          : typeName
     return (
-      <tr key={s.id} className="group hover:bg-muted/20">
-        {/* min-w: 항목명 열이 자동 배분에서 쪼그라들어 이름이 잘리는 것 방지(입력칸이 w-full이라 고유폭 0) */}
-        <td className="min-w-36 px-2 py-1">
-          <div className="relative flex items-center gap-1.5">
-            <button onClick={() => setColorFor(colorFor === s.id ? null : s.id)} className="size-3.5 shrink-0 rounded-full ring-1 ring-border transition-transform hover:scale-110" style={{ backgroundColor: swatch(s.color) }} title="색 변경" />
-            {colorFor === s.id && (
-              <div className="absolute left-0 top-6 z-20 flex gap-1 rounded-lg border bg-popover p-1.5 shadow-md">
-                {CATEGORY_COLORS.map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => {
-                      onUpdateSlot(s.id, { color: c })
-                      setColorFor(null)
-                    }}
-                    className="size-4 rounded-full ring-1 ring-border transition-transform hover:scale-110"
-                    style={{ backgroundColor: swatch(c) }}
-                    title={c}
-                  />
-                ))}
-              </div>
-            )}
-            <InlineText value={s.name} onCommit={(v) => onUpdateSlot(s.id, { name: v })} />
-          </div>
-        </td>
-        <td className="px-2 py-1">
-          {isOtherCustom ? (
-            <span className="rounded-full px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: tagBg(s.color, 22) }}>{slotLabel(s.kind)}</span>
-          ) : (
-            <select value={s.kind} onChange={(e) => onUpdateSlot(s.id, { kind: e.target.value, color: slotColor(e.target.value) })} style={{ backgroundColor: tagBg(s.color, 22) }} className="cursor-pointer rounded-full border-0 px-2 py-0.5 text-xs font-medium outline-none focus:ring-1 focus:ring-ring">
-              {SLOT_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
-              ))}
-            </select>
-          )}
-        </td>
-        <td className="px-2 py-1">
-          {s.item_type === "ledger" ? (
-            // 장부 연동 슬롯 — 이번 달 내역 합계 자동 반영(요약 탭과 같은 계산). 유형 변경 대신 삭제로 해제.
-            <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground" title="내역(장부) 이번 달 합계가 자동 반영돼요">장부 자동</span>
-          ) : (
-          <select
-            value={s.calc_type_id ? `c:${s.calc_type_id}` : s.item_type}
-            onChange={(e) => {
-              const v = e.target.value
-              if (v.startsWith("c:")) onUpdateSlot(s.id, { calc_type_id: v.slice(2), item_type: "fixed" })
-              else onUpdateSlot(s.id, { item_type: v, calc_type_id: null })
-            }}
-            className="cursor-pointer rounded border bg-background px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-ring"
-          >
-            <optgroup label="기본">
-              {ITEM_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
-              ))}
-            </optgroup>
-            {calcTypes.length > 0 && (
-              <optgroup label="커스텀">
-                {calcTypes.map((t) => (
-                  <option key={t.id} value={`c:${t.id}`}>{t.name}</option>
-                ))}
-              </optgroup>
-            )}
-          </select>
-          )}
-        </td>
-        {isDefault ? (
-          dfields.map((f) => (
-            <td key={f.key} className="px-2 py-1 text-right">{editor(f)}</td>
-          ))
-        ) : calc ? (
-          <td className="px-2 py-1" colSpan={ncol}>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              {fields.map((f) => (
-                <label key={f.key} className="flex items-center gap-1 text-xs text-muted-foreground">
-                  {f.label}
-                  {editor(f)}
-                </label>
-              ))}
-              {/* 계산값 = 기록 프리필용 도우미(진실 아님 — 진실은 금액 열의 이번 달 기록 합계) */}
-              {slotCategory(s.kind) !== "hold" && (
-                <>
-                  <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] tabular-nums text-muted-foreground" title="수식 계산값 — '기록'을 누르면 이 값이 장부에 기록돼요">
-                    계산값 {money(shownAmount, s.currency)}
-                  </span>
-                  <label className="flex items-center gap-1 text-xs text-muted-foreground">
-                    분류
-                    <CategoryInput slot={s} onUpdateSlot={onUpdateSlot} />
-                  </label>
-                </>
+      <Fragment key={s.id}>
+        <tr className="group hover:bg-muted/20">
+          {/* min-w: 항목명 열이 자동 배분에서 쪼그라들어 이름이 잘리는 것 방지(입력칸이 w-full이라 고유폭 0) */}
+          <td className="min-w-36 px-2 py-1.5">
+            <div className="relative flex items-center gap-1.5">
+              <button onClick={() => setColorFor(colorFor === s.id ? null : s.id)} className="size-3.5 shrink-0 rounded-full ring-1 ring-border transition-transform hover:scale-110" style={{ backgroundColor: swatch(s.color) }} title="색 변경" />
+              {colorFor === s.id && (
+                <div className="absolute left-0 top-6 z-20 flex gap-1 rounded-lg border bg-popover p-1.5 shadow-md">
+                  {CATEGORY_COLORS.map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => {
+                        onUpdateSlot(s.id, { color: c })
+                        setColorFor(null)
+                      }}
+                      className="size-4 rounded-full ring-1 ring-border transition-transform hover:scale-110"
+                      style={{ backgroundColor: swatch(c) }}
+                      title={c}
+                    />
+                  ))}
+                </div>
               )}
+              <InlineText value={s.name} onCommit={(v) => onUpdateSlot(s.id, { name: v })} />
             </div>
           </td>
-        ) : s.item_type === "ledger" ? (
-          // 장부 연동 슬롯 — 어떤 분류를 합산할지 선택(전체/식비/…). 바꾸면 다음 로드에서 금액 동기화.
-          <td className="px-2 py-1" colSpan={ncol}>
-            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              분류
-              <select
-                value={s.ledger_category ?? ""}
-                onChange={(e) => onUpdateSlot(s.id, { ledger_category: e.target.value || null })}
-                className="cursor-pointer rounded border bg-background px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-ring"
-              >
-                <option value="">전체</option>
-                {(slotCategory(s.kind) === "income" ? REVENUE_CATEGORIES : EXPENSE_CATEGORIES).map((c) => (
-                  <option key={c} value={c}>{c}</option>
+          <td className="px-2 py-1.5">
+            {isOtherCustom ? (
+              <span className="rounded-full px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: tagBg(s.color, 22) }}>{slotLabel(s.kind)}</span>
+            ) : (
+              <select value={s.kind} onChange={(e) => onUpdateSlot(s.id, { kind: e.target.value, color: slotColor(e.target.value) })} style={{ backgroundColor: tagBg(s.color, 22) }} className="cursor-pointer rounded-full border-0 px-2 py-0.5 text-xs font-medium outline-none focus:ring-1 focus:ring-ring">
+                {SLOT_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
                 ))}
-                {s.ledger_category &&
-                  !((slotCategory(s.kind) === "income" ? REVENUE_CATEGORIES : EXPENSE_CATEGORIES) as readonly string[]).includes(s.ledger_category) && (
-                    <option value={s.ledger_category}>{s.ledger_category}</option>
-                  )}
               </select>
-            </label>
-          </td>
-        ) : slotCategory(s.kind) !== "hold" ? (
-          // 직접 입력(fixed) 매출·비용 — 계산칸 대신 장부 분류 입력(기록 시 이 분류로 찍힘)
-          <td className="px-2 py-1" colSpan={Math.max(1, ncol)}>
-            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              분류
-              <CategoryInput slot={s} onUpdateSlot={onUpdateSlot} />
-            </label>
-          </td>
-        ) : dfields.length > 0 ? (
-          dfields.map((f) => (
-            <td key={f.key} className="px-2 py-1 text-right">
-              <Dash />
-            </td>
-          ))
-        ) : (
-          <td className="px-2 py-1 text-center">
-            <Dash />
-          </td>
-        )}
-        <td className="px-2 py-1 text-right">
-          {s.item_type === "ledger" ? (
-            <span className="px-1 font-medium tabular-nums" title="미연결 기록 잔여 합계 — 장부 자동">{money(Number(s.amount), s.currency)}</span>
-          ) : slotCategory(s.kind) === "hold" ? (
-            /* 보유금 — 장부 개념 없음, 직접 입력/수식 유지 */
-            calc ? <span className="px-1 font-medium tabular-nums">{money(shownAmount, s.currency)}</span> : <InlineNumber width="w-24" value={Number(s.amount)} onCommit={(v) => onUpdateSlot(s.id, { amount: v })} />
-          ) : (
-            /* 매출·비용 = 원장 파생(이번 달 자기 기록 합계) — 편집은 '기록'으로 */
-            <span className="px-1 font-medium tabular-nums" title="이번 달 기록 합계 — 장부 기준(기록 버튼으로 추가)">{money(Number(s.amount), s.currency)}</span>
-          )}
-        </td>
-        <td className="px-2 py-1">
-          <select value={s.currency} onChange={(e) => onUpdateSlot(s.id, { currency: e.target.value })} className="rounded border-0 bg-transparent text-xs outline-none focus:ring-1 focus:ring-ring">
-            {CURRENCIES.map((c) => (
-              <option key={c.code} value={c.code}>{c.code}</option>
-            ))}
-          </select>
-        </td>
-        <td className="px-1 py-1">
-          <div className="flex items-center justify-end gap-1.5">
-            {/* 기록 — 매출·비용 슬롯의 장부 쓰기(항상 노출). 보유금·ledger 자동 슬롯 제외 */}
-            {s.item_type !== "ledger" && slotCategory(s.kind) !== "hold" && (
-              <button onClick={() => onRecord(s)} className="rounded p-0.5 text-muted-foreground transition hover:text-primary" title="장부에 기록">
-                <PenLine className="size-3.5" />
-              </button>
             )}
-            <button onClick={() => onDeleteSlot(s)} className="text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:text-destructive" title="삭제">
-              <Trash2 className="size-3.5" />
+          </td>
+          {/* 계산 요약 — 누르면 아래에 편집 행이 열린다 */}
+          <td className="px-2 py-1.5">
+            <button
+              onClick={() => toggleExpand(s.id)}
+              className="flex w-full items-center gap-1.5 rounded px-1 py-0.5 text-left text-xs text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+              title={open ? "접기" : "펼쳐서 편집"}
+            >
+              {open ? <ChevronDown className="size-3 shrink-0" /> : <ChevronRight className="size-3 shrink-0" />}
+              <span className="truncate tabular-nums">{summary}</span>
             </button>
-          </div>
-        </td>
-      </tr>
+          </td>
+          <td className="px-2 py-1.5 text-right">
+            {isLedger ? (
+              <span className="px-1 font-medium tabular-nums" title="미연결 기록 잔여 합계 — 장부 자동">{money(Number(s.amount), s.currency)}</span>
+            ) : isHold ? (
+              /* 보유금 — 장부 개념 없음, 직접 입력/수식 유지 */
+              calc ? <span className="px-1 font-medium tabular-nums">{money(shownAmount, s.currency)}</span> : <InlineNumber width="w-24" value={Number(s.amount)} onCommit={(v) => onUpdateSlot(s.id, { amount: v })} />
+            ) : (
+              /* 매출·비용 = 원장 파생(이번 달 자기 기록 합계) — 편집은 '기록'으로 */
+              <span className="px-1 font-medium tabular-nums" title="이번 달 기록 합계 — 장부 기준(기록 버튼으로 추가)">{money(Number(s.amount), s.currency)}</span>
+            )}
+          </td>
+          <td className="px-1 py-1.5">
+            <div className="flex items-center justify-end gap-1.5">
+              {/* 기록 — 매출·비용 슬롯의 장부 쓰기(항상 노출). 보유금·ledger 자동 슬롯 제외 */}
+              {!isLedger && !isHold && (
+                <button onClick={() => onRecord(s)} className="rounded p-0.5 text-muted-foreground transition hover:text-primary" title="장부에 기록">
+                  <PenLine className="size-3.5" />
+                </button>
+              )}
+              <button onClick={() => onDeleteSlot(s)} className="text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:text-destructive" title="삭제">
+                <Trash2 className="size-3.5" />
+              </button>
+            </div>
+          </td>
+        </tr>
+        {/* 편집 행 — 유형·입력칸·분류·통화(요약을 눌렀을 때만) */}
+        {open && (
+          <tr className="bg-muted/10">
+            <td colSpan={NCOL} className="px-3 pb-2.5 pt-0.5">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                {isLedger ? (
+                  // 장부 연동 슬롯 — 어떤 분류를 합산할지 선택(전체/식비/…). 바꾸면 다음 로드에서 금액 동기화.
+                  <label className="flex items-center gap-1.5">
+                    분류
+                    <select
+                      value={s.ledger_category ?? ""}
+                      onChange={(e) => onUpdateSlot(s.id, { ledger_category: e.target.value || null })}
+                      className="cursor-pointer rounded border bg-background px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-ring"
+                    >
+                      <option value="">전체</option>
+                      {(slotCategory(s.kind) === "income" ? REVENUE_CATEGORIES : EXPENSE_CATEGORIES).map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                      {s.ledger_category &&
+                        !((slotCategory(s.kind) === "income" ? REVENUE_CATEGORIES : EXPENSE_CATEGORIES) as readonly string[]).includes(s.ledger_category) && (
+                          <option value={s.ledger_category}>{s.ledger_category}</option>
+                        )}
+                    </select>
+                  </label>
+                ) : (
+                  <>
+                    <label className="flex items-center gap-1.5">
+                      유형
+                      <select
+                        value={s.calc_type_id ? `c:${s.calc_type_id}` : s.item_type}
+                        onChange={(e) => {
+                          const v = e.target.value
+                          if (v.startsWith("c:")) onUpdateSlot(s.id, { calc_type_id: v.slice(2), item_type: "fixed" })
+                          else onUpdateSlot(s.id, { item_type: v, calc_type_id: null })
+                        }}
+                        className="cursor-pointer rounded border bg-background px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-ring"
+                      >
+                        <optgroup label="기본">
+                          {ITEM_TYPES.map((t) => (
+                            <option key={t.value} value={t.value}>{t.label}</option>
+                          ))}
+                        </optgroup>
+                        {calcTypes.length > 0 && (
+                          <optgroup label="커스텀">
+                            {calcTypes.map((t) => (
+                              <option key={t.id} value={`c:${t.id}`}>{t.name}</option>
+                            ))}
+                          </optgroup>
+                        )}
+                      </select>
+                    </label>
+                    {fields.map((f) => (
+                      <label key={f.key} className="flex items-center gap-1">
+                        {f.label}
+                        {editor(f)}
+                      </label>
+                    ))}
+                    {/* 계산값 = 기록 프리필용 도우미(진실 아님 — 진실은 금액 열의 이번 달 기록 합계) */}
+                    {calc && !isHold && (
+                      <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] tabular-nums" title="수식 계산값 — '기록'을 누르면 이 값이 장부에 기록돼요">
+                        계산값 {money(shownAmount, s.currency)}
+                      </span>
+                    )}
+                    {!isHold && (
+                      <label className="flex items-center gap-1">
+                        분류
+                        <CategoryInput slot={s} onUpdateSlot={onUpdateSlot} />
+                      </label>
+                    )}
+                  </>
+                )}
+                <label className="flex items-center gap-1.5">
+                  통화
+                  <select value={s.currency} onChange={(e) => onUpdateSlot(s.id, { currency: e.target.value })} className="cursor-pointer rounded border bg-background px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-ring">
+                    {CURRENCIES.map((c) => (
+                      <option key={c.code} value={c.code}>{c.code}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </td>
+          </tr>
+        )}
+      </Fragment>
     )
   }
 
@@ -294,24 +301,14 @@ export function CashGrid({
       </div>
 
       <div className="overflow-x-auto rounded-lg border">
-        <table className="w-full min-w-[900px] text-sm">
+        <table className="w-full min-w-[560px] text-sm">
           <thead className="border-b bg-muted/30 text-xs text-muted-foreground">
             <tr>
               <th className={th}><button onClick={() => toggleSort("name")} className="inline-flex items-center gap-1 hover:text-foreground">항목명 {sortIcon("name")}</button></th>
               <th className={th}><button onClick={() => toggleSort("kind")} className="inline-flex items-center gap-1 hover:text-foreground">구분 {sortIcon("kind")}</button></th>
-              <th className={th}>유형</th>
-              {dfields.length > 0 ? (
-                dfields.map((f, i) => (
-                  <th key={f.key} className={thR}>
-                    <ColHeader label={f.label} editable={!!defaultType} onCommit={(v) => renameField(i, v)} />
-                  </th>
-                ))
-              ) : (
-                <th className={thR}>계산</th>
-              )}
+              <th className={th} title="누르면 유형·입력칸·분류가 펼쳐져요">계산</th>
               <th className={thR}><button onClick={() => toggleSort("amount")} className="inline-flex items-center gap-1 hover:text-foreground" title="매출·비용 = 이번 달 장부 기록 합계(자동) · 보유금 = 직접 입력">이번 달 금액 {sortIcon("amount")}</button></th>
-              <th className={th}>통화</th>
-              <th className="w-8 px-1 py-2" />
+              <th className="w-14 px-1 py-2" />
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -386,34 +383,6 @@ function CategoryInput({ slot: s, onUpdateSlot }: { slot: CashAccount; onUpdateS
         if (v !== (s.ledger_category ?? "")) onUpdateSlot(s.id, { ledger_category: v || null })
       }}
       className="w-36 rounded border bg-background px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-ring"
-    />
-  )
-}
-
-function Dash() {
-  return <span className="text-muted-foreground/30">—</span>
-}
-
-// 계산 컬럼 헤더 — 라벨 인라인 수정(기본 유형 fields[i].label 갱신).
-function ColHeader({ label, editable, onCommit }: { label: string; editable: boolean; onCommit: (v: string) => void }) {
-  if (!editable) return <span>{label}</span>
-  return (
-    <input
-      key={label}
-      defaultValue={label}
-      title="칸 이름 — 수정 가능"
-      onBlur={(e) => {
-        const v = e.target.value.trim()
-        if (v && v !== label) onCommit(v)
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" && !e.nativeEvent.isComposing) e.currentTarget.blur()
-        if (e.key === "Escape") {
-          e.currentTarget.value = label
-          e.currentTarget.blur()
-        }
-      }}
-      className="w-20 rounded border-0 bg-transparent text-right font-medium text-muted-foreground outline-none hover:bg-background focus:bg-background focus:text-foreground focus:ring-1 focus:ring-ring"
     />
   )
 }

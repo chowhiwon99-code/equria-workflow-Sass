@@ -398,16 +398,7 @@ export function CashFlowView() {
     load()
   }
 
-  // 회사 기본 계산 유형(표 칸) 편집 — 필드/수식 변경 후 그 유형을 쓰는 행들 금액 재계산.
-  const onUpdateCalcType = async (id: string, patch: Partial<CashCalcType>) => {
-    await mustOk(supabase.from("cash_calc_types").update(patch).eq("id", id))
-    const ct = { ...calcTypes.find((t) => t.id === id), ...patch } as CashCalcType
-    const ast = (ct.formula as { ast?: CalcNode } | null)?.ast ?? null
-    // 매출·비용 슬롯 amount는 원장 파생(load 동기화) — 수식 변경의 amount 반영은 보유금(reserve)만.
-    const affected = slots.filter((s) => s.calc_type_id === id && s.kind === "reserve")
-    await Promise.all(affected.map((s) => supabase.from("cash_accounts").update({ amount: evalFormula(ast, (s.field_values as Record<string, number>) ?? {}) }).eq("id", s.id)))
-    load()
-  }
+  // 계산 유형 편집은 '칸 편집'(CalcTypeBuilder)로 일원화 — 세션41 그리드 심플화로 헤더 인라인 이름변경 제거.
   const editColumns = () => {
     if (defaultType) setEditType(defaultType)
     setShowBuilder(true)
@@ -642,7 +633,7 @@ export function CashFlowView() {
       </div>
 
       {/* 슬롯 표 — 금액은 원장 파생(이번 달 기록 합계), 기록 버튼으로 장부에 쓴다 */}
-      <CashGrid slots={slots} groups={groups} pool={graph.pool} calcTypes={calcTypes} defaultType={defaultType} onAddSlot={addSlot} onUpdateSlot={updateSlot} onDeleteSlot={deleteSlot} onUpdateCalcType={onUpdateCalcType} onEditColumns={editColumns} onRecord={setRecordSlot} />
+      <CashGrid slots={slots} groups={groups} pool={graph.pool} calcTypes={calcTypes} defaultType={defaultType} onAddSlot={addSlot} onUpdateSlot={updateSlot} onDeleteSlot={deleteSlot} onEditColumns={editColumns} onRecord={setRecordSlot} />
 
       {/* 슬롯 분류 자유입력 제안 — 캔버스/표의 input list가 참조(구분별) */}
       <datalist id="cf-cat-revenue">
