@@ -4,8 +4,10 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Complow 디자인 시스템 — 토스/애플 결(둥근 라운드 · 회색 페이지 위 흰 플로팅 카드 · 은은한 그림자).
- * primary는 모노톤(검정/흰) 유지, 파스텔은 기능 신호색(success/warning/info)만. 쿨 뉴트럴 hue≈264.
+ * Complow 디자인 시스템 — 랜딩과 한 언어(세션41 통일): 밝은 미니멀.
+ * 불투명 흰 카드 · 검정 알파 헤어라인 보더 · 소프트 섀도 · 파스텔은 기능 신호색(success/warning/info)만.
+ * primary는 랜딩 INK(#111) 근사 모노톤. 신호색은 Tailwind emerald/blue hue 정합(콘텐츠 직접 사용 색과 수렴).
+ * 글래스 토큰(--glass-*)은 불투명 값으로 유지 — .glass/.glass-panel 소비처 20파일 무수정, 롤백=토큰 복원.
  * 모든 값이 토큰 — 여기 한 줄씩 바꾸면 전 화면이 따라온다(계속 미세조정 가능).
  */
 :root {
@@ -19,34 +21,34 @@
   @media (width < 768px) {
     --app-pad: 0.75rem;
   }
-  --background: oklch(0.961 0.004 264); /* 회색 페이지 — 흰 카드가 또렷이 뜨도록 */
+  --background: oklch(0.977 0.003 260); /* 랜딩 목업 본문 #f7f8fa — 아주 연한 회색 위 흰 카드 */
   --foreground: oklch(0.18 0.004 264);
   --card: oklch(1 0 0); /* 흰 카드(페이지 위에 뜸) */
   --card-foreground: oklch(0.18 0.004 264);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.18 0.004 264);
-  --primary: oklch(0.205 0.003 264); /* 모노톤 검정 */
+  --primary: oklch(0.185 0.003 264); /* 랜딩 INK #111111 근사 — 모노톤 검정 */
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.965 0.004 264);
   --secondary-foreground: oklch(0.205 0.004 264);
   --muted: oklch(0.965 0.004 264);
-  --muted-foreground: oklch(0.52 0.006 264);
+  --muted-foreground: oklch(0.55 0.006 264); /* 랜딩 black/45 명도 계단 근접 */
   --accent: oklch(0.955 0.005 264);
   --accent-foreground: oklch(0.205 0.004 264);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
   --destructive-bg: oklch(0.95 0.03 25);
-  --success: oklch(0.62 0.15 150);
+  --success: oklch(0.596 0.145 163); /* emerald-600 정합 — 콘텐츠의 emerald 직접 사용과 한 hue */
   --success-foreground: oklch(0.985 0 0);
-  --success-bg: oklch(0.945 0.045 150);
+  --success-bg: oklch(0.95 0.045 163);
   --warning: oklch(0.72 0.15 70);
   --warning-foreground: oklch(0.3 0.05 70);
   --warning-bg: oklch(0.95 0.05 80);
-  --info: oklch(0.62 0.13 250);
+  --info: oklch(0.546 0.215 263); /* blue-600 정합 — 채도 과하면 0.16로 후퇴 */
   --info-foreground: oklch(0.985 0 0);
-  --info-bg: oklch(0.945 0.035 250);
-  --border: oklch(0.92 0.004 264);
-  --input: oklch(0.92 0.004 264);
+  --info-bg: oklch(0.945 0.035 263);
+  --border: oklch(0 0 0 / 0.08); /* 랜딩 border-black/[0.05~0.08] 헤어라인 — 알파라 어떤 표면 위에서도 정합 */
+  --input: oklch(0 0 0 / 0.08);
   --ring: oklch(0.6 0.006 264);
   --chart-1: oklch(0.62 0.13 264);
   --chart-2: oklch(0.68 0.12 165);
@@ -65,14 +67,14 @@
   --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.04), 0 1px 1px oklch(0 0 0 / 0.04);
   --shadow-md: 0 1px 2px oklch(0 0 0 / 0.05), 0 8px 24px oklch(0 0 0 / 0.08);
   --shadow-lg: 0 2px 6px oklch(0 0 0 / 0.05), 0 24px 60px oklch(0 0 0 / 0.1);
-  /* 글래스모피즘 토큰 — 프로스트 표면(Surface glass·셸·오버레이가 소비). 알파 하한 높게=본문 대비 확보(a11y) */
-  /* 강도 살짝↑(블러·채도) + 카드 구분용 '보이는' 뉴트럴 테두리(흰 테두리는 흰 배경서 안 보여서) */
-  --glass-bg: oklch(1 0 0 / 0.62);
-  --glass-border: oklch(0.42 0.015 264 / 0.16);
-  --glass-hairline: oklch(0.55 0.006 264 / 0.14);
-  --glass-blur: 20px;
-  --glass-saturate: 1.5;
-  --glass-sheen: linear-gradient(180deg, oklch(1 0 0 / 0.4), oklch(1 0 0 / 0) 42%);
+  /* 글래스 토큰 — 세션41 랜딩 통일로 불투명화(.force-light 방식의 :root 승격). 소비처(.glass/.glass-panel 20파일)는 무수정.
+   * 롤백 = 세션31 반투명 값 복원(git history 4e501d3). */
+  --glass-bg: var(--card);
+  --glass-border: oklch(0 0 0 / 0.08);
+  --glass-hairline: oklch(0 0 0 / 0.06);
+  --glass-blur: 0px;
+  --glass-saturate: 1;
+  --glass-sheen: none;
   /* 강조점 1개 — 모노크롬 유지, 활성/라이브 점에만 절제 사용 */
   --accent-dot: oklch(0.72 0.16 350);
 }
@@ -80,24 +82,24 @@
 /* 공개 화면(랜딩·로그인·회원가입) 라이트 고정 — 시스템/앱이 다크여도 항상 라이트 */
 .force-light {
   color-scheme: light;
-  --background: oklch(0.961 0.004 264);
+  --background: oklch(0.977 0.003 260);
   --foreground: oklch(0.18 0.004 264);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.18 0.004 264);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.18 0.004 264);
-  --primary: oklch(0.205 0.003 264);
+  --primary: oklch(0.185 0.003 264);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.965 0.004 264);
   --secondary-foreground: oklch(0.205 0.004 264);
   --muted: oklch(0.965 0.004 264);
-  --muted-foreground: oklch(0.52 0.006 264);
+  --muted-foreground: oklch(0.55 0.006 264); /* 랜딩 black/45 명도 계단 근접 */
   --accent: oklch(0.955 0.005 264);
   --accent-foreground: oklch(0.205 0.004 264);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.92 0.004 264);
-  --input: oklch(0.92 0.004 264);
+  --border: oklch(0 0 0 / 0.08); /* 랜딩 border-black/[0.05~0.08] 헤어라인 — 알파라 어떤 표면 위에서도 정합 */
+  --input: oklch(0 0 0 / 0.08);
   --ring: oklch(0.6 0.006 264);
   /* 글래스 옵트아웃 — 공개 화면은 항상 불투명(블러 0) */
   --glass-bg: var(--card);
@@ -127,15 +129,15 @@
   --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: oklch(0.985 0 0);
   --destructive-bg: oklch(0.32 0.07 25);
-  --success: oklch(0.72 0.15 152);
-  --success-foreground: oklch(0.18 0.03 152);
-  --success-bg: oklch(0.3 0.06 152);
+  --success: oklch(0.72 0.15 163);
+  --success-foreground: oklch(0.18 0.03 163);
+  --success-bg: oklch(0.3 0.06 163);
   --warning: oklch(0.82 0.15 80);
   --warning-foreground: oklch(0.22 0.04 80);
   --warning-bg: oklch(0.32 0.06 80);
-  --info: oklch(0.7 0.13 252);
-  --info-foreground: oklch(0.18 0.03 252);
-  --info-bg: oklch(0.3 0.05 252);
+  --info: oklch(0.7 0.15 263);
+  --info-foreground: oklch(0.18 0.03 263);
+  --info-bg: oklch(0.3 0.05 263);
   --border: oklch(1 0 0 / 14%);
   --input: oklch(1 0 0 / 16%);
   --ring: oklch(0.55 0.006 264);
@@ -155,13 +157,13 @@
   --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.3);
   --shadow-md: 0 1px 2px oklch(0 0 0 / 0.3), 0 8px 24px oklch(0 0 0 / 0.4);
   --shadow-lg: 0 2px 6px oklch(0 0 0 / 0.4), 0 24px 60px oklch(0 0 0 / 0.5);
-  /* 글래스 토큰(다크) — 카드보다 약간 어두운 반투명 + 얇은 흰 테두리 */
-  --glass-bg: oklch(0.27 0.006 264 / 0.58);
-  --glass-border: oklch(1 0 0 / 0.16);
+  /* 글래스 토큰(다크) — 불투명 카드 + 얇은 흰 헤어라인(세션41 랜딩 통일) */
+  --glass-bg: var(--card);
+  --glass-border: oklch(1 0 0 / 0.14);
   --glass-hairline: oklch(1 0 0 / 0.08);
-  --glass-blur: 22px;
-  --glass-saturate: 1.4;
-  --glass-sheen: linear-gradient(180deg, oklch(1 0 0 / 0.08), oklch(1 0 0 / 0) 45%);
+  --glass-blur: 0px;
+  --glass-saturate: 1;
+  --glass-sheen: none;
   --accent-dot: oklch(0.75 0.15 350);
 }
 
@@ -230,22 +232,14 @@ body {
 }
 
 /*
- * 앱 앰비언트 배경 — 프로스트 글래스가 블러할 은은한 실크 그라데이션(셸 layout에서만 fixed -z-10로 마운트).
- * body의 --background 위에 얹히고 모든 앱 콘텐츠 아래에 깔림. 미지원 렌더러/공개 화면은 flat --background 폴백.
+ * 앱 앰비언트 배경 — 세션41 랜딩 통일로 평탄화(그라데이션 제거 → flat --background).
+ * 마운트 div((app)/layout.tsx fixed -z-10)는 유지 — 안정 확인 후 별도 정리 커밋에서 클래스와 함께 제거 예정.
  */
 .app-ambient {
-  background:
-    radial-gradient(60% 55% at 15% 10%, oklch(0.75 0.05 320 / 0.06), transparent 60%),
-    radial-gradient(50% 50% at 85% 20%, oklch(0.72 0.05 240 / 0.06), transparent 55%),
-    radial-gradient(70% 60% at 50% 100%, oklch(0.8 0.03 264 / 0.06), transparent 60%),
-    var(--background);
+  background: var(--background);
 }
 .dark .app-ambient {
-  background:
-    radial-gradient(60% 55% at 15% 10%, oklch(0.45 0.06 320 / 0.10), transparent 60%),
-    radial-gradient(50% 50% at 85% 20%, oklch(0.42 0.06 240 / 0.10), transparent 55%),
-    radial-gradient(70% 60% at 50% 100%, oklch(0.3 0.03 264 / 0.11), transparent 60%),
-    var(--background);
+  background: var(--background);
 }
 
 /*
@@ -264,8 +258,8 @@ body {
 }
 
 /*
- * .glass — 프로스트 유리 표면(Surface glass·모달·플로팅 바가 소비). 반투명 + 블러 + 얇은 테두리 + 상단 시트광.
- * 폴백: backdrop-filter 미지원·prefers-reduced-transparency·prefers-contrast:more → 불투명(--card). 공개 화면(.force-light)은 토큰이 이미 불투명.
+ * .glass — 카드 표면(Surface glass·모달·플로팅 바가 소비). 세션41부터 토큰이 불투명이라 솔리드 흰 카드로 렌더.
+ * 클래스·소비처는 유지(rename 금지 — diff 최소화). backdrop-filter 블록은 제거됨(blur 0도 fixed containing block을 만들어 부작용).
  */
 @layer components {
   .glass {
@@ -280,35 +274,6 @@ body {
     background-image: var(--glass-sheen);
   }
 }
-@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .glass,
-  .glass-panel,
-  [data-slot="dropdown-menu-content"],
-  [data-slot="dropdown-menu-sub-content"] {
-    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  }
-}
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .glass,
-  .glass-panel {
-    background-color: var(--card);
-    background-image: none;
-  }
-}
-@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
-  .glass,
-  .glass-panel,
-  [data-slot="dropdown-menu-content"],
-  [data-slot="dropdown-menu-sub-content"] {
-    background-color: var(--card);
-    background-image: none;
-    border-color: var(--border);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
-}
-
 /* 클릭 가능한 요소 hover 시 살짝 확대 — 강도는 여기서 한 번에 조절 */
 @layer utilities {
   /* 클릭 가능한 카드 공용 호버 — 살짝 커짐. position:relative+z-index로 커질 때 옆 칸 위로 떠서 겹침 침범 방지. 1.02라 레이아웃 시프트 없음(transform). */
