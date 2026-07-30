@@ -75,7 +75,8 @@ export function WorkOverview() {
   }
 
   return (
-    <div className="grid shrink-0 gap-3 md:grid-cols-2">
+    // @2xl: 대시보드 좌측 컨테이너 폭 기준 자동 반응(좁으면 세로 스택)
+    <div className="grid shrink-0 gap-3 @2xl:grid-cols-2">
       <Surface padding="none" className="rounded-xl p-3">
         <h2 className="mb-1.5 inline-flex items-center gap-2 text-sm font-semibold">
           <CircleDot className="size-4 text-info" /> 진행 중인 작업

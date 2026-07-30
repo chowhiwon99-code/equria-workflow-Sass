@@ -59,9 +59,10 @@ export function DashboardLayout() {
     <div className="flex min-h-[var(--app-content-height)] flex-col gap-3 lg:h-[var(--app-content-height)] lg:min-h-0">
       <AnnouncementsBoard />
       <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row">
-        {/* 좌: 작업 카드들 — 카드 내부 스크롤, 페이지는 한 화면 유지 */}
-        <div className="flex min-h-0 flex-1 flex-col gap-3">
-          <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-2">
+        {/* 좌: 작업 카드들 — 카드 내부 스크롤, 페이지는 한 화면 유지.
+            @container: AI 칸을 넓혀 좌측이 좁아지면 카드가 자동으로 세로 스택(뷰포트가 아니라 실제 남은 폭 기준 반응) */}
+        <div className="@container flex min-h-0 min-w-0 flex-1 flex-col gap-3">
+          <div className="grid min-h-0 flex-1 gap-3 @2xl:grid-cols-2">
             <TodayTasks />
             <TaskSuggestions />
           </div>
@@ -72,7 +73,7 @@ export function DashboardLayout() {
           <>
             {/* 좌우 경계 — 커서 대면 AI 폭 조절 */}
             <div onPointerDown={startWidthResize} className="-mx-1 w-2 shrink-0 cursor-ew-resize touch-none" title="드래그해서 AI 채팅 폭 조절" />
-            <Surface padding="none" className="min-h-0 shrink-0 overflow-hidden rounded-xl" style={{ width: aiW }}>
+            <Surface padding="none" className="min-h-0 max-w-[50%] shrink-0 overflow-hidden rounded-xl" style={{ width: aiW }}>
               <DashboardAssistant />
             </Surface>
           </>
