@@ -420,7 +420,7 @@ function SlotCard({
             className="flex-1 cursor-pointer rounded border bg-background px-1 py-0.5 text-[10px] text-foreground outline-none focus:ring-1 focus:ring-ring"
           >
             <optgroup label="기본">
-              {ITEM_TYPES.map((t) => (
+              {ITEM_TYPES.filter((t) => !("legacy" in t && t.legacy) || t.value === s.item_type).map((t) => (
                 <option key={t.value} value={t.value}>{t.label}</option>
               ))}
             </optgroup>
@@ -459,21 +459,17 @@ function SlotCard({
               <p className="text-right text-sm font-bold tabular-nums">{money(shownAmount, s.currency)}</p>
             ) : (
               <>
-                {/* 계산값 = 기록 프리필 도우미 · 아래 금액 = 이번 달 장부 기록 합계(진실) */}
-                <div className="flex items-center justify-between gap-1 text-[11px] text-muted-foreground">
-                  <span className="tabular-nums" title="수식 계산값 — '기록'을 누르면 이 값이 장부에 기록돼요">계산값 {money(shownAmount, s.currency)}</span>
+                {/* 계산값=결과값 단일화(세션41) — 입력 즉시 이 값이 이번 달 금액이고 장부 기록도 자동 갱신 */}
+                <div className="flex items-center justify-end text-[11px] text-muted-foreground">
                   <button
                     onClick={() => onRecord(s)}
-                    className={cn(
-                      "rounded border px-1.5 py-0.5 font-medium transition-colors hover:border-primary/40 hover:text-primary",
-                      Number(s.amount) === 0 && shownAmount > 0 && "border-primary/40 text-primary" // 기록 전이면 다음 행동 강조
-                    )}
-                    title="장부에 기록 — 누르면 아래 '이번 달' 금액과 내역에 반영돼요"
+                    className="rounded border px-1.5 py-0.5 font-medium transition-colors hover:border-primary/40 hover:text-primary"
+                    title="날짜·메모를 정해 장부에 기록 — 계산값은 입력만 바꿔도 자동 반영돼요"
                   >
                     기록
                   </button>
                 </div>
-                <MonthAmount amount={Number(s.amount)} currency={s.currency} />
+                <MonthAmount amount={shownAmount} currency={s.currency} title="계산값 — 입력을 바꾸면 이번 달 장부 기록도 자동 갱신돼요" />
               </>
             )}
           </>

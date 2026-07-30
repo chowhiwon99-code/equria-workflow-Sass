@@ -309,7 +309,64 @@ export function CashFlowView() {
       delete safePatch.amount // 매출·비용 슬롯 amount 직접 쓰기 차단(파생값 보호)
     }
     await mustOk(supabase.from("cash_accounts").update({ ...safePatch, ...derived, ...amountPatch, updated_at: new Date().toISOString() }).eq("id", id))
+    // 세션41(대표): 계산값=결과값 단일화 — 계산 슬롯(매출·비용)의 계산 관련 변경은 이번 달 장부 기록을 자동 갱신.
+    // 위치/색/그룹 이동 등은 제외(불필요한 장부 쓰기 방지).
+    const SYNC_KEYS = ["field_values", "units", "unit_price", "rate", "extra", "calc_type_id", "item_type", "kind", "ledger_category", "name", "currency"]
+    if (merged.kind !== "reserve" && merged.item_type !== "ledger" && Object.keys(patch).some((k) => SYNC_KEYS.includes(k))) {
+      const v = calcPreview(merged)
+      if (v != null) await syncSlotRecord(merged, Math.round(v))
+    }
     load()
+  }
+
+  /** 세션41: 계산 슬롯의 이번 달 장부 기록을 계산값으로 동기화(금액=계산값 항등 — "계산한 대로 바뀌어야").
+   *  기록이 있으면 최신 1건 갱신+중복은 휴지통, 없으면 오늘 날짜로 생성, 계산값 0 이하면 휴지통(=0). 조용히 수행. */
+  const syncSlotRecord = async (slot: CashAccount, v: number) => {
+    if (!me || !wsId) return
+    const today = new Date()
+    const y = today.getFullYear()
+    const m = today.getMonth() + 1
+    const mStart = `${y}-${String(m).padStart(2, "0")}-01`
+    const mEnd = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`
+    const kind = slot.kind === "revenue_src" ? "revenue" : "expense"
+    const category = slot.ledger_category?.trim() || slot.name
+    const { data: existing } = await supabase
+      .from("finance_entries")
+      .select("id")
+      .eq("account_id", slot.id)
+      .is("deleted_at", null)
+      .gte("entry_date", mStart)
+      .lt("entry_date", mEnd)
+      .order("created_at", { ascending: false })
+    const now = new Date().toISOString()
+    if (existing && existing.length > 0) {
+      const [target, ...rest] = existing
+      if (v > 0) {
+        await supabase.from("finance_entries").update({ kind, vendor: slot.name, category, amount: v, total_amount: v, currency: slot.currency }).eq("id", target.id)
+      } else {
+        await supabase.from("finance_entries").update({ deleted_at: now }).eq("id", target.id)
+      }
+      if (rest.length > 0) await supabase.from("finance_entries").update({ deleted_at: now }).in("id", rest.map((r) => r.id))
+    } else if (v > 0) {
+      const d = `${y}-${String(m).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
+      await supabase.from("finance_entries").insert({
+        workspace_id: wsId as string,
+        kind,
+        entry_date: d,
+        vendor: slot.name,
+        category,
+        description: null,
+        amount: v,
+        tax_amount: 0,
+        fee_amount: 0,
+        total_amount: v,
+        currency: slot.currency,
+        account_id: slot.id,
+        source: "manual",
+        status: "confirmed",
+        created_by: me,
+      })
+    }
   }
   /** 수식(계산 도우미) 미리보기 값 — 기록 다이얼로그 금액 프리필용. 수식 없으면 null. */
   const calcPreview = (s: CashAccount): number | null => {

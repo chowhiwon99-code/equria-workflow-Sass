@@ -114,8 +114,8 @@ export function CashGrid({
     const isLedger = s.item_type === "ledger"
     const open = expanded.has(s.id)
     const typeName = isLedger ? "장부 자동" : (customType?.name ?? ITEM_TYPES.find((t) => t.value === s.item_type)?.label ?? "직접 입력")
-    // 요약 한 줄 — 유형·핵심 값만. 분류는 항목명 옆 셀렉트, 통화·입력칸은 펼친 편집 행에서(대표 요청 — 최대한 심플하게).
-    const summary = calc && !isHold ? `${typeName} · 계산값 ${money(shownAmount, s.currency)}` : typeName
+    // 요약 한 줄 — 유형만. 계산값=결과값 단일화(세션41 대표): 값은 금액 열 하나로만 보여준다.
+    const summary = typeName
     return (
       <Fragment key={s.id}>
         <tr className="group hover:bg-muted/20">
@@ -184,8 +184,10 @@ export function CashGrid({
               /* 보유금 — 장부 개념 없음, 직접 입력/수식 유지 */
               calc ? <span className="px-1 font-medium tabular-nums">{money(shownAmount, s.currency)}</span> : <InlineNumber width="w-24" value={Number(s.amount)} onCommit={(v) => onUpdateSlot(s.id, { amount: v })} />
             ) : (
-              /* 매출·비용 = 원장 파생(이번 달 자기 기록 합계) — 편집은 '기록'으로 */
-              <span className="px-1 font-medium tabular-nums" title="이번 달 기록 합계 — 장부 기준(기록 버튼으로 추가)">{money(Number(s.amount), s.currency)}</span>
+              /* 매출·비용 = 계산 슬롯이면 계산값(입력 즉시 반영·장부 자동 동기화), 직접 입력이면 이번 달 기록 합계 */
+              <span className="px-1 font-medium tabular-nums" title={calc ? "계산값 — 입력을 바꾸면 이번 달 장부 기록도 자동 갱신돼요" : "이번 달 기록 합계 — 장부 기준(기록 버튼으로 추가)"}>
+                {money(calc ? shownAmount : Number(s.amount), s.currency)}
+              </span>
             )}
           </td>
           <td className="px-1 py-1.5">
@@ -224,7 +226,7 @@ export function CashGrid({
                         className="cursor-pointer rounded border bg-background px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-ring"
                       >
                         <optgroup label="기본">
-                          {ITEM_TYPES.map((t) => (
+                          {ITEM_TYPES.filter((t) => !("legacy" in t && t.legacy) || t.value === s.item_type).map((t) => (
                             <option key={t.value} value={t.value}>{t.label}</option>
                           ))}
                         </optgroup>
@@ -243,12 +245,6 @@ export function CashGrid({
                         {editor(f)}
                       </label>
                     ))}
-                    {/* 계산값 = 기록 프리필용 도우미(진실 아님 — 진실은 금액 열의 이번 달 기록 합계) */}
-                    {calc && !isHold && (
-                      <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] tabular-nums" title="수식 계산값 — '기록'을 누르면 이 값이 장부에 기록돼요">
-                        계산값 {money(shownAmount, s.currency)}
-                      </span>
-                    )}
                   </>
                 )}
                 <label className="flex items-center gap-1.5">

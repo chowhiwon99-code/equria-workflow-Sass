@@ -32,7 +32,8 @@ export type SlotTypeValue = (typeof SLOT_TYPES)[number]["value"]
 export const ITEM_TYPES = [
   { value: "fixed", label: "직접 입력" }, // 금액 직접
   { value: "qty", label: "개수 × 단가" }, // 개수 × 개당 가격 (+추가금)
-  { value: "channel", label: "채널 판매" }, // 개수 × (개당 가격 × (1−수수료) − 배송비)
+  // 세션41(대표): 기본 노출 제거(첫 고객 잔재) — 이미 쓰는 슬롯에서만 옵션 유지, 계산·데이터는 계속 지원
+  { value: "channel", label: "채널 판매", legacy: true }, // 개수 × (개당 가격 × (1−수수료) − 배송비)
 ] as const
 export type ItemTypeValue = (typeof ITEM_TYPES)[number]["value"]
 const SLOT_MAP = new Map(SLOT_TYPES.map((s) => [s.value, s]))
