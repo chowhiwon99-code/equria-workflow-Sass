@@ -112,14 +112,12 @@ export function CashGrid({
     const isLedger = s.item_type === "ledger"
     const open = expanded.has(s.id)
     const typeName = isLedger ? "장부 자동" : (customType?.name ?? ITEM_TYPES.find((t) => t.value === s.item_type)?.label ?? "직접 입력")
-    // 요약 한 줄 — 입력칸을 늘어놓는 대신 유형·핵심 값만. 자세한 편집은 펼쳐서.
+    // 요약 한 줄 — 입력칸을 늘어놓는 대신 유형·핵심 값만. 분류는 항목명 옆 태그로 상시 표시(대표 요청).
     const summary = isLedger
-      ? `${typeName} · ${s.ledger_category || "전체"}`
+      ? `${typeName}${s.ledger_category ? "" : " · 전체"}`
       : calc && !isHold
         ? `${typeName} · 계산값 ${money(shownAmount, s.currency)}`
-        : s.ledger_category
-          ? `${typeName} · ${s.ledger_category}`
-          : typeName
+        : typeName
     return (
       <Fragment key={s.id}>
         <tr className="group hover:bg-muted/20">
@@ -144,6 +142,16 @@ export function CashGrid({
                 </div>
               )}
               <InlineText value={s.name} onCommit={(v) => onUpdateSlot(s.id, { name: v })} />
+              {/* 분류 태그 — 접힌 상태에서도 한눈에(누르면 편집 행이 열림) */}
+              {!isHold && s.ledger_category && (
+                <button
+                  onClick={() => toggleExpand(s.id)}
+                  className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                  title="기록 분류 — 누르면 편집"
+                >
+                  {s.ledger_category}
+                </button>
+              )}
             </div>
           </td>
           <td className="px-2 py-1.5">
