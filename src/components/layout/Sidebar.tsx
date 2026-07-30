@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { Check, SlidersHorizontal, ChevronDown } from "lucide-react"
 import { FEATURES, FEATURE_GROUPS } from "@/lib/config/features"
@@ -142,10 +143,8 @@ export function Sidebar({
       )}
     >
       <Link href="/dashboard" className="flex h-[var(--header-height)] items-center border-b px-4">
-        {/* 브랜드 워드마크 — Pretendard, 모노톤 그라데이션으로 느낌있게 */}
-        <span className="bg-gradient-to-r from-foreground to-foreground/55 bg-clip-text font-pretendard text-lg font-semibold tracking-tight text-transparent">
-          Complow
-        </span>
+        {/* 브랜드 로고 — 라이트=원본(다크 로고), 다크 테마=흰색 반전 */}
+        <Image src="/brand/logo-horizontal.png" alt="Complow" width={1046} height={256} priority className="h-5 w-auto dark:brightness-0 dark:invert" />
       </Link>
 
       {/* 워크스페이스 전환기 — 현재 회사 + 드롭다운(멤버십 2개+ 시). 게스트는 숨김(초대된 프로젝트만). */}
