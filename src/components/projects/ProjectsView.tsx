@@ -172,6 +172,7 @@ export function ProjectsView() {
       await mustOk(supabase.from("projects").update({ start_date: newStart, due_date: newDue }).eq("id", p.id))
     } catch {
       setProjects((list) => list.map((x) => (x.id === p.id ? { ...x, ...prev } : x)))
+      toast.error("기간 변경에 실패했어요.") // 리뷰 A2: 조용히 스냅백되던 문제
       return
     }
     push({

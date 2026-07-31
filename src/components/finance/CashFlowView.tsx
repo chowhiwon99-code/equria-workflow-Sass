@@ -258,12 +258,18 @@ export function CashFlowView() {
   // 분류 마스터 저장(마이그122) — 설정 '분류 관리'에서 편집. 저장 즉시 그리드·캔버스 분류 셀렉트에 반영.
   // 첫 수정 시 현재 목록(기본+실사용) 스냅샷이 마스터로 굳는다. 삭제해도 기존 기록의 분류는 보존.
   const saveCategories = async (next: { revenue: string[]; expense: string[] }) => {
+    const prev = catSuggest
     setCatSuggest(next)
-    await mustOk(
-      supabase
-        .from("cashflow_settings")
-        .upsert({ workspace_id: wsId as string, ledger_categories: next, updated_by: me, updated_at: new Date().toISOString() }, { onConflict: "workspace_id" })
-    )
+    try {
+      await mustOk(
+        supabase
+          .from("cashflow_settings")
+          .upsert({ workspace_id: wsId as string, ledger_categories: next, updated_by: me, updated_at: new Date().toISOString() }, { onConflict: "workspace_id" })
+      )
+    } catch {
+      setCatSuggest(prev) // 리뷰 A5: 실패 시 롤백(낙관 반영이 굳어버리는 문제)
+      toast.error("분류 저장에 실패했어요.")
+    }
   }
 
   // ── 슬롯 CRUD ──
@@ -394,6 +400,15 @@ export function CashFlowView() {
       }
       if (rest.length > 0) await supabase.from("finance_entries").update({ deleted_at: now }).in("id", rest.map((r) => r.id))
     } else if (v > 0) {
+      // 리뷰 A4: 미래 달로 명시 기록한 슬롯을 이번 달에 편집하면 이번 달 유령 항목이 생김 → 미래 기록이 있으면 자동 생성 스킵
+      const { data: future } = await supabase
+        .from("finance_entries")
+        .select("id")
+        .eq("account_id", slot.id)
+        .is("deleted_at", null)
+        .gte("entry_date", mEnd)
+        .limit(1)
+      if (future && future.length > 0) return
       const d = `${y}-${String(m).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
       await supabase.from("finance_entries").insert({
         workspace_id: wsId as string,
@@ -469,11 +484,7 @@ export function CashFlowView() {
         total_amount: target.total_amount,
         currency: target.currency,
       }
-      // 리뷰 M2: 다이얼로그 tax는 프리필이 없어 비워두면 0 — 기존 부가세를 덮지 않게 미입력(0) 시 보존
-      if (input.tax === 0 && Number(target.tax_amount ?? 0) > 0) {
-        patch.tax_amount = Number(target.tax_amount)
-        patch.total_amount = input.amount + patch.tax_amount
-      }
+      // 리뷰 D1: 다이얼로그가 이번 달 기존 부가세를 프리필하므로 input.tax가 사용자의 실제 의도(0=0). auto-restore 제거.
       const now = new Date().toISOString()
       const { error: e } = await supabase.from("finance_entries").update(patch).eq("id", target.id)
       if (e) {

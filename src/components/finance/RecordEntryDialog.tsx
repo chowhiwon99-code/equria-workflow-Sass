@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Loader2, PenLine } from "lucide-react"
 import { toast } from "sonner"
+import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Modal, fieldClass } from "@/components/shared/Modal"
 import { DateInput } from "@/components/shared/DateInput"
@@ -36,6 +37,28 @@ export function RecordEntryDialog({
   const [memo, setMemo] = useState("")
   const [busy, setBusy] = useState(false)
   const taxN = isRevenue ? 0 : Number(tax || 0)
+
+  // 이번 달 기존 기록을 프리필(리뷰 D1) — 부가세를 화면에 보여줘 사용자가 명시적으로 0으로도 바꿀 수 있게(비우면 0 덮어쓰기 사고 방지)
+  useEffect(() => {
+    if (isRevenue) return
+    const supabase = createClient()
+    const t = new Date()
+    const mStart = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-01`
+    const mEnd = t.getMonth() === 11 ? `${t.getFullYear() + 1}-01-01` : `${t.getFullYear()}-${String(t.getMonth() + 2).padStart(2, "0")}-01`
+    void supabase
+      .from("finance_entries")
+      .select("tax_amount")
+      .eq("account_id", slot.id)
+      .is("deleted_at", null)
+      .gte("entry_date", mStart)
+      .lt("entry_date", mEnd)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data && Number(data.tax_amount ?? 0) > 0) setTax(String(Math.round(Number(data.tax_amount))))
+      })
+  }, [slot.id, isRevenue])
 
   const save = async () => {
     const n = Number(amount)

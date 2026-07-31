@@ -95,7 +95,9 @@ export async function POST() {
       title: "최근 워크플로우 실행",
       lines: runRes.data.map((r) => {
         const wfName = (r as { workflows?: { name?: string } | null }).workflows?.name ?? "워크플로우"
-        return `- ${wfName}: ${r.status} (${String(r.created_at).slice(0, 10)})`
+        // KST 날짜(리뷰 D4 — UTC slice면 자정 근처 하루 어긋남, 이 파일 다른 곳과 일관)
+        const d = r.created_at ? new Date(r.created_at).toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" }) : ""
+        return `- ${wfName}: ${r.status} (${d})`
       }),
     })
   }

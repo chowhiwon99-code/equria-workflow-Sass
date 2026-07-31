@@ -90,6 +90,7 @@ export function AttendanceAdmin() {
   const [recs, setRecs] = useState<Rec[]>([]) // 선택 월 전체 멤버 기록(월별 탭)
   const [dayRecs, setDayRecs] = useState<Rec[]>([]) // 선택 일 전체 멤버 기록(일별 그래프)
   const [viewers, setViewers] = useState<Set<string>>(new Set())
+  const [todayRecs, setTodayRecs] = useState<Rec[]>([]) // 오늘 기록 — 월별 뷰 배지용(일별 그래프 날짜와 무관, 리뷰 A3)
   const [view, setView] = useState<"day" | "month">("day")
   const [day, setDay] = useState(todayStr())
   const [ym, setYm] = useState<YM>(currentYM)
@@ -102,18 +103,20 @@ export function AttendanceAdmin() {
 
   const load = useCallback(async () => {
     const { start, end } = monthRange(ym)
-    const [{ data: ws }, { data: profs }, { data: monthRows }, { data: dRows }, { data: vw }] = await Promise.all([
+    const [{ data: ws }, { data: profs }, { data: monthRows }, { data: dRows }, { data: vw }, { data: tdRows }] = await Promise.all([
       supabase.from("workspaces").select("owner_id").limit(1).maybeSingle(),
       supabase.from("profiles").select("id, name, department, position").order("name"),
       supabase.from("attendance_records").select(COLS).gte("work_date", start).lt("work_date", end).order("work_date", { ascending: false }),
       supabase.from("attendance_records").select(COLS).eq("work_date", day),
       supabase.from("attendance_viewers").select("viewer_user_id"),
+      supabase.from("attendance_records").select(COLS).eq("work_date", todayStr()),
     ])
     setOwnerId(ws?.owner_id ?? null)
     setMembers((profs as Member[]) ?? [])
     setRecs((monthRows as Rec[]) ?? [])
     setDayRecs((dRows as Rec[]) ?? [])
     setViewers(new Set((vw ?? []).map((v) => v.viewer_user_id)))
+    setTodayRecs((tdRows as Rec[]) ?? [])
     setLoading(false)
   }, [supabase, ym, day])
 
@@ -173,6 +176,7 @@ export function AttendanceAdmin() {
   const q = query.trim().toLowerCase()
   const filtered = q ? members.filter((m) => m.name.toLowerCase().includes(q)) : members
   const dayByUser = new Map(dayRecs.map((r) => [r.user_id, r]))
+  const todayByUser = new Map(todayRecs.map((r) => [r.user_id, r])) // 월별 뷰 배지 = 오늘 상태(리뷰 A3)
   const selected = selectedUser ?? filtered[0]?.id ?? null
   const selectedMember = members.find((m) => m.id === selected) ?? null
   const personRecs = selected ? recs.filter((r) => r.user_id === selected) : []
@@ -359,7 +363,7 @@ export function AttendanceAdmin() {
                 <p className="px-3 py-6 text-center text-sm text-muted-foreground">직원이 없어요.</p>
               ) : (
                 filtered.map((m) => {
-                  const r = dayByUser.get(m.id)
+                  const r = todayByUser.get(m.id) // 월별 뷰 배지 = 오늘 상태(리뷰 A3 — 일별 그래프 날짜와 무관)
                   const active = m.id === selected
                   return (
                     <button

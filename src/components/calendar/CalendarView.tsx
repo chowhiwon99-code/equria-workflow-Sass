@@ -470,10 +470,10 @@ export function CalendarView() {
                         marginRight: roundRight ? undefined : "-7px",
                       }}
                     >
-                      {/* 폰(<sm)은 칸이 좁아 제목의 첫 단어만(대표 확정) — sm+는 전체 제목 */}
+                      {/* 폰(<sm)은 칸이 좁아 제목의 첫 단어만 — 프로젝트는 📁 뒤 제목 기준(리뷰 A1: 이모지가 첫 토큰이라 이름 사라지던 버그) */}
                       {showLabel ? (
                         <>
-                          <span className="sm:hidden">{label.trim().split(/\s+/)[0]}</span>
+                          <span className="sm:hidden">{(b.kind === "project" ? "📁 " : "") + b.title.trim().split(/\s+/)[0]}</span>
                           <span className="hidden sm:inline">{label}</span>
                         </>
                       ) : (

@@ -17,12 +17,23 @@ import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
  */
 
 type Suggestion = {
+  _id: string // 클라 부여 안정 키(리뷰 D2 — 인덱스 키 리마운트·포커스 소실 방지)
   title: string
   reason: string
   priority: "urgent" | "high" | "medium"
   source_type: string
   source_label: string
   suggested_due: string | null
+}
+
+/** AI가 준 기한 문자열을 date 컬럼이 받는 YYYY-MM-DD로만 정규화(리뷰 C1 — 비ISO면 null로 떨궈 insert 실패 방지). */
+function normalizeDue(raw: string | null | undefined): string | null {
+  if (!raw) return null
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw.trim())
+  if (!m) return null
+  const iso = `${m[1]}-${m[2]}-${m[3]}`
+  const d = new Date(`${iso}T00:00:00`)
+  return Number.isNaN(d.getTime()) ? null : iso // 2026-13-40 등 무효 날짜 제거
 }
 
 const PRIORITY = {
@@ -45,9 +56,14 @@ export function TaskSuggestions() {
     setAddedAll(false)
     try {
       const res = await fetch("/api/task-suggestions", { method: "POST" })
+      // 리뷰 D3: res.ok 확인 전 json 파싱하면 504 HTML 등 비JSON 응답이 SyntaxError로 새어나감
+      if (!res.ok) {
+        const msg = await res.json().then((j) => j.error).catch(() => null)
+        throw new Error(msg ?? "작업 제안을 받지 못했어요.")
+      }
       const j = await res.json()
-      if (!res.ok) throw new Error(j.error ?? "실패")
-      setItems(j.suggestions ?? [])
+      const raw = (j.suggestions ?? []) as Omit<Suggestion, "_id">[]
+      setItems(raw.map((s, i) => ({ ...s, _id: `${Date.now()}-${i}`, suggested_due: normalizeDue(s.suggested_due) })))
       setSourcesUsed(j.sources_used ?? [])
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "작업 제안을 받지 못했어요.")
@@ -58,8 +74,8 @@ export function TaskSuggestions() {
 
   const addOne = async (s: Suggestion) => {
     if (!me) return
-    // 리뷰 F4: 낙관 제거 먼저 — insert 대기 중 제목을 고치면 참조가 바뀌어 제거 실패·중복 등록되던 문제. 실패 시 복원.
-    setItems((prev) => (prev ?? []).filter((x) => x !== s))
+    // 리뷰 F4·D2: _id로 낙관 제거(제목 편집으로 참조가 바뀌어도 안전). 실패 시 복원.
+    setItems((prev) => (prev ?? []).filter((x) => x._id !== s._id))
     try {
       await mustOk(supabase.from("personal_tasks").insert({ user_id: me, title: s.title, due_date: s.suggested_due }))
       toast.success("오늘 할 일에 추가했어요.")
@@ -83,8 +99,8 @@ export function TaskSuggestions() {
     }
   }
 
-  const dismiss = (s: Suggestion) => setItems((prev) => (prev ?? []).filter((x) => x !== s))
-  const editTitle = (s: Suggestion, title: string) => setItems((prev) => (prev ?? []).map((x) => (x === s ? { ...x, title } : x)))
+  const dismiss = (s: Suggestion) => setItems((prev) => (prev ?? []).filter((x) => x._id !== s._id))
+  const editTitle = (s: Suggestion, title: string) => setItems((prev) => (prev ?? []).map((x) => (x._id === s._id ? { ...x, title } : x)))
 
   return (
     <Surface padding="none" className="flex min-h-0 flex-col rounded-xl p-3">
@@ -122,8 +138,8 @@ export function TaskSuggestions() {
               <div className="flex flex-col gap-1.5">
                 {items
                   .filter((s) => s.priority === p)
-                  .map((s, i) => (
-                    <div key={`${p}-${i}-${s.source_label}`} className="group rounded-lg border bg-background px-2.5 py-2">
+                  .map((s) => (
+                    <div key={s._id} className="group rounded-lg border bg-background px-2.5 py-2">
                       <div className="flex items-start gap-1.5">
                         {/* 제목 인라인 수정 가능(사용자가 고쳐서 등록) */}
                         <input

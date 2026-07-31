@@ -110,7 +110,12 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
     const next = value || null
     if (prev === next) return
     const patchOf = (v: string | null) => (field === "start_date" ? { start_date: v } : { due_date: v })
-    await mustOk(supabase.from("projects").update(patchOf(next)).eq("id", projectId))
+    try {
+      await mustOk(supabase.from("projects").update(patchOf(next)).eq("id", projectId))
+    } catch {
+      toast.error("날짜 변경에 실패했어요.") // 리뷰 A6
+      return
+    }
     load()
     push({
       label: field === "start_date" ? "시작일 변경" : "종료 예정일 변경",
@@ -447,7 +452,12 @@ function ChecklistSection({ projectId }: { projectId: string }) {
   const updateTask = async (t: ProjectTask, patch: TaskPatch) => {
     const prev: TaskPatch = {}
     for (const k of Object.keys(patch) as (keyof TaskPatch)[]) prev[k] = t[k] as never
-    await mustOk(supabase.from("project_tasks").update(patch).eq("id", t.id))
+    try {
+      await mustOk(supabase.from("project_tasks").update(patch).eq("id", t.id))
+    } catch {
+      toast.error("할 일 수정에 실패했어요.") // 리뷰 A6: 드래그 실패 시 조용히 스냅백되던 문제
+      return
+    }
     load()
     push({
       label: "할 일 수정",
