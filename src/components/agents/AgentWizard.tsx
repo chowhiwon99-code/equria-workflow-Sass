@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Sparkles, Check, ArrowLeft, ArrowRight, Plug, X } from "lucide-react"
+import { Sparkles, Check, ArrowLeft, Plug, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/shared/Modal"
@@ -44,6 +44,37 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
   const [genError, setGenError] = useState<string | null>(null)
   const [generated, setGenerated] = useState("")
   const [knowledge, setKnowledge] = useState<StagedKnowledge[]>([]) // 필요한 데이터 스텝에서 첨부한 파일
+  // 원샷 생성(세션41 대표 확정 "한 줄 → 즉시 완성") — 이름·아이콘·분류·프롬프트를 한 번에
+  const [quickDraft, setQuickDraft] = useState<{ name: string; icon: string; category: string; system_prompt: string } | null>(null)
+  const [quickLoading, setQuickLoading] = useState(false)
+  const [quickError, setQuickError] = useState<string | null>(null)
+  const [refineText, setRefineText] = useState("")
+
+  const quickGenerate = async (refine?: string) => {
+    const purpose = ((inputs.purpose as string) ?? "").trim()
+    if (!purpose) return
+    setPhase("result")
+    setQuickLoading(true)
+    setQuickError(null)
+    try {
+      const res = await fetch("/api/agents/quick-generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ purpose, refine: refine?.trim() || undefined }),
+      })
+      if (!res.ok) {
+        const msg = await res.json().then((j) => j.error).catch(() => null)
+        throw new Error(msg ?? "에이전트 초안 생성에 실패했어요.")
+      }
+      const j = await res.json()
+      setQuickDraft(j.draft)
+      setRefineText("")
+    } catch (e) {
+      setQuickError(e instanceof Error ? e.message : "생성에 실패했어요.")
+    } finally {
+      setQuickLoading(false)
+    }
+  }
   // AI 되물음 인터뷰(생성 직전) — 빈틈 질문 + 답변. clarifications는 생성/재생성에 재사용.
   const [interviewLoading, setInterviewLoading] = useState(false)
   const [interviewQs, setInterviewQs] = useState<InterviewQ[]>([])
@@ -197,9 +228,11 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
             className={cn(fieldClass, "min-h-[92px] w-full resize-y rounded-2xl py-3 text-base")}
           />
           <div className="mt-2.5 flex items-center justify-between gap-2">
-            <span className="hidden text-xs text-muted-foreground sm:inline">⌘+Enter로 바로 시작</span>
-            <Button size="sm" disabled={!seed} onClick={startFromSeed} className="ml-auto">
-              다음 <ArrowRight className="size-4" />
+            <button type="button" onClick={startFromSeed} className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">
+              자세히 직접 설정
+            </button>
+            <Button size="sm" disabled={!seed} onClick={() => quickGenerate()}>
+              <Sparkles className="size-4" /> AI로 만들기
             </Button>
           </div>
         </div>
@@ -225,7 +258,79 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
     )
   }
 
-  // ── 결과: AI 생성 + 검토/저장 (기존 흐름) ──
+  // ── 원샷 결과: 한 줄 → 즉시 완성(로딩/에러/편집 폼 + 다듬기) ──
+  if (phase === "result" && (quickLoading || quickError || quickDraft)) {
+    return (
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+        {quickLoading || quickError || !quickDraft ? (
+          <div className="flex flex-col items-center gap-4 rounded-2xl border bg-card p-8 shadow-[var(--shadow-sm)]">
+            {quickLoading && (
+              <>
+                <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <Sparkles className="size-6 animate-pulse" />
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-medium">AI가 에이전트를 만들고 있어요…</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">이름·프롬프트·추천 설정까지 한 번에</p>
+                </div>
+              </>
+            )}
+            {quickError && (
+              <>
+                <p className="text-sm text-destructive">{quickError}</p>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setPhase("gallery")}>
+                    <ArrowLeft className="size-4" /> 돌아가기
+                  </Button>
+                  <Button size="sm" onClick={() => quickGenerate()}>
+                    다시 시도
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {/* 다듬기 — "이렇게 고쳐줘"로 재생성(자유 조정 정신) */}
+            <div className="flex flex-col gap-2 rounded-xl border bg-card p-3 shadow-[var(--shadow-sm)]">
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <Sparkles className="size-3.5 text-primary" /> AI 초안이 준비됐어요. 아래에서 직접 고치거나, 여기에 요청하면 다시 만들어요.
+              </span>
+              <div className="flex gap-1.5">
+                <input
+                  value={refineText}
+                  onChange={(e) => setRefineText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.nativeEvent.isComposing && refineText.trim()) quickGenerate(refineText)
+                  }}
+                  placeholder="예: 더 격식 있게 · 표로 정리하게 · 영어도 지원하게"
+                  className={cn(fieldClass, "flex-1")}
+                />
+                <Button size="sm" variant="outline" disabled={!refineText.trim()} onClick={() => quickGenerate(refineText)}>
+                  <Sparkles className="size-3.5" /> 다시
+                </Button>
+              </div>
+            </div>
+            <AgentBuilderForm
+              key={quickDraft.system_prompt.slice(0, 40)} // 재생성 시 폼 프리필 갱신
+              prefill={{
+                name: quickDraft.name,
+                icon: quickDraft.icon,
+                description: (inputs.purpose as string) || null,
+                category: quickDraft.category,
+                system_prompt: quickDraft.system_prompt,
+                ...(mcpPrefill?.length ? { mcp_servers: mcpPrefill } : {}),
+                ...(knowledge.length ? { knowledge } : {}),
+              }}
+              onBack={() => setPhase("gallery")}
+            />
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ── 결과: 가이드형(15필드) AI 생성 + 검토/저장 (기존 흐름·'자세히 직접 설정' 경로) ──
   if (phase === "result") {
     return (
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
