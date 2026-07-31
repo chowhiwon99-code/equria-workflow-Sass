@@ -46,7 +46,13 @@ export function JoinView({
     setError(null)
     const { data, error: e } = await supabase.rpc("accept_workspace_invite", { p_token: token })
     if (e) {
-      setError(/invalid or expired/i.test(e.message) ? "만료되었거나 회수된 초대예요. 관리자에게 새 링크를 요청해 주세요." : "참여에 실패했어요. 다시 시도해 주세요.")
+      setError(
+        /seat limit/i.test(e.message)
+          ? "이 워크스페이스는 요금제 인원이 가득 찼어요. 관리자에게 상위 요금제 업그레이드를 요청해 주세요."
+          : /invalid or expired/i.test(e.message)
+            ? "만료되었거나 회수된 초대예요. 관리자에게 새 링크를 요청해 주세요."
+            : "참여에 실패했어요. 다시 시도해 주세요.",
+      )
       setBusy(false)
       return
     }
