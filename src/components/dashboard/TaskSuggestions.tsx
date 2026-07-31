@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Sparkles, Plus, X, Loader2, RefreshCw, CheckCheck } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
+import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
 import { cn } from "@/lib/utils"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { Surface } from "@/components/shared/Surface"
@@ -46,6 +47,7 @@ const ORDER: Suggestion["priority"][] = ["urgent", "high", "medium"]
 export function TaskSuggestions() {
   const supabase = createClient()
   const me = useCurrentUserId()
+  const wsId = useCurrentWorkspaceId() // 오늘 할 일 회사별 분리(세션41·마이그126)
   const [items, setItems] = useState<Suggestion[] | null>(null) // null = 아직 안 받음
   const [sourcesUsed, setSourcesUsed] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
@@ -77,7 +79,7 @@ export function TaskSuggestions() {
     // 리뷰 F4·D2: _id로 낙관 제거(제목 편집으로 참조가 바뀌어도 안전). 실패 시 복원.
     setItems((prev) => (prev ?? []).filter((x) => x._id !== s._id))
     try {
-      await mustOk(supabase.from("personal_tasks").insert({ user_id: me, title: s.title, due_date: s.suggested_due }))
+      await mustOk(supabase.from("personal_tasks").insert({ user_id: me, workspace_id: wsId, title: s.title, due_date: s.suggested_due }))
       toast.success("오늘 할 일에 추가했어요.")
       window.dispatchEvent(new Event("equria:reload")) // TodayTasks 갱신
     } catch {
@@ -89,7 +91,7 @@ export function TaskSuggestions() {
   const addAll = async () => {
     if (!me || !items?.length) return
     try {
-      await mustOk(supabase.from("personal_tasks").insert(items.map((s) => ({ user_id: me, title: s.title, due_date: s.suggested_due }))))
+      await mustOk(supabase.from("personal_tasks").insert(items.map((s) => ({ user_id: me, workspace_id: wsId, title: s.title, due_date: s.suggested_due }))))
       setItems([])
       setAddedAll(true)
       toast.success(`${items.length}개를 오늘 할 일에 추가했어요.`)

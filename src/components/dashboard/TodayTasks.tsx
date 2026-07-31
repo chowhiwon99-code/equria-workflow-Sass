@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { ListTodo, Plus, Trash2, Loader2, Check } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
+import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { dueBadge } from "@/lib/tasks"
 import { cn } from "@/lib/utils"
@@ -23,6 +24,7 @@ type Task = Tables<"personal_tasks">
 export function TodayTasks() {
   const supabase = createClient()
   const me = useCurrentUserId()
+  const wsId = useCurrentWorkspaceId() // 오늘 할 일 회사별 분리(세션41·마이그126)
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -32,15 +34,18 @@ export function TodayTasks() {
 
   const load = useCallback(async () => {
     if (!me) return setLoading(false)
+    // 활성 워크스페이스의 할 일만(회사별 분리). wsId 준비 전엔 대기.
+    if (!wsId) return
     const { data } = await supabase
       .from("personal_tasks")
       .select("*")
+      .eq("workspace_id", wsId)
       .order("done", { ascending: true })
       .order("due_date", { ascending: true, nullsFirst: false })
       .order("created_at", { ascending: true })
     setTasks((data as Task[]) ?? [])
     setLoading(false)
-  }, [supabase, me])
+  }, [supabase, me, wsId])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -82,13 +87,13 @@ export function TodayTasks() {
   }
 
   const add = () => {
-    if (!me || submitting.current) return
+    if (!me || !wsId || submitting.current) return
     const t = title.trim()
     if (!t) return
     submitting.current = true
     run(async () => {
       try {
-        await mustOk(supabase.from("personal_tasks").insert({ user_id: me, title: t, due_date: due || null }))
+        await mustOk(supabase.from("personal_tasks").insert({ user_id: me, workspace_id: wsId, title: t, due_date: due || null }))
         setTitle("")
         setDue("")
       } finally {
