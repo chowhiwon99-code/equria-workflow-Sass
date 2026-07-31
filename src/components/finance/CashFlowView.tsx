@@ -328,16 +328,18 @@ export function CashFlowView() {
     }
     await mustOk(supabase.from("cash_accounts").update({ ...safePatch, ...derived, ...amountPatch, updated_at: new Date().toISOString() }).eq("id", id))
     // 세션41(대표): 계산값=결과값 단일화 — 계산 "값" 변경만 금액 동기화(리뷰 H2: 유형 전환·이름 변경이 수동 기록을 덮던 사고 방지).
-    // - 값 키(field_values 등)·kind: 금액 재동기화
+    // - 값 키(field_values 등)·통화: 금액 재동기화(계산 슬롯만 — 통화는 amount=계산값으로 새 통화 재생성, 라벨만 바꿔 환산없이 부패하던 리뷰#1 방지)
     // - 유형 전환(item_type/calc_type_id): 필드가 비어 계산값 0이 되므로 동기화 스킵(값을 채우면 그때 동기화)
-    // - 메타(name/분류/통화): 금액 건드리지 않고 라벨만 동기화
+    // - 메타(name/분류/구분): 금액·통화 건드리지 않고 라벨만(구분 relabel — 리뷰#2 fixed 슬롯 매출↔비용 미반영 해소)
     const isLedgerSlot = merged.kind === "reserve" || merged.item_type === "ledger"
-    const VALUE_KEYS = ["field_values", "units", "unit_price", "rate", "extra", "kind"]
-    const META_KEYS = ["name", "ledger_category", "currency"]
+    const VALUE_KEYS = ["field_values", "units", "unit_price", "rate", "extra", "currency"]
+    const META_KEYS = ["name", "ledger_category", "kind"]
     const keys = Object.keys(patch)
     if (!isLedgerSlot && keys.some((k) => VALUE_KEYS.includes(k))) {
       const v = calcPreview(merged)
       if (v != null) await enqueueSync(merged, Math.round(v))
+      // fixed 슬롯(계산값 없음)의 통화 변경은 기존 KRW 기록을 건드리지 않음(orphan은 되나 부패 아님) — 새 기록부터 새 통화
+      else if (keys.includes("kind")) await syncSlotMeta(merged)
     } else if (!isLedgerSlot && keys.some((k) => META_KEYS.includes(k))) {
       await syncSlotMeta(merged)
     }
@@ -348,21 +350,24 @@ export function CashFlowView() {
   const syncChainRef = useRef(new Map<string, Promise<void>>())
   const enqueueSync = (slot: CashAccount, v: number) => {
     const prev = syncChainRef.current.get(slot.id) ?? Promise.resolve()
-    const next = prev.then(() => syncSlotRecord(slot, v)).catch(() => {})
+    const next = prev.then(() => syncSlotRecord(slot, v)).catch(() => {
+      toast.error("장부 동기화에 실패했어요 — 새로고침 후 다시 시도해 주세요.") // 리뷰#4: 조용한 실패로 표시값↔장부 괴리 방지
+    })
     syncChainRef.current.set(slot.id, next)
     return next
   }
 
-  /** 메타(이름·분류·통화)만 장부 라벨에 반영 — 금액·부가세는 보존(리뷰 H2). */
+  /** 메타(이름·분류·구분)만 장부 라벨에 반영 — 금액·부가세·통화는 보존(리뷰 H2·#1). 구분(kind) relabel로 매출↔비용 정합(리뷰#2). */
   const syncSlotMeta = async (slot: CashAccount) => {
     const today = new Date()
     const y = today.getFullYear()
     const m = today.getMonth() + 1
     const mStart = `${y}-${String(m).padStart(2, "0")}-01`
     const mEnd = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`
+    const kind = slot.kind === "revenue_src" ? "revenue" : "expense"
     await supabase
       .from("finance_entries")
-      .update({ vendor: slot.name, category: slot.ledger_category?.trim() || slot.name, currency: slot.currency })
+      .update({ kind, vendor: slot.name, category: slot.ledger_category?.trim() || slot.name })
       .eq("account_id", slot.id)
       .is("deleted_at", null)
       .gte("entry_date", mStart)

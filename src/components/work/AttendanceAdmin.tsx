@@ -293,7 +293,10 @@ export function AttendanceAdmin() {
               if (r?.check_in) {
                 const s = hourOf(r.check_in)
                 const e = r.check_out ? hourOf(r.check_out) : isToday ? hourOf(new Date().toISOString()) : s + 0.5
-                span = [Math.max(AXIS_START, s), Math.min(AXIS_END, Math.max(e, s + 0.4))]
+                // 축(07~22시) 밖 출퇴근도 항상 축 안에 그려지게 클램프(리뷰#6: 23시 출근이 오른쪽 밖으로 튀던 버그). 정확한 시각은 라벨에.
+                const cs = Math.min(AXIS_END - 0.4, Math.max(AXIS_START, s))
+                const ce = Math.max(cs + 0.4, Math.min(AXIS_END, e))
+                span = [cs, ce]
                 timeLabel = `${fmtTime(r.check_in)} ~ ${r.check_out ? fmtTime(r.check_out) : isToday ? "근무 중" : "—"}`
               } else if (r && ABSENT_SPAN[r.status]) {
                 span = ABSENT_SPAN[r.status]

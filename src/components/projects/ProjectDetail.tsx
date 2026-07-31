@@ -265,10 +265,10 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
             {project.owner ? [project.owner.name, project.owner.position].filter(Boolean).join(" · ") : "미지정"}
           </MetaItem>
           <MetaItem label="시작일">
-            <DateInput className="w-full" value={project.start_date ?? ""} onChange={(v) => changeDate("start_date", v)} />
+            <DateInput className="w-full" value={project.start_date ?? ""} onChange={(v) => changeDate("start_date", v)} max={project.due_date ?? undefined} />
           </MetaItem>
           <MetaItem label="종료 예정">
-            <DateInput className="w-full" value={project.due_date ?? ""} onChange={(v) => changeDate("due_date", v)} />
+            <DateInput className="w-full" value={project.due_date ?? ""} onChange={(v) => changeDate("due_date", v)} min={project.start_date ?? undefined} />
           </MetaItem>
         </div>
         {/* 기간 시각화 — 시작~종료 진행 바 + 오늘까지 경과 + D-day(대표 요청) */}

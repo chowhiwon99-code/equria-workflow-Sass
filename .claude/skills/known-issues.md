@@ -63,3 +63,7 @@ description: EQURIA Workspace의 알려진 이슈·기술부채 백로그. 다�
 - **I22. finance_snapshot_open(마이그121) 죽은 컬럼**: 기능 제거(6349e84)로 미사용 — 다음 정리 커밋에서 drop 검토. workspaces UPDATE 정책 없어 위험 0.
 - **I23. AttendanceAdmin workspaces.select limit(1) 비결정**: 멀티 멤버십 유저의 isOwner UI 오판 가능(권한은 RLS가 강제 — 표시 문제만, LOW).
 - **I24. 어시스턴트/사이드바 리사이즈 핸들 4px 침범**: thin 스크롤바 위 일부를 핸들이 덮음(히트 확률 낮음, LOW).
+
+## 🆕 세션41 /code-review 보류분 (2026-07-31, by-design/cleanup)
+- **I25. 계산 슬롯 값→0 시 이번 달 장부 기록 soft-delete(Undo 없음)**: "계산값=결과값" 모델상 계산값 0=이번 달 금액 0이라 자동 휴지통 처리(recordEntry와 달리 undo push 없음). 수동 tax/memo 기록이 있으면 손실 — 휴지통에서만 복구. 모델 근본이라 by-design 수용(LOW·엣지).
+- **I26. 날짜 헬퍼 중복(cleanup)**: ProjectTimeline/TaskTimeline/WorkOverview/AttendanceAdmin이 d0/fmt/shiftDate/addDays/todayStr를 각자 재구현 — `@/lib/calendar`(toDateInputValue·isSameDay 등)로 통합 후보. 동작 정상, 유지보수 부채(LOW).
