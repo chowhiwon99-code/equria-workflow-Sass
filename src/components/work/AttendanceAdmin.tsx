@@ -420,22 +420,23 @@ export function AttendanceAdmin() {
                 </div>
 
                 {personRecs.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-muted-foreground">이 달 근태 기록이 없어요.</p>
+                  <p className="rounded-xl border border-dashed py-8 text-center text-sm text-muted-foreground">이 달 근태 기록이 없어요.</p>
                 ) : (
-                  <div className="flex flex-col divide-y rounded-xl border">
-                    {personRecs.map((r) => {
+                  <div className="overflow-hidden rounded-xl border bg-card shadow-[var(--shadow-sm)]">
+                    {personRecs.map((r, i) => {
                       const dur = workDuration(r.check_in, r.check_out)
+                      const isToday = r.work_date === todayStr()
+                      // 시간 표시: 퇴근 있으면 범위 · 오늘 미퇴근이면 '근무 중' · 지난날 미퇴근이면 출근만
+                      const timeText = r.check_out ? `${fmtTime(r.check_in)} – ${fmtTime(r.check_out)}` : r.check_in ? (isToday ? `${fmtTime(r.check_in)} · 근무 중` : `${fmtTime(r.check_in)} 출근`) : "미기록"
                       return (
-                        <div key={r.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
-                          <span className="w-14 shrink-0 text-muted-foreground tabular-nums">{fmtDate(r.work_date)}</span>
-                          <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", STATUS_BADGE[r.status] ?? "bg-muted text-muted-foreground")}>
+                        <div key={r.id} className={cn("flex items-center gap-3 px-4 py-3 text-sm", i > 0 && "border-t")}>
+                          <span className="w-12 shrink-0 font-medium tabular-nums">{fmtDate(r.work_date)}</span>
+                          <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium", STATUS_BADGE[r.status] ?? "bg-muted text-muted-foreground")}>
                             {r.status}
                           </span>
                           {r.note && <span className="min-w-0 truncate text-xs text-muted-foreground">{r.note}</span>}
-                          <span className="ml-auto text-muted-foreground tabular-nums">
-                            {fmtTime(r.check_in)} ~ {fmtTime(r.check_out)}
-                          </span>
-                          {dur && <span className="w-20 shrink-0 text-right text-xs text-muted-foreground/80 tabular-nums">{dur}</span>}
+                          <span className={cn("ml-auto shrink-0 tabular-nums", r.check_out ? "text-foreground" : "text-muted-foreground")}>{timeText}</span>
+                          <span className="w-16 shrink-0 text-right text-xs text-muted-foreground tabular-nums">{dur || "—"}</span>
                         </div>
                       )
                     })}

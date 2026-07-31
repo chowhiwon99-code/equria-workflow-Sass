@@ -6,6 +6,7 @@ import { Plus, Play, Trash2, Loader2, ChevronDown, Plug } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { mustOk } from "@/lib/supabase/mustOk"
+import { Markdown } from "@/components/shared/Markdown"
 import { useUndo } from "@/components/undo/UndoProvider"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -553,9 +554,9 @@ export function WorkflowEditor({ id }: { id: string }) {
             {nodeOutputs[selected.id] && (
               <div className="flex flex-col gap-1">
                 <span className="text-xs font-medium text-muted-foreground">이 단계 결과</span>
-                <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-md bg-muted/40 p-2 text-[11px] leading-relaxed">
-                  {nodeOutputs[selected.id]}
-                </pre>
+                <div className="max-h-40 overflow-auto rounded-lg border bg-card p-2 text-[12px]">
+                  <Markdown>{nodeOutputs[selected.id]}</Markdown>
+                </div>
               </div>
             )}
             <Button
@@ -595,9 +596,9 @@ export function WorkflowEditor({ id }: { id: string }) {
         {finalOutput != null && (
           <div className="flex flex-col gap-1">
             <span className="text-xs font-medium text-muted-foreground">최종 결과</span>
-            <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-md bg-muted/40 p-3 text-[12px] leading-relaxed">
-              {finalOutput || "(빈 결과)"}
-            </pre>
+            <div className="max-h-72 overflow-auto rounded-lg border bg-card p-3 text-[12px]">
+              {finalOutput ? <Markdown>{finalOutput}</Markdown> : <span className="text-muted-foreground">(빈 결과)</span>}
+            </div>
           </div>
         )}
       </div>
@@ -664,18 +665,22 @@ export function WorkflowEditor({ id }: { id: string }) {
                             {n.status === "error" ? " (오류)" : ""}
                           </span>
                           {n.toolNote && <p className="text-muted-foreground/70">🔗 {n.toolNote}</p>}
-                          <pre className="mt-0.5 max-h-40 overflow-auto whitespace-pre-wrap rounded-md bg-muted/40 p-2">
-                            {n.error ?? n.output ?? ""}
-                          </pre>
+                          {n.error ? (
+                            <pre className="mt-0.5 max-h-40 overflow-auto whitespace-pre-wrap rounded-md bg-destructive/10 p-2 text-destructive">{n.error}</pre>
+                          ) : (
+                            <div className="mt-0.5 max-h-40 overflow-auto rounded-lg border bg-card p-2 text-[12px]">
+                              <Markdown>{n.output ?? ""}</Markdown>
+                            </div>
+                          )}
                         </div>
                       ))}
                       {r.error && <p className="text-[11px] text-destructive">{r.error}</p>}
                       {r.final_output && (
                         <div className="text-[11px]">
                           <span className="font-medium text-muted-foreground">최종 결과</span>
-                          <pre className="mt-0.5 max-h-52 overflow-auto whitespace-pre-wrap rounded-md bg-muted/40 p-2">
-                            {r.final_output}
-                          </pre>
+                          <div className="mt-0.5 max-h-52 overflow-auto rounded-lg border bg-card p-2 text-[12px]">
+                            <Markdown>{r.final_output}</Markdown>
+                          </div>
                         </div>
                       )}
                     </div>

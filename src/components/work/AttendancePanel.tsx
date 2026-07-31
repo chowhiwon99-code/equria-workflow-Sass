@@ -45,6 +45,13 @@ export function fmtDate(d: string): string {
 /** 근무시간(출근~퇴근, 퇴근 전이면 현재까지) — "8시간 30분". 1분 미만은 "". */
 export function workDuration(checkIn: string | null, checkOut: string | null): string {
   if (!checkIn) return ""
+  // 퇴근 미기록: 오늘이면 지금까지("근무 중"은 UI에서), 지난 날짜면 계산 불가(빈값) — "366시간" 버그 방지(세션41)
+  if (!checkOut) {
+    const inD = new Date(checkIn)
+    const now = new Date()
+    const sameDay = inD.getFullYear() === now.getFullYear() && inD.getMonth() === now.getMonth() && inD.getDate() === now.getDate()
+    if (!sameDay) return "" // 며칠 전 출근인데 퇴근 미기록 → 경과시간 무의미
+  }
   const ms = (checkOut ? new Date(checkOut) : new Date()).getTime() - new Date(checkIn).getTime()
   if (ms < 60000) return "" // 1분 미만은 표시 안 함("0분" 방지)
   const h = Math.floor(ms / 3600000)
