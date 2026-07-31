@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Sparkles, Check, ArrowLeft, Plug, X } from "lucide-react"
+import { Sparkles, Check, ArrowLeft, ArrowRight, Plug, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/shared/Modal"
@@ -25,14 +25,13 @@ type InterviewQ = { id: string; question: string; hint?: string }
 // 한 화면에 한 질문씩 — 아이폰 초기 설정처럼 가로 슬라이드로 진행.
 
 // 진입 화면 배경에 떠다니는 에이전트 아이콘(장식·클릭 불가). 중앙 입력을 피해 가장자리에 흩뿌린다.
-const FLOAT_ICONS = [
-  { e: "📄", pos: "left-[3%] top-[3%]", delay: "0s", dur: "2.6s", size: "2.2rem" },
-  { e: "💬", pos: "right-[5%] top-[8%]", delay: "0.7s", dur: "2.9s", size: "2rem" },
-  { e: "🌐", pos: "left-[6%] top-[52%]", delay: "1.3s", dur: "3.1s", size: "2.4rem" },
-  { e: "📊", pos: "right-[4%] top-[60%]", delay: "0.4s", dur: "2.7s", size: "2rem" },
-  { e: "📱", pos: "left-[15%] top-[27%]", delay: "1s", dur: "3.3s", size: "1.7rem" },
-  { e: "⚖️", pos: "right-[12%] top-[33%]", delay: "1.7s", dur: "2.5s", size: "1.7rem" },
-  { e: "🧾", pos: "left-[45%] top-[88%]", delay: "0.9s", dur: "3s", size: "1.8rem" },
+// 예시 칩 — 클릭하면 입력에 채워짐(장식 아이콘 대신 실용·영감 겸용, 세션41 대표 요청)
+const EXAMPLE_PROMPTS = [
+  { icon: "✉️", text: "매주 거래처에 보내는 안내 메일을 회사 톤으로 대신 써줘" },
+  { icon: "🧾", text: "영수증·세금계산서를 정리하고 부가세 빠진 것 짚어줘" },
+  { icon: "📊", text: "이번 달 매출·비용 데이터를 요약하고 이상한 숫자 알려줘" },
+  { icon: "📱", text: "인스타그램·블로그에 올릴 콘텐츠 초안을 만들어줘" },
+  { icon: "💬", text: "고객 문의에 답하는 CS 응대 초안을 작성해줘" },
 ] as const
 
 export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
@@ -171,23 +170,14 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
       setIndex(0)
     }
     return (
-      <div className="relative isolate mx-auto flex w-full max-w-2xl flex-col items-center gap-6 pt-2">
-        {/* 떠다니는 에이전트 아이콘 — "이런 걸 만들어 쓸 수 있다"는 분위기(장식·클릭 불가) */}
-        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-          {FLOAT_ICONS.map((i) => (
-            <span
-              key={i.e}
-              className={cn("absolute select-none opacity-[0.16] motion-safe:animate-float", i.pos)}
-              style={{ animationDelay: i.delay, animationDuration: i.dur, fontSize: i.size }}
-            >
-              {i.e}
-            </span>
-          ))}
+      <div className="mx-auto flex w-full max-w-xl flex-col items-center gap-5 pt-10 sm:pt-16">
+        {/* 심플 히어로 — 아이콘 하나 + 한 줄 질문(장식 노이즈 제거, 세션41 대표 요청) */}
+        <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+          <Sparkles className="size-6" />
         </div>
-
         <div className="flex flex-col items-center gap-1.5 text-center">
           <h2 className="text-2xl font-semibold tracking-tight">어떤 일을 맡기고 싶으세요?</h2>
-          <p className="text-sm text-muted-foreground">평소 반복하는 업무를 편하게 적어주면, 몇 가지만 물어보고 AI가 맞춰 만들어줘요.</p>
+          <p className="text-sm text-muted-foreground">한 줄만 적으면 AI가 알아서 만들어줘요. 자세한 건 나중에 고쳐도 돼요.</p>
         </div>
 
         {/* 메인 = 열린 입력 */}
@@ -202,17 +192,35 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
                 startFromSeed()
               }
             }}
-            placeholder="예: 매주 거래처에 보내는 안내 메일을 대신 써줘 · 영수증 정리하고 부가세 빠진 것 짚어줘"
+            placeholder="예: 매주 거래처에 보내는 안내 메일을 대신 써줘"
             rows={3}
-            className={cn(fieldClass, "min-h-[96px] w-full resize-y rounded-2xl py-3 text-base")}
+            className={cn(fieldClass, "min-h-[92px] w-full resize-y rounded-2xl py-3 text-base")}
           />
-          <div className="mt-2.5 flex justify-end">
-            <Button size="sm" disabled={!seed} onClick={startFromSeed}>
-              다음
+          <div className="mt-2.5 flex items-center justify-between gap-2">
+            <span className="hidden text-xs text-muted-foreground sm:inline">⌘+Enter로 바로 시작</span>
+            <Button size="sm" disabled={!seed} onClick={startFromSeed} className="ml-auto">
+              다음 <ArrowRight className="size-4" />
             </Button>
           </div>
         </div>
 
+        {/* 예시 칩 — 클릭하면 채워짐(영감+실용) */}
+        <div className="flex w-full flex-col items-center gap-2">
+          <span className="text-xs text-muted-foreground">이런 걸 만들 수 있어요 · 눌러서 시작</span>
+          <div className="flex flex-wrap justify-center gap-1.5">
+            {EXAMPLE_PROMPTS.map((ex) => (
+              <button
+                key={ex.text}
+                type="button"
+                onClick={() => setText("purpose", ex.text)}
+                className="inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-[var(--shadow-sm)] transition-colors hover:border-primary/40 hover:text-foreground"
+              >
+                <span>{ex.icon}</span>
+                <span className="max-w-[15rem] truncate">{ex.text}</span>
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
     )
   }
