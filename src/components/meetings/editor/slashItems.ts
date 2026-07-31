@@ -8,6 +8,7 @@ import {
   List,
   ListOrdered,
   ListChecks,
+  ChevronRight,
   Quote,
   Info,
   Code,
@@ -104,6 +105,21 @@ export function buildSlashItems(handlers: SlashHandlers): SlashItem[] {
       icon: ListChecks,
       keywords: ["todo", "task", "check", "할일", "체크", "목록"],
       command: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleTaskList().run(),
+    },
+    {
+      key: "toggle",
+      title: "토글 목록",
+      hint: "▸",
+      section: "기본 블록",
+      icon: ChevronRight,
+      keywords: ["toggle", "collapse", "fold", "details", "토글", "접기", "펼치기"],
+      command: ({ editor, range }) =>
+        editor
+          .chain()
+          .focus()
+          .deleteRange(range)
+          .insertContent({ type: "toggle", attrs: { summary: "", open: true }, content: [{ type: "paragraph" }] })
+          .run(),
     },
     {
       key: "quote",

@@ -23,6 +23,7 @@ import xml from "highlight.js/lib/languages/xml"
 import css from "highlight.js/lib/languages/css"
 import { FileBlock } from "./FileBlock"
 import { Callout } from "./Callout"
+import { Toggle } from "./Toggle"
 import { CodeBlockView } from "./CodeBlockView"
 import { SlashMenu, type SlashMenuRef } from "./SlashMenu"
 import { buildSlashItems, filterSlashItems, type SlashHandlers, type SlashItem } from "./slashItems"
@@ -196,6 +197,7 @@ export function buildMeetingExtensions(opts: { placeholder: string; handlers: Sl
     TableCellBg,
     FileBlock,
     Callout,
+    Toggle,
     CodeBlock,
     SlashCommand.configure({ handlers: opts.handlers }),
     Placeholder.configure({
