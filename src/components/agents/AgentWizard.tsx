@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Sparkles, Check, ArrowLeft, Plug, X } from "lucide-react"
+import { Sparkles, Check, ArrowLeft, ArrowRight, Plug, X, Mail, Receipt, BarChart3, PenLine, MessagesSquare } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/shared/Modal"
@@ -25,13 +25,13 @@ type InterviewQ = { id: string; question: string; hint?: string }
 // 한 화면에 한 질문씩 — 아이폰 초기 설정처럼 가로 슬라이드로 진행.
 
 // 진입 화면 배경에 떠다니는 에이전트 아이콘(장식·클릭 불가). 중앙 입력을 피해 가장자리에 흩뿌린다.
-// 예시 칩 — 클릭하면 입력에 채워짐(장식 아이콘 대신 실용·영감 겸용, 세션41 대표 요청)
+// 예시 칩 — 클릭하면 입력에 채워짐. 아이콘은 브랜드 모노 라인(컬러 이모지 대신, 세션41 대표 요청)
 const EXAMPLE_PROMPTS = [
-  { icon: "✉️", text: "매주 거래처에 보내는 안내 메일을 회사 톤으로 대신 써줘" },
-  { icon: "🧾", text: "영수증·세금계산서를 정리하고 부가세 빠진 것 짚어줘" },
-  { icon: "📊", text: "이번 달 매출·비용 데이터를 요약하고 이상한 숫자 알려줘" },
-  { icon: "📱", text: "인스타그램·블로그에 올릴 콘텐츠 초안을 만들어줘" },
-  { icon: "💬", text: "고객 문의에 답하는 CS 응대 초안을 작성해줘" },
+  { Icon: Mail, text: "매주 거래처에 보내는 안내 메일을 회사 톤으로 대신 써줘" },
+  { Icon: Receipt, text: "영수증·세금계산서를 정리하고 부가세 빠진 것 짚어줘" },
+  { Icon: BarChart3, text: "이번 달 매출·비용 데이터를 요약하고 이상한 숫자 알려줘" },
+  { Icon: PenLine, text: "인스타그램·블로그에 올릴 콘텐츠 초안을 만들어줘" },
+  { Icon: MessagesSquare, text: "고객 문의에 답하는 CS 응대 초안을 작성해줘" },
 ] as const
 
 export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
@@ -44,37 +44,6 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
   const [genError, setGenError] = useState<string | null>(null)
   const [generated, setGenerated] = useState("")
   const [knowledge, setKnowledge] = useState<StagedKnowledge[]>([]) // 필요한 데이터 스텝에서 첨부한 파일
-  // 원샷 생성(세션41 대표 확정 "한 줄 → 즉시 완성") — 이름·아이콘·분류·프롬프트를 한 번에
-  const [quickDraft, setQuickDraft] = useState<{ name: string; icon: string; category: string; system_prompt: string } | null>(null)
-  const [quickLoading, setQuickLoading] = useState(false)
-  const [quickError, setQuickError] = useState<string | null>(null)
-  const [refineText, setRefineText] = useState("")
-
-  const quickGenerate = async (refine?: string) => {
-    const purpose = ((inputs.purpose as string) ?? "").trim()
-    if (!purpose) return
-    setPhase("result")
-    setQuickLoading(true)
-    setQuickError(null)
-    try {
-      const res = await fetch("/api/agents/quick-generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ purpose, refine: refine?.trim() || undefined }),
-      })
-      if (!res.ok) {
-        const msg = await res.json().then((j) => j.error).catch(() => null)
-        throw new Error(msg ?? "에이전트 초안 생성에 실패했어요.")
-      }
-      const j = await res.json()
-      setQuickDraft(j.draft)
-      setRefineText("")
-    } catch (e) {
-      setQuickError(e instanceof Error ? e.message : "생성에 실패했어요.")
-    } finally {
-      setQuickLoading(false)
-    }
-  }
   // AI 되물음 인터뷰(생성 직전) — 빈틈 질문 + 답변. clarifications는 생성/재생성에 재사용.
   const [interviewLoading, setInterviewLoading] = useState(false)
   const [interviewQs, setInterviewQs] = useState<InterviewQ[]>([])
@@ -211,8 +180,8 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
           <p className="text-sm text-muted-foreground">한 줄만 적으면 AI가 알아서 만들어줘요. 자세한 건 나중에 고쳐도 돼요.</p>
         </div>
 
-        {/* 메인 = 열린 입력 */}
-        <div className="w-full">
+        {/* 메인 = 열린 입력 (비었을 때 타이핑 예시 오버레이) */}
+        <div className="relative w-full">
           <textarea
             autoFocus
             value={(inputs.purpose as string) ?? ""}
@@ -223,16 +192,18 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
                 startFromSeed()
               }
             }}
-            placeholder="예: 매주 거래처에 보내는 안내 메일을 대신 써줘"
             rows={3}
             className={cn(fieldClass, "min-h-[92px] w-full resize-y rounded-2xl py-3 text-base")}
           />
+          {!((inputs.purpose as string) ?? "").length && (
+            <div aria-hidden className="pointer-events-none absolute left-3 top-3 pr-4 text-base text-muted-foreground">
+              <TypewriterPlaceholder phrases={EXAMPLE_PROMPTS.map((e) => e.text)} />
+            </div>
+          )}
           <div className="mt-2.5 flex items-center justify-between gap-2">
-            <button type="button" onClick={startFromSeed} className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">
-              자세히 직접 설정
-            </button>
-            <Button size="sm" disabled={!seed} onClick={() => quickGenerate()}>
-              <Sparkles className="size-4" /> AI로 만들기
+            <span className="hidden text-xs text-muted-foreground sm:inline">⌘+Enter로 바로 시작</span>
+            <Button size="sm" disabled={!seed} onClick={startFromSeed} className="ml-auto">
+              다음 <ArrowRight className="size-4" />
             </Button>
           </div>
         </div>
@@ -248,7 +219,7 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
                 onClick={() => setText("purpose", ex.text)}
                 className="inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-[var(--shadow-sm)] transition-colors hover:border-primary/40 hover:text-foreground"
               >
-                <span>{ex.icon}</span>
+                <ex.Icon className="size-3.5 shrink-0" />
                 <span className="max-w-[15rem] truncate">{ex.text}</span>
               </button>
             ))}
@@ -258,79 +229,7 @@ export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
     )
   }
 
-  // ── 원샷 결과: 한 줄 → 즉시 완성(로딩/에러/편집 폼 + 다듬기) ──
-  if (phase === "result" && (quickLoading || quickError || quickDraft)) {
-    return (
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
-        {quickLoading || quickError || !quickDraft ? (
-          <div className="flex flex-col items-center gap-4 rounded-2xl border bg-card p-8 shadow-[var(--shadow-sm)]">
-            {quickLoading && (
-              <>
-                <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                  <Sparkles className="size-6 animate-pulse" />
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-medium">AI가 에이전트를 만들고 있어요…</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">이름·프롬프트·추천 설정까지 한 번에</p>
-                </div>
-              </>
-            )}
-            {quickError && (
-              <>
-                <p className="text-sm text-destructive">{quickError}</p>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setPhase("gallery")}>
-                    <ArrowLeft className="size-4" /> 돌아가기
-                  </Button>
-                  <Button size="sm" onClick={() => quickGenerate()}>
-                    다시 시도
-                  </Button>
-                </div>
-              </>
-            )}
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {/* 다듬기 — "이렇게 고쳐줘"로 재생성(자유 조정 정신) */}
-            <div className="flex flex-col gap-2 rounded-xl border bg-card p-3 shadow-[var(--shadow-sm)]">
-              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                <Sparkles className="size-3.5 text-primary" /> AI 초안이 준비됐어요. 아래에서 직접 고치거나, 여기에 요청하면 다시 만들어요.
-              </span>
-              <div className="flex gap-1.5">
-                <input
-                  value={refineText}
-                  onChange={(e) => setRefineText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.nativeEvent.isComposing && refineText.trim()) quickGenerate(refineText)
-                  }}
-                  placeholder="예: 더 격식 있게 · 표로 정리하게 · 영어도 지원하게"
-                  className={cn(fieldClass, "flex-1")}
-                />
-                <Button size="sm" variant="outline" disabled={!refineText.trim()} onClick={() => quickGenerate(refineText)}>
-                  <Sparkles className="size-3.5" /> 다시
-                </Button>
-              </div>
-            </div>
-            <AgentBuilderForm
-              key={quickDraft.system_prompt.slice(0, 40)} // 재생성 시 폼 프리필 갱신
-              prefill={{
-                name: quickDraft.name,
-                icon: quickDraft.icon,
-                description: (inputs.purpose as string) || null,
-                category: quickDraft.category,
-                system_prompt: quickDraft.system_prompt,
-                ...(mcpPrefill?.length ? { mcp_servers: mcpPrefill } : {}),
-                ...(knowledge.length ? { knowledge } : {}),
-              }}
-              onBack={() => setPhase("gallery")}
-            />
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  // ── 결과: 가이드형(15필드) AI 생성 + 검토/저장 (기존 흐름·'자세히 직접 설정' 경로) ──
+  // ── 결과: 가이드형(15필드) AI 생성 + 검토/저장 (기존 흐름) ──
   if (phase === "result") {
     return (
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
@@ -770,5 +669,48 @@ function QuestionSlide({
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * 타이핑 플레이스홀더(세션41 대표 요청) — 입력이 비었을 때 예시가 타이핑되듯 흐르고 지워지는 오버레이.
+ * placeholder 속성은 애니메이션이 안 되므로 오버레이로 구현. reduced-motion이면 첫 예시만 정적으로.
+ */
+function TypewriterPlaceholder({ phrases }: { phrases: readonly string[] }) {
+  const [display, setDisplay] = useState("")
+  const [pi, setPi] = useState(0)
+  const [deleting, setDeleting] = useState(false)
+  const [reduced, setReduced] = useState(false)
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 마운트 1회 모션 선호 감지(외부 미디어쿼리)
+    setReduced(window.matchMedia("(prefers-reduced-motion: reduce)").matches)
+  }, [])
+
+  useEffect(() => {
+    if (reduced) return
+    const full = phrases[pi] ?? ""
+    let delay: number
+    if (!deleting && display.length < full.length) delay = 55 // 타이핑
+    else if (!deleting && display.length === full.length) delay = 1500 // 완성 후 멈춤
+    else if (deleting && display.length > 0) delay = 26 // 지우기
+    else delay = 300 // 다 지운 뒤 다음 예시
+    const t = setTimeout(() => {
+      if (!deleting && display.length < full.length) setDisplay(full.slice(0, display.length + 1))
+      else if (!deleting && display.length === full.length) setDeleting(true)
+      else if (deleting && display.length > 0) setDisplay(full.slice(0, display.length - 1))
+      else {
+        setDeleting(false)
+        setPi((i) => (i + 1) % phrases.length)
+      }
+    }, delay)
+    return () => clearTimeout(t)
+  }, [display, deleting, pi, phrases, reduced])
+
+  return (
+    <span>
+      예: {reduced ? phrases[0] : display}
+      {!reduced && <span className="animate-pulse text-muted-foreground/60">|</span>}
+    </span>
   )
 }
