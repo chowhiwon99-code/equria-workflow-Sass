@@ -429,8 +429,14 @@ export function AttendanceAdmin() {
                     {personRecs.map((r, i) => {
                       const dur = workDuration(r.check_in, r.check_out)
                       const isToday = r.work_date === todayStr()
-                      // 시간 표시: 퇴근 있으면 범위 · 오늘 미퇴근이면 '근무 중' · 지난날 미퇴근이면 출근만
-                      const timeText = r.check_out ? `${fmtTime(r.check_in)} – ${fmtTime(r.check_out)}` : r.check_in ? (isToday ? `${fmtTime(r.check_in)} · 근무 중` : `${fmtTime(r.check_in)} 출근`) : "미기록"
+                      // 시간 표시: 퇴근 있으면 범위 · 오늘 미퇴근이면 '근무 중' · 지난날 미퇴근이면 출근 시각만(부재형은 시각 없이 상태만)
+                      const timeText = r.check_out
+                        ? `${fmtTime(r.check_in)} – ${fmtTime(r.check_out)}`
+                        : r.check_in
+                          ? isToday
+                            ? `${fmtTime(r.check_in)} · 근무 중`
+                            : fmtTime(r.check_in)
+                          : ""
                       return (
                         <div key={r.id} className={cn("flex items-center gap-3 px-4 py-3 text-sm", i > 0 && "border-t")}>
                           <span className="w-12 shrink-0 font-medium tabular-nums">{fmtDate(r.work_date)}</span>
@@ -438,8 +444,8 @@ export function AttendanceAdmin() {
                             {r.status}
                           </span>
                           {r.note && <span className="min-w-0 truncate text-xs text-muted-foreground">{r.note}</span>}
-                          <span className={cn("ml-auto shrink-0 tabular-nums", r.check_out ? "text-foreground" : "text-muted-foreground")}>{timeText}</span>
-                          <span className="w-16 shrink-0 text-right text-xs text-muted-foreground tabular-nums">{dur || "—"}</span>
+                          {timeText && <span className={cn("ml-auto shrink-0 tabular-nums", r.check_out ? "text-foreground" : "text-muted-foreground")}>{timeText}</span>}
+                          {dur && <span className={cn("shrink-0 text-right text-xs text-muted-foreground tabular-nums", !timeText && "ml-auto")}>{dur}</span>}
                         </div>
                       )
                     })}
