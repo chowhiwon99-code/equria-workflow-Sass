@@ -1592,6 +1592,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "files_project_task_id_fkey"
+            columns: ["project_task_id"]
+            isOneToOne: false
+            referencedRelation: "project_tasks"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "files_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
@@ -2031,6 +2038,48 @@ export type Database = {
             foreignKeyName: "group_rooms_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_settings: {
+        Row: {
+          holidays: Json
+          leave_policy: Json
+          updated_at: string
+          updated_by: string | null
+          work_policy: Json
+          workspace_id: string
+        }
+        Insert: {
+          holidays?: Json
+          leave_policy?: Json
+          updated_at?: string
+          updated_by?: string | null
+          work_policy?: Json
+          workspace_id: string
+        }
+        Update: {
+          holidays?: Json
+          leave_policy?: Json
+          updated_at?: string
+          updated_by?: string | null
+          work_policy?: Json
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_settings_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
@@ -2695,6 +2744,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "personal_tasks_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
         ]
       }
       profiles: {
@@ -2704,6 +2760,7 @@ export type Database = {
           created_at: string
           department: string | null
           email: string
+          hire_date: string | null
           id: string
           mobile: string | null
           name: string
@@ -2719,6 +2776,7 @@ export type Database = {
           created_at?: string
           department?: string | null
           email: string
+          hire_date?: string | null
           id: string
           mobile?: string | null
           name: string
@@ -2734,6 +2792,7 @@ export type Database = {
           created_at?: string
           department?: string | null
           email?: string
+          hire_date?: string | null
           id?: string
           mobile?: string | null
           name?: string
@@ -3373,6 +3432,19 @@ export type Database = {
           user_id: string
         }[]
       }
+      attendance_balances: {
+        Args: { p_as_of?: string; p_workspace: string }
+        Returns: {
+          hire_date: string
+          name: string
+          used_annual: number
+          used_half: number
+          used_monthly: number
+          user_id: string
+          year_end: string
+          year_start: string
+        }[]
+      }
       auth_is_admin: { Args: never; Returns: boolean }
       auth_is_workspace_owner: { Args: { ws_id: string }; Returns: boolean }
       auth_user_department: { Args: never; Returns: string }
@@ -3444,6 +3516,7 @@ export type Database = {
       mark_dm_read: { Args: { conv_id: string }; Returns: number }
       mark_room_read: { Args: { p_room: string }; Returns: undefined }
       owner_can_set_role: { Args: { target: string }; Returns: boolean }
+      plan_seat_limit: { Args: { p_plan: string }; Returns: number }
       recall_document: { Args: { doc_id: string }; Returns: undefined }
       remind_due_personal_tasks: { Args: never; Returns: number }
       revise_document: { Args: { doc_id: string }; Returns: undefined }
@@ -3472,6 +3545,10 @@ export type Database = {
       }
       set_member_department: {
         Args: { new_department: string; target: string }
+        Returns: undefined
+      }
+      set_member_hire_date: {
+        Args: { p_hire_date: string; target: string }
         Returns: undefined
       }
       set_member_position: {
