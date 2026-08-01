@@ -8,7 +8,23 @@
 
 ---
 
-## 🔜 다음 세션 바로 착수 (세션41[디자인 통일+대개편+게이팅] 인계 · 2026-08-01 갱신 — 이 블록부터 읽기)
+## 🔜 다음 세션 바로 착수 (세션42[HR·근태 설정 + 범용 비서 컴피] 인계 · 2026-08-01 — 이 블록부터 읽기)
+
+> **⚠️ 상태 = 배포 코드 `a274fab`(미갱신) + 세션42 로컬 커밋 미푸시 + 마이그 001~130**(127~130 이번 세션·전부 **프로덕션 DB 적용됨**·전부 additive라 배포 코드 무영향). 세션42 = (1) 후속 정리(app-ambient 제거·죽은컬럼 drop 127) (2) **회사별 HR 설정 + 근태 잔여** (3) **범용 비서 '컴피'**. 각 tsc0·lint29/0·build0. **아직 미배포 — 대표 확인 후 `/deploy`.**
+
+### 세션42 완료(플랜 승인 `~/.claude/plans/memoized-sprouting-cascade.md` · 대표 결정: 범용비서 1개·이름 컴피·근태HR 먼저)
+- **HR(근태) 설정**: `hr_settings`(마이그128·workspace_id PK+jsonb·오너 write RLS)+`profiles.hire_date`+'월차'(status/leave_type enum). 오너 전용 `HrSettingsCard`(휴가기준·근무시간·휴무일)+구성원 입사일 칸. `lib/hr.ts` 순수 산식(근로기준법 기본값·근속 가산·1년미만 월부여·resolve* 병합).
+- **근태 잔여**: `attendance_balances` RPC(마이그129·`can_view_attendance` 오너/위임자 게이트·실호출 검증 6명/비오너0)→ `AttendanceAdmin` 인원별 '연차 잔여 N/부여 M·월차 K' 표시.
+- **컴피(Compi)**: `api/assistant` 승격 — 워크스페이스 현황 스냅샷+`features.ts` 기능 레지스트리 주입 + 네이티브 도구(`lib/agentTools`: get_attendance_balances·list_projects·list_calendar_events·list_my_tasks, 전부 `getUserWorkspaceId`·RLS 스코프)+게스트403. "누가 연차 며칠 남았어"→도구로 근태 RPC 조회해 정확 응답. `DashboardAssistant` 브랜딩(인사말·예시 칩·플레이스홀더).
+- **옛 8종**: 신규 워크스페이스=clean-slate(마이그130 `clone_seed_agents` no-op — 컴피가 대체). 기존 활성 시드 16개(3워크스페이스)는 **컴피 검증 후 소프트삭제**(대표 결정·I30).
+
+### 🔴 다음 액션
+1. **배포 결정**: `/deploy`로 세션42 로컬 커밋 푸시(main-first) → 대표가 라이브(complow.kr)에서 검증. (미배포 시 DB만 앞서 있음 — 무해하나 컴피/HR 화면 미노출.)
+2. **대표 dogfood(배포 후 필수)**: 설정→'인사(HR) 설정' 저장·구성원 입사일 지정 → 근태 화면 연차 잔여 표시 확인 → 컴피에 "이번 달 연차 누가 몇 개 남았어?"·"진행 중 프로젝트"·"오늘 일정" 물어 **도구호출·정확도** 확인(모바일/다크 포함).
+3. **컴피 검증 후**: 옛 8종 소프트삭제(마이그131 후보 `update agents set is_active=false where created_by is null`) · 컴피 도구 확장(재무·회의)·이월/셀프 잔여(I27~I30).
+
+<!-- ↓ 이전 세션41 인계(참고 유지) -->
+## 🔜 (이전) 세션41[디자인 통일+대개편+게이팅] 인계 · 2026-08-01
 
 > **프로덕션 = `a274fab`**(READY·`complow.kr`·main=feat=origin 동기) · 마이그 001~**126**(121=finance_snapshot_open[미사용·I22]·122=ledger_categories·123=task_timeline·124=task_color·**125=plan_seat_gating**·**126=personal_tasks_workspace** — 전부 추가형·DB 적용됨) · 세션41 = 대표 실시간 dogfood **대규모 반복 개편**. tsc0·lint29/0·build0 · **3중 적대 리뷰(데이터/UI/보안) HIGH 3·MED 6 + /code-review 2라운드(12+7건) 전부 수정** → main-first 배포.
 

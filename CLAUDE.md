@@ -138,7 +138,7 @@ equria-workspace/
 
 ---
 
-## 6. DB 스키마 요약 (약 55개 테이블 · 마이그 001~103)
+## 6. DB 스키마 요약 (약 57개 테이블 · 마이그 001~130)
 
 | 영역 | 테이블 |
 |------|--------|
@@ -155,12 +155,13 @@ equria-workspace/
 | 테넌시 | `workspaces` · `workspace_members`(회사 격리·마이그030~) |
 | 파일/문서 | `files` · `business_cards` · `tax_invoices` |
 | 회의 | `meeting_notes` · `meeting_note_folders` · `meeting_categories`(분류·중요도, 마이그 070) |
+| 근태/HR | `attendance_records`(사유=status enum: …연차·반차·월차) · `leave_requests` · `expense_reports` · `attendance_viewers`(열람 위임·064) · `hr_settings`(회사별 휴가·근무·휴무일 jsonb·오너 write·마이그128) · `profiles.hire_date`(근속 연차) |
 | 재무 | `finance_entries` · `fx_rates`(환율) |
 | 현금흐름(손익) | `cash_accounts`(슬롯) · `cash_transfers` · `cash_categories`(그룹) · `cashflow_settings` · `cash_calc_types`(회사 계산 유형·AST 수식) (마이그 078~085) |
 | 알림 | `notifications` |
 | 구글 연동 | `google_connections` |
 
-> 전체 SQL: `supabase/migrations/` (001~103). 원격 적용·drift 없음. **세부 진행상황·최신 변경은 HANDOFF.md가 SSOT.**
+> 전체 SQL: `supabase/migrations/` (001~130). 원격 적용·drift 없음. **세부 진행상황·최신 변경은 HANDOFF.md가 SSOT.**
 > 기본 에이전트 8개 시드: `supabase/seed.sql` 참고
 
 ---

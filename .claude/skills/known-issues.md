@@ -64,6 +64,13 @@ description: EQURIA Workspace의 알려진 이슈·기술부채 백로그. 다�
 - **I23. AttendanceAdmin workspaces.select limit(1) 비결정**: 멀티 멤버십 유저의 isOwner UI 오판 가능(권한은 RLS가 강제 — 표시 문제만, LOW).
 - **I24. 어시스턴트/사이드바 리사이즈 핸들 4px 침범**: thin 스크롤바 위 일부를 핸들이 덮음(히트 확률 낮음, LOW).
 
+## 🆕 세션42 HR·컴피 후속 (2026-08-01, 비차단·후속)
+- **I27. 연차 이월(carryover)·월차 잔여 미반영**: `hr_settings.leave_policy.carryover`·`monthly_leave`는 설정 저장만 되고 `computeBalance` remaining은 이월 0·월차는 사용 카운트만(잔여 계산 안 함). 정확한 이월 잔여는 전년도 잔여 추적 필요(후속). 현재 잔여 = 부여 − (연차 + 반차0.5). LOW.
+- **I28. 근태 잔여 셀프조회 부재**: `attendance_balances` RPC는 `can_view_attendance`(오너/위임자)만 → 일반 직원의 본인 연차 잔여 조회 경로 없음. 컴피도 오너/위임자 문맥만 답변. 셀프조회는 후속(RPC에 self 분기). LOW.
+- **I29. 컴피 도구 커버리지·수집 중복**: `agentTools`는 근태·프로젝트·일정·할일 4종만(재무·회의·채팅 도구 미구현 — 같은 패턴으로 추가). `task-suggestions` 인라인 수집과 `workspaceContext` 스냅샷이 유사 로직 중복(통합 후속). LOW.
+- **I30. 옛 기본 8종 기존 워크스페이스 잔존**: `created_by IS NULL` 활성 시드 16개(3워크스페이스). 신규는 마이그130 clean-slate로 미복제. 기존은 **컴피 라이브 검증 후 `is_active=false` 소프트삭제**(대표 결정). 되돌림=is_active 토글.
+- **⚠️ 상태**: 마이그 127~130 프로덕션 DB 적용됨 · 세션42 코드는 로컬 커밋(미푸시) — 배포 코드=`a274fab`. 컴피 라이브·HR 저장·잔여 표시 = 대표 dogfood 미검증(배포 후).
+
 ## 🆕 세션41 /code-review 보류분 (2026-07-31, by-design/cleanup)
 - **I25. 계산 슬롯 값→0 시 이번 달 장부 기록 soft-delete(Undo 없음)**: "계산값=결과값" 모델상 계산값 0=이번 달 금액 0이라 자동 휴지통 처리(recordEntry와 달리 undo push 없음). 수동 tax/memo 기록이 있으면 손실 — 휴지통에서만 복구. 모델 근본이라 by-design 수용(LOW·엣지).
 - **I26. 날짜 헬퍼 중복(cleanup)**: ProjectTimeline/TaskTimeline/WorkOverview/AttendanceAdmin이 d0/fmt/shiftDate/addDays/todayStr를 각자 재구현 — `@/lib/calendar`(toDateInputValue·isSameDay 등)로 통합 후보. 동작 정상, 유지보수 부채(LOW).

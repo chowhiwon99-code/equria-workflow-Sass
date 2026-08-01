@@ -5,6 +5,27 @@
 
 ---
 
+## 2026-08-01 · 세션42 — 회사별 HR(근태) 설정 + 범용 비서 '컴피' (플랜 승인·마이그128~130·로컬 커밋 미푸시)
+
+**무엇/왜:** 대표 지시 — "기본 에이전트를 사이드바 기능 제어형으로 싹 교체 / 근태 에이전트가 각 인원 연차·반차 잔여 답변(→회사별 HR 기준 설정 선행) / 워크스페이스를 다 아는 개인 전용 범용 에이전트(이름 추천)". 플랜모드(Explore 3+대표 결정 4)로 계획 승인(`~/.claude/plans/memoized-sprouting-cascade.md`). **대표 결정**: 범용 비서 1개·이름 **컴피(Compi)**·근태·HR 먼저·HR 범위 4종. **탐색 핵심**: 에이전트는 외부 MCP 도구만 호출(앱 데이터 네이티브 도구 전무)·연차 잔여/부여/입사일 개념 DB에 전무 → 신설.
+
+**트랙1 — 회사별 HR + 근태 잔여(각 tsc0·lint29/0·build0·main-first 커밋):**
+1. **마이그128(`hr_settings`)** — workspace_id PK+jsonb(leave_policy/work_policy/holidays·읽기=멤버·쓰기=오너 RLS `auth_is_workspace_owner`) + `profiles.hire_date` + `attendance_records.status`/`leave_requests.leave_type`에 '월차' additive. begin/rollback 시뮬(기존데이터 위반0)·advisors 신규 ERROR 0.
+2. **마이그129 RPC + `lib/hr.ts`** — `set_member_hire_date`(owner_can_set_role)·`attendance_balances`(can_view_attendance 게이트·인원별 기준연도창+연차/반차/월차 used). granted/remaining 법정 산식은 `lib/hr.ts` 순수함수(근로기준법 기본값·resolve* 병합). 실호출 검증: 오너=6명 집계(실근태 반영)·비오너=0행.
+3. **HR 설정 UI** — 오너 전용 `HrSettingsCard`(휴가기준·근무시간·휴무일, `SettingsView` 삽입) + 구성원 '입사일' date 칸(`MemberInfoRow`+`set_member_hire_date`). `/api/hr-settings` 라우트는 불필요(RLS 오너 게이팅·클라 upsert)로 단순화.
+4. **AttendanceAdmin 잔여** — `attendance_balances`+`hr_settings`→`lib/hr` 산식으로 인원별 연차 잔여 표시(상세 '잔여 N/부여 M·월차 K', 목록행 '연차 잔여 N'). '월차'를 BAR_STYLE·ABSENT_SPAN·REASON_STATUSES·STATUS_BADGE 반영.
+
+**트랙2 — 범용 비서 컴피:**
+5. **`workspaceContext.ts`**(featuresOverview·buildWorkspaceSnapshot·kstDate) + **`agentTools.ts`**(네이티브 도구 4종: get_attendance_balances·list_projects·list_calendar_events·list_my_tasks — 전부 RLS·활성 워크스페이스 스코프).
+6. **assistant 라우트 → 컴피 승격** — 페르소나 + 기능 레지스트리 + 현황 스냅샷 주입 + 도구 병합(streamText tools·stepCountIs5) + 게스트 403 fail-closed. "누가 연차 며칠 남았어" → 도구로 근태 RPC 조회해 정확 응답.
+7. **컴피 브랜딩**(DashboardAssistant 인사말·클릭 예시 칩·플레이스홀더).
+
+**옛 8종:** 신규 워크스페이스 clean-slate — **마이그130** `clone_seed_agents` no-op(옛 시드 복제 중단, 컴피가 대체). **기존 워크스페이스 활성 시드 16개(3워크스페이스)는 유지** — 대표 결정 "컴피 검증 후 숨기기"(별도 처리·is_active 토글로 되돌림 쉬움).
+
+**예상이슈 체크:** ⚠️ **상태 주의**: 마이그 127~130은 **프로덕션 DB 적용됨**, 코드는 **전부 로컬 커밋(미푸시)** — 배포 코드는 여전히 `a274fab`. 적용 마이그는 전부 additive라 배포 코드 무영향(hr_settings/hire_date/월차/RPC 미참조). 단 130(clone no-op)은 라이브 신규 워크스페이스 생성 시 시드 없음 — 가입 게이팅 상태라 실영향 미미. **컴피 라이브 도구호출 스트리밍·HR 설정 저장·잔여 표시 = 대표 dogfood 미검증(배포 후).** 후속(known-issues): 이월 잔여 반영·본인 잔여 셀프조회·재무/회의 도구·task-suggestions↔workspaceContext 통합·옛 8종 숨김.
+
+---
+
 ## 2026-08-01 · 세션42 — 후속 정리(기술부채): app-ambient 중복 제거 + 죽은 컬럼 drop (로컬 커밋 `76b70c9`·`4d6a6c1`)
 
 **무엇/왜:** 세션41 개편 소개서 PDF 산출(`~/Desktop/complow/Complow_세션41_업데이트_소개서.pdf`) 후, 대표 선택으로 **후속 정리(기술부채)** 착수. HANDOFF 세션41 다음액션 #3 중 안전·고가치 항목만 잘게 처리. 각 변경 전 safe-changes(추가>수정>삭제·파괴는 검증 후) 준수.
