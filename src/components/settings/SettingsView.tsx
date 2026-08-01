@@ -16,6 +16,7 @@ import { Loading, ErrorState } from "@/components/shared/States"
 import { formatUsd } from "@/lib/pricing"
 import { McpCredentialsCard } from "./McpCredentialsCard"
 import { InviteLinksCard } from "./InviteLinksCard"
+import { HrSettingsCard } from "./HrSettingsCard"
 
 const THEMES = [
   { value: "light", label: "라이트" },
@@ -144,7 +145,7 @@ export function SettingsView() {
   const [position, setPosition] = useState("")
   // 대표(오너) 전용 — 구성원 직급 일괄 관리
   const [isOwner, setIsOwner] = useState(false)
-  const [memberList, setMemberList] = useState<{ id: string; name: string; department: string | null; position: string | null }[]>([])
+  const [memberList, setMemberList] = useState<{ id: string; name: string; department: string | null; position: string | null; hire_date: string | null }[]>([])
   // 대표(오너) 전용 — 구성원별 AI 사용량(호출·토큰·비용). 내용은 없고 사용량 메타만(RPC가 오너 게이팅).
   const [usage, setUsage] = useState<
     { user_id: string; name: string; calls: number; tokens_input: number; tokens_output: number; cost_usd: number; month_cost_usd: number }[] | null
@@ -203,8 +204,8 @@ export function SettingsView() {
       const owner = !!ws?.owner_id && ws.owner_id === meId
       setIsOwner(owner)
       if (owner) {
-        const { data: mem } = await supabase.from("profiles").select("id, name, department, position").order("name")
-        setMemberList((mem as { id: string; name: string; department: string | null; position: string | null }[]) ?? [])
+        const { data: mem } = await supabase.from("profiles").select("id, name, department, position, hire_date").order("name")
+        setMemberList((mem as { id: string; name: string; department: string | null; position: string | null; hire_date: string | null }[]) ?? [])
         const { data: usageRows } = await supabase.rpc("admin_usage_by_member")
         setUsage(usageRows ?? [])
       }
@@ -289,7 +290,7 @@ export function SettingsView() {
     toast.success("상태를 변경했어요.")
   }
 
-  const saveMemberInfo = async (id: string, dept: string, position: string) => {
+  const saveMemberInfo = async (id: string, dept: string, position: string, hireDate: string) => {
     const m = memberList.find((x) => x.id === id)
     setBusyId(id)
     try {
@@ -299,6 +300,11 @@ export function SettingsView() {
       }
       if (m && position !== (m.position ?? "")) {
         const { error } = await supabase.rpc("set_member_position", { target: id, new_position: position })
+        if (error) throw new Error(error.message)
+      }
+      if (m && hireDate !== (m.hire_date ?? "")) {
+        // p_hire_date는 date(널 허용=입사일 지움) — 생성 타입은 string이라 캐스트
+        const { error } = await supabase.rpc("set_member_hire_date", { target: id, p_hire_date: (hireDate || null) as unknown as string })
         if (error) throw new Error(error.message)
       }
       toast.success("저장했어요.")
@@ -468,10 +474,18 @@ export function SettingsView() {
           ) : (
             <div className="flex flex-col divide-y overflow-hidden rounded-xl border">
               {memberList.map((m) => (
-                <MemberInfoRow key={m.id} member={m} isMe={m.id === meId} busy={busyId === m.id} onSave={(dept, pos) => saveMemberInfo(m.id, dept, pos)} onDelete={() => deleteMember(m.id)} />
+                <MemberInfoRow key={m.id} member={m} isMe={m.id === meId} busy={busyId === m.id} onSave={(dept, pos, hire) => saveMemberInfo(m.id, dept, pos, hire)} onDelete={() => deleteMember(m.id)} />
               ))}
             </div>
           )}
+        </Card>
+      )}
+
+      {/* 대표: 회사 HR 기준(휴가·근무시간·휴무일) — 근태 잔여 계산 근거 */}
+      {isOwner && (
+        <Card>
+          <SectionTitle title="인사(HR) 설정" desc="회사별 연차·반차·월차 기준, 근무시간, 휴무일을 정해요. 근태의 연차·반차 잔여가 이 기준으로 계산돼요." />
+          <HrSettingsCard />
         </Card>
       )}
 
@@ -632,16 +646,18 @@ function MemberInfoRow({
   onSave,
   onDelete,
 }: {
-  member: { id: string; name: string; department: string | null; position: string | null }
+  member: { id: string; name: string; department: string | null; position: string | null; hire_date: string | null }
   isMe: boolean
   busy: boolean
-  onSave: (dept: string, position: string) => void
+  onSave: (dept: string, position: string, hireDate: string) => void
   onDelete: () => void
 }) {
   const [dept, setDept] = useState(member.department ?? "")
   const [pos, setPos] = useState(member.position ?? "")
+  const [hire, setHire] = useState(member.hire_date ?? "")
   const [confirming, setConfirming] = useState(false)
-  const dirty = dept.trim() !== (member.department ?? "") || pos.trim() !== (member.position ?? "")
+  const dirty =
+    dept.trim() !== (member.department ?? "") || pos.trim() !== (member.position ?? "") || hire !== (member.hire_date ?? "")
   return (
     <div className="flex flex-wrap items-center gap-2 px-3.5 py-2.5">
       <span className="min-w-0 text-sm font-medium">
@@ -651,10 +667,18 @@ function MemberInfoRow({
       <form
         onSubmit={(e) => {
           e.preventDefault()
-          onSave(dept.trim(), pos.trim())
+          onSave(dept.trim(), pos.trim(), hire)
         }}
         className="ml-auto flex flex-wrap items-center gap-1.5"
       >
+        <input
+          type="date"
+          value={hire}
+          onChange={(e) => setHire(e.target.value)}
+          title="입사일"
+          aria-label={`${member.name} 입사일`}
+          className="h-8 w-36 rounded-lg border bg-background px-2.5 text-xs outline-none focus:ring-2 focus:ring-ring [color-scheme:light] dark:[color-scheme:dark]"
+        />
         <input
           value={dept}
           onChange={(e) => setDept(e.target.value)}
