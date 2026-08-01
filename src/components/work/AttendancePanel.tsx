@@ -29,6 +29,7 @@ export const STATUS_BADGE: Record<string, string> = {
   출장: "bg-violet-100 text-violet-700",
   반차: "bg-slate-100 text-slate-700",
   연차: "bg-slate-100 text-slate-700",
+  월차: "bg-teal-100 text-teal-700",
   결근: "bg-red-100 text-red-700",
 }
 

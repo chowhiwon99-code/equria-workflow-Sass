@@ -14,6 +14,7 @@ import { DateInput } from "@/components/shared/DateInput"
 import { MonthStepper, currentYM, monthRange, type YM } from "@/components/shared/MonthStepper"
 import { Loading } from "@/components/shared/States"
 import { mustOk } from "@/lib/supabase/mustOk"
+import { resolveLeavePolicy, computeBalance, type AttendanceBalanceRow, type LeaveBalance } from "@/lib/hr"
 import { STATUS_BADGE, fmtTime, fmtDate, todayStr, workDuration } from "./AttendancePanel"
 
 type Member = { id: string; name: string; department: string | null; position: string | null }
@@ -43,11 +44,12 @@ const BAR_STYLE: Record<string, string> = {
   출장: "border-indigo-300/60 bg-indigo-500/15 text-indigo-700",
   반차: "border-violet-300/60 bg-violet-500/15 text-violet-700",
   연차: "border-purple-300/60 bg-purple-500/15 text-purple-700",
+  월차: "border-teal-300/60 bg-teal-500/15 text-teal-700",
   결근: "border-border bg-muted text-muted-foreground",
 }
-/** 부재형(출퇴근 없이 사유만) 기본 표시 구간 — 연차=종일, 반차=오전 반 */
-const ABSENT_SPAN: Record<string, [number, number]> = { 연차: [9, 18], 결근: [9, 18], 반차: [9, 13.5] }
-const REASON_STATUSES = ["재택", "외근", "출장", "반차", "연차", "결근"] as const
+/** 부재형(출퇴근 없이 사유만) 기본 표시 구간 — 연차·월차=종일, 반차=오전 반 */
+const ABSENT_SPAN: Record<string, [number, number]> = { 연차: [9, 18], 월차: [9, 18], 결근: [9, 18], 반차: [9, 13.5] }
+const REASON_STATUSES = ["재택", "외근", "출장", "반차", "연차", "월차", "결근"] as const
 
 function hourOf(iso: string): number {
   const d = new Date(iso)
@@ -90,6 +92,7 @@ export function AttendanceAdmin() {
   const [recs, setRecs] = useState<Rec[]>([]) // 선택 월 전체 멤버 기록(월별 탭)
   const [dayRecs, setDayRecs] = useState<Rec[]>([]) // 선택 일 전체 멤버 기록(일별 그래프)
   const [viewers, setViewers] = useState<Set<string>>(new Set())
+  const [balances, setBalances] = useState<Map<string, LeaveBalance>>(new Map()) // user_id → 연차 잔여(오너/위임자만 로드됨)
   const [todayRecs, setTodayRecs] = useState<Rec[]>([]) // 오늘 기록 — 월별 뷰 배지용(일별 그래프 날짜와 무관, 리뷰 A3)
   const [view, setView] = useState<"day" | "month">("day")
   const [day, setDay] = useState(todayStr())
@@ -103,13 +106,16 @@ export function AttendanceAdmin() {
 
   const load = useCallback(async () => {
     const { start, end } = monthRange(ym)
-    const [{ data: ws }, { data: profs }, { data: monthRows }, { data: dRows }, { data: vw }, { data: tdRows }] = await Promise.all([
+    const [{ data: ws }, { data: profs }, { data: monthRows }, { data: dRows }, { data: vw }, { data: tdRows }, { data: balRows }, { data: hrRow }] = await Promise.all([
       supabase.from("workspaces").select("owner_id").limit(1).maybeSingle(),
       supabase.from("profiles").select("id, name, department, position").order("name"),
       supabase.from("attendance_records").select(COLS).gte("work_date", start).lt("work_date", end).order("work_date", { ascending: false }),
       supabase.from("attendance_records").select(COLS).eq("work_date", day),
       supabase.from("attendance_viewers").select("viewer_user_id"),
       supabase.from("attendance_records").select(COLS).eq("work_date", todayStr()),
+      // 연차 잔여 — RPC가 can_view_attendance로 게이팅(비권한자는 빈 결과)
+      wsId ? supabase.rpc("attendance_balances", { p_workspace: wsId }) : Promise.resolve({ data: [] }),
+      wsId ? supabase.from("hr_settings").select("leave_policy").eq("workspace_id", wsId).maybeSingle() : Promise.resolve({ data: null }),
     ])
     setOwnerId(ws?.owner_id ?? null)
     setMembers((profs as Member[]) ?? [])
@@ -117,8 +123,16 @@ export function AttendanceAdmin() {
     setDayRecs((dRows as Rec[]) ?? [])
     setViewers(new Set((vw ?? []).map((v) => v.viewer_user_id)))
     setTodayRecs((tdRows as Rec[]) ?? [])
+    // 정책(hr_settings) + RPC 집계 → 인원별 잔여(lib/hr 산식)
+    const policy = resolveLeavePolicy((hrRow as { leave_policy: unknown } | null)?.leave_policy)
+    const asOf = new Date()
+    const bmap = new Map<string, LeaveBalance>()
+    for (const row of ((balRows as unknown as AttendanceBalanceRow[] | null) ?? [])) {
+      bmap.set(row.user_id, computeBalance(policy, row, asOf))
+    }
+    setBalances(bmap)
     setLoading(false)
-  }, [supabase, ym, day])
+  }, [supabase, ym, day, wsId])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -181,6 +195,7 @@ export function AttendanceAdmin() {
   const selectedMember = members.find((m) => m.id === selected) ?? null
   const personRecs = selected ? recs.filter((r) => r.user_id === selected) : []
   const sum = summarize(personRecs)
+  const selBal = selected ? balances.get(selected) : undefined
   const axisW = (AXIS_END - AXIS_START) * PPH
   const isToday = day === todayStr()
 
@@ -367,6 +382,7 @@ export function AttendanceAdmin() {
               ) : (
                 filtered.map((m) => {
                   const r = todayByUser.get(m.id) // 월별 뷰 배지 = 오늘 상태(리뷰 A3 — 일별 그래프 날짜와 무관)
+                  const b = balances.get(m.id)
                   const active = m.id === selected
                   return (
                     <button
@@ -385,7 +401,11 @@ export function AttendanceAdmin() {
                           {m.name}
                           {m.id === meId && <span className="rounded bg-muted px-1 text-[10px] font-normal text-muted-foreground">나</span>}
                         </span>
-                        {m.position && <span className="truncate text-[11px] text-muted-foreground">{m.position}</span>}
+                        {b ? (
+                          <span className="truncate text-[11px] text-muted-foreground">연차 잔여 {b.remaining}일{m.position ? ` · ${m.position}` : ""}</span>
+                        ) : (
+                          m.position && <span className="truncate text-[11px] text-muted-foreground">{m.position}</span>
+                        )}
                       </div>
                       <span className={cn("shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium", STATUS_BADGE[r?.status ?? ""] ?? "bg-muted text-muted-foreground")}>
                         {r?.status ?? "미기록"}
@@ -414,6 +434,14 @@ export function AttendanceAdmin() {
                 </div>
 
                 <div className="flex flex-wrap gap-1.5">
+                  {selBal && (
+                    <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[11px] font-semibold text-purple-700 dark:bg-purple-500/20 dark:text-purple-300">
+                      잔여 연차 {selBal.remaining}일 <span className="font-normal opacity-70">/ 부여 {selBal.granted}일</span>
+                    </span>
+                  )}
+                  {selBal && selBal.used_monthly > 0 && (
+                    <span className="rounded-full bg-teal-100 px-2 py-0.5 text-[11px] font-medium text-teal-700 dark:bg-teal-500/20 dark:text-teal-300">월차 {selBal.used_monthly}회</span>
+                  )}
                   {Object.entries(sum.byStatus).map(([s, n]) => (
                     <span key={s} className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", STATUS_BADGE[s] ?? "bg-muted text-muted-foreground")}>
                       {s} {n}
