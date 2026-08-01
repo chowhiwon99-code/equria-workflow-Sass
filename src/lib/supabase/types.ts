@@ -3308,7 +3308,6 @@ export type Database = {
       workspaces: {
         Row: {
           created_at: string
-          finance_snapshot_open: boolean
           id: string
           monthly_budget_usd: number | null
           name: string
@@ -3318,7 +3317,6 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          finance_snapshot_open?: boolean
           id?: string
           monthly_budget_usd?: number | null
           name: string
@@ -3328,7 +3326,6 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          finance_snapshot_open?: boolean
           id?: string
           monthly_budget_usd?: number | null
           name?: string
