@@ -195,8 +195,22 @@ export function DashboardAssistant() {
             <div className="grid size-9 place-items-center rounded-xl bg-primary/8 text-primary shadow-[var(--shadow-sm)]">
               <Sparkles className="size-4" />
             </div>
-            <p className="mt-2.5 break-keep text-sm font-semibold tracking-tight">무엇을 도와드릴까요?</p>
-            <p className="mt-1 max-w-56 break-keep text-xs leading-relaxed text-muted-foreground">Complow 어시스턴트에게 무엇이든 물어보세요.</p>
+            <p className="mt-2.5 break-keep text-sm font-semibold tracking-tight">안녕하세요, 컴피예요</p>
+            <p className="mt-1 max-w-60 break-keep text-xs leading-relaxed text-muted-foreground">
+              워크스페이스를 다 아는 개인 비서예요. 근태·프로젝트·일정 무엇이든 물어보세요.
+            </p>
+            <div className="mt-3 flex flex-wrap justify-center gap-1.5">
+              {["이번 달 연차 누가 몇 개 남았어?", "진행 중인 프로젝트 알려줘", "오늘 일정 뭐 있어?"].map((ex) => (
+                <button
+                  key={ex}
+                  type="button"
+                  onClick={() => setInput(ex)}
+                  className="rounded-full border px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  {ex}
+                </button>
+              ))}
+            </div>
           </div>
         ) : (
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-5 [scrollbar-gutter:stable] [scrollbar-width:thin]">
@@ -296,7 +310,7 @@ export function DashboardAssistant() {
                     submit()
                   }
                 }}
-                placeholder="무엇이든 물어보세요…"
+                placeholder="컴피에게 물어보세요…"
                 rows={1}
                 className="max-h-40 flex-1 resize-none bg-transparent py-1 text-sm outline-none placeholder:text-muted-foreground"
               />
