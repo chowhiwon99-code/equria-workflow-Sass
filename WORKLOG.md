@@ -5,6 +5,20 @@
 
 ---
 
+## 2026-08-01 · 세션42 — 후속 정리(기술부채): app-ambient 중복 제거 + 죽은 컬럼 drop (로컬 커밋 `76b70c9`·`4d6a6c1`)
+
+**무엇/왜:** 세션41 개편 소개서 PDF 산출(`~/Desktop/complow/Complow_세션41_업데이트_소개서.pdf`) 후, 대표 선택으로 **후속 정리(기술부채)** 착수. HANDOFF 세션41 다음액션 #3 중 안전·고가치 항목만 잘게 처리. 각 변경 전 safe-changes(추가>수정>삭제·파괴는 검증 후) 준수.
+
+**쪼갠 내용:**
+1. **app-ambient 중복 배경 제거(`76b70c9`)** — 세션41 랜딩 통일로 `.app-ambient`가 flat `var(--background)`만 칠하게 평탄화됐고 `body`가 이미 동일 배경을 칠함 → `(app)/layout.tsx`의 `fixed -z-10` 마운트 div + `globals.css` `.app-ambient`/`.dark .app-ambient` 블록 완전 중복. 둘 다 제거(참조 grep 0 확인·레이아웃/픽셀 무변화).
+2. **죽은 컬럼 drop(`4d6a6c1`·마이그127, I22)** — `workspaces.finance_snapshot_open`(마이그121)은 세션41 대시보드 개편(6349e84)에서 FinanceSnapshot 기능 제거로 미사용. 검증: 코드 참조 0(생성 types.ts 3줄 제외)·RLS 정책/함수/뷰/제약 의존성 전부 0(MCP execute_sql)·`begin; drop; rollback` 시뮬 통과 → `apply_migration`로 원격 drop + `127_drop_finance_snapshot_open.sql` 파일화(SSOT) + types.ts Row/Insert/Update 3줄 제거. 롤백=마이그 주석의 add column.
+
+**보류(위험/가치 판단):** ① **Surface glass variant** — `.glass`가 이제 솔리드로 렌더되지만 `AnnouncementsBoard`가 아직 `variant="glass"` 1곳 사용 중 → 솔리드 치환이 시각 동일한지 확인 전엔 보류(기존 디자인 유지). ② **랜딩 리터럴 토큰화** — 랜딩은 의도적 리터럴 하드코딩(토큰 변동 격리)이라 재커플링 가치 낮고 공개 마케팅 페이지 시각 변동 위험. ③ **날짜헬퍼 통합(I26)** — 지역 헬퍼는 문자열(YYYY-MM-DD) 기반, `lib/calendar`는 Date 기반이라 통합 시 타임존 off-by-one 위험(드래그 로직) → 별도 정밀 작업으로 이월.
+
+**예상이슈 체크:** tsc0·lint29/0(신규0·베이스라인 유지)·build0. 마이그127 advisors 신규 ERROR 0(WARN 68·INFO 1 전부 기존 I9 범주). **⚠️ 상태 주의**: 코드 2커밋은 **로컬(미푸시)**, 마이그127은 **프로덕션 DB 적용됨** — 배포 코드(`a274fab`)가 해당 컬럼을 미참조하므로 라이브 무영향. 배포(푸시)는 대표 확인 후.
+
+---
+
 ## 2026-08-01 · 세션41 후속 — 회의노트 토글(접기) 블록 + 메일 상태 확인 (`a274fab`)
 
 **무엇/왜:** 대표 지시 — "회의노트에 노션식 슬래시 기능 추가·부실한 기능 파악/수정·**안되는 건 하지마셈 확실하게**" + "메일은?". ① 회의노트 슬래시 메뉴가 노션 대비 **토글(접기) 블록**만 비어 있어 추가(제목 옆 셰브론으로 펼침/접힘·본문에 임의 블록). Callout/FileBlock와 동일한 커스텀 노드 패턴 — `summary`·`open`을 `data-*`로 직렬화해 `getHTML()` 왕복 안전, 읽기 전용(editable=false)에서도 같은 확장으로 렌더되어 로컬 상태로 접기/펼치기 동작. ② **메일**은 이미 완성(Gmail OAuth·3분할·읽기/별표/보관/휴지통/검색·작성/답장+AI 도우미·첨부·DOMPurify) — 부실 아님. 초대는 대표 확정대로 **링크 방식 유지**(메일 발송 안 함, 별개 기능)로 정리 보고.

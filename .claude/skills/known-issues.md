@@ -60,7 +60,7 @@ description: EQURIA Workspace의 알려진 이슈·기술부채 백로그. 다�
 - **I19. 손익 계산 슬롯 표시(세전) vs 총계(부가세 포함) 불일치**: CashGrid 금액 열=계산값(amount), tfoot·pool=total_amount 합산 — VAT 넣은 슬롯은 행 100,000/총계 110,000. 표기 기준 통일 필요(LOW).
 - **I20. 매출·비용 슬롯→보유금 전환 시 이번 달 자동 기록 유령 잔존**: kind=reserve면 sync 스킵이라 기존 귀속 기록이 미귀속 잔여로 pool에 이중 표현(LOW·엣지).
 - **I21. AI 라우트 rate limit 부재 + 예산 기본 무제한**: monthly_budget_usd null=무제한, checkBudget은 커밋된 합계만(병렬 통과 가능). 완화=배포 후 예산 설정(설정→AI 비용 예산). B3 크레딧 시스템에서 정식 해결 예정(MED·수용).
-- **I22. finance_snapshot_open(마이그121) 죽은 컬럼**: 기능 제거(6349e84)로 미사용 — 다음 정리 커밋에서 drop 검토. workspaces UPDATE 정책 없어 위험 0.
+- ~~**I22. finance_snapshot_open(마이그121) 죽은 컬럼**~~ → ✅ **해소(2026-08-01·마이그127 `drop_finance_snapshot_open`)**: 의존성 0(정책·함수·뷰·제약)·코드 참조 0(생성 types.ts 제외) 검증 + begin/rollback 시뮬 통과 후 drop. 원격 적용+파일화·advisors 신규 ERROR 0. 롤백=마이그127 주석의 add column. **동반 정리**: `.app-ambient` 중복 배경(마운트 div + CSS)도 제거 — 세션41 평탄화로 `body`와 동일 `var(--background)`만 칠하던 무영향 잔재(픽셀 무변화). ⚠️ 코드 2커밋은 **로컬(미푸시)**, 마이그127은 **프로덕션 DB 적용됨**(컬럼이 배포 코드에서 미사용이라 라이브 무영향).
 - **I23. AttendanceAdmin workspaces.select limit(1) 비결정**: 멀티 멤버십 유저의 isOwner UI 오판 가능(권한은 RLS가 강제 — 표시 문제만, LOW).
 - **I24. 어시스턴트/사이드바 리사이즈 핸들 4px 침범**: thin 스크롤바 위 일부를 핸들이 덮음(히트 확률 낮음, LOW).
 
