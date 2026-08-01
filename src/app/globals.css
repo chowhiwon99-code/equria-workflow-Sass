@@ -232,17 +232,6 @@ body {
 }
 
 /*
- * 앱 앰비언트 배경 — 세션41 랜딩 통일로 평탄화(그라데이션 제거 → flat --background).
- * 마운트 div((app)/layout.tsx fixed -z-10)는 유지 — 안정 확인 후 별도 정리 커밋에서 클래스와 함께 제거 예정.
- */
-.app-ambient {
-  background: var(--background);
-}
-.dark .app-ambient {
-  background: var(--background);
-}
-
-/*
  * shadcn data-slot 글로벌 리스타일 — components/ui/* 무수정으로 토스/애플 플로팅을 입힌다.
  * Card는 흰 카드 + 은은한 그림자(회색 페이지 위에 뜸), 플로팅 메뉴는 큰 그림자.
  * 라운드는 --radius 캐스케이드로 자동. 이 블록 삭제 시 즉시 원복.
