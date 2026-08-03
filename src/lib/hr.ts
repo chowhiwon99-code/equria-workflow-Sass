@@ -138,8 +138,10 @@ export function computeGrantedLeave(policy: LeavePolicy, hireDate: string | null
   const tb = policy.tenure_bonus
   let granted = policy.annual_base
   if (tb.enabled && years >= tb.start_year) {
-    const bonus = Math.floor((years - 1) / tb.every_years) * tb.plus_days
-    granted = Math.min(policy.annual_base + bonus, tb.max_days)
+    // start_year부터 가산 시작(그 해 +plus_days), 이후 every_years마다 추가. 상한 max_days.
+    // 법정 기본(start 3·every 2·plus 1): 3년 16 · 5년 17 … 25 상한. start_year≠3도 정확.
+    const steps = Math.floor((years - tb.start_year) / tb.every_years) + 1
+    granted = Math.min(policy.annual_base + steps * tb.plus_days, tb.max_days)
   }
   return granted
 }

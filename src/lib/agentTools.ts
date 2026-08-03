@@ -14,14 +14,15 @@ import { kstDate } from "@/lib/workspaceContext"
 
 type DB = SupabaseClient<Database>
 
-export function buildCompiTools({ supabase, userId, workspaceId }: { supabase: DB; userId: string; workspaceId: string | null }): ToolSet {
+// workspaceId는 활성 워크스페이스(라우트가 !workspaceId면 403이라 항상 존재). RLS는 개인전용 테이블(personal_tasks)·
+// notifications를 멤버십 전체로 열어주므로, 회사 혼입(이큐리아/이큐리아2) 방지를 위해 모든 쿼리에 명시 스코프한다.
+export function buildCompiTools({ supabase, userId, workspaceId }: { supabase: DB; userId: string; workspaceId: string }): ToolSet {
   return {
     get_attendance_balances: tool({
       description:
         "팀 구성원별 연차/반차 잔여를 조회한다. '누가 연차 며칠 남았어', '반차 남은 개수' 같은 질문에 사용. 오너 또는 근태 열람 위임자만 결과가 있고, 권한이 없으면 빈 배열을 반환한다.",
       inputSchema: z.object({}),
       execute: async () => {
-        if (!workspaceId) return { members: [], note: "워크스페이스를 찾을 수 없어요." }
         const [{ data: balRows }, { data: hrRow }] = await Promise.all([
           supabase.rpc("attendance_balances", { p_workspace: workspaceId }),
           supabase.from("hr_settings").select("leave_policy").eq("workspace_id", workspaceId).maybeSingle(),
@@ -51,7 +52,7 @@ export function buildCompiTools({ supabase, userId, workspaceId }: { supabase: D
         status: z.enum(["planned", "in_progress", "on_hold", "done", "all"]).optional().describe("기본 = 진행/예정(planned·in_progress·on_hold)"),
       }),
       execute: async ({ status }) => {
-        let q = supabase.from("projects").select("name, status, start_date, due_date, importance").is("deleted_at", null)
+        let q = supabase.from("projects").select("name, status, start_date, due_date, importance").eq("workspace_id", workspaceId).is("deleted_at", null)
         q = status && status !== "all" ? q.eq("status", status) : q.in("status", ["planned", "in_progress", "on_hold"])
         const { data } = await q.order("due_date", { ascending: true, nullsFirst: false }).limit(40)
         return {
@@ -76,6 +77,7 @@ export function buildCompiTools({ supabase, userId, workspaceId }: { supabase: D
         const { data } = await supabase
           .from("calendar_events")
           .select("title, start_time")
+          .eq("workspace_id", workspaceId)
           .gte("start_time", `${from}T00:00:00+09:00`)
           .lte("start_time", `${to}T23:59:59+09:00`)
           .order("start_time", { ascending: true })
@@ -92,6 +94,7 @@ export function buildCompiTools({ supabase, userId, workspaceId }: { supabase: D
           .from("personal_tasks")
           .select("title, due_date")
           .eq("user_id", userId)
+          .eq("workspace_id", workspaceId)
           .eq("done", false)
           .order("due_date", { ascending: true, nullsFirst: false })
           .limit(40)

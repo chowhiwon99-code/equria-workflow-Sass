@@ -80,9 +80,15 @@ export async function POST(req: Request) {
   const startedAt = Date.now()
   const modelMessages = await convertToModelMessages(messages.slice(-HISTORY_WINDOW))
 
-  // 워크스페이스 인지 = 기능 레지스트리 + 현황 스냅샷(실패해도 대화는 진행) + 네이티브 도구.
-  const snapshot = await buildWorkspaceSnapshot(supabase, user.id).catch(() => "(현황 조회 실패)")
-  const system = `${COMPI_BASE}\n\n## 워크스페이스 기능\n${featuresOverview()}\n\n## 현재 현황(스냅샷)\n${snapshot}${OUTPUT_STYLE_RULE}`
+  // 워크스페이스 인지 = 기능 레지스트리(정적) + 현황 스냅샷 + 네이티브 도구.
+  // 스냅샷은 대화 시작(첫 턴)에만 주입 — 매 턴 4쿼리+동적 프롬프트는 지연·프롬프트캐시 무효(리뷰 P6).
+  // 이후 턴은 필요 시 도구로 최신값을 조회한다.
+  const isFirstTurn = messages.length <= 1
+  const snapshot = isFirstTurn ? await buildWorkspaceSnapshot(supabase, user.id, workspaceId).catch(() => "") : ""
+  const system =
+    `${COMPI_BASE}\n\n## 워크스페이스 기능\n${featuresOverview()}` +
+    (snapshot ? `\n\n## 현재 현황(스냅샷)\n${snapshot}` : "") +
+    OUTPUT_STYLE_RULE
   const tools = buildCompiTools({ supabase, userId: user.id, workspaceId })
 
   const result = streamText({
@@ -92,11 +98,11 @@ export async function POST(req: Request) {
     tools,
     stopWhen: stepCountIs(5), // 도구 조회 후 답변까지 다단계 허용
     maxOutputTokens: 3072,
-    async onFinish({ text, usage }) {
-      // 비용 추적: 어시스턴트도 Claude 호출 → agent_usage 기록. await로 묶어 전송 보장(M1: 기존 void는 전송 안 됨).
-      const inT = usage.inputTokens ?? 0
-      const outT = usage.outputTokens ?? 0
-      await Promise.all([
+    async onFinish({ text, totalUsage }) {
+      // 비용 추적: 도구(다단계) 턴은 마지막 스텝 usage가 아니라 전체 합산 totalUsage로 기록 — 과소집계 방지(리뷰 D4).
+      const inT = totalUsage.inputTokens ?? 0
+      const outT = totalUsage.outputTokens ?? 0
+      const writes: PromiseLike<unknown>[] = [
         supabase.from("agent_usage").insert(
           withWorkspace(
             {
@@ -111,15 +117,20 @@ export async function POST(req: Request) {
             workspaceId,
           ),
         ),
-        // 이번 턴의 어시스턴트 답변만 저장(사용자 메시지는 위에서 선저장)
-        supabase.from("assistant_messages").insert(
-          withWorkspace({ conversation_id: convId, role: "assistant", content: text }, workspaceId),
-        ),
         supabase
           .from("assistant_conversations")
           .update({ updated_at: new Date().toISOString() })
           .eq("id", convId),
-      ])
+      ]
+      // 빈 답변(도구 스텝에서 상한 소진 등)은 저장 안 함 — 빈 말풍선 방지(리뷰 D7).
+      if (text.trim()) {
+        writes.push(
+          supabase.from("assistant_messages").insert(
+            withWorkspace({ conversation_id: convId, role: "assistant", content: text }, workspaceId),
+          ),
+        )
+      }
+      await Promise.all(writes)
     },
     async onError({ error }) {
       // 사용자 메시지는 이미 선저장됨. 실패 사용량 기록(관측성).

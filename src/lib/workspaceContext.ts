@@ -23,13 +23,18 @@ export function featuresOverview(): string {
   return items.map((f) => `- ${f.label} (${f.href}): ${f.description}`).join("\n")
 }
 
-/** 현재 워크스페이스 상태의 가벼운 스냅샷(전부 RLS 스코프·실패한 소스는 생략). */
-export async function buildWorkspaceSnapshot(supabase: DB, userId: string): Promise<string> {
+/**
+ * 현재 워크스페이스 상태의 가벼운 스냅샷. 모든 소스를 활성 워크스페이스로 명시 스코프한다 —
+ * personal_tasks/notifications는 개인전용 RLS라 멤버십 전체를 열어주므로(이큐리아/이큐리아2 혼입),
+ * projects/calendar도 방어적으로 workspace_id 명시(활성 회사만). 실패한 소스는 생략.
+ */
+export async function buildWorkspaceSnapshot(supabase: DB, userId: string, workspaceId: string): Promise<string> {
   const todayS = kstDate()
   const [projRes, evRes, taskRes, notiRes] = await Promise.all([
     supabase
       .from("projects")
       .select("name, status, due_date, importance")
+      .eq("workspace_id", workspaceId)
       .is("deleted_at", null)
       .in("status", ["planned", "in_progress", "on_hold"])
       .order("due_date", { ascending: true })
@@ -37,12 +42,13 @@ export async function buildWorkspaceSnapshot(supabase: DB, userId: string): Prom
     supabase
       .from("calendar_events")
       .select("title, start_time")
+      .eq("workspace_id", workspaceId)
       .gte("start_time", `${todayS}T00:00:00+09:00`)
       .lte("start_time", `${todayS}T23:59:59+09:00`)
       .order("start_time", { ascending: true })
       .limit(15),
-    supabase.from("personal_tasks").select("title, due_date").eq("user_id", userId).eq("done", false).order("due_date", { ascending: true, nullsFirst: false }).limit(15),
-    supabase.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("is_read", false),
+    supabase.from("personal_tasks").select("title, due_date").eq("user_id", userId).eq("workspace_id", workspaceId).eq("done", false).order("due_date", { ascending: true, nullsFirst: false }).limit(15),
+    supabase.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("workspace_id", workspaceId).eq("is_read", false),
   ])
 
   const lines: string[] = [`오늘: ${todayS} (KST)`]

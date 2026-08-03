@@ -22,6 +22,8 @@
 
 **옛 8종:** 신규 워크스페이스 clean-slate — **마이그130** `clone_seed_agents` no-op(옛 시드 복제 중단, 컴피가 대체). **기존 워크스페이스 활성 시드 16개(3워크스페이스)는 유지** — 대표 결정 "컴피 검증 후 숨기기"(별도 처리·is_active 토글로 되돌림 쉬움).
 
+**/code-review 후속 수정(2026-08-03, 7건 전부 실결함):** ① 컴피 도구 `list_projects`·`list_calendar_events`·`list_my_tasks`가 활성 워크스페이스 미스코프 → 명시 `.eq(workspace_id)`(개인전용 RLS라 이큐리아/이큐리아2 혼입·마이그126 회귀 방지) ② `buildWorkspaceSnapshot`도 4소스 전부 workspace_id 스코프+시그니처에 wsId 추가 ③ 컴피 라우트 onFinish `usage`→`totalUsage`(도구 다단계 토큰 과소집계) ④ 스냅샷을 첫 턴에만 주입(매 턴 4쿼리·프롬프트캐시 무효 완화) ⑤ 빈 답변 시 assistant_messages 미저장(빈 말풍선 방지) ⑥ `lib/hr` 근속 가산 산식이 start_year 무시(비법정 설정서 오산) → `floor((years-start_year)/every)+1`. 각 tsc0·lint29/0·build0.
+
 **예상이슈 체크:** ⚠️ **상태 주의**: 마이그 127~130은 **프로덕션 DB 적용됨**, 코드는 **전부 로컬 커밋(미푸시)** — 배포 코드는 여전히 `a274fab`. 적용 마이그는 전부 additive라 배포 코드 무영향(hr_settings/hire_date/월차/RPC 미참조). 단 130(clone no-op)은 라이브 신규 워크스페이스 생성 시 시드 없음 — 가입 게이팅 상태라 실영향 미미. **컴피 라이브 도구호출 스트리밍·HR 설정 저장·잔여 표시 = 대표 dogfood 미검증(배포 후).** 후속(known-issues): 이월 잔여 반영·본인 잔여 셀프조회·재무/회의 도구·task-suggestions↔workspaceContext 통합·옛 8종 숨김.
 
 ---
