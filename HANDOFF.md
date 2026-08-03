@@ -17,6 +17,7 @@
 - **근태 잔여**: `attendance_balances` RPC(마이그129·`can_view_attendance` 오너/위임자 게이트·실호출 검증 6명/비오너0)→ `AttendanceAdmin` 인원별 '연차 잔여 N/부여 M·월차 K' 표시.
 - **컴피(Compi)**: `api/assistant` 승격 — 워크스페이스 현황 스냅샷+`features.ts` 기능 레지스트리 주입 + 네이티브 도구(`lib/agentTools`: get_attendance_balances·list_projects·list_calendar_events·list_my_tasks, 전부 `getUserWorkspaceId`·RLS 스코프)+게스트403. "누가 연차 며칠 남았어"→도구로 근태 RPC 조회해 정확 응답. `DashboardAssistant` 브랜딩(인사말·예시 칩·플레이스홀더).
 - **옛 8종**: 신규 워크스페이스=clean-slate(마이그130 `clone_seed_agents` no-op — 컴피가 대체). 기존 활성 시드 16개(3워크스페이스)는 **컴피 검증 후 소프트삭제**(대표 결정·I30).
+- **후속(2026-08-03)**: ① **/code-review 7건 반영**(`a061bd3`) — 컴피 도구·스냅샷 활성 워크스페이스 명시 스코프(이큐리아/이큐리아2 혼입 차단·마이그126 회귀)·onFinish `usage`→`totalUsage`·스냅샷 첫 턴만·빈 답변 미저장·`lib/hr` 근속 가산 `start_year` 반영. ② **컴피 캐릭터/위젯 헤더는 대표 요청으로 되돌림(제외)** — reflog `ee18201`에 보존(복구 가능). 컴피 UI는 캐릭터 없는 직전 브랜딩 상태.
 
 ### 🔴 다음 액션
 1. **배포 결정**: `/deploy`로 세션42 로컬 커밋 푸시(main-first) → 대표가 라이브(complow.kr)에서 검증. (미배포 시 DB만 앞서 있음 — 무해하나 컴피/HR 화면 미노출.)
