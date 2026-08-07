@@ -17,6 +17,8 @@
 
 **라이브된 것:** 회사별 HR 설정(오너 카드·입사일)·근태 연차/월차 잔여 표시·범용 비서 컴피(스냅샷+네이티브 도구 4종)·신규 워크스페이스 clean-slate·app-ambient 제거·죽은컬럼 drop·/code-review 7건 수정.
 
+**후속 — Gmail MCP 프리뷰 차단 해제 검증(같은 날):** 대표가 "구글 메일이 안 온다"고 해 확인 → **승인 메일은 7/28 17:06에 이미 도착**(수신함이 `complow@complow.kr`이라 미확인·신청 당일 승인). 독촉 메일 초안까지 썼다가 불필요로 폐기. 진단 스크립트(scratchpad `probe_gmail_mcp.mjs`: .env.local→service_role로 `mcp_user_connections`/`mcp_oauth_clients` 조회→AES-256-GCM 복호화→refresh_token 갱신→Streamable HTTP JSON-RPC, 토큰 미출력)로 실호출 검증: initialize 200 → tools/list 13개 → **`list_drafts` tools/call 200·isError=false·실데이터**. 경계도 확인 — `search_threads`는 403이나 사유가 `insufficient authentication scopes`(스코프 부족)로, 7/28의 `caller does not have permission`(프리뷰 미등록)과 **다름** = 프로젝트 차단 해제 확정. 읽기 403은 CASA 회피로 의도한 설계. 잔여: 캘린더는 연결 행 자체가 없어 재연결 후 재검증 필요 · 검증은 대표 계정 1건 기준 · 판매는 GA 후(Pre-GA 약관).
+
 **예상이슈 체크:** DDL은 이번 배포에 신규 0(127~130은 이미 적용됨) → 앱-DB 동기 배포 리스크 없음. 마이그130 no-op은 이제 코드와 함께 라이브 — 신규 워크스페이스에 시드 에이전트 없이 컴피만 제공되는 게 의도대로인지 **첫 신규 가입 시 확인 필요**. 기존 워크스페이스 활성 시드 16개는 그대로(I30·컴피 검증 후 소프트삭제). **대표 dogfood 미검증**: HR 설정 저장·잔여 표시·컴피 도구호출 정확도(모바일/다크 포함).
 
 ---

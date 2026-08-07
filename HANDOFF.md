@@ -142,10 +142,12 @@
 - ⚠️ 구글 앱 게시 심사 통과 전엔 **콘솔 테스트 사용자 등록 계정만** 구글 인증 가능(심사 통과 시 전면 개방).
 - 도입 문의 기업 셋업(운영자): SQL Editor에서 `select admin_create_workspace('회사명','slug');` → 반환 토큰으로 `https://complow.kr/join/<토큰>` 전달(7일·1회·owner 승계). Runbook=마이그 115 주석.
 
-### 🔴 Gmail·캘린더 MCP = 구글 개발자 프리뷰 전용 (2026-07-28 오후 발견 — 대기 트랙)
-- **증상**: 에이전트 Gmail 도구 전부 403("The caller does not have permission"). 우리 쪽 전부 정상 검증(토큰 복호화→tokeninfo: gmail.compose 부여 ✅ · API 사용 설정 ✅ · 클라이언트 ✅ · 서버 직접 JSON-RPC 호출로 재현).
-- **원인**: gmailmcp/calendarmcp.googleapis.com은 **Google Workspace Developer Preview Program 전용(Pre-GA)** — 미등록 프로젝트는 도구 호출 거부. 연결·tools/list는 등록 없이도 성공해서 7/24 검증(디스커버리까지)이 통과했던 것. **교훈: 연동 검증 = "실제 도구 호출 1회 성공"까지.**
-- **✅ 프리뷰 신청 제출 완료(2026-07-28, `complow@complow.kr`+프로젝트 353073448998·Gmail/Calendar 선택)** — 처리 약 1주, 미응답 시 workspace-dpp-mod@google.com. 승인 오면: Workspace 계정으로 연결→서버 재검증(+개인 gmail 최종사용자 지원 실측)→**데모 영상 촬영→스코프 심사 제출**.
+### ✅ Gmail MCP 프리뷰 차단 해제 — 실호출 검증 완료 (2026-08-07 세션43)
+- **🟢 승인 확인**: 구글 프리뷰 승인 메일이 **2026-07-28 17:06**에 이미 도착해 있었음(`workspace-devrel-dpp-starter@google.com` → "Your Google Cloud Project(s) has been registered", 프로젝트 **353073448998**). **신청 당일 승인.** 수신함이 `complow@complow.kr`이라 10일간 미확인 상태였던 것 — 독촉 불필요.
+- **🟢 실호출 검증 통과(2026-08-07)**: 진단 스크립트로 refresh_token 갱신(7/28 저장분 유효·scope=gmail.compose) → initialize 200 → tools/list 13개 → **`list_drafts` tools/call = HTTP 200·isError=false·실데이터 반환**. HANDOFF 검증 기준("실제 도구 호출 1회 성공") 충족.
+- **🔑 결정적 구분 — 403 사유가 바뀜**: 7/28 `The caller does not have permission`(프리뷰 미등록=프로젝트 거부) → 지금 `Request had insufficient authentication scopes`(스코프 부족). 즉 **프로젝트 차단은 사라졌고**, 남은 403은 읽기 스코프 미보유(`search_threads`/`get_message` 등 — CASA 비용 회피로 의도적 제외)라 **설계대로**. 진단 스크립트=scratchpad `probe_gmail_mcp.mjs`(env→DB→복호화→갱신→JSON-RPC, 토큰 미출력).
+- **잔여**: ① **캘린더는 `mcp_user_connections`에 연결 행 자체가 없음** → 재연결 후 같은 방식 재검증 필요 ② 검증은 **대표 계정 1건** 기준 — 다른 사용자는 각자 연결(+Testing 모드라 콘솔 테스트 사용자 등록) ③ 개인 gmail 최종사용자 지원 실측 ④ 데모 영상 촬영→스코프 심사 제출.
+- **원인 기록(보존)**: gmailmcp/calendarmcp.googleapis.com은 **Developer Preview Program 전용(Pre-GA)** — 미등록 프로젝트는 도구 호출 거부. 연결·tools/list는 등록 없이도 성공해서 7/24 검증(디스커버리까지)이 통과했던 것. **교훈: 연동 검증 = "실제 도구 호출 1회 성공"까지.**
 - **약관 제약(로드맵)**: Pre-GA 기능은 **GA 전 고객 제공 금지** — Gmail/캘린더 에이전트 기능의 B2B 판매는 구글 GA 후. 사내 사용 OK. 개인 gmail 최종사용자 지원 여부=승인 후 실측 예정. 폴백=네이티브 Gmail 통합(자체 googleapis, 개인 계정 지원, 메일 탭 숨김 상태).
 - **오늘 배포된 관련 개선**(각 tsc0·lint29/0·build0): 위저드 MCP 팝업 제자리 연결(`d82409b`)·목적 카드 중복 제거(`e20bbb8`)·Gmail 작성전용 usageNote 주입(`18deb72`)·**연결 직후 자동 점검**(tokeninfo 스코프 검사, `c0f4749`).
 
