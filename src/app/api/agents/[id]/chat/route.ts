@@ -180,8 +180,10 @@ export async function POST(
   // 오래된 턴 압축 요약 주입 — HISTORY_WINDOW 밖으로 밀려난 맥락의 망각 방지(트랙2)
   systemPrompt += summaryBlock(convSummary)
 
-  // 에이전트에 연결된 MCP 서버의 도구 로드(있으면). 연결 실패 서버는 건너뜀.
+  // 에이전트에 연결된 MCP 서버의 도구 로드(있으면). 연결/도구로딩 실패 서버는 건너뜀.
+  // ⚠️ tools()도 반드시 try 안에서 — 커넥터 하나의 실패가 채팅 전체를 죽이면 안 된다(워크플로우 run 라우트와 동일 규약).
   const mcpClients: Awaited<ReturnType<typeof connectMcp>>[] = []
+  const toolSets: ToolSet[] = []
   const mcpIds = agentVersion.mcp_servers ?? []
   if (mcpIds.length > 0) {
     const { data: mcpServers } = await supabase
@@ -191,9 +193,11 @@ export async function POST(
       .eq("is_active", true)
     for (const srv of mcpServers ?? []) {
       try {
-        mcpClients.push(await connectMcp(srv))
+        const client = await connectMcp(srv)
+        mcpClients.push(client)
+        toolSets.push(await client.tools())
       } catch {
-        /* 연결 실패 MCP 서버는 건너뜀 */
+        /* 연결/도구로딩 실패 MCP 서버는 건너뜀 — 도구 없이 진행 */
       }
     }
   }
@@ -205,22 +209,41 @@ export async function POST(
   )
   if (usageNotes.length > 0) systemPrompt += `\n\n${usageNotes.join("\n")}`
   if (boundConnectors.length > 0) {
+    const CONN_COLS = "id, connector_id, auth_method, encrypted_token, encrypted_refresh_token"
     const { data: myConnections } = await supabase
       .from("mcp_user_connections")
-      .select("id, connector_id, auth_method, encrypted_token, encrypted_refresh_token")
+      .select(CONN_COLS)
       .eq("user_id", user.id)
       .in("connector_id", boundConnectors)
     for (const row of myConnections ?? []) {
       const cfg = resolveUserConnectionConfig(row, user.id)
       if (!cfg) continue
       try {
-        mcpClients.push(await connectMcp(cfg))
+        const client = await connectMcp(cfg)
+        mcpClients.push(client)
+        toolSets.push(await client.tools())
       } catch {
-        /* 연결 실패한 개인 커넥터는 건너뜀 */
+        // access token 만료 시 일부 서버(구글 gmailmcp 등)가 첫 호출에 401을 던지는데,
+        // 그 과정에서 SDK OAuth 프로바이더가 refresh_token으로 갱신해 DB에 저장한다.
+        // → 갱신된 행을 다시 읽어 1회만 재연결(이게 없으면 만료 직후 첫 요청이 항상 실패).
+        try {
+          const { data: fresh } = await supabase
+            .from("mcp_user_connections")
+            .select(CONN_COLS)
+            .eq("id", row.id)
+            .maybeSingle()
+          const retryCfg = fresh ? resolveUserConnectionConfig(fresh, user.id) : null
+          if (retryCfg) {
+            const retryClient = await connectMcp(retryCfg)
+            mcpClients.push(retryClient)
+            toolSets.push(await retryClient.tools())
+          }
+        } catch {
+          /* 재시도도 실패하면 이 커넥터 없이 진행 — 채팅 자체는 계속된다 */
+        }
       }
     }
   }
-  const toolSets = await Promise.all(mcpClients.map((c) => c.tools()))
   const tools: ToolSet = Object.assign({}, ...toolSets)
   const hasTools = Object.keys(tools).length > 0
   const closeMcp = () => Promise.allSettled(mcpClients.map((c) => c.close()))
