@@ -11,6 +11,8 @@ export type BudgetStatus = {
   isAdmin: boolean
   /** 남은 AI 크레딧. null = 무제한 플랜. */
   credits: number | null
+  /** 워크스페이스 요금제 id(잔액 게이지의 상한 계산용). */
+  plan: string | null
   /** 차단 사유별 안내 문구(ok=false일 때). */
   message: string | null
 }
@@ -39,21 +41,27 @@ export async function checkBudget(userId: string): Promise<BudgetStatus> {
     .limit(1)
     .maybeSingle()
   const wsId = mem?.workspace_id
-  if (!wsId) return { ok: true, spent: 0, limit: null, isAdmin, credits: null, message: null }
+  if (!wsId) return { ok: true, spent: 0, limit: null, isAdmin, credits: null, plan: null, message: null }
+
+  const { data: ws0 } = await admin.from("workspaces").select("monthly_budget_usd, plan").eq("id", wsId).maybeSingle()
+  const plan = ws0?.plan ?? null
 
   // 크레딧 게이트 — 경과일만큼 충전한 뒤 잔액을 본다(무료는 하루 17씩 상한 500까지 회복).
   // 관리자도 예외 없음: 예산은 우리 내부 통제지만 크레딧은 요금제로 판 것이라 우회하면 과금이 무너진다.
   const credit = await syncCredits(wsId)
   if (!credit.ok) {
-    return { ok: false, spent: 0, limit: null, isAdmin, credits: credit.balance, message: CREDIT_EXHAUSTED_MSG }
+    return {
+      ok: false,
+      spent: 0,
+      limit: null,
+      isAdmin,
+      credits: credit.balance,
+      plan,
+      message: CREDIT_EXHAUSTED_MSG,
+    }
   }
 
-  const { data: ws } = await admin
-    .from("workspaces")
-    .select("monthly_budget_usd")
-    .eq("id", wsId)
-    .maybeSingle()
-  const limit = ws?.monthly_budget_usd != null ? Number(ws.monthly_budget_usd) : null
+  const limit = ws0?.monthly_budget_usd != null ? Number(ws0.monthly_budget_usd) : null
 
   // 이번 달 성공 호출 비용 합계.
   const now = new Date()
@@ -66,7 +74,9 @@ export async function checkBudget(userId: string): Promise<BudgetStatus> {
     .eq("success", true)
   const spent = (rows ?? []).reduce((s, r) => s + Number(r.cost_usd ?? 0), 0)
 
-  if (limit == null) return { ok: true, spent, limit: null, isAdmin, credits: credit.balance, message: null } // 무제한
+  if (limit == null) {
+    return { ok: true, spent, limit: null, isAdmin, credits: credit.balance, plan, message: null } // 무제한
+  }
   const withinBudget = isAdmin || spent < limit
   return {
     ok: withinBudget,
@@ -74,6 +84,7 @@ export async function checkBudget(userId: string): Promise<BudgetStatus> {
     limit,
     isAdmin,
     credits: credit.balance,
+    plan,
     message: withinBudget ? null : BUDGET_EXCEEDED_MSG,
   }
 }

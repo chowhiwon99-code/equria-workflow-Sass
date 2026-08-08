@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { checkBudget } from "@/lib/budget"
+import { planOf } from "@/lib/plans"
 
 export const runtime = "nodejs"
 
@@ -19,6 +20,8 @@ export async function GET() {
     limit: b.limit,
     isAdmin: b.isAdmin,
     credits: b.credits, // null = 무제한 플랜
+    creditCap: b.credits == null ? null : planOf(b.plan).includedCredits,
+    plan: b.plan,
   })
 }
 
