@@ -16,7 +16,9 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://complow.kr"),
-  title: "Complow 워크스페이스",
+  // 앱 화면(대시보드 등)의 기본 제목 — 설치 앱 창 제목·브라우저 탭에 그대로 뜨므로 브랜드만.
+  // 랜딩(page.tsx)·법적 문서 등 공개 페이지는 각자 SEO용 제목을 따로 갖고 있어 영향 없음.
+  title: "Complow",
   description: "Complow 직원 전용 워크스페이스",
   // PWA — manifest는 app/manifest.ts가 /manifest.webmanifest로 제공.
   manifest: "/manifest.webmanifest",
