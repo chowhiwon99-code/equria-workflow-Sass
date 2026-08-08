@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
+import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -17,6 +18,14 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://complow.kr"),
   title: "Complow 워크스페이스",
   description: "Complow 직원 전용 워크스페이스",
+  // PWA — manifest는 app/manifest.ts가 /manifest.webmanifest로 제공.
+  manifest: "/manifest.webmanifest",
+  // iOS는 매니페스트의 display를 안 읽는다. '홈 화면에 추가' 시 전체화면으로 뜨려면 이 메타가 필요.
+  appleWebApp: {
+    capable: true,
+    title: "Complow",
+    statusBarStyle: "default",
+  },
 };
 
 // iOS Safari: 입력창 폰트가 16px 미만이면 포커스 시 화면을 자동 확대 → 전송버튼이 화면 밖으로 밀림.
@@ -48,6 +57,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col">
         <ThemeProvider>{children}</ThemeProvider>
+        <ServiceWorkerRegister />
       </body>
     </html>
   );

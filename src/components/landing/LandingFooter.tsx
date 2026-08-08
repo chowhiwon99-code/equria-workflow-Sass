@@ -37,11 +37,11 @@ const COLUMNS: { title: string; links: FootLink[] }[] = [
     ],
   },
   {
-    // 노션식 다운로드 자리(대표 지시 2026-07-28) — 앱 빌드(Electron·모바일)는 별도 트랙, 그 전까지 "준비 중"
+    // PWA로 실제 설치 가능해짐(2026-08) — 설치 파일 배포가 아니라 브라우저 설치라 안내 페이지로 보낸다.
     title: "다운로드",
     links: [
-      { l: "iOS & Android" },
-      { l: "Mac & Windows" },
+      { l: "iOS & Android", href: "/download" },
+      { l: "Mac & Windows", href: "/download" },
     ],
   },
   {

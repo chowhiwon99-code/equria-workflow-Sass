@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <title>연결 없음 · Complow</title>
+    <!-- 정적 안내 화면. 사용자 데이터가 한 글자도 들어가면 안 된다(기기에 캐시되는 유일한 HTML). -->
+    <style>
+      :root { color-scheme: light dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; min-height: 100dvh; display: grid; place-items: center; padding: 24px;
+        font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", system-ui, sans-serif;
+        background: #fff; color: #111;
+      }
+      @media (prefers-color-scheme: dark) { body { background: #0b0b0c; color: #f2f2f3; } }
+      .box { text-align: center; max-width: 320px; }
+      .mark { width: 56px; height: 56px; border-radius: 14px; margin: 0 auto 20px; display: block; }
+      h1 { font-size: 17px; font-weight: 600; margin: 0 0 8px; letter-spacing: -0.01em; }
+      p { font-size: 14px; line-height: 1.6; margin: 0 0 20px; opacity: 0.62; }
+      button {
+        font: inherit; font-size: 14px; font-weight: 500; cursor: pointer;
+        padding: 9px 20px; border-radius: 9px; border: 1px solid rgba(0,0,0,0.14);
+        background: transparent; color: inherit;
+      }
+      @media (prefers-color-scheme: dark) { button { border-color: rgba(255,255,255,0.2); } }
+      button:hover { background: rgba(0,0,0,0.04); }
+      @media (prefers-color-scheme: dark) { button:hover { background: rgba(255,255,255,0.07); } }
+    </style>
+  </head>
+  <body>
+    <div class="box">
+      <img src="/icons/icon-192.png" alt="" class="mark" />
+      <h1>인터넷에 연결되어 있지 않아요</h1>
+      <p>Complow는 회사 데이터를 실시간으로 불러오기 때문에 연결이 필요해요. 네트워크를 확인한 뒤 다시 시도해 주세요.</p>
+      <button onclick="location.reload()">다시 시도</button>
+    </div>
+  </body>
+</html>

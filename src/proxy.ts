@@ -6,7 +6,22 @@ import type { Database } from "@/lib/supabase/types"
 const AUTH_PATHS = ["/login", "/signup"]
 /** 법적 문서·검색엔진 파일·OAuth 콜백 — 로그인 여부와 무관하게 항상 접근.
  *  /auth/callback은 code 교환 "전"이라 세션이 없음 → 여기 없으면 프록시가 /login으로 튕겨 OAuth가 영원히 실패. */
-const OPEN_PATHS = ["/privacy", "/terms", "/refund", "/sitemap.xml", "/robots.txt", "/auth/callback", "/join"]
+// ⚠️ 여기 빠지면 미인증 요청이 /login으로 리다이렉트돼 조용히 실패한다(sitemap·robots가 그랬던 전례).
+//    PWA 4종은 브라우저가 '로그인 전에' 가져가므로 반드시 공개여야 설치 버튼이 뜬다.
+const OPEN_PATHS = [
+  "/privacy",
+  "/terms",
+  "/refund",
+  "/sitemap.xml",
+  "/robots.txt",
+  "/auth/callback",
+  "/join",
+  "/manifest.webmanifest",
+  "/sw.js",
+  "/offline.html",
+  "/icons/",
+  "/download",
+]
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request })
