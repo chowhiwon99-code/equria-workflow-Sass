@@ -1286,6 +1286,73 @@ export type Database = {
           },
         ]
       }
+      credit_ledger: {
+        Row: {
+          balance_after: number
+          created_at: string
+          delta: number
+          id: string
+          note: string | null
+          reason: string
+          workspace_id: string
+        }
+        Insert: {
+          balance_after: number
+          created_at?: string
+          delta: number
+          id?: string
+          note?: string | null
+          reason: string
+          workspace_id: string
+        }
+        Update: {
+          balance_after?: number
+          created_at?: string
+          delta?: number
+          id?: string
+          note?: string | null
+          reason?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_ledger_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_credits: {
+        Row: {
+          balance: number
+          last_grant_on: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          balance?: number
+          last_grant_on?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          balance?: number
+          last_grant_on?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_credits_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       direct_conversations: {
         Row: {
           created_at: string
@@ -3463,6 +3530,13 @@ export type Database = {
         Returns: string
       }
       create_workspace: { Args: { p_name: string }; Returns: Json }
+      credit_consume: {
+        Args: { p_credits: number; p_note?: string; p_workspace_id: string }
+        Returns: number
+      }
+      credit_sync: { Args: { p_workspace_id: string }; Returns: number }
+      free_daily_drip: { Args: never; Returns: number }
+      plan_monthly_credits: { Args: { p_plan: string }; Returns: number }
       create_workspace_invite: {
         Args: {
           p_expires_days?: number

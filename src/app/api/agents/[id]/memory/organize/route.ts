@@ -29,7 +29,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!user) return new Response("Unauthorized", { status: 401 })
 
   const budget = await checkBudget(user.id)
-  if (!budget.ok) return new Response(BUDGET_EXCEEDED_MSG, { status: 429 })
+  if (!budget.ok) return new Response(budget.message ?? BUDGET_EXCEEDED_MSG, { status: 429 })
 
   // 현재 활성 기억(본인 것만·RLS).
   const { data: current } = await supabase

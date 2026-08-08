@@ -5,7 +5,8 @@ import { checkBudget } from "@/lib/budget"
 
 export const runtime = "nodejs"
 
-/** 이번 달 AI 사용액·월 한도 조회 (모든 로그인 유저). */
+/** 이번 달 AI 사용액·월 한도 + 남은 AI 크레딧 조회 (모든 로그인 유저).
+ *  checkBudget이 credit_sync를 호출하므로 이 GET 자체가 '경과일만큼 충전'을 겸한다. */
 export async function GET() {
   const supabase = await createClient()
   const {
@@ -13,7 +14,12 @@ export async function GET() {
   } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const b = await checkBudget(user.id)
-  return NextResponse.json({ spent: b.spent, limit: b.limit, isAdmin: b.isAdmin })
+  return NextResponse.json({
+    spent: b.spent,
+    limit: b.limit,
+    isAdmin: b.isAdmin,
+    credits: b.credits, // null = 무제한 플랜
+  })
 }
 
 /** 월 예산 한도 설정 (관리자만). 0/빈값 = 무제한(null). */

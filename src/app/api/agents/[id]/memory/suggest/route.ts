@@ -27,7 +27,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!user) return new Response("Unauthorized", { status: 401 })
 
   const budget = await checkBudget(user.id)
-  if (!budget.ok) return new Response(BUDGET_EXCEEDED_MSG, { status: 429 })
+  if (!budget.ok) return new Response(budget.message ?? BUDGET_EXCEEDED_MSG, { status: 429 })
 
   const body = (await req.json().catch(() => null)) as { text?: string } | null
   const text = body?.text?.trim()

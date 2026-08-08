@@ -55,7 +55,7 @@ export async function POST(
   if (!user) return new Response("Unauthorized", { status: 401 })
 
   const budget = await checkBudget(user.id)
-  if (!budget.ok) return new Response(BUDGET_EXCEEDED_MSG, { status: 429 })
+  if (!budget.ok) return new Response(budget.message ?? BUDGET_EXCEEDED_MSG, { status: 429 })
 
   const body = (await req.json()) as {
     messages: UIMessage[]

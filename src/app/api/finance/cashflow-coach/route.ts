@@ -46,7 +46,7 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const budget = await checkBudget(user.id)
-  if (!budget.ok) return NextResponse.json({ error: BUDGET_EXCEEDED_MSG }, { status: 429 })
+  if (!budget.ok) return NextResponse.json({ error: budget.message ?? BUDGET_EXCEEDED_MSG }, { status: 429 })
 
   const workspaceId = await getUserWorkspaceId(supabase, user.id) // B1-b: agent_usage에 명시
 
