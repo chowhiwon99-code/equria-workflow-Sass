@@ -1,4 +1,11 @@
-import { streamText, convertToModelMessages, stepCountIs, type UIMessage, type ToolSet } from "ai"
+import {
+  streamText,
+  convertToModelMessages,
+  stepCountIs,
+  type UIMessage,
+  type ToolSet,
+  type ModelMessage,
+} from "ai"
 import { anthropic } from "@/lib/claude/client"
 import { createClient } from "@/lib/supabase/server"
 import { connectMcp, resolveUserConnectionConfig } from "@/lib/mcp/connect"
@@ -54,7 +61,9 @@ export async function POST(
     messages: UIMessage[]
     conversationId?: string | null
   }
-  const { messages } = body
+  // ⚠️ UIMessage.role 에는 'system'이 포함된다 — 클라이언트가 system 메시지를 섞어 보내면
+  // 우리 시스템 프롬프트 뒤에 붙어 지시를 덮어쓰는 프롬프트 주입이 된다. 이력은 user/assistant만 신뢰한다.
+  const messages = (body.messages ?? []).filter((m) => m.role === "user" || m.role === "assistant")
   const userTurns = messages.filter((m) => m.role === "user").length
   let conversationId = body.conversationId ?? null
 
@@ -126,7 +135,13 @@ export async function POST(
 
   // 에이전트 지식파일(참고 자료) 주입 — 텍스트는 시스템 프롬프트에, PDF/이미지는 파일 파트로.
   // 공유 에이전트를 다른 멤버가 대화할 수 있으므로 admin 클라로 서명(소유자 폴더 RLS 우회).
-  let systemPrompt = agentVersion.system_prompt + OUTPUT_STYLE_RULE // 전 에이전트 공통 — AI 티 나는 기호(-, *, **) 절제
+  // 프롬프트 캐싱 경계 — 시스템 프롬프트를 두 구간으로 나눈다.
+  //   stable  : 에이전트 프롬프트·지식파일·커넥터 사용규칙 (턴이 바뀌어도 그대로 → 캐시)
+  //   volatile: 기억·대화요약 (턴마다 갱신될 수 있음 → 캐시 뒤)
+  // 캐싱은 '프리픽스 완전 일치'라 1바이트만 달라져도 그 뒤가 전부 무효다. 큰 지식파일이 변동 텍스트보다
+  // 반드시 앞에 와야 캐시가 산다. 입력이 원가의 93~99%를 차지하므로 여기가 비용의 핵심.
+  let stableSystem = agentVersion.system_prompt + OUTPUT_STYLE_RULE // 전 에이전트 공통 — AI 티 나는 기호(-, *, **) 절제
+  let volatileSystem = ""
   {
     const { data: kn } = await supabase
       .from("agent_knowledge")
@@ -149,7 +164,7 @@ export async function POST(
         }
       }
       if (textBlocks.length > 0) {
-        systemPrompt += `\n\n# 참고 자료(회사가 첨부한 지식)\n아래 자료를 우선 근거로 삼아 답하세요. 자료에 없으면 지어내지 말고 모른다고 하세요.\n\n${textBlocks.join("\n\n")}`
+        stableSystem += `\n\n# 참고 자료(회사가 첨부한 지식)\n아래 자료를 우선 근거로 삼아 답하세요. 자료에 없으면 지어내지 말고 모른다고 하세요.\n\n${textBlocks.join("\n\n")}`
       }
       if (fileParts.length > 0) {
         modelMessages.unshift({
@@ -174,11 +189,11 @@ export async function POST(
       .order("importance", { ascending: false }) // 중요한 규칙이 최근 잡담에 안 밀리게(마이그106)
       .order("created_at", { ascending: false })
       .limit(30)
-    systemPrompt += buildMemoryBlock(mems ?? [])
+    volatileSystem += buildMemoryBlock(mems ?? [])
   }
 
   // 오래된 턴 압축 요약 주입 — HISTORY_WINDOW 밖으로 밀려난 맥락의 망각 방지(트랙2)
-  systemPrompt += summaryBlock(convSummary)
+  volatileSystem += summaryBlock(convSummary)
 
   // 에이전트에 연결된 MCP 서버의 도구 로드(있으면). 연결/도구로딩 실패 서버는 건너뜀.
   // ⚠️ tools()도 반드시 try 안에서 — 커넥터 하나의 실패가 채팅 전체를 죽이면 안 된다(워크플로우 run 라우트와 동일 규약).
@@ -207,7 +222,8 @@ export async function POST(
   const usageNotes = MCP_CONNECTORS.filter((c) => boundConnectors.includes(c.id) && c.usageNote).map(
     (c) => `[${c.name} 사용 규칙] ${c.usageNote}`
   )
-  if (usageNotes.length > 0) systemPrompt += `\n\n${usageNotes.join("\n")}`
+  // 커넥터 사용규칙은 바인딩된 커넥터에서만 나오므로 턴과 무관 → 캐시되는 안정 구간에 둔다.
+  if (usageNotes.length > 0) stableSystem += `\n\n${usageNotes.join("\n")}`
   if (boundConnectors.length > 0) {
     const CONN_COLS = "id, connector_id, auth_method, encrypted_token, encrypted_refresh_token"
     const { data: myConnections } = await supabase
@@ -248,10 +264,22 @@ export async function POST(
   const hasTools = Object.keys(tools).length > 0
   const closeMcp = () => Promise.allSettled(mcpClients.map((c) => c.close()))
 
+  // `system` 파라미터로는 캐시 breakpoint를 걸 수 없다(단일 문자열). system 역할 메시지로 쪼개
+  // messages 맨 앞에 두고, 안정 구간 끝에만 cacheControl을 건다. 렌더 순서는 tools → system → messages.
+  const systemMessages: ModelMessage[] = [
+    {
+      role: "system",
+      content: stableSystem,
+      providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
+    },
+    ...(volatileSystem ? [{ role: "system" as const, content: volatileSystem }] : []),
+  ]
+
   const result = streamText({
     model: anthropic(agentVersion.model),
-    system: systemPrompt,
-    messages: modelMessages,
+    messages: [...systemMessages, ...modelMessages],
+    // 우리가 직접 만든 system 메시지만 들어간다(클라이언트발 system은 위에서 필터링). 캐시 breakpoint 때문에 필요.
+    allowSystemInMessages: true,
     maxOutputTokens: agentVersion.max_tokens,
     temperature: Number(agentVersion.temperature),
     // MCP 도구가 있으면 다단계 도구호출 허용(없으면 단일 응답)
@@ -279,8 +307,12 @@ export async function POST(
     async onFinish({ text, usage, totalUsage }) {
       // 다단계(MCP 도구) 실행이면 totalUsage가 전 스텝 합산 — 비용/토큰은 합산 기준(워크플로우 run 라우트와 동일).
       const u = totalUsage ?? usage
+      // ⚠️ inputTokens는 캐시 토큰을 포함한 총합(@ai-sdk/anthropic이 합산해 넘김). 내역은 inputTokenDetails.
+      // 캐시분을 빼고 계산하지 않으면 캐시 읽기(0.1×)를 정가로 청구하게 된다 — computeCostUsd가 처리.
       const inputTokens = u.inputTokens ?? 0
       const outputTokens = u.outputTokens ?? 0
+      const cacheReadTokens = u.inputTokenDetails?.cacheReadTokens ?? 0
+      const cacheWriteTokens = u.inputTokenDetails?.cacheWriteTokens ?? 0
 
       await Promise.all([
         supabase.from("messages").insert(
@@ -303,10 +335,15 @@ export async function POST(
               conversation_id: conversationId,
               tokens_input: inputTokens,
               tokens_output: outputTokens,
+              cache_read_tokens: cacheReadTokens,
+              cache_write_tokens: cacheWriteTokens,
               duration_ms: Date.now() - startedAt,
               success: true,
               model: agentVersion.model,
-              cost_usd: computeCostUsd(agentVersion.model, inputTokens, outputTokens),
+              cost_usd: computeCostUsd(agentVersion.model, inputTokens, outputTokens, {
+                readTokens: cacheReadTokens,
+                writeTokens: cacheWriteTokens,
+              }),
             },
             workspaceId,
           ),

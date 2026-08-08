@@ -125,6 +125,8 @@ export type Database = {
       agent_usage: {
         Row: {
           agent_id: string | null
+          cache_read_tokens: number
+          cache_write_tokens: number
           conversation_id: string | null
           cost_usd: number | null
           created_at: string
@@ -140,6 +142,8 @@ export type Database = {
         }
         Insert: {
           agent_id?: string | null
+          cache_read_tokens?: number
+          cache_write_tokens?: number
           conversation_id?: string | null
           cost_usd?: number | null
           created_at?: string
@@ -155,6 +159,8 @@ export type Database = {
         }
         Update: {
           agent_id?: string | null
+          cache_read_tokens?: number
+          cache_write_tokens?: number
           conversation_id?: string | null
           cost_usd?: number | null
           created_at?: string

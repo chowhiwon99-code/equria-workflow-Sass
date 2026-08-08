@@ -1,4 +1,4 @@
-import { streamText, convertToModelMessages, stepCountIs, type UIMessage } from "ai"
+import { streamText, convertToModelMessages, stepCountIs, type UIMessage, type ModelMessage } from "ai"
 import { anthropic, MODELS } from "@/lib/claude/client"
 import { createClient } from "@/lib/supabase/server"
 import { computeCostUsd } from "@/lib/pricing"
@@ -52,7 +52,9 @@ export async function POST(req: Request) {
     messages?: UIMessage[]
     conversationId?: string | null
   }
-  const messages = body.messages ?? []
+  // ⚠️ UIMessage.role 에는 'system'이 포함된다 — 클라이언트가 섞어 보내면 컴피의 시스템 지시를
+  // 덮어쓰는 프롬프트 주입이 된다(도구 권한이 있어 영향이 큼). 이력은 user/assistant만 신뢰한다.
+  const messages = (body.messages ?? []).filter((m) => m.role === "user" || m.role === "assistant")
   let conversationId = body.conversationId ?? null
 
   // 새 대화면 생성(제목 = 첫 사용자 메시지 일부). 생성 실패 시 500으로 막아 턴이 조용히 유실되지 않게(M2).
@@ -85,16 +87,26 @@ export async function POST(req: Request) {
   // 이후 턴은 필요 시 도구로 최신값을 조회한다.
   const isFirstTurn = messages.length <= 1
   const snapshot = isFirstTurn ? await buildWorkspaceSnapshot(supabase, user.id, workspaceId).catch(() => "") : ""
-  const system =
-    `${COMPI_BASE}\n\n## 워크스페이스 기능\n${featuresOverview()}` +
-    (snapshot ? `\n\n## 현재 현황(스냅샷)\n${snapshot}` : "") +
-    OUTPUT_STYLE_RULE
+  // 프롬프트 캐싱 경계 — 스냅샷은 첫 턴에만 붙으므로 그대로 두면 턴1과 턴2의 프리픽스가 갈라진다.
+  // 스타일 규칙을 스냅샷 앞으로 옮겨 '항상 동일한' 안정 구간을 만들고, 그 끝에만 cacheControl을 건다.
+  const stableSystem = `${COMPI_BASE}\n\n## 워크스페이스 기능\n${featuresOverview()}` + OUTPUT_STYLE_RULE
+  const volatileSystem = snapshot ? `## 현재 현황(스냅샷)\n${snapshot}` : ""
   const tools = buildCompiTools({ supabase, userId: user.id, workspaceId })
+
+  const systemMessages: ModelMessage[] = [
+    {
+      role: "system",
+      content: stableSystem,
+      providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
+    },
+    ...(volatileSystem ? [{ role: "system" as const, content: volatileSystem }] : []),
+  ]
 
   const result = streamText({
     model: anthropic(MODELS.default),
-    system,
-    messages: modelMessages,
+    messages: [...systemMessages, ...modelMessages],
+    // 우리가 직접 만든 system 메시지만 들어간다(클라이언트발 system은 위에서 필터링). 캐시 breakpoint 때문에 필요.
+    allowSystemInMessages: true,
     tools,
     stopWhen: stepCountIs(5), // 도구 조회 후 답변까지 다단계 허용
     maxOutputTokens: 3072,
@@ -102,6 +114,9 @@ export async function POST(req: Request) {
       // 비용 추적: 도구(다단계) 턴은 마지막 스텝 usage가 아니라 전체 합산 totalUsage로 기록 — 과소집계 방지(리뷰 D4).
       const inT = totalUsage.inputTokens ?? 0
       const outT = totalUsage.outputTokens ?? 0
+      // inputTokens는 캐시 포함 총합 — 내역을 빼서 넘기지 않으면 캐시 읽기를 정가로 청구하게 된다.
+      const cacheReadTokens = totalUsage.inputTokenDetails?.cacheReadTokens ?? 0
+      const cacheWriteTokens = totalUsage.inputTokenDetails?.cacheWriteTokens ?? 0
       const writes: PromiseLike<unknown>[] = [
         supabase.from("agent_usage").insert(
           withWorkspace(
@@ -109,10 +124,15 @@ export async function POST(req: Request) {
               user_id: user.id,
               tokens_input: inT,
               tokens_output: outT,
+              cache_read_tokens: cacheReadTokens,
+              cache_write_tokens: cacheWriteTokens,
               duration_ms: Date.now() - startedAt,
               success: true,
               model: MODELS.default,
-              cost_usd: computeCostUsd(MODELS.default, inT, outT),
+              cost_usd: computeCostUsd(MODELS.default, inT, outT, {
+                readTokens: cacheReadTokens,
+                writeTokens: cacheWriteTokens,
+              }),
             },
             workspaceId,
           ),
