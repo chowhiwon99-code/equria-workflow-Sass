@@ -6,7 +6,8 @@ import type { MetadataRoute } from "next"
  *  앱을 열었을 때 마케팅 페이지가 아니라 업무 화면이 떠야 한다(미로그인이면 로그인으로 리다이렉트). */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Complow — 회사 AI 워크스페이스",
+    // 설치 창·앱 이름에 그대로 노출된다 → 브랜드만. 설명은 description으로 충분(노션·슬랙도 같은 방식).
+    name: "Complow",
     short_name: "Complow",
     description: "회사 업무에 맞춘 AI 에이전트·프로젝트·근태·재무를 한곳에서.",
     lang: "ko",
