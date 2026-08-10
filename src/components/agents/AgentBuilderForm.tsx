@@ -21,6 +21,7 @@ import {
   TEMPERATURE_PRESETS,
   categoryToLabel,
 } from "@/lib/agents"
+import { canUseModel, isPremiumModel, PLANS, PREMIUM_MODEL_MIN_PLAN } from "@/lib/plans"
 
 export type AgentFormInitial = {
   id: string
@@ -73,6 +74,8 @@ export function AgentBuilderForm({
     initial?.system_prompt ?? prefill?.system_prompt ?? ""
   )
   const [model, setModel] = useState(initial?.model ?? prefill?.model ?? AGENT_DEFAULTS.model)
+  // 고급 모델(Opus) 게이팅 — 서버 강제는 마이그134 트리거. 여기선 미리 알려주는 용도.
+  const [plan, setPlan] = useState<string>("free")
   const [temperature, setTemperature] = useState(
     initial?.temperature ?? prefill?.temperature ?? AGENT_DEFAULTS.temperature
   )
@@ -87,6 +90,23 @@ export function AgentBuilderForm({
   const [mcpServers, setMcpServers] = useState<string[]>(
     initial?.mcp_servers ?? prefill?.mcp_servers ?? []
   )
+  // 요금제 조회 — 고급 모델 선택 가능 여부 안내용(InviteLinksCard의 시트 게이팅과 같은 방식).
+  useEffect(() => {
+    if (!wsId) return
+    let alive = true
+    supabase
+      .from("workspaces")
+      .select("plan")
+      .eq("id", wsId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (alive) setPlan(data?.plan ?? "free")
+      })
+    return () => {
+      alive = false
+    }
+  }, [supabase, wsId])
+
   const [availableMcp, setAvailableMcp] = useState<{ id: string; name: string }[]>([])
   useEffect(() => {
     fetch("/api/mcp/servers")
@@ -119,6 +139,30 @@ export function AgentBuilderForm({
   }, [])
   const toggleConnector = (id: string) =>
     setMcpConnectors((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+
+  // 모델 선택 — 위저드 스텝과 검토 폼 두 곳에서 같은 것을 쓰므로 한 번만 만든다.
+  // 고급 모델은 Pro 이상 전용(마이그134 트리거가 서버 강제). 이미 그 모델로 저장된
+  // 에이전트는 트리거가 grandfather 처리하므로 편집 시 잠그지 않는다.
+  const modelLocked = (value: string) =>
+    isPremiumModel(value) && !canUseModel(plan, value) && initial?.model !== value
+  const modelField = (
+    <label className="flex flex-1 flex-col gap-1.5 text-sm">
+      <span className="text-xs text-muted-foreground">모델</span>
+      <select className={fieldClass} value={model} onChange={(e) => setModel(e.target.value)}>
+        {AGENT_MODELS.map((m) => (
+          <option key={m.value} value={m.value} disabled={modelLocked(m.value)}>
+            {m.label}
+            {modelLocked(m.value) ? ` · ${PLANS[PREMIUM_MODEL_MIN_PLAN].label} 이상` : ""}
+          </option>
+        ))}
+      </select>
+      {modelLocked(model) && (
+        <span className="text-[11px] text-amber-600">
+          고급 모델은 {PLANS[PREMIUM_MODEL_MIN_PLAN].label} 요금제부터 쓸 수 있어요. Sonnet을 선택해 주세요.
+        </span>
+      )}
+    </label>
+  )
 
   // 지식파일(참고 자료) — 생성 시 prefill(위저드에서 스테이징), 수정 시 DB에서 로드.
   const [knowledge, setKnowledge] = useState<StagedKnowledge[]>(prefill?.knowledge ?? [])
@@ -417,16 +461,7 @@ export function AgentBuilderForm({
         node: (
           <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-end gap-3">
-              <label className="flex flex-1 flex-col gap-1.5 text-sm">
-                <span className="text-xs text-muted-foreground">모델</span>
-                <select className={fieldClass} value={model} onChange={(e) => setModel(e.target.value)}>
-                  {AGENT_MODELS.map((m) => (
-                    <option key={m.value} value={m.value}>
-                      {m.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              {modelField}
               <label className="flex w-32 flex-col gap-1.5 text-sm">
                 <span className="text-xs text-muted-foreground">최대 토큰</span>
                 <input
@@ -612,16 +647,7 @@ export function AgentBuilderForm({
 
       {/* 모델 + 최대 토큰 */}
       <div className="flex flex-wrap items-end gap-3">
-        <label className="flex flex-1 flex-col gap-1.5 text-sm">
-          <span className="text-xs text-muted-foreground">모델</span>
-          <select className={fieldClass} value={model} onChange={(e) => setModel(e.target.value)}>
-            {AGENT_MODELS.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        {modelField}
         <label className="flex w-32 flex-col gap-1.5 text-sm">
           <span className="text-xs text-muted-foreground">최대 토큰</span>
           <input

@@ -37,3 +37,29 @@ export function seatsFull(plan: string | null | undefined, seatsUsed: number): b
   const seats = planOf(plan).seats
   return seats != null && seatsUsed >= seats
 }
+
+/** 고급 모델을 쓸 수 있는 최소 플랜 — 랜딩 요금표의 Pro '+Opus'와 정합. */
+export const PREMIUM_MODEL_MIN_PLAN: PlanId = "pro"
+
+/**
+ * 모델 id가 고가 티어(Opus·Fable·Mythos)인지.
+ * 개별 id를 나열하지 않고 이름으로 잡는 이유: 새 고가 모델이 나왔을 때 목록에 없어서
+ * 무료 플랜에 열리는 fail-open을 막는다(모르는 고가 모델은 막히는 쪽).
+ * 단가(2026-08): Opus $5/$25 · Fable/Mythos $10/$50 vs Sonnet $3/$15 · Haiku $1/$5.
+ */
+export function isPremiumModel(model: string | null | undefined): boolean {
+  const m = (model ?? "").toLowerCase()
+  return m.includes("opus") || m.includes("fable") || m.includes("mythos")
+}
+
+/**
+ * 이 플랜에서 해당 모델을 **새로** 고를 수 있는지.
+ * 서버 강제는 마이그134 트리거 `agent_version_enforce_model_plan` — 이 함수는 UI 안내용이며
+ * 규칙이 바뀌면 **트리거와 반드시 함께** 고칠 것(에이전트 버전은 클라가 Supabase로 직접 insert한다).
+ * 이미 그 모델을 쓰던 에이전트의 편집은 트리거가 grandfather 처리하므로 여기서 막지 않아도 된다.
+ */
+export function canUseModel(plan: string | null | undefined, model: string): boolean {
+  if (!isPremiumModel(model)) return true
+  const id = planOf(plan).id
+  return id === "pro" || id === "premium"
+}
