@@ -2,7 +2,7 @@
 // 초과 & 비관리자면 차단(hard limit). 관리자는 예외. 서버 전용(admin client로 신뢰성 있게 조회 — RLS fail-open 방지).
 // ⚠️ 단일 워크스페이스 전제: 사용자의 첫 멤버십 워크스페이스로 스코프. (B1-b 멀티테넌트 시 그대로 동작.)
 import { createAdminClient } from "@/lib/supabase/admin"
-import { syncCredits, CREDIT_EXHAUSTED_MSG } from "@/lib/credits"
+import { syncCredits, creditBlockReason, type UsageKind } from "@/lib/credits"
 
 export type BudgetStatus = {
   ok: boolean // false = 차단
@@ -23,8 +23,15 @@ export const PER_RUN_MAX_USD = 2
 /** 예산 초과 차단 시 사용자 안내 메시지. */
 export const BUDGET_EXCEEDED_MSG = "이번 달 AI 예산을 초과했어요. 관리자에게 문의하세요."
 
-/** 이번 달 워크스페이스 AI 비용 vs 월 예산. 관리자는 항상 ok. */
-export async function checkBudget(userId: string): Promise<BudgetStatus> {
+/**
+ * 이번 달 워크스페이스 AI 비용 vs 월 예산 + 크레딧 게이트. 관리자는 예산 한도만 예외.
+ *
+ * `kind`는 하이브리드 한도의 기준이다. 기본값이 "automated"(엄격)인 것은 의도적이다 —
+ * 새 라우트가 표시를 빼먹으면 **막히는 쪽**으로 실패해야지, 조용히 무제한이 되면 안 된다
+ * (마이그133이 차감을 트리거에 둔 것과 같은 이유). 사람이 직접 누르는 라우트만 명시적으로
+ * "interactive"를 넘긴다.
+ */
+export async function checkBudget(userId: string, kind: UsageKind = "automated"): Promise<BudgetStatus> {
   const admin = createAdminClient()
 
   const { data: prof } = await admin.from("profiles").select("role").eq("id", userId).maybeSingle()
@@ -49,7 +56,8 @@ export async function checkBudget(userId: string): Promise<BudgetStatus> {
   // 크레딧 게이트 — 경과일만큼 충전한 뒤 잔액을 본다(무료는 하루 17씩 상한 500까지 회복).
   // 관리자도 예외 없음: 예산은 우리 내부 통제지만 크레딧은 요금제로 판 것이라 우회하면 과금이 무너진다.
   const credit = await syncCredits(wsId)
-  if (!credit.ok) {
+  const creditBlocked = creditBlockReason(credit.balance, plan, kind)
+  if (creditBlocked) {
     return {
       ok: false,
       spent: 0,
@@ -57,7 +65,7 @@ export async function checkBudget(userId: string): Promise<BudgetStatus> {
       isAdmin,
       credits: credit.balance,
       plan,
-      message: CREDIT_EXHAUSTED_MSG,
+      message: creditBlocked,
     }
   }
 

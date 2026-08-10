@@ -7,13 +7,38 @@
 // 충전은 크론이 아니라 호출 시점 lazy 계산(credit_sync)이다. 무료 플랜은 하루 17크레딧씩
 // 상한 500까지 회복되므로, 하루치를 다 써도 다음 날 다시 쓸 수 있다.
 import { createAdminClient } from "@/lib/supabase/admin"
+import { planOf } from "@/lib/plans"
 
 /** 1 크레딧에 해당하는 원가(USD). */
 export const USD_PER_CREDIT = 0.01
 
-/** 크레딧 소진 시 사용자 안내. */
+/**
+ * AI 호출의 종류 — 하이브리드 한도의 기준(대표 결정 2026-08-10).
+ * · interactive = 사람이 직접 눌러서 도는 것(채팅·보조·수식 도우미). 공정 사용 범위에서는 막지 않는다.
+ * · automated   = 사람 없이 토큰을 태우는 것(워크플로우 자동실행·다단계 리서치·배치 정리). 포함량을 넘으면 막는다.
+ *
+ * 노션도 같은 구조다(일반 AI 무제한 / 자율 에이전트만 크레딧). 우리는 노션 대비 1/5 가격이라
+ * 전 기능 무제한은 불가능하지만, "채팅이 갑자기 멈추는" 경험만은 피한다.
+ *
+ * 분류는 checkBudget 호출부에 있다 — `grep -rn '"interactive"' src/app` 하면 관대한 쪽 전부가 나온다.
+ * 표시가 없으면 automated(엄격)다. 다단계 리서치는 사용자가 눌러서 시작해도 그 뒤로는 스스로
+ * 여러 호출을 도는 자율 실행이라 automated로 둔다.
+ */
+export type UsageKind = "interactive" | "automated"
+
+/**
+ * 공정 사용 안전밸브 — interactive도 무한은 아니다. 포함량의 이 배수까지 쓰면 그때는 막는다.
+ * 없으면 무료 워크스페이스 하나가 원가를 무제한으로 태울 수 있다.
+ */
+export const FAIR_USE_MULTIPLIER = 3
+
+/** 자동 실행분 소진 안내 — 채팅은 계속 된다는 걸 반드시 알려준다(고장으로 오해 방지). */
 export const CREDIT_EXHAUSTED_MSG =
-  "이번 크레딧을 다 썼어요. 내일 다시 충전되고, 더 필요하면 요금제를 올리면 바로 늘어나요."
+  "자동 실행에 쓸 AI 사용량을 다 썼어요. 채팅은 그대로 쓸 수 있고, 자동 실행은 내일 다시 충전돼요."
+
+/** 공정 사용 한도까지 넘긴 경우(사실상 드묾). */
+export const FAIR_USE_EXCEEDED_MSG =
+  "이번 요금제의 공정 사용량을 크게 넘었어요. 요금제를 올리면 바로 풀려요."
 
 /** USD 원가 → 크레딧. */
 export function usdToCredits(usd: number): number {
@@ -23,23 +48,38 @@ export function usdToCredits(usd: number): number {
 export type CreditStatus = {
   /** 잔액(크레딧). null = 무제한 플랜(게이팅 없음). */
   balance: number | null
-  /** false = 차단해야 함. */
-  ok: boolean
+}
+
+/**
+ * 이 호출을 막아야 하는지. 막아야 하면 안내 문구를, 통과면 null을 돌려준다.
+ *
+ * 차감은 종류와 무관하게 항상 일어난다(원가 관측을 잃지 않기 위해) — 달라지는 건 **차단 시점**뿐이다.
+ * interactive는 잔액이 음수로 내려가도 계속 쓰다가, 포함량의 FAIR_USE_MULTIPLIER 배에서 멈춘다.
+ */
+export function creditBlockReason(
+  balance: number | null,
+  plan: string | null | undefined,
+  kind: UsageKind
+): string | null {
+  if (balance == null) return null // 무제한 플랜
+  if (kind === "automated") return balance > 0 ? null : CREDIT_EXHAUSTED_MSG
+  const cap = planOf(plan).includedCredits
+  const floor = -cap * (FAIR_USE_MULTIPLIER - 1) // 총 사용 가능량 = 포함량 × FAIR_USE_MULTIPLIER
+  return balance > floor ? null : FAIR_USE_EXCEEDED_MSG
 }
 
 /** 워크스페이스 크레딧을 최신화(경과일만큼 충전)하고 잔액을 돌려준다.
  *  실패하면 **열어준다**(fail-open) — 크레딧 조회 장애로 AI 전체가 멈추는 게 더 나쁘다.
- *  잔액이 0 이하면 차단. 스트리밍이라 호출 전엔 비용을 모르므로 사전 검사는 "잔액이 남아있나"만 본다. */
+ *  차단 판정은 호출 종류를 아는 checkBudget이 creditBlockReason으로 한다. */
 export async function syncCredits(workspaceId: string | null | undefined): Promise<CreditStatus> {
-  if (!workspaceId) return { balance: null, ok: true }
+  if (!workspaceId) return { balance: null }
   try {
     const admin = createAdminClient()
     const { data, error } = await admin.rpc("credit_sync", { p_workspace_id: workspaceId })
-    if (error) return { balance: null, ok: true }
-    if (data == null) return { balance: null, ok: true } // 무제한 플랜
-    const balance = Number(data)
-    return { balance, ok: balance > 0 }
+    if (error) return { balance: null }
+    if (data == null) return { balance: null } // 무제한 플랜
+    return { balance: Number(data) }
   } catch {
-    return { balance: null, ok: true }
+    return { balance: null }
   }
 }

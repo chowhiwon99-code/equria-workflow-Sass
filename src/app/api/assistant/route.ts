@@ -40,7 +40,7 @@ export async function POST(req: Request) {
   } = await supabase.auth.getUser()
   if (!user) return new Response("Unauthorized", { status: 401 })
 
-  const budget = await checkBudget(user.id)
+  const budget = await checkBudget(user.id, "interactive")
   if (!budget.ok) return new Response(budget.message ?? BUDGET_EXCEEDED_MSG, { status: 429 })
 
   // B1-b: 이후 assistant_conversations/messages/agent_usage INSERT에 명시할 워크스페이스 id.
