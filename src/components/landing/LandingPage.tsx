@@ -51,12 +51,15 @@ const SECURITY = [
   { icon: Server, t: "국내 리전", d: "데이터는 국내(서울) 리전에 저장됩니다." },
 ]
 
-/** 4티어 요금 카드 (2026-07-29 대표 확정 — 워크스페이스 정액 + 초과 시트 + AI 크레딧) */
+/** 4티어 요금 카드 (2026-07-29 대표 확정 — 워크스페이스 정액 + 초과 시트 + AI 사용량)
+ *  ⚠️ AI는 "크레딧"이 아니라 **사용량**으로 표기한다. 구독료에 크레딧이 포함되면 환금성으로 분류돼
+ *  PG 심사가 막힌다(KCP 거절 사유 ①, 2026-08-10). 별도 판매(추가 구매)도 하지 않는다.
+ *  한도 구조는 lib/credits.ts UsageKind — 채팅은 공정 사용, 자동 실행만 한도. */
 const PLANS: { name: string; price: string; unit: string; credits: string; highlight: boolean; cta: string; desc: string[] }[] = [
-  { name: "Basic", price: "₩0", unit: "3명 포함 · 영구 무료", credits: "월 500 크레딧 (AI 맛보기)", highlight: false, cta: "무료로 시작", desc: ["팀 협업 (채팅·캘린더·프로젝트)", "AI 에이전트 맛보기", "회사별 데이터 격리"] },
-  { name: "Standard", price: "₩29,000", unit: "/월 · 5명 포함", credits: "월 3,000 크레딧 · Sonnet", highlight: true, cta: "시작하기", desc: ["모든 업무 기능 (+결재·근태·회의·재무)", "AI 에이전트 전체 사용", "초과 시트 ₩4,000/인 · 이메일 지원"] },
-  { name: "Pro", price: "₩49,000", unit: "/월 · 10명 포함", credits: "월 7,000 크레딧 · +Opus", highlight: false, cta: "시작하기", desc: ["스탠다드 전체 + 워크플로우·전용 에이전트", "고급 AI 모델(Opus)·대형 지식파일", "초과 시트 ₩4,000/인 · 우선 지원"] },
-  { name: "Premium", price: "문의", unit: "무제한 인원 · 맞춤", credits: "초대량 크레딧 · Fable·미디어", highlight: false, cta: "도입 문의", desc: ["전 기능 + 이미지·영상 생성", "API·SSO·전용 온보딩/컨설팅", "맞춤 크레딧·전용 셋업"] },
+  { name: "Basic", price: "₩0", unit: "3명 포함 · 영구 무료", credits: "AI 맛보기 · 매일 충전", highlight: false, cta: "무료로 시작", desc: ["팀 협업 (채팅·캘린더·프로젝트)", "AI 에이전트 맛보기", "회사별 데이터 격리"] },
+  { name: "Standard", price: "₩29,000", unit: "/월 · 5명 포함", credits: "AI 채팅 넉넉히 · Sonnet", highlight: true, cta: "시작하기", desc: ["모든 업무 기능 (+결재·근태·회의·재무)", "AI 에이전트 전체 사용", "초과 시트 ₩4,000/인 · 이메일 지원"] },
+  { name: "Pro", price: "₩49,000", unit: "/월 · 10명 포함", credits: "AI 채팅 넉넉히 · +Opus", highlight: false, cta: "시작하기", desc: ["스탠다드 전체 + 워크플로우·전용 에이전트", "고급 AI 모델(Opus)·대형 지식파일", "초과 시트 ₩4,000/인 · 우선 지원"] },
+  { name: "Premium", price: "문의", unit: "무제한 인원 · 맞춤", credits: "AI 무제한 · Fable·미디어", highlight: false, cta: "도입 문의", desc: ["전 기능 + 이미지·영상 생성", "API·SSO·전용 온보딩/컨설팅", "맞춤 사용량·전용 셋업"] },
 ]
 
 /** 요금별 기능 비교 (4티어) — false=미포함(—), true=체크, 문자열=값 표기 */
@@ -65,7 +68,8 @@ const PLAN_ROWS: { f: string; basic: string | boolean; std: string | boolean; pr
   { f: "전자결재·근태", basic: false, std: true, pro: true, prem: true },
   { f: "회의노트(AI 요약)·명함(OCR)·비용·매출", basic: false, std: true, pro: true, prem: true },
   { f: "AI 에이전트 (기본 8종 + 직접 제작)", basic: "맛보기", std: true, pro: true, prem: true },
-  { f: "포함 크레딧 / 월", basic: "500", std: "3,000", pro: "7,000", prem: "초대량" },
+  { f: "AI 채팅·보조 (공정 사용)", basic: "맛보기", std: true, pro: true, prem: true },
+  { f: "자동 실행 (워크플로우·리서치)", basic: "맛보기", std: "포함", pro: "2배 이상", prem: "맞춤" },
   { f: "AI 모델", basic: "Sonnet", std: "Sonnet", pro: "+Opus", prem: "+Fable" },
   { f: "지식파일 첨부", basic: "소형", std: "중형", pro: "대형", prem: "무제한" },
   { f: "워크플로우·MCP 연동", basic: false, std: false, pro: true, prem: true },
@@ -76,8 +80,9 @@ const PLAN_ROWS: { f: string; basic: string | boolean; std: string | boolean; pr
 ]
 
 const FAQS = [
-  { q: "정말 무료로 시작할 수 있나요?", a: "네. Basic 플랜은 별도 카드 등록 없이 영구 무료입니다. 팀 협업 기능과 매달 AI 크레딧(맛보기)이 포함돼요. 더 쓰려면 유료 플랜으로 올리면 됩니다." },
-  { q: "요금은 어떻게 되나요?", a: "회사 단위 정액(Basic 무료 · Standard ₩29,000 · Pro ₩49,000)에 포함 인원을 넘으면 1인당 ₩4,000이 붙습니다. AI는 포함 크레딧으로 쓰고, 더 필요하면 추가 구매하거나 상위 플랜으로 올리면 됩니다. 연간 결제 시 2개월 무료." },
+  { q: "정말 무료로 시작할 수 있나요?", a: "네. Basic 플랜은 별도 카드 등록 없이 영구 무료입니다. 팀 협업 기능과 AI 맛보기가 포함되고, AI 사용량은 매일 조금씩 다시 채워집니다. 더 쓰려면 유료 플랜으로 올리면 됩니다." },
+  { q: "요금은 어떻게 되나요?", a: "회사 단위 정액(Basic 무료 · Standard ₩29,000 · Pro ₩49,000)에 포함 인원을 넘으면 1인당 ₩4,000이 붙습니다. AI는 요금제에 포함된 사용량 안에서 쓰고, 더 필요하면 상위 플랜으로 올리면 됩니다. 연간 결제 시 2개월 무료." },
+  { q: "AI를 쓰다가 갑자기 막히지 않나요?", a: "사람이 직접 쓰는 AI 채팅과 보조 기능은 공정 사용 범위에서 막지 않습니다. 사용량 한도는 워크플로우 자동 실행처럼 사람 없이 도는 작업에만 적용되고, 그마저도 매일(무료) 또는 매달(유료) 다시 채워집니다." },
   { q: "우리 회사 데이터는 안전한가요?", a: "회사별로 데이터가 격리되고, 민감 정보는 암호화해 국내 리전에 저장합니다. 데이터의 소유권은 회사에 있습니다." },
   { q: "우리 회사 방식에 맞출 수 있나요?", a: "그게 컴플로우(Complow)의 출발점입니다. 손익 계산 수식, AI 에이전트, 결재선까지 회사 방식대로 직접 구성할 수 있습니다." },
   { q: "도입은 어떻게 진행되나요?", a: "도입 문의를 남기면 세팅부터 온보딩까지 함께합니다. 쓰던 도구(구글·노션 등)는 연동으로 그대로 이어집니다." },
@@ -395,7 +400,7 @@ export default function LandingPage() {
       <section id="pricing" className="mx-auto max-w-5xl scroll-mt-16 border-t border-black/[0.06] px-6 py-24">
         <div className="text-center">
           <h2 className="text-[clamp(1.6rem,4vw,2.2rem)] font-extrabold tracking-[-0.02em]">간단한 구독제</h2>
-          <p className="mt-3 text-[15px] text-black/45">회사 단위로 시작하고, 인원만큼만 내세요. AI는 쓴 만큼 크레딧으로.</p>
+          <p className="mt-3 text-[15px] text-black/45">회사 단위로 시작하고, 인원만큼만 내세요. AI 채팅은 넉넉하게.</p>
           {/* 얼리버드 스트립(프로모션 틀) */}
           <span className="mt-5 inline-flex items-center gap-1.5 rounded-full border border-black/[0.08] bg-black/[0.03] px-3.5 py-1.5 text-[12px] font-semibold text-black/60">
             <Sparkles className="size-3.5" /> 얼리버드 — 사전 신청 회사 한정 할인 예정
