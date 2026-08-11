@@ -1,6 +1,8 @@
 import { streamText } from "ai"
 import { anthropic, MODELS } from "@/lib/claude/client"
 import { createClient } from "@/lib/supabase/server"
+import { recordAiUsage } from "@/lib/aiUsage"
+import { getUserWorkspaceId } from "@/lib/workspace"
 
 export const maxDuration = 60
 export const runtime = "nodejs"
@@ -82,13 +84,30 @@ export async function POST(req: Request) {
   // 교정(spellcheck)은 결정적이어야 해 낮은 temperature, 다듬기는 약간 높게
   const TEMP: Record<Action, number> = { polish: 0.4, spellcheck: 0.2, summarize: 0.3, translate: 0.3 }
 
+  const workspaceId = await getUserWorkspaceId(supabase, user.id)
+  const startedAt = Date.now()
+
   const result = streamText({
     model: anthropic(MODELS.default),
     system: systemFor(action, targetLang),
     prompt: text,
     temperature: TEMP[action],
     maxOutputTokens: 1500,
+    // 스트리밍이라 응답이 끝난 뒤에야 토큰 수를 안다 → onFinish에서 기록(세션44: 이 라우트는 집계에서 빠져 있었다).
+    onFinish: async ({ usage }) => {
+      await recordAiUsage(supabase, {
+        workspaceId,
+        userId: user.id,
+        model: MODELS.default,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        startedAt,
+      })
+    },
   })
+
+  // 클라이언트가 중간에 끊어도 서버가 끝까지 소비해 onFinish(기록)가 실행되게 한다.
+  void result.consumeStream({ onError: () => {} })
 
   return result.toTextStreamResponse()
 }

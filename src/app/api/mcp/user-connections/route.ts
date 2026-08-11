@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { encryptToken } from "@/lib/google/crypto"
 import { discoverMcpTools } from "@/lib/mcp/connect"
 import { summarizeToolsKo } from "@/lib/mcp/summarize"
+import { getUserWorkspaceId } from "@/lib/workspace"
 import { MCP_CONNECTORS } from "@/lib/mcp"
 
 export const runtime = "nodejs"
@@ -71,7 +72,8 @@ export async function POST(req: Request) {
         url: connector.preset.url,
         auth_type: "bearer",
         encrypted_token,
-      })
+      }),
+      { supabase, userId: user.id, workspaceId: await getUserWorkspaceId(supabase, user.id) }
     )
     await supabase
       .from("mcp_user_connections")

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { generateObject } from "ai"
 import { createClient } from "@/lib/supabase/server"
 import { getUserWorkspaceId } from "@/lib/workspace"
+import { recordAiUsage, recordAiFailure } from "@/lib/aiUsage"
 import { anthropic, MODELS } from "@/lib/claude/client"
 import { receiptSchema } from "@/lib/claude/schemas"
 import { buildOcrFilePart } from "@/lib/storage"
@@ -36,6 +37,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "이미지 URL 생성 실패" }, { status: 500 })
   }
 
+  const wsId = await getUserWorkspaceId(supabase, user.id) // B1-b: 쓰기에 워크스페이스 명시
+  const startedAt = Date.now()
+
   let object
   try {
     const result = await generateObject({
@@ -55,14 +59,27 @@ export async function POST(req: Request) {
       ],
     })
     object = result.object
+    // 세션44: 이 라우트는 사용량 집계에서 빠져 있었다(원가·크레딧 둘 다 누락).
+    await recordAiUsage(supabase, {
+      workspaceId: wsId,
+      userId: user.id,
+      model: MODELS.default,
+      inputTokens: result.usage.inputTokens,
+      outputTokens: result.usage.outputTokens,
+      startedAt,
+    })
   } catch (e) {
+    await recordAiFailure(
+      supabase,
+      { workspaceId: wsId, userId: user.id, model: MODELS.default, startedAt },
+      e
+    )
     return NextResponse.json(
       { error: `OCR 실패: ${e instanceof Error ? e.message : "unknown"}` },
       { status: 502 }
     )
   }
 
-  const wsId = await getUserWorkspaceId(supabase, user.id) // B1-b: 쓰기에 워크스페이스 명시
   const { data: inserted, error: insErr } = await supabase
     .from("finance_entries")
     .insert({

@@ -1,6 +1,8 @@
 import { streamText } from "ai"
-import { anthropic } from "@/lib/claude/client"
+import { anthropic, MODELS } from "@/lib/claude/client"
 import { createClient } from "@/lib/supabase/server"
+import { recordAiUsage } from "@/lib/aiUsage"
+import { getUserWorkspaceId } from "@/lib/workspace"
 import { SKILL_MD_SYSTEM, serializeInputs, type WizardInputs } from "@/lib/agentBuilder"
 
 export const maxDuration = 60
@@ -33,13 +35,31 @@ export async function POST(req: Request) {
     ? `\n\n## 사용자 추가 답변(인터뷰)\n${clarifications}`
     : ""
 
+  const workspaceId = await getUserWorkspaceId(supabase, user.id)
+  const startedAt = Date.now()
+
   const result = streamText({
-    model: anthropic("claude-sonnet-4-6"),
+    // 하드코딩된 모델 문자열이었다 → MODELS.default(같은 값). 기본 모델이 바뀌어도 같이 따라간다.
+    model: anthropic(MODELS.default),
     system: SKILL_MD_SYSTEM,
     prompt: `다음 입력을 바탕으로 skill.md 시스템 프롬프트를 작성하세요.\n\n${serializeInputs(inputs)}${clarifyBlock}`,
     temperature: 0.4,
     maxOutputTokens: 2000,
+    // 스트리밍이라 끝나야 토큰 수를 안다 → onFinish에서 기록(세션44: 집계에서 빠져 있던 라우트).
+    onFinish: async ({ usage }) => {
+      await recordAiUsage(supabase, {
+        workspaceId,
+        userId: user.id,
+        model: MODELS.default,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        startedAt,
+      })
+    },
   })
+
+  // 클라이언트가 끊겨도 서버가 끝까지 소비해 onFinish(기록)가 실행되게 한다.
+  void result.consumeStream({ onError: () => {} })
 
   return result.toTextStreamResponse()
 }

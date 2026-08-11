@@ -1,6 +1,8 @@
 import { streamText } from "ai"
 import { anthropic, MODELS } from "@/lib/claude/client"
 import { createClient } from "@/lib/supabase/server"
+import { recordAiUsage } from "@/lib/aiUsage"
+import { getUserWorkspaceId } from "@/lib/workspace"
 
 export const maxDuration = 60
 export const runtime = "nodejs"
@@ -86,13 +88,30 @@ export async function POST(req: Request) {
 
   const TEMP: Record<Action, number> = { formal: 0.4, casual: 0.5, concise: 0.3, translate: 0.3 }
 
+  const workspaceId = await getUserWorkspaceId(supabase, user.id)
+  const startedAt = Date.now()
+
   const result = streamText({
     model: anthropic(MODELS.default),
     system: systemFor(action, targetLang),
     prompt: text,
     temperature: TEMP[action],
     maxOutputTokens: 2000,
+    // 스트리밍이라 끝나야 토큰 수를 안다 → onFinish에서 기록(세션44: 집계에서 빠져 있던 라우트).
+    onFinish: async ({ usage }) => {
+      await recordAiUsage(supabase, {
+        workspaceId,
+        userId: user.id,
+        model: MODELS.default,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        startedAt,
+      })
+    },
   })
+
+  // 클라이언트가 끊겨도 서버가 끝까지 소비해 onFinish(기록)가 실행되게 한다.
+  void result.consumeStream({ onError: () => {} })
 
   return result.toTextStreamResponse()
 }

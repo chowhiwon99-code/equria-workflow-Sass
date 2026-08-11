@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { discoverMcpTools, resolveUserConnectionConfig } from "@/lib/mcp/connect"
 import { summarizeToolsKo } from "@/lib/mcp/summarize"
+import { getUserWorkspaceId } from "@/lib/workspace"
 import { MCP_CONNECTORS, credentialKeyFor } from "@/lib/mcp"
 import { decryptToken } from "@/lib/google/crypto"
 
@@ -30,7 +31,11 @@ export async function POST(_req: Request, { params }: { params: Promise<{ connec
   const rowId = row.id
 
   try {
-    const tools = await summarizeToolsKo(cfg.name, await discoverMcpTools(cfg))
+    const tools = await summarizeToolsKo(cfg.name, await discoverMcpTools(cfg), {
+      supabase,
+      userId: user.id,
+      workspaceId: await getUserWorkspaceId(supabase, user.id),
+    })
 
     // 구글 스코프 검사 — 부여 안 됐으면 "실패한 연결"로 기록(사용자 관점: 도구가 전부 403이므로)
     const connector = MCP_CONNECTORS.find((c) => c.id === connectorId)
