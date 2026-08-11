@@ -55,31 +55,31 @@ const SECURITY = [
  *  ⚠️ AI는 "크레딧"이 아니라 **사용량**으로 표기한다. 구독료에 크레딧이 포함되면 환금성으로 분류돼
  *  PG 심사가 막힌다(KCP 거절 사유 ①, 2026-08-10). 별도 판매(추가 구매)도 하지 않는다.
  *  한도 구조는 lib/credits.ts UsageKind — 채팅은 공정 사용, 자동 실행만 한도. */
+//  Premium 카드는 뺐다(2026-08-11 대표 결정) — 타겟이 중소 규모라 맞출 이유가 없고,
+//  '무제한 인원'이라는 존재 이유는 초과 인원 과금으로 이미 해결된다. 큰 회사는 표 아래 문의 경로로.
+//  ⚠️ lib/plans.ts 의 premium 은 **유지**한다(자사 워크스페이스가 쓰는 내부 무제한 플랜).
+//  ⚠️ 여기엔 **실제로 있는 것만** 적는다. 없던 것 제거: API·SSO, 이미지·영상 생성, Fable,
+//     사이드바 전용 에이전트(미구현), 지식파일 용량 차등(전 플랜 동일 20MB).
 const PLANS: { name: string; price: string; unit: string; credits: string; highlight: boolean; cta: string; desc: string[] }[] = [
   { name: "Basic", price: "₩0", unit: "3명 포함 · 영구 무료", credits: "AI 맛보기 · 매일 충전", highlight: false, cta: "무료로 시작", desc: ["팀 협업 (채팅·캘린더·프로젝트)", "AI 에이전트 맛보기", "회사별 데이터 격리"] },
   { name: "Standard", price: "₩29,000", unit: "/월 · 5명 포함", credits: "AI 채팅 넉넉히 · Sonnet", highlight: true, cta: "시작하기", desc: ["모든 업무 기능 (+결재·근태·회의·재무)", "AI 에이전트 전체 사용", "6명째부터 1인당 ₩4,000 · 이메일 지원"] },
-  { name: "Pro", price: "₩49,000", unit: "/월 · 10명 포함", credits: "AI 채팅 넉넉히 · +Opus", highlight: false, cta: "시작하기", desc: ["스탠다드 전체 + 워크플로우·전용 에이전트", "고급 AI 모델(Opus)·대형 지식파일", "11명째부터 1인당 ₩4,000 · 우선 지원"] },
-  { name: "Premium", price: "문의", unit: "무제한 인원 · 맞춤", credits: "AI 무제한 · Fable·미디어", highlight: false, cta: "도입 문의", desc: ["전 기능 + 이미지·영상 생성", "API·SSO·전용 온보딩/컨설팅", "맞춤 사용량·전용 셋업"] },
+  { name: "Pro", price: "₩49,000", unit: "/월 · 10명 포함", credits: "AI 채팅 넉넉히 · +Opus", highlight: false, cta: "시작하기", desc: ["스탠다드 전체 + 워크플로우·MCP 연동", "고급 AI 모델(Opus) 사용", "11명째부터 1인당 ₩4,000 · 우선 지원"] },
 ]
 
-/** 요금별 기능 비교 (4티어) — false=미포함(—), true=체크, 문자열=값 표기 */
-const PLAN_ROWS: { f: string; basic: string | boolean; std: string | boolean; pro: string | boolean; prem: string | boolean }[] = [
-  { f: "팀 협업 (채팅·캘린더·프로젝트·구성원·파일)", basic: true, std: true, pro: true, prem: true },
-  { f: "전자결재·근태", basic: false, std: true, pro: true, prem: true },
-  { f: "회의노트(AI 요약)·명함(OCR)·비용·매출", basic: false, std: true, pro: true, prem: true },
-  { f: "AI 에이전트 (기본 8종 + 직접 제작)", basic: "맛보기", std: true, pro: true, prem: true },
-  { f: "AI 채팅·보조 (공정 사용)", basic: "맛보기", std: true, pro: true, prem: true },
+/** 요금별 기능 비교 (3티어) — false=미포함(—), true=체크, 문자열=값 표기 */
+const PLAN_ROWS: { f: string; basic: string | boolean; std: string | boolean; pro: string | boolean }[] = [
+  { f: "팀 협업 (채팅·캘린더·프로젝트·구성원·파일)", basic: true, std: true, pro: true },
+  { f: "전자결재·근태", basic: false, std: true, pro: true },
+  { f: "회의노트(AI 요약)·명함(OCR)·비용·매출", basic: false, std: true, pro: true },
+  { f: "AI 에이전트 (직접 제작 + 지식파일 첨부)", basic: "맛보기", std: true, pro: true },
+  { f: "AI 채팅·보조 (공정 사용)", basic: "맛보기", std: true, pro: true },
   // ⚠️ 워크플로우는 아래 별도 행에서 Pro 전용이다 → 이 행 이름에 워크플로우를 넣으면
   //    Basic/Standard에 없는 기능의 한도를 적어놓는 모순이 된다. 전 플랜에 있는 것만 예시로.
-  { f: "자동 실행 사용량 (리서치·작업 제안)", basic: "맛보기", std: "포함", pro: "2배 이상", prem: "맞춤" },
-  { f: "AI 모델", basic: "Sonnet", std: "Sonnet", pro: "+Opus", prem: "+Fable" },
-  { f: "지식파일 첨부", basic: "소형", std: "중형", pro: "대형", prem: "무제한" },
-  { f: "워크플로우·MCP 연동", basic: false, std: false, pro: true, prem: true },
-  { f: "사이드바 기능별 전용 에이전트", basic: false, std: false, pro: true, prem: true },
-  { f: "미디어 생성 (이미지·영상)", basic: false, std: false, pro: false, prem: true },
-  { f: "API·SSO·전용 온보딩", basic: false, std: false, pro: false, prem: true },
+  { f: "자동 실행 사용량 (리서치·작업 제안)", basic: "맛보기", std: "포함", pro: "2배 이상" },
+  { f: "AI 모델", basic: "Sonnet", std: "Sonnet", pro: "+Opus" },
+  { f: "워크플로우·MCP 연동", basic: false, std: false, pro: true },
   // "시트"는 업계 용어라 처음 보는 사람에게 안 통한다(대표도 물어봤다) → 인원수로 직접 쓴다.
-  { f: "포함 인원 / 추가 요금", basic: "3명", std: "5명 / 1인당 ₩4,000", pro: "10명 / 1인당 ₩4,000", prem: "무제한" },
+  { f: "포함 인원 / 추가 요금", basic: "3명", std: "5명 / 1인당 ₩4,000", pro: "10명 / 1인당 ₩4,000" },
 ]
 
 const FAQS = [
@@ -409,7 +409,7 @@ export default function LandingPage() {
             <Sparkles className="size-3.5" /> 얼리버드 — 사전 신청 회사 한정 할인 예정
           </span>
         </div>
-        <div className="mx-auto mt-10 grid max-w-5xl gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mx-auto mt-10 grid max-w-4xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {PLANS.map((p) => (
             <div key={p.name} className={`flex flex-col rounded-2xl border p-6 ${p.highlight ? "" : "border-black/[0.08]"}`} style={p.highlight ? { borderColor: INK } : undefined}>
               {/* min-h: '추천' 배지가 있는 카드만 헤더가 몇 px 높아져 아래 줄이 어긋나는 것을 막는다 */}
@@ -446,23 +446,22 @@ export default function LandingPage() {
           ))}
         </div>
 
-        {/* 요금별 기능 비교 표 (4티어) */}
+        {/* 요금별 기능 비교 표 (3티어) */}
         <div className="mx-auto mt-12 max-w-3xl overflow-x-auto rounded-2xl border border-black/[0.07]">
           <table className="w-full min-w-[640px] text-left text-[13px]">
             <thead>
               <tr className="border-b border-black/[0.06] bg-[#fbfbfc] text-black/45">
                 <th className="px-4 py-3 font-semibold">기능</th>
-                <th className="w-24 px-3 py-3 text-center font-semibold">Basic</th>
-                <th className="w-28 px-3 py-3 text-center font-semibold">Standard</th>
-                <th className="w-24 px-3 py-3 text-center font-semibold">Pro</th>
-                <th className="w-28 px-3 py-3 text-center font-semibold">Premium</th>
+                <th className="w-36 px-3 py-3 text-center font-semibold">Basic</th>
+                <th className="w-36 px-3 py-3 text-center font-semibold">Standard</th>
+                <th className="w-36 px-3 py-3 text-center font-semibold">Pro</th>
               </tr>
             </thead>
             <tbody>
               {PLAN_ROWS.map((r) => (
                 <tr key={r.f} className="border-b border-black/[0.04] last:border-0">
                   <td className="px-4 py-3 text-black/70">{r.f}</td>
-                  {[r.basic, r.std, r.pro, r.prem].map((v, i) => (
+                  {[r.basic, r.std, r.pro].map((v, i) => (
                     <td key={i} className="px-3 py-3 text-center">
                       {v === true ? (
                         <Check className="mx-auto size-4" strokeWidth={2.25} />
@@ -478,8 +477,13 @@ export default function LandingPage() {
             </tbody>
           </table>
         </div>
+        {/* Premium 카드를 뺀 대신 남기는 문의 경로 — 인원이 많거나 별도 요건이 있는 회사용 */}
+        <p className="mt-6 text-center text-[13px] text-black/45">
+          인원이 더 많거나 별도 요건이 있나요?{" "}
+          <a href={CONTACT} className="font-semibold text-black/70 underline underline-offset-2 hover:text-black">도입 문의</a>
+        </p>
         {/* 프로모션 틀 — 연간·리퍼럴 자리 */}
-        <p className="mt-6 text-center text-[13px] text-black/40">연간 결제 시 2개월 무료 · 추천한 회사가 시작하면 양쪽 모두 1개월 무료</p>
+        <p className="mt-2 text-center text-[13px] text-black/40">연간 결제 시 2개월 무료 · 추천한 회사가 시작하면 양쪽 모두 1개월 무료</p>
       </section>
 
       {/* ── FAQ ── */}
