@@ -51,14 +51,14 @@ const SECURITY = [
   { icon: Server, t: "국내 리전", d: "데이터는 국내(서울) 리전에 저장됩니다." },
 ]
 
-/** 4티어 요금 카드 (2026-07-29 대표 확정 — 워크스페이스 정액 + 초과 시트 + AI 사용량)
+/** 4티어 요금 카드 (2026-07-29 대표 확정 — 워크스페이스 정액 + 인원 추가 요금 + AI 사용량)
  *  ⚠️ AI는 "크레딧"이 아니라 **사용량**으로 표기한다. 구독료에 크레딧이 포함되면 환금성으로 분류돼
  *  PG 심사가 막힌다(KCP 거절 사유 ①, 2026-08-10). 별도 판매(추가 구매)도 하지 않는다.
  *  한도 구조는 lib/credits.ts UsageKind — 채팅은 공정 사용, 자동 실행만 한도. */
 const PLANS: { name: string; price: string; unit: string; credits: string; highlight: boolean; cta: string; desc: string[] }[] = [
   { name: "Basic", price: "₩0", unit: "3명 포함 · 영구 무료", credits: "AI 맛보기 · 매일 충전", highlight: false, cta: "무료로 시작", desc: ["팀 협업 (채팅·캘린더·프로젝트)", "AI 에이전트 맛보기", "회사별 데이터 격리"] },
-  { name: "Standard", price: "₩29,000", unit: "/월 · 5명 포함", credits: "AI 채팅 넉넉히 · Sonnet", highlight: true, cta: "시작하기", desc: ["모든 업무 기능 (+결재·근태·회의·재무)", "AI 에이전트 전체 사용", "초과 시트 ₩4,000/인 · 이메일 지원"] },
-  { name: "Pro", price: "₩49,000", unit: "/월 · 10명 포함", credits: "AI 채팅 넉넉히 · +Opus", highlight: false, cta: "시작하기", desc: ["스탠다드 전체 + 워크플로우·전용 에이전트", "고급 AI 모델(Opus)·대형 지식파일", "초과 시트 ₩4,000/인 · 우선 지원"] },
+  { name: "Standard", price: "₩29,000", unit: "/월 · 5명 포함", credits: "AI 채팅 넉넉히 · Sonnet", highlight: true, cta: "시작하기", desc: ["모든 업무 기능 (+결재·근태·회의·재무)", "AI 에이전트 전체 사용", "6명째부터 1인당 ₩4,000 · 이메일 지원"] },
+  { name: "Pro", price: "₩49,000", unit: "/월 · 10명 포함", credits: "AI 채팅 넉넉히 · +Opus", highlight: false, cta: "시작하기", desc: ["스탠다드 전체 + 워크플로우·전용 에이전트", "고급 AI 모델(Opus)·대형 지식파일", "11명째부터 1인당 ₩4,000 · 우선 지원"] },
   { name: "Premium", price: "문의", unit: "무제한 인원 · 맞춤", credits: "AI 무제한 · Fable·미디어", highlight: false, cta: "도입 문의", desc: ["전 기능 + 이미지·영상 생성", "API·SSO·전용 온보딩/컨설팅", "맞춤 사용량·전용 셋업"] },
 ]
 
@@ -78,7 +78,8 @@ const PLAN_ROWS: { f: string; basic: string | boolean; std: string | boolean; pr
   { f: "사이드바 기능별 전용 에이전트", basic: false, std: false, pro: true, prem: true },
   { f: "미디어 생성 (이미지·영상)", basic: false, std: false, pro: false, prem: true },
   { f: "API·SSO·전용 온보딩", basic: false, std: false, pro: false, prem: true },
-  { f: "포함 시트 / 초과", basic: "3명", std: "5명 / +₩4,000", pro: "10명 / +₩4,000", prem: "무제한" },
+  // "시트"는 업계 용어라 처음 보는 사람에게 안 통한다(대표도 물어봤다) → 인원수로 직접 쓴다.
+  { f: "포함 인원 / 추가 요금", basic: "3명", std: "5명 / 1인당 ₩4,000", pro: "10명 / 1인당 ₩4,000", prem: "무제한" },
 ]
 
 const FAQS = [
