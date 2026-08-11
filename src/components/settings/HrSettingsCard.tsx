@@ -100,11 +100,11 @@ export function HrSettingsCard() {
           </Row>
         )}
 
-        <Row label="기본 연차(1년 이상)" hint="근로기준법 기본 15일">
+        <Row label="기본 연차" hint="입사 1년 이상 · 법정 15일">
           <NumInput value={leave.annual_base} min={0} max={40} onChange={(n) => patchLeave({ annual_base: n })} suffix="일" />
         </Row>
 
-        <Row label="근속 가산" hint="법정: 3년 이상부터 2년마다 1일, 최대 25일">
+        <Row label="근속 가산">
           <Toggle
             value={leave.tenure_bonus.enabled ? "on" : "off"}
             options={[
@@ -114,18 +114,18 @@ export function HrSettingsCard() {
             onChange={(v) => patchTenure({ enabled: v === "on" })}
           />
         </Row>
-        {/* 근속 가산 상세 — 숫자 4개가 본문 행들과 같은 축에 놓이면 리듬이 깨진다.
-            딸린 옵션임이 보이도록 들여쓰고, 읽으면 한 문장이 되게 배치한다. */}
+        {/* 근속 가산 상세 — 딸린 옵션이므로 들여쓰기만 하고 배경은 빼 시선을 뺏지 않게.
+            읽으면 "3년 이상부터 2년마다 1일씩 더, 25일까지"라는 한 문장이 된다. */}
         {leave.tenure_bonus.enabled && (
-          <div className="ml-3 flex flex-wrap items-center gap-x-2 gap-y-2 rounded-lg border-l-2 bg-muted/40 py-2.5 pl-3 pr-2 text-xs text-muted-foreground">
-            <NumInput value={leave.tenure_bonus.start_year} min={1} max={30} onChange={(n) => patchTenure({ start_year: n })} suffix="년 이상부터" suffixWidth="w-[4.5rem]" />
-            <NumInput value={leave.tenure_bonus.every_years} min={1} max={10} onChange={(n) => patchTenure({ every_years: n })} suffix="년마다" suffixWidth="w-11" />
-            <NumInput value={leave.tenure_bonus.plus_days} min={0} max={10} onChange={(n) => patchTenure({ plus_days: n })} suffix="일씩 더" suffixWidth="w-11" />
-            <NumInput value={leave.tenure_bonus.max_days} min={0} max={60} onChange={(n) => patchTenure({ max_days: n })} suffix="일까지" suffixWidth="w-11" />
+          <div className="ml-3 flex flex-wrap items-center gap-x-2 gap-y-2 border-l pl-4 text-xs text-muted-foreground">
+            <NumInput compact value={leave.tenure_bonus.start_year} min={1} max={30} onChange={(n) => patchTenure({ start_year: n })} suffix="년 이상부터" suffixWidth="w-[4.2rem]" />
+            <NumInput compact value={leave.tenure_bonus.every_years} min={1} max={10} onChange={(n) => patchTenure({ every_years: n })} suffix="년마다" suffixWidth="w-10" />
+            <NumInput compact value={leave.tenure_bonus.plus_days} min={0} max={10} onChange={(n) => patchTenure({ plus_days: n })} suffix="일씩" suffixWidth="w-7" />
+            <NumInput compact value={leave.tenure_bonus.max_days} min={0} max={60} onChange={(n) => patchTenure({ max_days: n })} suffix="일까지" suffixWidth="w-10" />
           </div>
         )}
 
-        <Row label="입사 1년 미만 월 1일 부여" hint="개근 시 월 1일(최대 11일)">
+        <Row label="입사 1년 미만 월 1일 부여" hint="개근한 달마다 1일 (최대 11일)">
           <Toggle
             value={leave.first_year_monthly ? "on" : "off"}
             options={[
@@ -168,9 +168,9 @@ export function HrSettingsCard() {
         <h3 className="text-sm font-semibold">근무시간</h3>
         <Row label="표준 근무시간">
           <div className="flex items-center gap-1.5">
-            <input type="time" value={work.standard_start} onChange={(e) => setWork((v) => ({ ...v, standard_start: e.target.value }))} className={cn(inputCls, "w-[8.5rem]")} />
-            <span className="text-xs text-muted-foreground">~</span>
-            <input type="time" value={work.standard_end} onChange={(e) => setWork((v) => ({ ...v, standard_end: e.target.value }))} className={cn(inputCls, "w-[8.5rem]")} />
+            <input type="time" value={work.standard_start} onChange={(e) => setWork((v) => ({ ...v, standard_start: e.target.value }))} className={cn(inputCls, "w-32")} />
+            <span className="shrink-0 text-xs text-muted-foreground">~</span>
+            <input type="time" value={work.standard_end} onChange={(e) => setWork((v) => ({ ...v, standard_end: e.target.value }))} className={cn(inputCls, "w-32")} />
           </div>
         </Row>
         <Row label="주 근무시간">
@@ -244,29 +244,35 @@ export function HrSettingsCard() {
   )
 }
 
-/** 설정 한 줄 — 왼쪽 라벨(+보조설명), 오른쪽 컨트롤.
- *  컨트롤을 고정 폭으로 묶어 행마다 입력칸 위치가 흔들리지 않게 한다(단위 글자 수가 달라도 축이 유지됨). */
+/**
+ * 설정 한 줄 — 왼쪽 라벨(+보조설명), 오른쪽 컨트롤.
+ *
+ * 컨트롤 열을 **고정 폭(17rem)** 으로 잡는 게 핵심이다. 컨트롤 종류가 토글·숫자+단위·시간범위로
+ * 제각각이라, 내용 폭에 맡기면 행마다 오른쪽 끝이 달라져 "정렬이 안 맞아" 보인다.
+ * 카드가 max-w-2xl(672px)이므로 17rem을 떼도 라벨 열에 충분한 폭이 남는다.
+ */
 function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
-      <div className="min-w-0 flex-1">
-        <p className="text-sm">{label}</p>
+    <div className="grid items-center gap-x-4 gap-y-2 sm:grid-cols-[1fr_17rem]">
+      <div className="min-w-0">
+        <p className="text-sm leading-tight">{label}</p>
         {/* 라벨이 먼저 읽히도록 보조설명은 한 톤 더 작고 옅게 */}
-        {hint && <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground/75">{hint}</p>}
+        {hint && <p className="mt-1 text-[11px] leading-snug text-muted-foreground/70">{hint}</p>}
       </div>
-      <div className="flex shrink-0 items-center justify-end">{children}</div>
+      <div className="flex items-center justify-end">{children}</div>
     </div>
   )
 }
 
-/** 숫자 + 단위. `suffixWidth`로 단위 칸을 고정하면 여러 행의 입력칸이 세로로 정렬된다. */
+/** 숫자 + 단위. 단위 칸을 고정 폭으로 두어 '일'·'시간'처럼 길이가 달라도 숫자 박스가 세로로 정렬된다. */
 function NumInput({
   value,
   min,
   max,
   onChange,
   suffix,
-  suffixWidth = "w-8",
+  suffixWidth = "w-9",
+  compact = false,
 }: {
   value: number
   min: number
@@ -274,6 +280,8 @@ function NumInput({
   onChange: (n: number) => void
   suffix?: string
   suffixWidth?: string
+  /** 근속 가산처럼 한 줄에 여러 개가 들어가는 자리 — 입력칸을 좁게 */
+  compact?: boolean
 }) {
   return (
     <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -286,7 +294,7 @@ function NumInput({
           const n = Number(e.target.value)
           if (Number.isFinite(n)) onChange(Math.min(max, Math.max(min, n)))
         }}
-        className={numCls}
+        className={cn(numCls, compact && "w-16")}
       />
       {suffix && <span className={cn("shrink-0 text-left", suffixWidth)}>{suffix}</span>}
     </span>
