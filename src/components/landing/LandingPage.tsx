@@ -412,15 +412,17 @@ export default function LandingPage() {
         <div className="mx-auto mt-10 grid max-w-5xl gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {PLANS.map((p) => (
             <div key={p.name} className={`flex flex-col rounded-2xl border p-6 ${p.highlight ? "" : "border-black/[0.08]"}`} style={p.highlight ? { borderColor: INK } : undefined}>
-              <div className="flex items-center justify-between">
+              {/* min-h: '추천' 배지가 있는 카드만 헤더가 몇 px 높아져 아래 줄이 어긋나는 것을 막는다 */}
+              <div className="flex min-h-[26px] items-center justify-between">
                 <span className="text-[15px] font-bold">{p.name}</span>
                 {p.highlight && <span className="rounded-full px-2.5 py-1 text-[11px] font-bold text-white" style={{ background: INK }}>추천</span>}
               </div>
-              <div className="mt-3 flex items-baseline gap-1">
-                <span className="text-[26px] font-extrabold tracking-tight">{p.price}</span>
-                <span className="text-[12px] text-black/40">{p.unit}</span>
-              </div>
-              <p className="mt-1.5 text-[12px] font-semibold text-black/55">{p.credits}</p>
+              {/* 가격·단위·AI설명을 각각 한 줄로 고정한다.
+                  같은 줄에 두면 긴 단위(Pro '/월 · 10명 포함')가 카드 폭을 넘겨 줄바꿈되고,
+                  그 카드만 아래 내용이 통째로 밀려 4장의 줄이 어긋난다. */}
+              <div className="mt-3 text-[26px] font-extrabold leading-none tracking-tight">{p.price}</div>
+              <p className="mt-1.5 text-[12px] leading-snug text-black/40">{p.unit}</p>
+              <p className="mt-2 text-[12px] font-semibold leading-snug text-black/55">{p.credits}</p>
               <ul className="mt-4 flex-1 space-y-2 text-[13px] leading-relaxed text-black/55">
                 {p.desc.map((d) => (
                   <li key={d} className="flex gap-1.5">
