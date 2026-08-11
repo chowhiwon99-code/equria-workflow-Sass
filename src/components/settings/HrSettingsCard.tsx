@@ -75,7 +75,7 @@ export function HrSettingsCard() {
   return (
     <div className="flex flex-col gap-5">
       {/* ── 휴가 기준 ── */}
-      <section className="flex flex-col gap-3">
+      <section className="flex flex-col gap-4">
         <h3 className="text-sm font-semibold">휴가 기준</h3>
 
         <Row label="연차 부여 방식" hint="입사일 기준 = 각자 입사일 1년 주기 · 회계연도 = 매년 같은 날 일괄">
@@ -114,12 +114,14 @@ export function HrSettingsCard() {
             onChange={(v) => patchTenure({ enabled: v === "on" })}
           />
         </Row>
+        {/* 근속 가산 상세 — 숫자 4개가 본문 행들과 같은 축에 놓이면 리듬이 깨진다.
+            딸린 옵션임이 보이도록 들여쓰고, 읽으면 한 문장이 되게 배치한다. */}
         {leave.tenure_bonus.enabled && (
-          <div className="flex flex-wrap items-center gap-2 pl-1 text-xs text-muted-foreground">
-            <NumInput value={leave.tenure_bonus.start_year} min={1} max={30} onChange={(n) => patchTenure({ start_year: n })} suffix="년 이상부터" />
-            <NumInput value={leave.tenure_bonus.every_years} min={1} max={10} onChange={(n) => patchTenure({ every_years: n })} suffix="년마다" />
-            <NumInput value={leave.tenure_bonus.plus_days} min={0} max={10} onChange={(n) => patchTenure({ plus_days: n })} suffix="일 가산" />
-            <NumInput value={leave.tenure_bonus.max_days} min={0} max={60} onChange={(n) => patchTenure({ max_days: n })} suffix="일 상한" />
+          <div className="ml-3 flex flex-wrap items-center gap-x-2 gap-y-2 rounded-lg border-l-2 bg-muted/40 py-2.5 pl-3 pr-2 text-xs text-muted-foreground">
+            <NumInput value={leave.tenure_bonus.start_year} min={1} max={30} onChange={(n) => patchTenure({ start_year: n })} suffix="년 이상부터" suffixWidth="w-[4.5rem]" />
+            <NumInput value={leave.tenure_bonus.every_years} min={1} max={10} onChange={(n) => patchTenure({ every_years: n })} suffix="년마다" suffixWidth="w-11" />
+            <NumInput value={leave.tenure_bonus.plus_days} min={0} max={10} onChange={(n) => patchTenure({ plus_days: n })} suffix="일씩 더" suffixWidth="w-11" />
+            <NumInput value={leave.tenure_bonus.max_days} min={0} max={60} onChange={(n) => patchTenure({ max_days: n })} suffix="일까지" suffixWidth="w-11" />
           </div>
         )}
 
@@ -162,13 +164,13 @@ export function HrSettingsCard() {
       </section>
 
       {/* ── 근무시간 ── */}
-      <section className="flex flex-col gap-3 border-t pt-4">
+      <section className="flex flex-col gap-4 border-t pt-5">
         <h3 className="text-sm font-semibold">근무시간</h3>
         <Row label="표준 근무시간">
           <div className="flex items-center gap-1.5">
-            <input type="time" value={work.standard_start} onChange={(e) => setWork((v) => ({ ...v, standard_start: e.target.value }))} className={cn(inputCls, "w-28")} />
+            <input type="time" value={work.standard_start} onChange={(e) => setWork((v) => ({ ...v, standard_start: e.target.value }))} className={cn(inputCls, "w-[8.5rem]")} />
             <span className="text-xs text-muted-foreground">~</span>
-            <input type="time" value={work.standard_end} onChange={(e) => setWork((v) => ({ ...v, standard_end: e.target.value }))} className={cn(inputCls, "w-28")} />
+            <input type="time" value={work.standard_end} onChange={(e) => setWork((v) => ({ ...v, standard_end: e.target.value }))} className={cn(inputCls, "w-[8.5rem]")} />
           </div>
         </Row>
         <Row label="주 근무시간">
@@ -187,7 +189,7 @@ export function HrSettingsCard() {
       </section>
 
       {/* ── 회사 휴무일 ── */}
-      <section className="flex flex-col gap-3 border-t pt-4">
+      <section className="flex flex-col gap-3 border-t pt-5">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold">회사 휴무일·공휴일</h3>
           <button
@@ -242,21 +244,39 @@ export function HrSettingsCard() {
   )
 }
 
+/** 설정 한 줄 — 왼쪽 라벨(+보조설명), 오른쪽 컨트롤.
+ *  컨트롤을 고정 폭으로 묶어 행마다 입력칸 위치가 흔들리지 않게 한다(단위 글자 수가 달라도 축이 유지됨). */
 function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <div className="min-w-0">
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
+      <div className="min-w-0 flex-1">
         <p className="text-sm">{label}</p>
-        {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+        {/* 라벨이 먼저 읽히도록 보조설명은 한 톤 더 작고 옅게 */}
+        {hint && <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground/75">{hint}</p>}
       </div>
-      <div className="shrink-0">{children}</div>
+      <div className="flex shrink-0 items-center justify-end">{children}</div>
     </div>
   )
 }
 
-function NumInput({ value, min, max, onChange, suffix }: { value: number; min: number; max: number; onChange: (n: number) => void; suffix?: string }) {
+/** 숫자 + 단위. `suffixWidth`로 단위 칸을 고정하면 여러 행의 입력칸이 세로로 정렬된다. */
+function NumInput({
+  value,
+  min,
+  max,
+  onChange,
+  suffix,
+  suffixWidth = "w-8",
+}: {
+  value: number
+  min: number
+  max: number
+  onChange: (n: number) => void
+  suffix?: string
+  suffixWidth?: string
+}) {
   return (
-    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
       <input
         type="number"
         value={value}
@@ -268,7 +288,7 @@ function NumInput({ value, min, max, onChange, suffix }: { value: number; min: n
         }}
         className={numCls}
       />
-      {suffix}
+      {suffix && <span className={cn("shrink-0 text-left", suffixWidth)}>{suffix}</span>}
     </span>
   )
 }
