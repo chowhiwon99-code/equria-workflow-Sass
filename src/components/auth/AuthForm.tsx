@@ -31,6 +31,8 @@ export function AuthForm({
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  // 폴백 로그인 접힘 상태 — 기본은 구글 버튼만 노출(가입은 구글 전용이므로 신규 사용자에겐 불필요).
+  const [showPasswordLogin, setShowPasswordLogin] = useState(false)
 
   // 이름+비밀번호 로그인(구글 미연결 기존 계정용 폴백). 가입은 구글 전용이라 signup 분기 없음.
   async function handleSubmit(e: React.FormEvent) {
@@ -69,7 +71,7 @@ export function AuthForm({
       {mode === "signup" ? (
         /* 가입 = 구글 전용(대표 결정 2026-07-28) — 이름+공용비번 폼 제거.
            신규 멤버는 관리자가 설정 '구성원 초대'에 구글 이메일을 등록해야 로그인 가능. */
-        <p className="mt-5 rounded-lg bg-muted/60 px-4 py-3 text-center text-[13px] leading-relaxed text-muted-foreground">
+        <p className="mt-5 break-keep rounded-lg bg-muted/60 px-4 py-3 text-center text-[13px] leading-relaxed text-muted-foreground">
           Complow는 구글 계정으로 시작해요.
           <br />
           관리자가 회원님의 구글 이메일을 등록했다면 위 버튼으로 바로 로그인됩니다.
@@ -78,6 +80,21 @@ export function AuthForm({
         </p>
       ) : (
         <>
+          {/* 이름+비밀번호 폴백은 기본 접힘. 신규 사용자는 구글(추후 애플)만 쓰고, 구글 미연결
+              기존 계정만 펼쳐서 쓴다 — 합성 이메일(u<hex>@equria.local)이라 자동 연결이 불가해
+              폼을 제거하면 잠긴다. 2026-08-12 확인: auth.users 7명 중 5명이 구글 미연결(전원 실사용자).
+              5명 전원 마이페이지에서 구글 연결을 마치면 이 분기를 통째로 삭제해도 된다. */}
+          {!showPasswordLogin && (
+            <button
+              type="button"
+              onClick={() => setShowPasswordLogin(true)}
+              className="mx-auto mt-5 block break-keep text-xs text-muted-foreground/70 underline"
+            >
+              기존 계정(이름·비밀번호)으로 로그인
+            </button>
+          )}
+          {showPasswordLogin && (
+          <>
           <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground/60">
             <span className="h-px flex-1 bg-border" />
             또는
@@ -106,10 +123,12 @@ export function AuthForm({
               {loading ? "로그인 중..." : "계속"}
             </Button>
           </form>
+          </>
+          )}
         </>
       )}
 
-      <p className="mt-8 text-center text-sm text-muted-foreground">
+      <p className="mt-8 break-keep text-center text-sm text-muted-foreground">
         {mode === "login" ? "신규 사용자이신가요? " : "이미 계정이 있으신가요? "}
         {onSwitchMode ? (
           <button type="button" onClick={() => onSwitchMode(other)} className="font-semibold text-foreground underline">
@@ -121,7 +140,7 @@ export function AuthForm({
           </Link>
         )}
       </p>
-      <p className="mx-auto mt-6 max-w-[320px] text-center text-xs leading-relaxed text-muted-foreground/70">
+      <p className="mx-auto mt-6 max-w-[320px] break-keep text-center text-xs leading-relaxed text-muted-foreground/70">
         계속 진행하면 <Link href="/terms" className="underline">이용약관</Link> 및 <Link href="/privacy" className="underline">개인정보처리방침</Link>을
         이해했으며 이에 동의하는 것으로 간주됩니다.
       </p>
