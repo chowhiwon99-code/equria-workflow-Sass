@@ -10,8 +10,10 @@
 
 ## 🔜 다음 세션 바로 착수 (세션45[구글 로그인 프로젝트 분리·CASA 회피·나이스페이] 인계 · 2026-08-12 — 이 블록부터 읽기)
 
-> ⚠️ **작업물 위치 = 브랜치 `worktree-gmail-scope-narrow`(origin 푸시 완료, main 아님·배포 안 함).**
-> 커밋 2개: `1da3c14`(Gmail 스코프 축소) · `53d176e`(문구 정렬 + 폴백 폼 접기). 검증 = tsc 0 · eslint 변경파일 0(전체 29 = 기존 베이스라인) · `next build` 성공.
+> **✅ 프로덕션 배포 완료 = `62663fe` (2026-08-13 · Vercel READY · `complow.kr`/`www.complow.kr` alias 확인) · 롤백 후보 = `4b7fe08`**(직전 프로덕션).
+> 게이트: tsc 0 · eslint 29/0(신규 0) · `next build` 성공 → `git push origin HEAD:main`(ff, 7커밋). 작업 브랜치 `worktree-gmail-scope-narrow`도 origin 푸시됨. **DDL 0(마이그 추가 없음).**
+> 라이브된 것: Gmail 스코프 축소(`gmail.send`만) · `/mail` 발송 전용화 · 로그인/가입 문구 줄바꿈 + 폴백 폼 접기 · 문서.
+> ⚠️ **이 배포에 빠진 것 = 대표 메인 체크아웃의 미커밋 "충전"→"사용량 제공" 문구 2곳**(`LandingPage.tsx`·`credits.ts`). PG 위험업종(포인트충전) 분류 회피용이라 **별도 커밋·배포 필요**. ⚠️ `feat/toss-ui-refresh`는 이제 main보다 뒤처짐(정리 필요).
 > ⚠️ **대표 메인 체크아웃에 미커밋 3건 잔존**: `HANDOFF.md`(나이스페이 PG 조사) · `LandingPage.tsx`·`credits.ts`("충전"→"사용량 제공" 문구 2곳). 커밋 필요.
 
 ### ✅ 구글 OAuth 프로젝트 분리 — 로그인 100명 상한 제거
