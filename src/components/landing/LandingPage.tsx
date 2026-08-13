@@ -61,7 +61,7 @@ const SECURITY = [
 //  ⚠️ 여기엔 **실제로 있는 것만** 적는다. 없던 것 제거: API·SSO, 이미지·영상 생성, Fable,
 //     사이드바 전용 에이전트(미구현), 지식파일 용량 차등(전 플랜 동일 20MB).
 const PLANS: { name: string; price: string; unit: string; credits: string; highlight: boolean; cta: string; desc: string[] }[] = [
-  { name: "Basic", price: "₩0", unit: "3명 포함 · 영구 무료", credits: "AI 맛보기 · 매일 충전", highlight: false, cta: "무료로 시작", desc: ["팀 협업 (채팅·캘린더·프로젝트)", "AI 에이전트 맛보기", "회사별 데이터 격리"] },
+  { name: "Basic", price: "₩0", unit: "3명 포함 · 영구 무료", credits: "AI 맛보기 · 매일 사용량 제공", highlight: false, cta: "무료로 시작", desc: ["팀 협업 (채팅·캘린더·프로젝트)", "AI 에이전트 맛보기", "회사별 데이터 격리"] },
   { name: "Standard", price: "₩29,000", unit: "/월 · 5명 포함", credits: "AI 채팅 넉넉히 · Sonnet", highlight: true, cta: "시작하기", desc: ["모든 업무 기능 (+결재·근태·회의·재무)", "AI 에이전트 전체 사용", "6명째부터 1인당 ₩4,000 · 이메일 지원"] },
   { name: "Pro", price: "₩49,000", unit: "/월 · 10명 포함", credits: "AI 채팅 넉넉히 · +Opus", highlight: false, cta: "시작하기", desc: ["스탠다드 전체 + 워크플로우·MCP 연동", "고급 AI 모델(Opus) 사용", "11명째부터 1인당 ₩4,000 · 우선 지원"] },
 ]
