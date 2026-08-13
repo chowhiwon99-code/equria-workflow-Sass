@@ -486,9 +486,14 @@
 ## 💡 합의된 정책 (코드만으론 안 보이는 결정 — 깨지 말 것)
 
 - **🏷️ 브랜드/철학(최신 — CLAUDE.md §1 브랜딩 규칙을 대체)**: 제품 브랜드 = **Complow(컴플로우)** 확정. **도메인** = `complow.kr`(국내 B2B 메인) + 방어용 `.ai`/`.io`/복합`.com`(`complow.com`은 1999년 선점 → 후순위 매입). **상표** = 9류(소프트웨어)·42류(SaaS·AI 서비스)·35류(비즈니스)로 변리사 출원 예정(국내 "컴플로우" 무경합; 38류 COMPLOW는 "포기"건이라 무관). 코드 UI 브랜드 문자열은 Complow로 교체 완료(내부 식별자 `equria:*`/`equria-*`/`equria.local`은 유지). `K-뷰티`는 첫 사내 고객 잔재. 철학 = **회사별 커스터마이징**(도메인·브랜드는 고정값 아닌 **슬롯/설정** 지향).
+- **🎯 타겟 고객·제품 목표(대표 진술 2026-08-13 — 기능·가격·UX 판단의 기준선)**: **기업이 아니라 소규모 팀·스타트업·대학생 수준의 작은 조직**이 타겟. 목표 = *"작은 단위의 사람들이 AI를 프로페셔널하게·조직적으로 다루게 하는 것."*
+  - **따라서 후순위**: 기업용 요건(SSO·감사로그·온프레미스·조달). 요금표에서 API·SSO를 뺀 판단(세션44)과 일치.
+  - **따라서 우선**: IT 담당자가 없는 조직도 스스로 세팅 가능한 온보딩 · 1인당 부담이 작은 가격(Standard ₩29,000/5석 = 1인 ₩5,800) · 설치·심사 없는 진입(**PWA**).
+  - **판단 기준**: "이 기능이 5~10명 팀에게 필요한가"로 되묻는다. 대기업 기준으로 설계하면 이 층이 못 쓴다.
+- **📲 앱 배포 = PWA(대표 결정 2026-08-13)**: 설치 파일·스토어 배포를 하지 않는다. 이유 = ① 서명 고정비(Apple 연 $99 + Windows 코드서명 인증서)가 없으면 미서명 실행 파일이 OS 경고로 차단돼 **오히려 신뢰를 깎는다**(타겟층은 보안 경고에 취약) ② 데스크톱 앱은 구버전이 남아 서버 API와 어긋나는 사고가 나는데 **우리는 거의 매일 배포** ③ Electron은 데스크톱 전용이라 모바일은 별도. 얻는 것(독립 창·아이콘·알림)은 PWA가 이미 제공. **Electron 재검토 조건 = 유료 고객 요구 또는 배포 주기가 주 1회 이하로 안정될 때**(그때도 최소 2종: mac Universal + Windows x64).
 - **삭제 = soft-delete(휴지통)**: 목록 `deleted_at is null` 필터, Storage 파일 보존, ⌘Z Undo(무음·실패 시만 토스트).
   - **⚠️ `is_active` 소프트삭제 테이블의 SELECT 정책에 `is_active=true`를 USING에 넣지 말 것**(마이그 031·032 교훈): 삭제 시 결과 행이 SELECT 가시성을 잃어 42501로 막힘. 소유자는 활성/비활성 무관 조회 + 앱에서 `is_active=true` 필터.
-- **🔐 RLS 멀티테넌시 패턴(B1)**: 모든 데이터 SELECT = `workspace_id in (select public.auth_user_workspace_ids())`, INSERT with check = `public.is_workspace_member(workspace_id)`. 헬퍼는 `security definer stable`. **신규 가입자는 `handle_new_user()`가 equria 멤버로 자동 등록(043)** — INSERT 정책 충족 위해 필수.
+- **🔐 RLS 멀티테넌시 패턴(B1)**: 모든 데이터 SELECT = `workspace_id in (select public.auth_user_workspace_ids())`, INSERT with check = `public.is_workspace_member(workspace_id)`. 헬퍼는 `security definer stable`. ⚠️ **옛 기록 정정(2026-08-13 DB 실물 확인)**: "신규 가입자는 `handle_new_user()`가 equria 멤버로 자동 등록(043)"은 **더 이상 사실이 아니다** — 마이그 **116**이 그 자동 등록을 제거했고(가입 개방 시 외부인이 우리 회사로 들어오던 구조), 지금 `handle_new_user`는 `profiles`만 만든다. 워크스페이스 귀속은 **온보딩(`create_workspace`)·초대 수락(`accept_workspace_invite`)** 이 담당한다.
 - **에이전트 = 우하단 위젯 only**(/agents는 빌더/관리). 내 핀 기준. 비공개 기본 + 공유(이제 "내 워크스페이스 안 공개").
 - **워크플로우 = n8n 캔버스**. 비공개 기본 + `is_public`. 소유자만 수정, 끈 위상정렬 실행(노드≤6·60s).
 - **채팅 SSOT**: `content`(plain)가 모든 텍스트 소비자의 단일 진실. 리치는 `body_json`(버블만). Tiptap 확장 추가 시 `MessageBody` 렌더러 케이스도 함께(`lib/tiptap.ts` 규약).

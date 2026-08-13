@@ -37,11 +37,12 @@ const COLUMNS: { title: string; links: FootLink[] }[] = [
     ],
   },
   {
-    // PWA로 실제 설치 가능해짐(2026-08) — 설치 파일 배포가 아니라 브라우저 설치라 안내 페이지로 보낸다.
-    title: "다운로드",
+    // PWA 배포(대표 결정 2026-08-13 — HANDOFF §합의된 정책). 설치 파일이 없으므로 "다운로드"라고 쓰지 않는다:
+    // 파일을 기대하게 만들면 /download(브라우저 설치 안내)에서 기대가 어긋난다. 라벨을 실제 동작에 맞춤.
+    title: "앱 설치",
     links: [
-      { l: "iOS & Android", href: "/download" },
-      { l: "Mac & Windows", href: "/download" },
+      { l: "데스크톱 (Mac·Windows)", href: "/download" },
+      { l: "모바일 (iOS·Android)", href: "/download" },
     ],
   },
   {
