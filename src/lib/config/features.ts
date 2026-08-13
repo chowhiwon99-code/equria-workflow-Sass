@@ -182,11 +182,12 @@ export const FEATURES: Feature[] = [
   },
   // ── 연동 ──
   {
-    // 네이티브 메일함(받은메일 읽기 UI)은 사이드바에서 숨김 — 메일은 에이전트가 Gmail 커넥터(compose)로 작성.
-    // gmail.readonly(제한된 스코프·CASA 검증 비용) 회피 정책과 일치. 되돌리려면 hiddenFromNav 제거.
+    // 메일은 **작성·발송 전용**(2026-08-12 대표 결정 A안 — `GOOGLE_SCOPES`=gmail.send만).
+    // 받은편지함 읽기는 gmail.readonly/modify가 구글 '제한' 스코프라 CASA 연간 보안감사를 부르므로 중단.
+    // ⚠️ hiddenFromNav를 유지하면 사용자가 발송 화면에 도달할 경로가 없다(현재 상태). 노출 여부는 대표 결정 대기.
     href: "/mail",
     label: "메일",
-    description: "Gmail 연동 — 받은편지함·작성·발송 (개인 계정 연결)",
+    description: "Gmail 연동 — 메일 작성·발송 (개인 계정 연결)",
     icon: Mail,
     status: "ready",
     phase: 6,
