@@ -47,7 +47,8 @@
 - 로그인 화면 이름·비밀번호 폼 **기본 접기 + '기존 계정으로 로그인' 토글**. **제거 불가 근거 = `auth.users` 7명 중 구글 연결 2명 / 미연결 5명이고 그 5명 전원이 워크스페이스 멤버 + 로그인 이력 보유(실사용자). 합성 이메일 `u<hex>@equria.local`이라 이메일 자동 연결도 불가 → 제거하면 5명 영구 잠김.** 5명이 마이페이지에서 구글 연결을 마치면 분기 통째 삭제 가능.
 
 ### 🔴 대표 액션
-1. **Supabase 신규가입 ON** — 대시보드 → Authentication → Sign In / Providers → **Allow new users to sign up**. (Supabase MCP에 auth 설정 도구가 없어 코드로 불가 = 대시보드 클릭 필요)
+1. ~~Supabase 신규가입 ON~~ → **✅ 이미 켜져 있음(2026-08-13 라이브 확인)**. 확인 방법 = GoTrue 공개 설정 엔드포인트: `curl -H "apikey: <anon>" https://dutovtfdckhayyvhtuxu.supabase.co/auth/v1/settings` → **`disable_signup: false`**(=가입 허용) · `google: true` · `email: true`(기존 5명 폴백) · `apple: false` · `anonymous_users: false`.
+   ⚠️ **세션45 초반에 "가입 OFF"라고 적은 것은 HANDOFF 구절을 근거로 한 오판이었다** — 라이브 설정이 SSOT. **즉 외부인은 이미 가입 가능한데 E2E 검증만 안 된 상태**이므로, 제3자 계정 가입 테스트의 우선순위가 올라간다(대표 보류 중이나 문은 열려 있음).
 2. **브랜드 검증 제출 확인** — `complow-login` 인증 센터
 3. **나이스페이 전자결제 신청** — 테스트 상점 개설 완료(상점명 `컴플로우`). 신청서에 **"월 정액 구독 SaaS"** 기재 · **"크레딧·충전·포인트" 표현 금지**(KCP 반려 추정 원인 = 포인트충전 위험업종 분류). 요구 서류 목록 공유 필요.
 4. **통신판매업 신고번호** → 푸터 반영(대표 보유·미전달. 푸터엔 사업자번호·대표·주소·전화·이메일까지 이미 라이브)
