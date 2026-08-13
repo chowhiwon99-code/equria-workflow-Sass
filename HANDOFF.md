@@ -31,7 +31,8 @@
 - ⚠️ **기존 HANDOFF 기록 "Gmail=compose만 → 민감(제한 아님)"은 오류였다** — `gmail.compose`는 제한이다. 이 기록으로 정정.
 - **`oauth.ts` `GOOGLE_SCOPES` = openid·email·profile·`gmail.send`** (커밋 `1da3c14`).
   - Drive: `GoogleDriveTab.tsx`가 **어디서도 임포트되지 않는 죽은 코드**라 `drive.readonly` 제거로 깨지는 기능 0. 파일·`/api/google/drive/*` 라우트는 **보존**(파괴적 삭제는 별도 검증 후).
-  - Gmail: `/mail` 페이지(`MailShell`)는 살아 있고 `features.ts` `hiddenFromNav: true`로 사이드바만 비노출. **`gmail.send`만으론 받은편지함 읽기·라벨·초안 저장이 동작하지 않는다** → `/mail` UI 정리(발송 전용화) **미처리 = 다음 세션 작업**.
+  - **✅ `/mail` 발송 전용화 완료(커밋 `84f5e4d`)**: 신규 `MailSendView`(연결 확인 + '새 메일 쓰기' → 기존 `MailCompose` 우하단 플로팅 재사용, 첨부·서식·AI 다듬기 유지·디자인 무변경). `MailShell.tsx`와 읽기 라우트(`threads`·`labels`·`attachments`)는 **보존**(grep으로 호출자 0건 확인 → 도달 불가 상태. 되돌리려면 페이지만 `MailShell`로 교체. 파괴적 삭제는 별도 검증 후 = safe-changes §2).
+  - ⚠️ **`features.ts` `hiddenFromNav: true`가 유지 중이라 사용자가 발송 화면에 도달할 경로가 없다.** 에이전트에도 메일 발송 도구가 없어 실질적으로 발송 기능이 잠긴 상태 → **노출 여부 = 대표 결정 대기**(노출하려면 `hiddenFromNav` 제거 한 줄).
   - 기존 연결 사용자 토큰은 부여 당시 범위 유지(축소는 재동의 시점부터 적용).
 - ⚠️ **기존 프로젝트의 "제한된 범위" 칸 미확인**(스크린샷 스크롤 잘림). Gmail 계열이 남아 있으면 그 프로젝트 스코프 검증 시 CASA가 재발한다 → 확인 필요.
 
