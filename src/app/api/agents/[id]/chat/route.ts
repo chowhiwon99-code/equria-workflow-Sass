@@ -315,9 +315,18 @@ export async function POST(
         closeMcp(),
       ])
     },
-    async onFinish({ text, usage, totalUsage }) {
+    async onFinish({ text, steps, usage, totalUsage }) {
       // 다단계(MCP 도구) 실행이면 totalUsage가 전 스텝 합산 — 비용/토큰은 합산 기준(워크플로우 run 라우트와 동일).
       const u = totalUsage ?? usage
+      // ⚠️ `text`는 SDK 정의상 **마지막 스텝**의 텍스트다(`OnFinishEvent = StepResult & { steps }`).
+      //    도구를 쓰는 턴이 도구 호출로 끝나면 빈 문자열이 되어 **답변이 빈 채로 저장**된다
+      //    (실측 2026-08-14: 출력 2,463토큰을 썼는데 messages.content가 0자). 사용자는 스트리밍으로
+      //    봤지만 새로고침하면 사라진다. → 전 스텝의 텍스트를 이어붙여 저장한다.
+      const fullText =
+        steps
+          .map((s) => s.text)
+          .filter((t) => t && t.trim().length > 0)
+          .join("\n\n") || text
       // ⚠️ inputTokens는 캐시 토큰을 포함한 총합(@ai-sdk/anthropic이 합산해 넘김). 내역은 inputTokenDetails.
       // 캐시분을 빼고 계산하지 않으면 캐시 읽기(0.1×)를 정가로 청구하게 된다 — computeCostUsd가 처리.
       const inputTokens = u.inputTokens ?? 0
@@ -331,7 +340,7 @@ export async function POST(
             {
               conversation_id: conversationId!,
               role: "assistant",
-              content: text,
+              content: fullText,
               tokens_used: outputTokens,
               model: agentVersion.model,
             },
@@ -375,7 +384,8 @@ export async function POST(
             userId: user.id,
             conversationId: conversationId!,
             workspaceId,
-            turns: turnsForExtraction(messages, text),
+            // fullText(전 스텝 합본) — text는 마지막 스텝만이라 도구로 끝난 턴에서 빈 답변으로 추출된다.
+            turns: turnsForExtraction(messages, fullText),
           })
         } catch {
           /* 기억 추출 실패는 채팅에 영향 주지 않음 */
