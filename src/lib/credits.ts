@@ -33,10 +33,18 @@ export const USD_PER_CREDIT = 0.01
 export type UsageKind = "interactive" | "automated"
 
 /**
- * 공정 사용 안전밸브 — interactive도 무한은 아니다. 포함량의 이 배수까지 쓰면 그때는 막는다.
+ * 공정 사용 안전밸브 — interactive도 무한은 아니다. 포함량의 배수까지 쓰면 그때는 막는다.
  * 없으면 무료 워크스페이스 하나가 원가를 무제한으로 태울 수 있다.
+ *
+ * 배수는 **플랜별**(`PlanDef.fairUseMultiplier`)이다 — 무료 1.0 / 유료 1.3.
+ * 이전에는 전 플랜 공통 3배였는데, 그러면 Standard 최악 원가가 3,000×3 = 9,000크레딧 = $90
+ * (매출 $19.16 대비 **원가율 470%**)이 되어 안전밸브가 아니라 적자 밸브였다.
+ * 2026-08-14 원가율 40% 재설계로 포함량을 750/1,300으로 내리면서 배수도 함께 낮췄다
+ * → 최악 원가율 Standard 50.9% · Pro 52.2%.
  */
-export const FAIR_USE_MULTIPLIER = 3
+export function fairUseMultiplierOf(plan: string | null | undefined): number {
+  return planOf(plan).fairUseMultiplier
+}
 
 /** 자동 실행분 소진 안내 — 채팅은 계속 된다는 걸 반드시 알려준다(고장으로 오해 방지). */
 export const CREDIT_EXHAUSTED_MSG =
@@ -60,7 +68,8 @@ export type CreditStatus = {
  * 이 호출을 막아야 하는지. 막아야 하면 안내 문구를, 통과면 null을 돌려준다.
  *
  * 차감은 종류와 무관하게 항상 일어난다(원가 관측을 잃지 않기 위해) — 달라지는 건 **차단 시점**뿐이다.
- * interactive는 잔액이 음수로 내려가도 계속 쓰다가, 포함량의 FAIR_USE_MULTIPLIER 배에서 멈춘다.
+ * interactive는 잔액이 음수로 내려가도 계속 쓰다가, 포함량 × 플랜별 공정사용 배수에서 멈춘다.
+ * 무료(배수 1.0)는 잔액 0에서 바로 멈추는데, 하루 17크레딧씩 회복되므로 다음 날 다시 쓸 수 있다.
  */
 export function creditBlockReason(
   balance: number | null,
@@ -69,8 +78,8 @@ export function creditBlockReason(
 ): string | null {
   if (balance == null) return null // 무제한 플랜
   if (kind === "automated") return balance > 0 ? null : CREDIT_EXHAUSTED_MSG
-  const cap = planOf(plan).includedCredits
-  const floor = -cap * (FAIR_USE_MULTIPLIER - 1) // 총 사용 가능량 = 포함량 × FAIR_USE_MULTIPLIER
+  const { includedCredits: cap, fairUseMultiplier: mult } = planOf(plan)
+  const floor = -cap * (mult - 1) // 총 사용 가능량 = 포함량 × 배수
   return balance > floor ? null : FAIR_USE_EXCEEDED_MSG
 }
 

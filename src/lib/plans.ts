@@ -11,13 +11,41 @@ export type PlanDef = {
   seats: number | null // null = 무제한(협의)
   priceKrw: number | null // null = 문의
   includedCredits: number
+  /**
+   * 공정 사용 배수 — interactive(사람이 직접 쓰는) 호출은 포함량의 이 배수까지 막지 않는다.
+   * 플랜별로 다른 이유: 무료는 매출이 0이라 초과분이 전부 순손실이지만, 유료는 초과분을
+   * 다음 요금제로 올릴 여지(업셀 신호)로 볼 수 있다. 상세는 credits.ts creditBlockReason.
+   */
+  fairUseMultiplier: number
 }
 
+/**
+ * 포함량 산정 근거 — **원가율 40% 목표 역산**(대표 결정 2026-08-14).
+ *
+ *   포함 크레딧 = 월 매출(USD) × 0.40 ÷ $0.01   (1 크레딧 = $0.01 원가)
+ *
+ * | 플랜     | 월 매출          | 40% 허용 원가 | 역산값 | 채택值 | 포함량 원가율 |
+ * |----------|------------------|---------------|--------|--------|---------------|
+ * | Standard | ₩29,000 = $19.16 | $7.66         | 766    | 750    | 39.2%         |
+ * | Pro      | ₩49,000 = $32.37 | $12.95        | 1,295  | 1,300  | 40.2%         |
+ *
+ * 환율 ₩1,514/$ 기준. 표시가격(부가세·PG 수수료 차감 전) 기준이므로 실질 원가율은 이보다
+ * 높다(부가세 10% + PG 약 3% 반영 시 Standard 약 45%) — 환율·수수료가 크게 움직이면 재계산할 것.
+ *
+ * Basic(무료)은 매출이 0이라 원가율로 역산할 수 없다 → 포함량 500(=월 $5)을 **전환 미끼 예산**
+ * 으로 유지하되 공정 사용 배수를 1.0으로 두어 최악값을 $15 → $5로 묶는다.
+ *
+ * ⚠️ **DB `plan_monthly_credits()`(마이그138)와 반드시 같은 값이어야 한다.** 차감·충전은 DB가
+ *    하고 화면 안내만 이 파일이 하므로, 한쪽만 바꾸면 "안내는 여유인데 실제로 막히는" 상태가 된다.
+ * ⚠️ 인원 추가(₩4,000/인)는 포함량을 늘리지 않는다 — 10인 Standard가 5인과 같은 포함량을 받는다.
+ *    시트 비례 가산은 미설계(HANDOFF 다음 세션 항목).
+ */
 export const PLANS: Record<PlanId, PlanDef> = {
-  free: { id: "free", label: "Basic", seats: 3, priceKrw: 0, includedCredits: 500 },
-  standard: { id: "standard", label: "Standard", seats: 5, priceKrw: 29000, includedCredits: 3000 },
-  pro: { id: "pro", label: "Pro", seats: 10, priceKrw: 49000, includedCredits: 7000 },
-  premium: { id: "premium", label: "Premium", seats: null, priceKrw: null, includedCredits: 0 },
+  free: { id: "free", label: "Basic", seats: 3, priceKrw: 0, includedCredits: 500, fairUseMultiplier: 1 },
+  standard: { id: "standard", label: "Standard", seats: 5, priceKrw: 29000, includedCredits: 750, fairUseMultiplier: 1.3 },
+  pro: { id: "pro", label: "Pro", seats: 10, priceKrw: 49000, includedCredits: 1300, fairUseMultiplier: 1.3 },
+  // 무제한(협의) — credit_sync가 null을 돌려주므로 게이팅 자체가 걸리지 않는다. 배수는 미사용.
+  premium: { id: "premium", label: "Premium", seats: null, priceKrw: null, includedCredits: 0, fairUseMultiplier: 1 },
 }
 
 /** plan 문자열 → 정의(알 수 없으면 free로 안전 폴백). */
