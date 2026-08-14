@@ -143,10 +143,14 @@ export async function POST(
   let stableSystem = agentVersion.system_prompt + OUTPUT_STYLE_RULE // 전 에이전트 공통 — AI 티 나는 기호(-, *, **) 절제
   let volatileSystem = ""
   {
+    // ⚠️ order 필수 — 이 결과가 그대로 캐시 프리픽스(stableSystem)의 일부가 된다.
+    //    행 순서가 흔들리면 프롬프트 앞부분이 1바이트 달라져 프롬프트 캐시가 통째로 무효가 된다.
     const { data: kn } = await supabase
       .from("agent_knowledge")
       .select("storage_path, name, mime_type, extracted_text")
       .eq("agent_id", agentId)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
     if (kn && kn.length > 0) {
       const textBlocks: string[] = []
       const fileParts: Array<
@@ -201,11 +205,15 @@ export async function POST(
   const toolSets: ToolSet[] = []
   const mcpIds = agentVersion.mcp_servers ?? []
   if (mcpIds.length > 0) {
+    // ⚠️ order 필수 — 도구 정의는 렌더 순서상 system보다 **앞**이라, 도구 키 순서가 흔들리면
+    //    프롬프트 캐시가 system까지 통째로 무효가 된다(캐시는 prefix 완전 일치).
     const { data: mcpServers } = await supabase
       .from("mcp_servers")
       .select("id, name, type, url, auth_type, is_active, encrypted_token")
       .in("id", mcpIds)
       .eq("is_active", true)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
     for (const srv of mcpServers ?? []) {
       try {
         const client = await connectMcp(srv)
@@ -226,11 +234,14 @@ export async function POST(
   if (usageNotes.length > 0) stableSystem += `\n\n${usageNotes.join("\n")}`
   if (boundConnectors.length > 0) {
     const CONN_COLS = "id, connector_id, auth_method, encrypted_token, encrypted_refresh_token"
+    // ⚠️ order 필수 — 위 mcp_servers와 같은 이유(도구 키 순서 = 캐시 프리픽스).
     const { data: myConnections } = await supabase
       .from("mcp_user_connections")
       .select(CONN_COLS)
       .eq("user_id", user.id)
       .in("connector_id", boundConnectors)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
     for (const row of myConnections ?? []) {
       const cfg = resolveUserConnectionConfig(row, user.id)
       if (!cfg) continue
