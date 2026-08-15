@@ -51,19 +51,25 @@ const SECURITY = [
   { icon: Server, t: "국내 리전", d: "데이터는 국내(서울) 리전에 저장됩니다." },
 ]
 
-/** 4티어 요금 카드 (2026-07-29 대표 확정 — 워크스페이스 정액 + 인원 추가 요금 + AI 사용량)
+/** 3티어 요금 카드 (2026-07-29 대표 확정 — 워크스페이스 정액 + AI 사용량)
  *  ⚠️ AI는 "크레딧"이 아니라 **사용량**으로 표기한다. 구독료에 크레딧이 포함되면 환금성으로 분류돼
  *  PG 심사가 막힌다(KCP 거절 사유 ①, 2026-08-10). 별도 판매(추가 구매)도 하지 않는다.
  *  한도 구조는 lib/credits.ts UsageKind — 채팅은 공정 사용, 자동 실행만 한도. */
-//  Premium 카드는 뺐다(2026-08-11 대표 결정) — 타겟이 중소 규모라 맞출 이유가 없고,
-//  '무제한 인원'이라는 존재 이유는 초과 인원 과금으로 이미 해결된다. 큰 회사는 표 아래 문의 경로로.
+//  🔴 인원 추가 요금(₩4,000/인) 표기 제거 — 2026-08-15 대표 결정 ⓑ.
+//  파는 것과 되는 것이 달랐다: accept_workspace_invite가 plan_seat_limit(3·5·10) 도달 시
+//  'seat limit reached'로 **6번째 멤버를 거부**한다(우회 경로 없음 — workspace_members RLS에
+//  INSERT 정책 0개·앱 직접 insert 0건). PG 심사자가 보는 페이지라 불일치를 남겨둘 수 없다.
+//  → 좌석 추가 구매는 정기결제(빌링키)가 필요해 결제 연동 때 구현하고, **그때 문구를 되살린다**.
+//     되살릴 때는 lib/plans.ts의 시트 비례 포함량(+105크레딧/인)도 함께 붙일 것.
+//  Premium 카드는 뺐다(2026-08-11 대표 결정) — 타겟이 중소 규모라 맞출 이유가 없다.
+//  인원이 더 필요한 회사는 상위 요금제, 10명을 넘으면 표 아래 문의 경로로.
 //  ⚠️ lib/plans.ts 의 premium 은 **유지**한다(자사 워크스페이스가 쓰는 내부 무제한 플랜).
 //  ⚠️ 여기엔 **실제로 있는 것만** 적는다. 없던 것 제거: API·SSO, 이미지·영상 생성, Fable,
 //     사이드바 전용 에이전트(미구현), 지식파일 용량 차등(전 플랜 동일 20MB).
 const PLANS: { name: string; price: string; unit: string; credits: string; highlight: boolean; cta: string; desc: string[] }[] = [
-  { name: "Basic", price: "₩0", unit: "3명 포함 · 영구 무료", credits: "AI 맛보기 · 매일 사용량 제공", highlight: false, cta: "무료로 시작", desc: ["팀 협업 (채팅·캘린더·프로젝트)", "AI 에이전트 맛보기", "회사별 데이터 격리"] },
-  { name: "Standard", price: "₩29,000", unit: "/월 · 5명 포함", credits: "AI 채팅 넉넉히 · Sonnet", highlight: true, cta: "시작하기", desc: ["모든 업무 기능 (+결재·근태·회의·재무)", "AI 에이전트 전체 사용", "6명째부터 1인당 ₩4,000 · 이메일 지원"] },
-  { name: "Pro", price: "₩49,000", unit: "/월 · 10명 포함", credits: "AI 채팅 넉넉히 · +Opus", highlight: false, cta: "시작하기", desc: ["스탠다드 전체 + 워크플로우·MCP 연동", "고급 AI 모델(Opus) 사용", "11명째부터 1인당 ₩4,000 · 우선 지원"] },
+  { name: "Basic", price: "₩0", unit: "3명까지 · 영구 무료", credits: "AI 맛보기 · 매일 사용량 제공", highlight: false, cta: "무료로 시작", desc: ["팀 협업 (채팅·캘린더·프로젝트)", "AI 에이전트 맛보기", "회사별 데이터 격리"] },
+  { name: "Standard", price: "₩29,000", unit: "/월 · 5명까지", credits: "AI 채팅 넉넉히 · Sonnet", highlight: true, cta: "시작하기", desc: ["모든 업무 기능 (+결재·근태·회의·재무)", "AI 에이전트 전체 사용", "인원이 늘면 Pro로 · 이메일 지원"] },
+  { name: "Pro", price: "₩49,000", unit: "/월 · 10명까지", credits: "AI 채팅 넉넉히 · +Opus", highlight: false, cta: "시작하기", desc: ["스탠다드 전체 + 워크플로우·MCP 연동", "고급 AI 모델(Opus) 사용", "10명이 넘으면 도입 문의 · 우선 지원"] },
 ]
 
 /** 요금별 기능 비교 (3티어) — false=미포함(—), true=체크, 문자열=값 표기 */
@@ -79,12 +85,14 @@ const PLAN_ROWS: { f: string; basic: string | boolean; std: string | boolean; pr
   { f: "AI 모델", basic: "Sonnet", std: "Sonnet", pro: "+Opus" },
   { f: "워크플로우·MCP 연동", basic: false, std: false, pro: true },
   // "시트"는 업계 용어라 처음 보는 사람에게 안 통한다(대표도 물어봤다) → 인원수로 직접 쓴다.
-  { f: "포함 인원 / 추가 요금", basic: "3명", std: "5명 / 1인당 ₩4,000", pro: "10명 / 1인당 ₩4,000" },
+  // ⚠️ 이 숫자는 lib/plans.ts PLANS.seats · DB plan_seat_limit()과 **같은 값**이어야 한다.
+  //    셋이 어긋나면 "파는 인원"과 "실제로 들어가지는 인원"이 달라진다(2026-08-15 사고 원인).
+  { f: "이용 인원 (초과 시 상위 요금제)", basic: "3명", std: "5명", pro: "10명" },
 ]
 
 const FAQS = [
   { q: "정말 무료로 시작할 수 있나요?", a: "네. Basic 플랜은 별도 카드 등록 없이 영구 무료입니다. 팀 협업 기능과 AI 맛보기가 포함되고, AI 사용량은 매일 조금씩 다시 채워집니다. 더 쓰려면 유료 플랜으로 올리면 됩니다." },
-  { q: "요금은 어떻게 되나요?", a: "회사 단위 정액(Basic 무료 · Standard ₩29,000 · Pro ₩49,000)에 포함 인원을 넘으면 1인당 ₩4,000이 붙습니다. AI는 요금제에 포함된 사용량 안에서 쓰고, 더 필요하면 상위 플랜으로 올리면 됩니다. 연간 결제 시 2개월 무료." },
+  { q: "요금은 어떻게 되나요?", a: "회사 단위 정액입니다(Basic 무료 · Standard ₩29,000 · Pro ₩49,000). 요금제마다 이용 인원이 정해져 있고(3명·5명·10명), 인원이 늘면 상위 요금제로 올리시면 됩니다. 10명이 넘는 팀은 도입 문의를 남겨주세요. AI도 요금제에 포함된 사용량 안에서 쓰고, 더 필요하면 같은 방식으로 올리면 됩니다. 연간 결제 시 2개월 무료." },
   { q: "AI를 쓰다가 갑자기 막히지 않나요?", a: "사람이 직접 쓰는 AI 채팅과 보조 기능은 공정 사용 범위에서 막지 않습니다. 사용량 한도는 리서치·작업 제안·워크플로우 자동 실행처럼 사람 없이 도는 작업에만 적용되고, 그마저도 매일(무료) 또는 매달(유료) 다시 채워집니다." },
   { q: "우리 회사 데이터는 안전한가요?", a: "회사별로 데이터가 격리되고, 민감 정보는 암호화해 국내 리전에 저장합니다. 데이터의 소유권은 회사에 있습니다." },
   { q: "우리 회사 방식에 맞출 수 있나요?", a: "그게 컴플로우(Complow)의 출발점입니다. 손익 계산 수식, AI 에이전트, 결재선까지 회사 방식대로 직접 구성할 수 있습니다." },
@@ -403,7 +411,7 @@ export default function LandingPage() {
       <section id="pricing" className="mx-auto max-w-5xl scroll-mt-16 border-t border-black/[0.06] px-6 py-24">
         <div className="text-center">
           <h2 className="text-[clamp(1.6rem,4vw,2.2rem)] font-extrabold tracking-[-0.02em]">간단한 구독제</h2>
-          <p className="mt-3 text-[15px] text-black/45">회사 단위로 시작하고, 인원만큼만 내세요. AI 채팅은 넉넉하게.</p>
+          <p className="mt-3 text-[15px] text-black/45">회사 단위로 시작하고, 팀 크기에 맞는 요금제만 고르세요. AI 채팅은 넉넉하게.</p>
           {/* 얼리버드 스트립(프로모션 틀) */}
           <span className="mt-5 inline-flex items-center gap-1.5 rounded-full border border-black/[0.08] bg-black/[0.03] px-3.5 py-1.5 text-[12px] font-semibold text-black/60">
             <Sparkles className="size-3.5" /> 얼리버드 — 사전 신청 회사 한정 할인 예정

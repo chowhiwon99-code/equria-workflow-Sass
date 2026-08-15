@@ -37,8 +37,12 @@ export type PlanDef = {
  *
  * ⚠️ **DB `plan_monthly_credits()`(마이그138)와 반드시 같은 값이어야 한다.** 차감·충전은 DB가
  *    하고 화면 안내만 이 파일이 하므로, 한쪽만 바꾸면 "안내는 여유인데 실제로 막히는" 상태가 된다.
- * ⚠️ 인원 추가(₩4,000/인)는 포함량을 늘리지 않는다 — 10인 Standard가 5인과 같은 포함량을 받는다.
- *    시트 비례 가산은 미설계(HANDOFF 다음 세션 항목).
+ * ⚠️ 시트 비례 가산은 **일부러 안 넣었다**(2026-08-15 검증). 초과 좌석이 지금은 생길 수 없다 —
+ *    `accept_workspace_invite`가 `plan_seat_limit`(3·5·10) 도달 시 거부하고, `workspace_members`
+ *    RLS에 INSERT 정책이 없어 우회도 불가하다. 유일하게 초과가 생기는 경로는 **요금제 다운그레이드**
+ *    인데 그 좌석은 **돈을 안 받은 좌석**이라, 비례 가산을 넣으면 미결제 사용량을 주게 된다.
+ *    → 좌석 추가 **과금**(=`paid_seats` 기록)이 먼저 생긴 뒤, 그 값에 비례해 +105크레딧/인을 붙일 것.
+ *    랜딩의 "₩4,000/인" 문구도 같은 이유로 제거됨(LandingPage.tsx 요금 카드 주석).
  */
 export const PLANS: Record<PlanId, PlanDef> = {
   free: { id: "free", label: "Basic", seats: 3, priceKrw: 0, includedCredits: 500, fairUseMultiplier: 1 },
