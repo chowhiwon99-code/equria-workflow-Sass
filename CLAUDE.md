@@ -139,7 +139,7 @@ equria-workspace/
 
 ---
 
-## 6. DB 스키마 요약 (약 57개 테이블 · 마이그 001~130)
+## 6. DB 스키마 요약 (약 61개 테이블 · 마이그 001~140)
 
 | 영역 | 테이블 |
 |------|--------|
@@ -161,8 +161,10 @@ equria-workspace/
 | 현금흐름(손익) | `cash_accounts`(슬롯) · `cash_transfers` · `cash_categories`(그룹) · `cashflow_settings` · `cash_calc_types`(회사 계산 유형·AST 수식) (마이그 078~085) |
 | 알림 | `notifications` |
 | 구글 연동 | `google_connections` |
+| AI 사용량(크레딧) | `workspace_credits` · `credit_ledger` (마이그132~133 — 차감은 **DB 트리거**가 한다) |
+| 결제/구독 | `billing_subscriptions` · `billing_payments` · `billing_keys`(**RLS 정책 0개 = 전면 거부**) · `billing_events`(감사로그) — 마이그139~140. 쓰기는 전부 `security definer` RPC(service_role 전용) |
 
-> 전체 SQL: `supabase/migrations/` (001~130). 원격 적용·drift 없음. **세부 진행상황·최신 변경은 HANDOFF.md가 SSOT.**
+> 전체 SQL: `supabase/migrations/` (001~140, 135~137은 결번). 원격 적용·drift 없음. **세부 진행상황·최신 변경은 HANDOFF.md가 SSOT.**
 > 기본 에이전트 8개 시드: `supabase/seed.sql` 참고
 
 ---
