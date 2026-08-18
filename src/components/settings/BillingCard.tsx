@@ -140,7 +140,7 @@ export function BillingCard() {
         {/* 이 프로젝트의 Button은 asChild를 지원하지 않는다(base-ui 래핑 없이 cva만 사용).
             CreditMeter.tsx:83과 같이 Link에 직접 스타일을 준다. */}
         <Link
-          href="/#pricing"
+          href="/billing"
           className="inline-flex h-9 w-full items-center justify-center rounded-lg border text-sm font-medium transition-colors hover:bg-accent"
         >
           요금제 보기
