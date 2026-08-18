@@ -19,6 +19,10 @@ export function LegalShell({ title, effective, children }: { title: string; effe
           {" · "}
           <Link href="/refund" className="underline hover:text-foreground">환불정책</Link>
           {" · "}
+          {/* 자동결제 약관은 이용약관과 별도 문서다(나이스페이 계약 제22조 ③ — 회원가입 약관에
+              끼워 넣으면 동의가 없는 것으로 본다). 여기·사이트맵·푸터에서 항상 도달 가능해야 한다. */}
+          <Link href="/terms/billing" className="underline hover:text-foreground">자동결제 약관</Link>
+          {" · "}
           <span>문의: complow@complow.kr</span>
         </div>
       </div>

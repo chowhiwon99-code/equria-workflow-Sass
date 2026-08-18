@@ -106,6 +106,8 @@ export function LandingFooter() {
             <Link href="/privacy" className="font-semibold text-white/70 transition-colors hover:text-white">개인정보처리방침</Link>
             <Link href="/terms" className="transition-colors hover:text-white">이용약관</Link>
             <Link href="/refund" className="transition-colors hover:text-white">환불정책</Link>
+            {/* 자동결제 약관 — 회원가입 약관과 별도 고지 의무(나이스페이 계약 제22조 ③). */}
+            <Link href="/terms/billing" className="transition-colors hover:text-white">자동결제 약관</Link>
           </div>
           {/* 소셜 — 인스타·X 실제 계정 연결됨 */}
           <div className="flex items-center gap-5">

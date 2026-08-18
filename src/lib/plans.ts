@@ -17,6 +17,14 @@ export type PlanDef = {
    * null = 문의(협의가)
    */
   priceKrw: number | null
+  /**
+   * 연간 표시가격(원). 부가세 포함. **월가 × 10** = 2개월 무료(랜딩 FAQ 문구와 정합).
+   *
+   * 연간이 중요한 이유: 빌링키(자동결제)가 아직 승인 전이라 월 구독은 매달 고객이 카드를
+   * 다시 입력해야 한다. 연간은 **일반결제 1회로 끝나** 빌링키 없이도 구독이 성립한다.
+   * (HANDOFF 결제 트랙 · 대표 결정 2026-08-18)
+   */
+  priceKrwYearly: number | null
   includedCredits: number
   /**
    * 공정 사용 배수 — interactive(사람이 직접 쓰는) 호출은 포함량의 이 배수까지 막지 않는다.
@@ -52,12 +60,15 @@ export type PlanDef = {
  *    랜딩의 "₩4,000/인" 문구도 같은 이유로 제거됨(LandingPage.tsx 요금 카드 주석).
  */
 export const PLANS: Record<PlanId, PlanDef> = {
-  free: { id: "free", label: "Basic", seats: 3, priceKrw: 0, includedCredits: 500, fairUseMultiplier: 1 },
-  standard: { id: "standard", label: "Standard", seats: 5, priceKrw: 29000, includedCredits: 750, fairUseMultiplier: 1.3 },
-  pro: { id: "pro", label: "Pro", seats: 10, priceKrw: 49000, includedCredits: 1300, fairUseMultiplier: 1.3 },
+  free: { id: "free", label: "Basic", seats: 3, priceKrw: 0, priceKrwYearly: 0, includedCredits: 500, fairUseMultiplier: 1 },
+  standard: { id: "standard", label: "Standard", seats: 5, priceKrw: 29000, priceKrwYearly: 290000, includedCredits: 750, fairUseMultiplier: 1.3 },
+  pro: { id: "pro", label: "Pro", seats: 10, priceKrw: 49000, priceKrwYearly: 490000, includedCredits: 1300, fairUseMultiplier: 1.3 },
   // 무제한(협의) — credit_sync가 null을 돌려주므로 게이팅 자체가 걸리지 않는다. 배수는 미사용.
-  premium: { id: "premium", label: "Premium", seats: null, priceKrw: null, includedCredits: 0, fairUseMultiplier: 1 },
+  premium: { id: "premium", label: "Premium", seats: null, priceKrw: null, priceKrwYearly: null, includedCredits: 0, fairUseMultiplier: 1 },
 }
+
+/** 연간 결제로 아끼는 개월 수(= 12 - 연간가/월가). 랜딩 "2개월 무료" 문구의 근거. */
+export const YEARLY_FREE_MONTHS = 2
 
 /** plan 문자열 → 정의(알 수 없으면 free로 안전 폴백). */
 export function planOf(plan: string | null | undefined): PlanDef {
