@@ -9,7 +9,14 @@ export type PlanDef = {
   id: PlanId
   label: string
   seats: number | null // null = 무제한(협의)
-  priceKrw: number | null // null = 문의
+  /**
+   * 월 표시가격(원). **부가세 포함 총액**이다(대표 결정 2026-08-18).
+   * 즉 ₩29,000을 받으면 순매출은 ₩26,364이고 ₩2,636이 부가세다.
+   * ⚠️ 랜딩 가격표 · `billing_payments.amount_krw` · 환불 일할 계산이 **모두 같은 정의**여야 한다.
+   *    하나라도 "부가세 별도"로 해석하면 환불 금액이 10% 어긋난다.
+   * null = 문의(협의가)
+   */
+  priceKrw: number | null
   includedCredits: number
   /**
    * 공정 사용 배수 — interactive(사람이 직접 쓰는) 호출은 포함량의 이 배수까지 막지 않는다.

@@ -412,6 +412,11 @@ export default function LandingPage() {
         <div className="text-center">
           <h2 className="text-[clamp(1.6rem,4vw,2.2rem)] font-extrabold tracking-[-0.02em]">간단한 구독제</h2>
           <p className="mt-3 text-[15px] text-black/45">회사 단위로 시작하고, 팀 크기에 맞는 요금제만 고르세요. AI 채팅은 넉넉하게.</p>
+          {/* 표시 가격의 부가세 포함 여부(대표 결정 2026-08-18 = 포함). 표기가 없으면 결제 때
+              "29,000원이라며?" 분쟁이 나고 PG 심사자도 보는 항목이다. 카드 unit에 넣으면
+              긴 문자열이 카드 폭을 넘겨 줄바꿈되므로(위 PLANS 주석) 여기 한 줄로 둔다.
+              ⚠️ lib/plans.ts priceKrw · billing_payments.amount_krw · 환불 계산이 전부 이 정의를 따른다. */}
+          <p className="mt-1.5 text-[13px] text-black/35">표시 가격은 부가세(VAT) 포함입니다.</p>
           {/* 얼리버드 스트립(프로모션 틀) */}
           <span className="mt-5 inline-flex items-center gap-1.5 rounded-full border border-black/[0.08] bg-black/[0.03] px-3.5 py-1.5 text-[12px] font-semibold text-black/60">
             <Sparkles className="size-3.5" /> 얼리버드 — 사전 신청 회사 한정 할인 예정
