@@ -708,6 +708,249 @@ export type Database = {
           },
         ]
       }
+      billing_events: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          id: string
+          kind: string
+          payload: Json
+          workspace_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+          payload?: Json
+          workspace_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          payload?: Json
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_events_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_events_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_keys: {
+        Row: {
+          bid: string
+          card_brand: string | null
+          card_last4: string | null
+          id: string
+          issued_at: string
+          provider: string
+          revoked_at: string | null
+          status: string
+          workspace_id: string
+        }
+        Insert: {
+          bid: string
+          card_brand?: string | null
+          card_last4?: string | null
+          id?: string
+          issued_at?: string
+          provider?: string
+          revoked_at?: string | null
+          status?: string
+          workspace_id: string
+        }
+        Update: {
+          bid?: string
+          card_brand?: string | null
+          card_last4?: string | null
+          id?: string
+          issued_at?: string
+          provider?: string
+          revoked_at?: string | null
+          status?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_keys_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_payments: {
+        Row: {
+          amount_krw: number
+          approved_at: string | null
+          billing_cycle: string
+          canceled_amount_krw: number
+          canceled_at: string | null
+          created_at: string
+          id: string
+          method: string | null
+          order_id: string
+          pay_source: string
+          period_end: string | null
+          period_start: string | null
+          plan: string
+          raw: Json
+          receipt_url: string | null
+          refund_reason: string | null
+          seats: number
+          status: string
+          tid: string | null
+          workspace_id: string
+        }
+        Insert: {
+          amount_krw: number
+          approved_at?: string | null
+          billing_cycle: string
+          canceled_amount_krw?: number
+          canceled_at?: string | null
+          created_at?: string
+          id?: string
+          method?: string | null
+          order_id: string
+          pay_source?: string
+          period_end?: string | null
+          period_start?: string | null
+          plan: string
+          raw?: Json
+          receipt_url?: string | null
+          refund_reason?: string | null
+          seats?: number
+          status: string
+          tid?: string | null
+          workspace_id: string
+        }
+        Update: {
+          amount_krw?: number
+          approved_at?: string | null
+          billing_cycle?: string
+          canceled_amount_krw?: number
+          canceled_at?: string | null
+          created_at?: string
+          id?: string
+          method?: string | null
+          order_id?: string
+          pay_source?: string
+          period_end?: string | null
+          period_start?: string | null
+          plan?: string
+          raw?: Json
+          receipt_url?: string | null
+          refund_reason?: string | null
+          seats?: number
+          status?: string
+          tid?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_payments_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_subscriptions: {
+        Row: {
+          amount_krw: number
+          auto_renew: boolean
+          billing_cycle: string
+          cancel_effective_at: string | null
+          cancel_reason: string | null
+          cancel_requested_at: string | null
+          card_brand: string | null
+          card_last4: string | null
+          consent_auto_billing_at: string | null
+          consent_terms_version: string | null
+          created_at: string
+          current_period_end: string
+          current_period_start: string
+          last_notice_sent_at: string | null
+          next_charge_at: string | null
+          paid_seats: number
+          plan: string
+          retry_count: number
+          status: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          amount_krw: number
+          auto_renew?: boolean
+          billing_cycle?: string
+          cancel_effective_at?: string | null
+          cancel_reason?: string | null
+          cancel_requested_at?: string | null
+          card_brand?: string | null
+          card_last4?: string | null
+          consent_auto_billing_at?: string | null
+          consent_terms_version?: string | null
+          created_at?: string
+          current_period_end: string
+          current_period_start: string
+          last_notice_sent_at?: string | null
+          next_charge_at?: string | null
+          paid_seats?: number
+          plan: string
+          retry_count?: number
+          status: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          amount_krw?: number
+          auto_renew?: boolean
+          billing_cycle?: string
+          cancel_effective_at?: string | null
+          cancel_reason?: string | null
+          cancel_requested_at?: string | null
+          card_brand?: string | null
+          card_last4?: string | null
+          consent_auto_billing_at?: string | null
+          consent_terms_version?: string | null
+          created_at?: string
+          current_period_end?: string
+          current_period_start?: string
+          last_notice_sent_at?: string | null
+          next_charge_at?: string | null
+          paid_seats?: number
+          plan?: string
+          retry_count?: number
+          status?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_subscriptions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       business_cards: {
         Row: {
           address: string | null
@@ -1319,35 +1562,6 @@ export type Database = {
             foreignKeyName: "credit_ledger_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      workspace_credits: {
-        Row: {
-          balance: number
-          last_grant_on: string | null
-          updated_at: string
-          workspace_id: string
-        }
-        Insert: {
-          balance?: number
-          last_grant_on?: string | null
-          updated_at?: string
-          workspace_id: string
-        }
-        Update: {
-          balance?: number
-          last_grant_on?: string | null
-          updated_at?: string
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workspace_credits_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: true
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
@@ -3344,6 +3558,35 @@ export type Database = {
           },
         ]
       }
+      workspace_credits: {
+        Row: {
+          balance: number
+          last_grant_on: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          balance?: number
+          last_grant_on?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          balance?: number
+          last_grant_on?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_credits_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_invites: {
         Row: {
           created_at: string
@@ -3530,13 +3773,6 @@ export type Database = {
         Returns: string
       }
       create_workspace: { Args: { p_name: string }; Returns: Json }
-      credit_consume: {
-        Args: { p_credits: number; p_note?: string; p_workspace_id: string }
-        Returns: number
-      }
-      credit_sync: { Args: { p_workspace_id: string }; Returns: number }
-      free_daily_drip: { Args: never; Returns: number }
-      plan_monthly_credits: { Args: { p_plan: string }; Returns: number }
       create_workspace_invite: {
         Args: {
           p_expires_days?: number
@@ -3565,6 +3801,11 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      credit_consume: {
+        Args: { p_credits: number; p_note?: string; p_workspace_id: string }
+        Returns: number
+      }
+      credit_sync: { Args: { p_workspace_id: string }; Returns: number }
       current_workspace_id: { Args: never; Returns: string }
       directory_contact: {
         Args: { target: string }
@@ -3574,6 +3815,7 @@ export type Database = {
           work_phone: string
         }[]
       }
+      free_daily_drip: { Args: never; Returns: number }
       get_invite_preview: {
         Args: { p_token: string }
         Returns: {
@@ -3596,6 +3838,7 @@ export type Database = {
       mark_dm_read: { Args: { conv_id: string }; Returns: number }
       mark_room_read: { Args: { p_room: string }; Returns: undefined }
       owner_can_set_role: { Args: { target: string }; Returns: boolean }
+      plan_monthly_credits: { Args: { p_plan: string }; Returns: number }
       plan_seat_limit: { Args: { p_plan: string }; Returns: number }
       recall_document: { Args: { doc_id: string }; Returns: undefined }
       remind_due_personal_tasks: { Args: never; Returns: number }
@@ -3641,6 +3884,10 @@ export type Database = {
       }
       shares_workspace_with: { Args: { other_user: string }; Returns: boolean }
       submit_document: { Args: { doc_id: string }; Returns: string }
+      workspace_seat_limit: {
+        Args: { p_workspace_id: string }
+        Returns: number
+      }
     }
     Enums: {
       [_ in never]: never
