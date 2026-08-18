@@ -11,13 +11,14 @@
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { quoteAmountKrw, periodFor, newOrderId, isPayablePlan, type BillingCycle } from "@/lib/billing/orders"
+import { createNicepayProvider } from "@/lib/billing/nicepay"
 import { AUTO_BILLING_TERMS_VERSION } from "@/app/terms/billing/page"
 
 export const runtime = "nodejs"
 
 /** PG 자격증명이 주입됐는지. 없으면 결제창을 띄울 수 없으므로 'ready' 행도 만들지 않는다(고아 방지). */
 export function isBillingConfigured(): boolean {
-  return !!process.env.NICEPAY_CLIENT_KEY && !!process.env.NICEPAY_SECRET_KEY
+  return !!process.env.NICEPAY_MID && !!process.env.NICEPAY_MERCHANT_KEY
 }
 
 /** 자동 갱신(빌링키) 사용 가능 여부. 나이스페이 별도 신청 승인 후 env로 켠다. */
@@ -95,14 +96,14 @@ export async function POST(req: Request) {
     })
   }
 
-  return Response.json({
-    ok: true,
+  // 결제창 파라미터·서명 생성. 서명은 서버에서만 만든다(MerchantKey가 클라로 나가면 안 된다).
+  const provider = createNicepayProvider()
+  const checkout = provider.buildCheckout({
     orderId,
     amountKrw,
-    plan,
-    cycle,
-    // 결제창 파라미터는 나이스페이 클라이언트키가 주입된 뒤 lib/billing/nicepay.ts에서 채운다.
-    clientKey: process.env.NICEPAY_CLIENT_KEY,
+    goodsName: `Complow ${plan === "pro" ? "Pro" : "Standard"} ${cycle === "yearly" ? "연간" : "월"} 구독`,
     returnUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/api/billing/nicepay/return`,
   })
+
+  return Response.json({ ok: true, orderId, amountKrw, plan, cycle, checkout })
 }
