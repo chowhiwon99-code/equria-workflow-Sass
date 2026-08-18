@@ -3765,6 +3765,51 @@ export type Database = {
       auth_is_workspace_owner: { Args: { ws_id: string }; Returns: boolean }
       auth_user_department: { Args: never; Returns: string }
       auth_user_workspace_ids: { Args: never; Returns: string[] }
+      billing_apply_payment: {
+        Args: {
+          p_amount_krw: number
+          p_approved_at: string
+          p_order_id: string
+          p_raw?: Json
+          p_tid: string
+        }
+        Returns: string
+      }
+      billing_expire_due: { Args: never; Returns: number }
+      billing_fail_payment: {
+        Args: { p_order_id: string; p_raw?: Json; p_reason?: string }
+        Returns: string
+      }
+      billing_record_consent: {
+        Args: {
+          p_payload?: Json
+          p_terms_version: string
+          p_user_id: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
+      billing_request_cancel: {
+        Args: { p_reason?: string; p_user_id: string; p_workspace_id: string }
+        Returns: string
+      }
+      billing_revoke_cancel: {
+        Args: { p_user_id: string; p_workspace_id: string }
+        Returns: undefined
+      }
+      billing_start_checkout: {
+        Args: {
+          p_amount_krw: number
+          p_billing_cycle: string
+          p_order_id: string
+          p_period_end: string
+          p_period_start: string
+          p_plan: string
+          p_seats: number
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       can_access_project: { Args: { p_project: string }; Returns: boolean }
       can_view_attendance: { Args: { ws: string }; Returns: boolean }
       clone_seed_agents: { Args: { target_ws: string }; Returns: number }

@@ -17,6 +17,7 @@ import { formatUsd } from "@/lib/pricing"
 import { McpCredentialsCard } from "./McpCredentialsCard"
 import { InviteLinksCard } from "./InviteLinksCard"
 import { HrSettingsCard } from "./HrSettingsCard"
+import { BillingCard } from "./BillingCard"
 
 const THEMES = [
   { value: "light", label: "라이트" },
@@ -624,6 +625,9 @@ export function SettingsView() {
         )}
       </Card>
 
+      {/* 요금제·구독 — 자체 완결형 카드(제목까지 직접 렌더). AI 사용액 카드 바로 뒤에 두어
+          "얼마 쓰는지 → 어떤 요금제인지"로 읽히게 한다. 해지는 오너만. */}
+      {isOwner && <BillingCard />}
 
       {/* 계정 */}
       <Card>
