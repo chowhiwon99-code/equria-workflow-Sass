@@ -10,7 +10,7 @@
 
 | 항목 | 값 |
 |---|---|
-| 프로덕션 | **`e1b2759`** · `complow.kr` (Vercel `icn1` · **플랜 = Hobby**) · 배포 2026-08-19 · **롤백 후보 `56a858b`** |
+| 프로덕션 | **`96d6ed1`** · `complow.kr` (Vercel `icn1` · **플랜 = Hobby**) · 배포 2026-08-19 · **롤백 후보 `26c3634`** |
 | 작업 브랜치 | `feat/toss-ui-refresh` (worktree: `worktree-gmail-scope-narrow`) |
 | 마이그레이션 | **001~141** 적용 · drift 없음 (135~137은 결번) |
 | 게이트 | `tsc` 0 · `pnpm lint` **29 errors/0 warnings**(전부 기존 부채, **신규 0이 베이스라인**) · `next build` 성공 |
