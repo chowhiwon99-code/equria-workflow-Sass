@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { ChevronLeft, ChevronRight, Plus, X, Check, Trash2, CalendarDays, Pencil, Paperclip, Download, Loader2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, Plus, X, Check, Trash2, CalendarDays, CalendarPlus, Pencil, Paperclip, Download, Loader2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { PROJECT_STATUS } from "@/lib/projects"
@@ -381,6 +381,15 @@ export function CalendarView() {
           <Plus /> 일정 추가
         </Button>
       </div>
+
+      {/* 빈 안내 — 이 달에 일정이 하나도 없을 때만 한 줄. 달력은 격자 자체가 UI라
+          EmptyState로 격자를 가리면 안 된다(만드는 법을 알려주는 게 목적). */}
+      {!loading && events.length === 0 && (
+        <p className="flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">
+          <CalendarPlus className="size-3.5 shrink-0" />
+          이 달에는 일정이 없어요. 날짜를 드래그하거나 ‘일정 추가’를 눌러 첫 일정을 만들어 보세요.
+        </p>
+      )}
 
       {/* 요일 행 */}
       <div className="grid grid-cols-7 border-b text-center text-xs font-medium text-muted-foreground">

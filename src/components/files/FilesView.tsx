@@ -561,6 +561,12 @@ export function FilesView() {
                   ? "낱개(미분류) 파일이 없어요."
                   : "이 폴더에 파일이 없어요."
             }
+            description="계약서·견적서처럼 팀이 자주 찾는 파일부터 올려두면 편해요."
+            action={
+              <Button size="sm" variant="outline" onClick={() => inputRef.current?.click()} disabled={uploading}>
+                <Upload className="size-3.5" /> {uploading ? "업로드 중…" : "파일 업로드"}
+              </Button>
+            }
           />
         )
       ) : (
