@@ -10,13 +10,13 @@
 
 | 항목 | 값 |
 |---|---|
-| 프로덕션 | **`d230d68`** · `complow.kr` (Vercel `icn1`) |
+| 프로덕션 | **`56a858b`** · `complow.kr` (Vercel `icn1`) · 배포 2026-08-19 · **롤백 후보 `688d0ec`** |
 | 작업 브랜치 | `feat/toss-ui-refresh` (worktree: `worktree-gmail-scope-narrow`) |
 | 마이그레이션 | **001~141** 적용 · drift 없음 (135~137은 결번) |
 | 게이트 | `tsc` 0 · `pnpm lint` **29 errors/0 warnings**(전부 기존 부채, **신규 0이 베이스라인**) · `next build` 성공 |
 | 유료 고객 | **0명** (free 1 · premium 2) — 스키마·가격 변경 리스크가 사실상 없는 시점 |
 | 결제 | **코드는 자격증명만 넣으면 되는 상태**. 결제창 호출·승인·망취소·웹훅·자동 점검까지 완료. 실결제 미개통(자격증명 대기) |
-| 작업 위치 | `worktree-gmail-scope-narrow` 브랜치에 **커밋만 됨(미푸시)** — `c21af5b`. main 반영은 대표 확인 후 |
+| 작업 브랜치(추가) | `worktree-gmail-scope-narrow` — main과 동일 SHA로 푸시됨 |
 
 **배포 규칙 (어기면 프로덕션 승격이 스킵된다)**
 `main`을 **먼저** push → Vercel 프로덕션 빌드 생성 확인 → 그 다음 feat 브랜치 push.
@@ -83,7 +83,9 @@
 
 > ⚠️ **`c21af5b` 이전에는 자격증명을 넣어도 4·5번이 안 됐다.** ⓐ `start()`가 checkout API만 부르고
 > 결제창을 띄우지 않았고, ⓑ 결제창이 POST하는 리턴 URL이 프록시에 막혀 `/login`으로 튕겼다.
-> 둘 다 이 커밋에서 고쳤으므로, **이 커밋이 main에 올라가야 스크린샷을 찍을 수 있다.**
+> **2026-08-19 배포 완료(`56a858b`)** — 프로덕션에서 `/api/billing/reconcile` 401 ·
+> `/api/billing/nicepay/webhook` 503(자격증명 없음)로 **핸들러 도달 확인**. `/login` 리다이렉트 없음.
+> 이제 **MID·상점키만 들어가면 4·5번 캡쳐가 된다.**
 
 1. **나이스페이 관리자 > 상점정보/개발정보에서 항목 이름 확인** — `MID + 상점키(MerchantKey)`인지 `clientKey + secretKey`인지.
    문서 확인 규격은 전자라 그걸로 구현했다. 후자면 **`lib/billing/nicepay.ts` 한 파일만 교체**(그 외 코드·DB 그대로).
