@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/shared/Modal"
 import { Surface } from "@/components/shared/Surface"
+import { EmptyState } from "@/components/shared/States"
 import type { Tables } from "@/lib/supabase/types"
 
 type Ann = Tables<"announcements">
@@ -164,7 +165,20 @@ export function AnnouncementsBoard() {
 
       {/* 목록 */}
       {list.length === 0 ? (
-        <p className="text-sm text-muted-foreground">아직 공지가 없어요. {isOwner && "첫 공지를 올려보세요."}</p>
+        // 대시보드는 한 화면 고정이라 EmptyState를 낮게 눌러 쓴다(py-16 → py-5).
+        <EmptyState
+          className="border-0 py-5"
+          icon={Megaphone}
+          title="아직 공지가 없어요."
+          description={isOwner ? "팀에 알릴 소식을 첫 공지로 남겨보세요." : "오너가 공지를 올리면 여기에 보여요."}
+          action={
+            isOwner && !composing ? (
+              <Button size="sm" variant="outline" onClick={() => setComposing(true)}>
+                <Plus className="size-3.5" /> 첫 공지 작성
+              </Button>
+            ) : undefined
+          }
+        />
       ) : (
         <div className={cn("flex flex-col divide-y", expanded && "max-h-72 overflow-y-auto")}>
           {shown.map((a) => (

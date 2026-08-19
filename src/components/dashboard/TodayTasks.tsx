@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/shared/Modal"
 import { DateInput } from "@/components/shared/DateInput"
 import { Surface } from "@/components/shared/Surface"
+import { EmptyState } from "@/components/shared/States"
 import type { Tables } from "@/lib/supabase/types"
 
 type Task = Tables<"personal_tasks">
@@ -150,7 +151,13 @@ export function TodayTasks() {
 
       {/* 목록 */}
       {tasks.length === 0 ? (
-        <p className="py-2 text-sm text-muted-foreground">할 일을 추가해 하루를 시작해보세요.</p>
+        // 추가 입력이 바로 위에 있으므로 CTA 버튼 대신 어디에 적으면 되는지만 알린다.
+        <EmptyState
+          className="border-0 py-5"
+          icon={ListTodo}
+          title="오늘 할 일이 없어요."
+          description="위 칸에 적으면 바로 추가돼요. 나만 보는 목록이에요."
+        />
       ) : (
         <div className="flex min-h-0 flex-1 flex-col divide-y overflow-y-auto">
           {tasks.map((t) => {

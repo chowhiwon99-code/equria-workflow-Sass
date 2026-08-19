@@ -6,6 +6,7 @@ import { CircleDot, CircleDashed } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { Surface } from "@/components/shared/Surface"
+import { EmptyState } from "@/components/shared/States"
 import type { Project } from "@/types"
 
 /**
@@ -83,7 +84,16 @@ export function WorkOverview() {
           <span className="text-xs font-normal text-muted-foreground tabular-nums">{inProgress.length}</span>
         </h2>
         {inProgress.length === 0 ? (
-          <p className="py-2 text-sm text-muted-foreground">진행 중인 프로젝트가 없어요.</p>
+          <EmptyState
+            className="border-0 py-4"
+            icon={CircleDot}
+            title="진행 중인 프로젝트가 없어요."
+            action={
+              <Link href="/projects" className="text-xs text-primary underline underline-offset-2">
+                프로젝트 만들기
+              </Link>
+            }
+          />
         ) : (
           <div className="flex max-h-48 flex-col overflow-y-auto">{inProgress.map(row)}</div>
         )}
@@ -94,7 +104,7 @@ export function WorkOverview() {
           <span className="text-xs font-normal text-muted-foreground tabular-nums">{planned.length}</span>
         </h2>
         {planned.length === 0 ? (
-          <p className="py-2 text-sm text-muted-foreground">예정된 프로젝트가 없어요.</p>
+          <EmptyState className="border-0 py-4" icon={CircleDashed} title="예정된 프로젝트가 없어요." />
         ) : (
           <div className="flex max-h-48 flex-col overflow-y-auto">{planned.map(row)}</div>
         )}
