@@ -6,16 +6,17 @@
 
 ---
 
-## 🎯 지금 상태 (2026-08-18)
+## 🎯 지금 상태 (2026-08-19)
 
 | 항목 | 값 |
 |---|---|
 | 프로덕션 | **`d230d68`** · `complow.kr` (Vercel `icn1`) |
 | 작업 브랜치 | `feat/toss-ui-refresh` (worktree: `worktree-gmail-scope-narrow`) |
-| 마이그레이션 | **001~140** 적용 · drift 없음 (135~137은 결번) |
+| 마이그레이션 | **001~141** 적용 · drift 없음 (135~137은 결번) |
 | 게이트 | `tsc` 0 · `pnpm lint` **29 errors/0 warnings**(전부 기존 부채, **신규 0이 베이스라인**) · `next build` 성공 |
 | 유료 고객 | **0명** (free 1 · premium 2) — 스키마·가격 변경 리스크가 사실상 없는 시점 |
-| 결제 | 계약 서명 완료, **코드 작성 중**. 실결제 미개통(자격증명 대기) |
+| 결제 | **코드는 자격증명만 넣으면 되는 상태**. 결제창 호출·승인·망취소·웹훅·자동 점검까지 완료. 실결제 미개통(자격증명 대기) |
+| 작업 위치 | `worktree-gmail-scope-narrow` 브랜치에 **커밋만 됨(미푸시)** — `c21af5b`. main 반영은 대표 확인 후 |
 
 **배포 규칙 (어기면 프로덕션 승격이 스킵된다)**
 `main`을 **먼저** push → Vercel 프로덕션 빌드 생성 확인 → 그 다음 feat 브랜치 push.
@@ -38,18 +39,23 @@
 | `0982585` | 연간 요금(월×10) · `lib/billing/orders.ts` · `/terms/billing` 자동결제 약관 |
 | `1f80c46` | 설정 **요금제 카드 + 24시간 해지** · cancel API · `/refund` 제6조 개정 |
 | `cde652d` | **결제 시작 화면 `/billing`** + 자동결제 별도 동의 + checkout API |
-| `d230d68` | **결제창 연결** — 서명·승인·**망취소** (`lib/billing/nicepay.ts`) |
+| `d230d68` | 서명·승인·**망취소** (`lib/billing/nicepay.ts`) |
+| `c21af5b` | **🔴 프록시 차단 해제**(결제가 조용히 전부 실패하던 버그) + **웹훅** + **자동 점검 시계**(크론) + **마이그141**(복구·만료·고지) + **결제창 실제 호출** + 랜딩 가격 파생화 |
 
-### 🔜 다음 (순서대로 — 전부 자격증명 없이 가능)
+### 🔜 다음
 
-1. **자동 점검 시계** — `vercel.json`에 `crons`가 **없다**(현재 `regions`만). 지금은 대사·갱신·고지가 **아무것도 안 돈다.**
-   `/api/billing/reconcile` 1개가 ① 5분 넘은 `ready` 대사 ② `next_charge_at` 갱신 ③ **7일 전 고지**를 처리.
-   ⚠️ Hobby 플랜은 크론이 1일 1회 제한이라 결제 대사엔 부족 — 플랜 확인 필요.
-2. **웹훅 수신** `/api/billing/nicepay/webhook` — 승인 응답 유실 복구용. **항상 200 반환**(재시도 폭주 방지),
-   본문을 신뢰하지 말고 `tid`로 조회 API를 다시 때린 뒤 RPC 호출. Vercel 배포보호는 **off 확인됨**(웹훅 401 위험 없음).
-3. **랜딩 가격 파생화** — `LandingPage.tsx:69,76,95`에 가격이 **3중 하드코딩**. `lib/plans.ts`에서 파생시킨다.
-4. `computeFairRefundKrw()` — `/refund` 일할 계산식과 **글자 단위로 같아야** 한다.
-5. 자격증명 확보 후: 실승인 1건 + 실취소, 나이스페이 관리자에 **웹훅/리턴 URL 도메인 등록**.
+**자격증명 없이 가능**
+1. `computeFairRefundKrw()` — `/refund` 일할 계산식과 **글자 단위로 같아야** 한다. (남은 유일한 미구현 의무)
+2. **취소 통보 처리** — 웹훅이 `StateCd` 1·2(전취소/후취소)를 받으면 **지금은 감사 로그만 남긴다.**
+   자동 강등은 일부러 안 넣었다 — 환불(부분취소·일할)과 한 묶음이어야 하고, 반쪽만 만들면
+   "취소됐는데 요금제는 그대로"보다 나쁜 회수 분쟁이 생긴다. 1번과 같이 설계할 것.
+3. **Vercel 플랜 확인** — Pro면 `vercel.json`의 `schedule`만 조이면 대사가 실시간에 가까워진다(코드 변경 0).
+   Hobby면 **하루 1회가 상한**이고 더 잦은 식은 **배포가 실패**한다(2026-08-19 문서 확인).
+
+**자격증명 확보 후 (반나절)**
+4. 실승인 1건 + 실취소(최소금액). 이때 **한글 상품명이 결제창에서 안 깨지는지** 반드시 확인
+   (문서상 `GoodsName`은 euc-kr 규격인데 우리는 utf-8로 보낸다 — `CheckoutView.tsx` 주석 참조).
+5. 승인 응답이 EUC-KR로 오는지 확인(`nicepay.ts` `CharSet` 주석).
 
 ### 🔴 대표 액션 — 카드사 승인심사 스크린샷 제출 (2026-08-19 담당자 회신)
 
@@ -69,18 +75,27 @@
 | 2 | 홈페이지 URL 확인 | ✅ `https://complow.kr` |
 | 3 | 로그인 페이지 + **심사용 ID/PW 제공** | ⬜ 대표가 심사용 계정 준비 |
 | 4 | **상품 목록** (정기결제는 단일상품 가능) ⚠️ **"sample·test" 문구 있으면 심사 불가** | ⚠️ `/billing`에 Standard·Pro가 있으나 자격증명이 없어 **"결제 준비 중"으로 잠김** |
-| 5 | **신용카드 정보 입력 페이지** — 카드번호·유효기간·생년월일/사업자번호·비밀번호 앞 2자리 입력창 **필수** | ⬜ 결제창이 안 뜸(자격증명 대기) |
+| 5 | **신용카드 정보 입력 페이지** — 카드번호·유효기간·생년월일/사업자번호·비밀번호 앞 2자리 입력창 **필수** | ⚠️ 결제창 호출은 **연결 완료**(`c21af5b`). 자격증명만 들어가면 뜬다 |
 
 🔴 **닭과 달걀 주의**: 4·5번은 결제창이 실제로 떠야 캡쳐된다. 그런데 메일이 "지금 바로 결제를 받아보라"고
 하므로 **자격증명은 이미 나와 있을 공산이 크다.** 관리자에서 MID·상점키를 확인해 Vercel 환경변수
 (`NICEPAY_MID`·`NICEPAY_MERCHANT_KEY`)에 넣으면 `/billing` 잠금이 풀리고 4·5번 캡쳐가 가능해진다.
+
+> ⚠️ **`c21af5b` 이전에는 자격증명을 넣어도 4·5번이 안 됐다.** ⓐ `start()`가 checkout API만 부르고
+> 결제창을 띄우지 않았고, ⓑ 결제창이 POST하는 리턴 URL이 프록시에 막혀 `/login`으로 튕겼다.
+> 둘 다 이 커밋에서 고쳤으므로, **이 커밋이 main에 올라가야 스크린샷을 찍을 수 있다.**
 
 1. **나이스페이 관리자 > 상점정보/개발정보에서 항목 이름 확인** — `MID + 상점키(MerchantKey)`인지 `clientKey + secretKey`인지.
    문서 확인 규격은 전자라 그걸로 구현했다. 후자면 **`lib/billing/nicepay.ts` 한 파일만 교체**(그 외 코드·DB 그대로).
    ⚠️ **키 값 자체는 공유 불필요** — Vercel 환경변수에 대표가 직접 넣는다.
 2. **담당자 회신 시 질문** (영업일 2일 ≈ 8/20): ① 자동결제(빌링키) 신청 방법·수수료율·전용 MID 여부
    ② 정산한도 200만원의 기간 단위(월/회차) ③ 베이직→프리미엄 전환 가능 여부.
-3. 계약서 사본 보관 — 알림톡 「이메일 전달」(카톡 삭제 시 문서 열람 불가).
+3. **Vercel 환경변수 `CRON_SECRET` 추가**(16자 이상 랜덤). 없으면 `/api/billing/reconcile`이
+   크론 호출을 전부 401로 막아 **만료·고지가 안 돈다.**
+4. **나이스페이 관리자 > 가맹점정보에 통보(노티) URL 등록** — `https://complow.kr/api/billing/nicepay/webhook`.
+   등록하지 않으면 노티가 오지 않아 승인 유실 복구 경로가 죽는다(코드만으로는 안 온다).
+   리턴 URL도 같은 화면에서 도메인 등록이 필요한지 함께 확인할 것.
+5. 계약서 사본 보관 — 알림톡 「이메일 전달」(카톡 삭제 시 문서 열람 불가).
 
 ---
 
@@ -120,7 +135,7 @@
 | # | 의무 | 구현 |
 |---|---|---|
 | ① | 자동결제 약관을 **회원가입 약관과 별도로** 고지 + **사전 동의** | `/terms/billing` (별도 문서) + `/billing` 결제 화면의 **분리된 체크박스** → `billing_record_consent` |
-| ② | 금액 변경·유료 전환 시 **결제 7일 전 고지** | ⬜ 미구현 — 크론(`reconcile`)에서 처리 예정. ⚠️ **`past_due` 재시도도 승인요청이라 고지 대상** → 재시도를 원 결제일 ±7일 안에 끝낼 것 |
+| ② | 금액 변경·유료 전환 시 **결제 7일 전 고지** | ✅ `billing_notice_upcoming`(마이그141) + 크론 `/api/billing/reconcile` 매일 1회. 앱 내 알림 + `billing_events` 증빙. ⚠️ **`past_due` 재시도도 승인요청이라 고지 대상** → 재시도를 원 결제일 ±7일 안에 끝낼 것 |
 | ③ | 영업시간 외에도 **24시간 해지 채널** | ✅ 설정 > 요금제 해지 버튼 + `/api/billing/subscription/cancel` + `/refund` 제6조 1항 |
 | ④ | 사용여부·기간 고려한 **공정 환불** | `/refund` 제1~2조 (계산식은 `computeFairRefundKrw()`와 글자 단위로 맞출 것) |
 
@@ -230,7 +245,7 @@
 - **Vercel**: team `team_wcW0NMU7oiIxNndyV1afigbp` · project `prj_CcCTUr8eIYpaStaj6RNq7VoLPZG6` · 배포보호 **off**
 - **Supabase**: project `dutovtfdckhayyvhtuxu` (ap-northeast-2 서울) · 마이그 **001~140**
 - **사업자**: 개인사업자 · 등록번호 592-58-00892 · 통신판매업 제2026-인천계양-0642호
-- **.env.local**: ANTHROPIC · Supabase 3종 · Google 4종 · `WORKSPACE_PASSWORD` · **나이스페이 3종(미입력)**
+- **.env.local**: ANTHROPIC · Supabase 3종 · Google 4종 · `WORKSPACE_PASSWORD` · **나이스페이 3종(미입력)** · `CRON_SECRET`(Vercel 전용)
   ⚠️ **시크릿 값을 문서·채팅에 적지 말 것** (HANDOFF는 git 추적됨)
 - 링크: [GitHub](https://github.com/chowhiwon99-code/equria-workflow-Sass) · [Vercel](https://vercel.com/chowhiwon99-2151s-projects/equria-workflow-sass) · [Supabase](https://supabase.com/dashboard/project/dutovtfdckhayyvhtuxu)
 
