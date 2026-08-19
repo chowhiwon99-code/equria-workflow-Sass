@@ -6,12 +6,11 @@ import { taskSuggestionsSchema } from "@/lib/claude/schemas"
 import { computeCostUsd } from "@/lib/pricing"
 import { checkBudget, BUDGET_EXCEEDED_MSG } from "@/lib/budget"
 import { getUserWorkspaceId, withWorkspace } from "@/lib/workspace"
-import { getGmailForUser } from "@/lib/google/client"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
 
-const SYSTEM = `당신은 회사 업무 비서입니다. 연동된 소스(회사 앱 데이터·Gmail)를 읽고 "지금 해야 할 일"을 제안합니다.
+const SYSTEM = `당신은 회사 업무 비서입니다. 회사 앱 데이터를 읽고 "지금 해야 할 일"을 제안합니다.
 
 원칙:
 - 주어진 데이터에 실제로 있는 근거로만 제안합니다. 지어내지 마세요.
@@ -24,7 +23,36 @@ const SYSTEM = `당신은 회사 업무 비서입니다. 연동된 소스(회사
 
 type Src = { title: string; lines: string[] }
 
-/** 대시보드 작업 제안(세션41) — 앱 내부 데이터 + Gmail(연동 시)을 읽고 우선순위·출처 있는 할 일 제안.
+/** 근거 데이터가 아직 없는 워크스페이스(=가입 첫날)에 돌려줄 제안.
+ *  taskSuggestionsSchema와 같은 모양이어야 한다(클라이언트가 그대로 렌더한다). */
+const ONBOARDING_SUGGESTIONS = [
+  {
+    title: "첫 프로젝트 만들기",
+    reason: "진행 중인 업무를 프로젝트로 등록하면 일정·담당·진행률을 팀원과 한 화면에서 볼 수 있어요.",
+    priority: "high",
+    source_type: "app",
+    source_label: "시작하기",
+    suggested_due: null,
+  },
+  {
+    title: "팀원 초대하기",
+    reason: "구성원이 있어야 채팅·일정·결재 같은 협업 기능이 의미를 가져요. 설정 > 구성원에서 초대 링크를 만들 수 있어요.",
+    priority: "high",
+    source_type: "app",
+    source_label: "시작하기",
+    suggested_due: null,
+  },
+  {
+    title: "회의록 AI 요약 써보기",
+    reason: "회의 내용을 붙여넣으면 요약과 할 일을 자동으로 뽑아줘요. 첫날에 효과를 바로 확인할 수 있는 기능이에요.",
+    priority: "medium",
+    source_type: "app",
+    source_label: "시작하기",
+    suggested_due: null,
+  },
+]
+
+/** 대시보드 작업 제안(세션41) — 앱 내부 데이터를 읽고 우선순위·출처 있는 할 일 제안.
  *  읽기 전용(DB 쓰기는 agent_usage 기록뿐). 등록은 클라이언트가 사용자의 확인을 받아 personal_tasks에 쓴다. */
 export async function POST() {
   const supabase = await createClient()
@@ -102,33 +130,18 @@ export async function POST() {
     })
   }
 
-  // Gmail(연동 시) — 최근 7일 안 읽은 메일 제목·발신자. 미연동/실패는 조용히 건너뜀.
-  try {
-    const gmail = await getGmailForUser(user.id)
-    const list = await gmail.users.messages.list({ userId: "me", q: "is:unread newer_than:7d", maxResults: 10 })
-    const ids = (list.data.messages ?? []).map((m) => m.id as string).filter(Boolean)
-    if (ids.length) {
-      const metas = await Promise.all(
-        ids.map((id) => gmail.users.messages.get({ userId: "me", id, format: "metadata", metadataHeaders: ["Subject", "From", "Date"] }).catch(() => null))
-      )
-      const lines = metas
-        .filter((m): m is NonNullable<typeof m> => !!m)
-        .map((m) => {
-          const h = m.data.payload?.headers ?? []
-          const get = (n: string) => h.find((x) => x.name?.toLowerCase() === n)?.value ?? ""
-          return `- "${get("subject")}" — ${get("from")} (${get("date").slice(0, 16)})${m.data.snippet ? ` · ${m.data.snippet.slice(0, 60)}` : ""}`
-        })
-      if (lines.length) {
-        used.push("Gmail")
-        sources.push({ title: "읽지 않은 메일(7일)", lines })
-      }
-    }
-  } catch {
-    /* 미연동·토큰 만료 등 — Gmail 소스만 생략 */
-  }
+  // 🔴 Gmail 소스는 제거했다(2026-08-19).
+  //    여기서 `messages.list`를 부르고 있었는데, 우리 OAuth 스코프는 `gmail.send`뿐이라
+  //    (lib/google/oauth.ts GOOGLE_SCOPES) **누구에게도 성공할 수 없는 호출**이었다.
+  //    실패는 catch가 삼켜서 아무 로그도 없이 "제안 없음"으로만 보였다.
+  //    ⚠️ 되살리려면 `gmail.readonly`가 필요한데, 그건 **제한(restricted) 스코프**라
+  //       프로덕션 공개 시 CASA 연간 유료 감사가 강제된다(HANDOFF 합의된 정책) → 되살리지 말 것.
 
   if (sources.length === 0) {
-    return NextResponse.json({ suggestions: [], sources_used: [], note: "제안할 근거 데이터가 아직 없어요." })
+    // 가입 첫날엔 근거 데이터가 없다. 예전엔 빈 배열을 돌려줘서 대시보드 카드가 그냥 빈칸이었다
+    // (신규 사용자가 가장 먼저 보는 화면인데 아무 안내가 없었다).
+    // AI를 부르지 않고 정적으로 돌려주므로 **비용 0**이고 항상 즉시 응답한다.
+    return NextResponse.json({ suggestions: ONBOARDING_SUGGESTIONS, sources_used: ["시작하기"] })
   }
 
   const prompt = [

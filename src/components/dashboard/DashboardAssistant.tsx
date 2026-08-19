@@ -197,10 +197,20 @@ export function DashboardAssistant() {
             </div>
             <p className="mt-2.5 break-keep text-sm font-semibold tracking-tight">안녕하세요, 컴피예요</p>
             <p className="mt-1 max-w-60 break-keep text-xs leading-relaxed text-muted-foreground">
-              워크스페이스를 다 아는 개인 비서예요. 근태·프로젝트·일정 무엇이든 물어보세요.
+              워크스페이스를 다 아는 개인 비서예요. 물어보거나, 초안 작성을 시켜보세요.
             </p>
             <div className="mt-3 flex flex-wrap justify-center gap-1.5">
-              {["이번 달 연차 누가 몇 개 남았어?", "진행 중인 프로젝트 알려줘", "오늘 일정 뭐 있어?"].map((ex) => (
+              {/* 🔴 예시는 반드시 **생성형**이어야 한다.
+                  예전엔 조회형 3개("연차 몇 개 남았어?"·"진행 중인 프로젝트"·"오늘 일정")였는데,
+                  컴피의 툴은 전부 조회(agentTools.ts: 구성원·프로젝트·일정·오늘할일)라서
+                  **가입 첫날처럼 데이터가 0건이면 "없어요"만 답한다** = 첫 AI 경험이 실패한다.
+                  생성형은 데이터가 없어도 결과물이 나오므로 첫날에도 가치가 남는다.
+                  (조회 기능 자체는 그대로다 — 사용자가 직접 물으면 툴이 돈다.) */}
+              {[
+                "우리 팀 첫 공지 초안 써줘",
+                "이번 주 업무 계획을 표로 정리해줘",
+                "거래처에 보낼 정중한 미팅 요청 메일 써줘",
+              ].map((ex) => (
                 <button
                   key={ex}
                   type="button"

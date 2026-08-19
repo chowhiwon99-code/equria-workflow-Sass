@@ -118,7 +118,9 @@ export default function AgentsPage() {
         <div>
           <h1 className="text-lg font-semibold">AI 에이전트 관리</h1>
           <p className="text-sm text-muted-foreground">
-            나만의 에이전트를 만들고, 위젯에 띄울 에이전트를 고르세요. 실제 대화는 우하단 위젯(⌘K)에서.
+            {/* 핀 개념을 명시한다 — 만든 에이전트가 위젯에 안 보인다는 오해가 첫 사용에서 가장 흔했다.
+                새로 만든 에이전트는 자동으로 핀되므로(AgentBuilderForm), 여기선 "끄고 켤 수 있다"만 알리면 된다. */}
+            나만의 에이전트를 만들면 <b>핀</b>이 켜져 우하단 위젯(⌘K)에 바로 나타나요. 대화는 그 위젯에서 하고, 핀을 끄면 목록에서 숨겨져요.
           </p>
         </div>
         <Button size="sm" onClick={() => router.push("/agents/new")}>
