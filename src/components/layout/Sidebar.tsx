@@ -9,6 +9,7 @@ import { FEATURES, FEATURE_GROUPS } from "@/lib/config/features"
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider"
 import { WorkspaceSwitcher } from "@/components/workspace/WorkspaceSwitcher"
 import { CreditMeter } from "@/components/layout/CreditMeter"
+import { TeamInviteLink } from "@/components/layout/TeamInviteLink"
 import { cn } from "@/lib/utils"
 import { useUnreadDms } from "@/hooks/useUnreadDms"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
@@ -296,6 +297,9 @@ export function Sidebar({
 
       {/* AI 사용량 — 소진되면 자동 실행이 멈추므로 항상 보이는 자리에(무제한 플랜은 자동 숨김) */}
       <CreditMeter />
+
+      {/* 팀 초대 — 골든패스 1단계 진입로 + 잔여 좌석(오너만) */}
+      <TeamInviteLink />
 
       {/* 편집 토글 — 항상 노출(메뉴를 다 숨겨도 여기서 복구) */}
       <div className="border-t p-2">

@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
-import { Copy, Link2, XCircle, ArrowUpCircle, Users, UserCog, User, ChevronDown, Check } from "lucide-react"
+import { Copy, Link2, XCircle, ArrowUpCircle, UserCog, User, ChevronDown, Check } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { planOf, nextPlan, seatsFull } from "@/lib/plans"
+import { SeatMeter } from "@/components/workspace/SeatMeter"
 
 type Invite = {
   id: string
@@ -120,22 +121,8 @@ export function InviteLinksCard() {
 
   return (
     <div className="flex flex-col gap-3">
-      {/* 시트 사용량 — 무료 3석 등(게스트 제외) */}
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Users className="size-3.5" />
-        <span className="font-medium text-foreground">{planDef.label} 요금제</span>
-        <span className="tabular-nums">
-          구성원 {seatsUsed}
-          {planDef.seats != null ? ` / ${planDef.seats}명` : " (무제한)"}
-        </span>
-        {planDef.seats != null && (
-          <span className="ml-1 flex-1">
-            <span className="inline-block h-1.5 w-24 max-w-full overflow-hidden rounded-full bg-muted align-middle">
-              <span className={cn("block h-full rounded-full", full ? "bg-rose-500" : "bg-primary")} style={{ width: `${Math.min(100, (seatsUsed / planDef.seats) * 100)}%` }} />
-            </span>
-          </span>
-        )}
-      </div>
+      {/* 시트 사용량 — 무료 3석 등(게스트 제외). 사이드바 '팀 초대'와 같은 컴포넌트를 쓴다. */}
+      <SeatMeter plan={plan} used={seatsUsed} />
 
       {/* 역할 선택 — 노션식 리치 드롭다운(역할별 설명 + 플러스 배지) */}
       <div>

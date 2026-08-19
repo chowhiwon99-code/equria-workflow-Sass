@@ -45,9 +45,10 @@ function applyThemeSmooth(apply: () => void) {
 }
 
 /** 섹션 카드 — 떠 있는 흰 카드(토스/애플) */
-function Card({ children }: { children: ReactNode }) {
+// id는 딥링크 앵커용(사이드바 '팀 초대' → /settings#invite). 설정이 탭 없는 한 장이라 앵커로 간다.
+function Card({ children, id }: { children: ReactNode; id?: string }) {
   return (
-    <section className="flex flex-col gap-4 rounded-2xl glass p-5">
+    <section id={id} className="flex scroll-mt-6 flex-col gap-4 rounded-2xl glass p-5">
       {children}
     </section>
   )
@@ -457,7 +458,7 @@ export function SettingsView() {
 
       {/* 대표: 초대 링크(노션식) — 링크 공유로 멤버/게스트 합류 */}
       {isOwner && (
-        <Card>
+        <Card id="invite">
           <SectionTitle
             title="구성원 초대"
             desc="초대 링크를 만들어 공유하면 받은 사람이 구글 로그인 후 바로 합류해요. 게스트는 고른 프로젝트만 볼 수 있어요. (구글 앱 테스트 모드 동안은 콘솔 '테스트 사용자' 등록도 필요)"

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 import { Surface } from "@/components/shared/Surface"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
+import { GettingStartedCard } from "./GettingStartedCard"
 import { AnnouncementsBoard } from "./AnnouncementsBoard"
 import { TodayTasks } from "./TodayTasks"
 import { TaskSuggestions } from "./TaskSuggestions"
@@ -62,6 +63,8 @@ export function DashboardLayout() {
 
   return (
     <div className="flex min-h-[var(--app-content-height)] flex-col gap-3 lg:h-[var(--app-content-height)] lg:min-h-0">
+      {/* 골든패스 안내 — 3단계를 다 하거나 닫으면 스스로 사라진다(그 뒤엔 자리도 차지하지 않음) */}
+      <GettingStartedCard />
       <AnnouncementsBoard />
       <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row">
         {/* 좌: 작업 카드들 — 카드 내부 스크롤, 페이지는 한 화면 유지.
