@@ -3780,6 +3780,9 @@ export type Database = {
         Args: { p_order_id: string; p_raw?: Json; p_reason?: string }
         Returns: string
       }
+      billing_fail_stale_checkouts: { Args: { p_minutes?: number }; Returns: number }
+      billing_lapse_due: { Args: { p_grace_days?: number }; Returns: Json }
+      billing_notice_upcoming: { Args: { p_days?: number }; Returns: number }
       billing_record_consent: {
         Args: {
           p_payload?: Json

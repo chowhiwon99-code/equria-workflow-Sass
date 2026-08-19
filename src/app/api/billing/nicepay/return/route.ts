@@ -62,6 +62,21 @@ export async function POST(req: Request) {
   })
 
   if (!approved.ok) {
+    // 🔴 네트워크 오류는 "승인 실패"가 아니라 **승인 여부를 모르는 상태**다.
+    //    나이스페이 쪽에서 승인이 끝난 뒤 응답만 유실됐을 수 있고, 그때 failed로 닫아버리면
+    //    돈은 빠졌는데 우리 기록은 실패로 굳는다. 'ready'로 남겨두면
+    //      · 결제통보(노티)가 오면 webhook이 조회 API로 확인해 정산하고,
+    //      · 끝내 안 오면 크론이 6시간 뒤 정리한다.
+    //    (마이그141이 'failed' → 'paid' 복구를 열어뒀지만, 애초에 실패로 찍지 않는 편이 낫다.)
+    if (approved.code === "NETWORK") {
+      await admin.from("billing_events").insert({
+        workspace_id: pay.workspace_id,
+        kind: "renew_failed",
+        payload: { order_id: moid, tid, note: "approve_network_error", message: approved.message },
+      })
+      return redirect("/billing?result=pending")
+    }
+
     await admin.rpc("billing_fail_payment", {
       p_order_id: moid,
       p_reason: `${approved.code}:${approved.message}`.slice(0, 200),

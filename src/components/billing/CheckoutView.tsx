@@ -11,14 +11,128 @@
 //    (api/billing/checkout 주석 참조). 여기 표시되는 금액은 안내용일 뿐이다.
 //
 // ⚠️ 문구에 "충전·크레딧·포인트" 금지(PG 위험업종 분류 회피).
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { PLANS, YEARLY_FREE_MONTHS } from "@/lib/plans"
 import { quoteAmountKrw, formatKrw, type BillingCycle, type PayablePlan } from "@/lib/billing/orders"
 
 const PAYABLE: PayablePlan[] = ["standard", "pro"]
+
+/** return 라우트가 붙여 보내는 reason → 사용자에게 보일 문구. 기술 용어를 그대로 노출하지 않는다. */
+const FAIL_MESSAGE: Record<string, string> = {
+  auth: "결제 인증이 완료되지 않았어요.",
+  declined: "카드사에서 결제가 거절됐어요. 다른 카드로 시도해 보세요.",
+  reverted: "결제 처리 중 문제가 생겨 자동으로 취소했어요. 금액은 청구되지 않아요.",
+  settle_error: "결제는 승인됐지만 처리 중 문제가 생겼어요. 곧 자동으로 확인되며, 반영되지 않으면 문의해 주세요.",
+  unknown_order: "주문 정보를 찾을 수 없어요. 다시 시도해 주세요.",
+  bad_request: "결제 요청이 올바르지 않아요. 다시 시도해 주세요.",
+}
+
+// ── 나이스페이 결제창(PC/모바일) 호출부 ────────────────────────────────────────
+//
+// 규격 출처(2026-08-19 확인, developers.nicepay.co.kr/manual-auth.php):
+//   · SDK: https://pg-web.nicepay.co.kr/v3/common/js/nicepay-pgweb.js
+//   · 호출: goPay(form)  — form 객체를 통째로 넘긴다
+//   · 필수 input: PayMethod · GoodsName · Amt · MID · Moid · EdiDate · SignData · ReturnURL
+//   · PC 결제창은 가맹점 페이지에 **전역 함수 2개**가 있어야 동작한다:
+//       nicepaySubmit() — 인증이 끝나면 SDK가 부른다. 우리는 form을 ReturnURL로 submit한다.
+//       nicepayClose()  — 사용자가 결제창을 닫으면 SDK가 부른다.
+//     모바일은 콜백 없이 ReturnURL로 바로 리다이렉트된다.
+//
+// 🔴 form을 React로 그리지 않고 **DOM에 직접 만든다.**
+//    SDK가 인증 결과(AuthToken·NextAppURL·TxTid…)를 이 form 안에 input으로 **써 넣은 뒤**
+//    submit하는데, React가 소유한 DOM이면 리렌더가 그 input들을 지워버릴 수 있다.
+//    그러면 승인에 필요한 값이 사라져 결제가 조용히 실패한다.
+const NICEPAY_SDK = "https://pg-web.nicepay.co.kr/v3/common/js/nicepay-pgweb.js"
+
+type CheckoutParams = {
+  mid: string
+  moid: string
+  amt: number
+  /** 상품명은 **서버가 만든 값**을 그대로 쓴다. 화면에서 다시 조립하면 영수증·심사자료와 어긋난다. */
+  goodsName: string
+  ediDate: string
+  signData: string
+  returnUrl: string
+}
+
+declare global {
+  interface Window {
+    goPay?: (form: HTMLFormElement) => void
+    nicepaySubmit?: () => void
+    nicepayClose?: () => void
+  }
+}
+
+/** SDK를 한 번만 로드한다. 이미 있으면 즉시 resolve. */
+function loadNicepaySdk(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve()
+  if (window.goPay) return Promise.resolve()
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>(`script[src="${NICEPAY_SDK}"]`)
+    if (existing) {
+      existing.addEventListener("load", () => resolve(), { once: true })
+      existing.addEventListener("error", () => reject(new Error("sdk")), { once: true })
+      return
+    }
+    const el = document.createElement("script")
+    el.src = NICEPAY_SDK
+    el.async = true
+    el.onload = () => resolve()
+    el.onerror = () => reject(new Error("sdk"))
+    document.head.appendChild(el)
+  })
+}
+
+function openNicepayWindow(c: CheckoutParams, onClosed: () => void) {
+  const form = document.createElement("form")
+  form.name = "payForm" // SDK가 document.payForm으로 참조할 수 있게 이름을 준다
+  form.method = "post"
+  form.action = c.returnUrl // 인증이 끝나면 이 주소로 POST된다(= 우리 return 라우트)
+  form.acceptCharset = "utf-8"
+  form.style.display = "none"
+
+  const add = (name: string, value: string | number) => {
+    const i = document.createElement("input")
+    i.type = "hidden"
+    i.name = name
+    i.value = String(value)
+    form.appendChild(i)
+  }
+  // 바로오픈 기간에는 신용카드만 즉시 승인된다(나이스페이 담당자 회신 2026-08-19).
+  add("PayMethod", "CARD")
+  add("GoodsName", c.goodsName)
+  add("Amt", c.amt)
+  add("MID", c.mid)
+  add("Moid", c.moid)
+  add("EdiDate", c.ediDate)
+  add("SignData", c.signData)
+  add("ReturnURL", c.returnUrl)
+  // ⚠️ 문서상 GoodsName은 euc-kr 규격이다. 페이지가 utf-8이라 CharSet=utf-8로 요청하는데,
+  //    실키로 결제창을 한 번 띄워 **상품명 한글이 깨지지 않는지** 반드시 확인할 것.
+  //    깨지면 상품명을 영문으로 바꾸거나 euc-kr 인코딩 폼으로 전환해야 한다.
+  add("CharSet", "utf-8")
+
+  document.body.appendChild(form)
+
+  const cleanup = () => {
+    delete window.nicepaySubmit
+    delete window.nicepayClose
+    form.remove()
+  }
+  // PC 결제창: 인증 완료 → SDK가 form에 결과를 채운 뒤 이걸 부른다.
+  window.nicepaySubmit = () => form.submit()
+  // PC 결제창: 사용자가 창을 닫음. 'ready' 행은 크론이 정리한다(결제는 일어나지 않았다).
+  window.nicepayClose = () => {
+    cleanup()
+    onClosed()
+  }
+
+  window.goPay?.(form)
+}
 
 export function CheckoutView({
   currentPlan,
@@ -29,6 +143,7 @@ export function CheckoutView({
   billingConfigured: boolean
   recurringEnabled: boolean
 }) {
+  const router = useRouter()
   const [plan, setPlan] = useState<PayablePlan>("standard")
   const [cycle, setCycle] = useState<BillingCycle>("monthly")
   const [agreed, setAgreed] = useState(false)
@@ -40,18 +155,48 @@ export function CheckoutView({
   const needConsent = recurringEnabled
   const blocked = !billingConfigured || (needConsent && !agreed)
 
+  // 결제창에서 돌아왔을 때(return 라우트가 /billing?result=... 로 보낸다) 결과를 알린다.
+  // 함께 **지연 대사**를 한 번 돌린다 — 크론이 하루 1회뿐이라(Vercel Hobby 제한) 화면 상태가
+  // 최대 하루까지 낡을 수 있다. credit_sync가 지연 방식을 택한 것과 같은 이유다.
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search)
+    const result = sp.get("result")
+    if (!result) return
+    if (result === "ok") toast.success("결제가 완료됐어요. 요금제가 바로 적용됩니다.")
+    else if (result === "pending") toast("결제 확인 중이에요. 확인되면 자동으로 반영됩니다.")
+    else toast.error(FAIL_MESSAGE[sp.get("reason") ?? ""] ?? "결제가 완료되지 않았어요.")
+
+    // 대사는 실패해도 화면이 깨지지 않게 조용히 넘긴다(크론이 다시 처리한다).
+    void fetch("/api/billing/reconcile", { method: "POST" })
+      .catch(() => {})
+      .finally(() => router.refresh()) // 서버에서 받은 현재 요금제를 새로 읽어온다
+    // 새로고침 때 같은 토스트가 또 뜨지 않도록 쿼리만 지운다.
+    window.history.replaceState({}, "", window.location.pathname)
+  }, [router])
+
   async function start() {
     setBusy(true)
-    const res = await fetch("/api/billing/checkout", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      // ★금액을 보내지 않는다. 서버가 plan/cycle로 다시 계산한다.
-      body: JSON.stringify({ plan, cycle, autoBillingConsent: agreed }),
-    })
-    setBusy(false)
-    if (!res.ok) return toast.error(await res.text())
-    toast.success("결제창을 준비했어요.")
-    // 결제창 호출은 나이스페이 자격증명이 주입된 뒤 lib/billing/nicepay.ts가 담당한다.
+    try {
+      const res = await fetch("/api/billing/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // ★금액을 보내지 않는다. 서버가 plan/cycle로 다시 계산한다.
+        body: JSON.stringify({ plan, cycle, autoBillingConsent: agreed }),
+      })
+      if (!res.ok) {
+        toast.error(await res.text())
+        return
+      }
+      const data = (await res.json()) as { checkout: CheckoutParams }
+      await loadNicepaySdk()
+      // 여기서부터는 나이스페이 결제창이 화면을 가져간다. 인증이 끝나면 SDK가
+      // nicepaySubmit()을 불러 return 라우트로 POST하고, 승인·정산은 서버가 한다.
+      openNicepayWindow(data.checkout, () => toast("결제를 취소했어요."))
+    } catch {
+      toast.error("결제창을 여는 데 실패했어요. 잠시 후 다시 시도해 주세요.")
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (

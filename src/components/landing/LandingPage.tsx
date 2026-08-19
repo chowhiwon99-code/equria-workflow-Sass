@@ -14,6 +14,8 @@ import { LandingFooter } from "./LandingFooter"
 import { AuthModal } from "./AuthModal"
 import { INK, CONTACT } from "./const"
 import type { AuthMode } from "@/components/auth/AuthForm"
+import { PLANS as PLAN_DEFS, YEARLY_FREE_MONTHS, type PlanDef } from "@/lib/plans"
+import { formatKrw } from "@/lib/billing/orders"
 
 /**
  * Complow 랜딩(마케팅) 페이지 — 공개(로그인 불필요).
@@ -66,10 +68,20 @@ const SECURITY = [
 //  ⚠️ lib/plans.ts 의 premium 은 **유지**한다(자사 워크스페이스가 쓰는 내부 무제한 플랜).
 //  ⚠️ 여기엔 **실제로 있는 것만** 적는다. 없던 것 제거: API·SSO, 이미지·영상 생성, Fable,
 //     사이드바 전용 에이전트(미구현), 지식파일 용량 차등(전 플랜 동일 20MB).
+//  🔴 가격·인원 숫자를 여기에 다시 적지 않는다 — **lib/plans.ts가 SSOT**다.
+//     예전에는 이 파일에만 3중으로 하드코딩돼 있어서(가격 카드·비교표·FAQ) plans.ts를 고쳐도
+//     랜딩만 옛 숫자로 남는 구조였다. PG 심사자가 보는 페이지라 불일치를 남길 수 없다.
+//     ⚠️ 표시 문구(설명·CTA)는 마케팅 카피라 그대로 두고, **숫자만** 파생시킨다.
+const P = { basic: PLAN_DEFS.free, std: PLAN_DEFS.standard, pro: PLAN_DEFS.pro }
+/** "5명" · 무제한(협의가)이면 "무제한". plans.ts의 seats가 null일 때 "null명"이 찍히는 걸 막는다. */
+const seatText = (p: PlanDef) => (p.seats == null ? "무제한" : `${p.seats}명`)
+/** 표시 가격. plans.ts의 priceKrw는 **부가세 포함 총액**이다(환불 일할 계산과 같은 정의). */
+const priceText = (p: PlanDef) => (p.priceKrw == null ? "문의" : formatKrw(p.priceKrw))
+
 const PLANS: { name: string; price: string; unit: string; credits: string; highlight: boolean; cta: string; desc: string[] }[] = [
-  { name: "Basic", price: "₩0", unit: "3명까지 · 영구 무료", credits: "AI 맛보기 · 매일 사용량 제공", highlight: false, cta: "무료로 시작", desc: ["팀 협업 (채팅·캘린더·프로젝트)", "AI 에이전트 맛보기", "회사별 데이터 격리"] },
-  { name: "Standard", price: "₩29,000", unit: "/월 · 5명까지", credits: "AI 채팅 넉넉히 · Sonnet", highlight: true, cta: "시작하기", desc: ["모든 업무 기능 (+결재·근태·회의·재무)", "AI 에이전트 전체 사용", "인원이 늘면 Pro로 · 이메일 지원"] },
-  { name: "Pro", price: "₩49,000", unit: "/월 · 10명까지", credits: "AI 채팅 넉넉히 · +Opus", highlight: false, cta: "시작하기", desc: ["스탠다드 전체 + 워크플로우·MCP 연동", "고급 AI 모델(Opus) 사용", "10명이 넘으면 도입 문의 · 우선 지원"] },
+  { name: P.basic.label, price: priceText(P.basic), unit: `${seatText(P.basic)}까지 · 영구 무료`, credits: "AI 맛보기 · 매일 사용량 제공", highlight: false, cta: "무료로 시작", desc: ["팀 협업 (채팅·캘린더·프로젝트)", "AI 에이전트 맛보기", "회사별 데이터 격리"] },
+  { name: P.std.label, price: priceText(P.std), unit: `/월 · ${seatText(P.std)}까지`, credits: "AI 채팅 넉넉히 · Sonnet", highlight: true, cta: "시작하기", desc: ["모든 업무 기능 (+결재·근태·회의·재무)", "AI 에이전트 전체 사용", `인원이 늘면 ${P.pro.label}로 · 이메일 지원`] },
+  { name: P.pro.label, price: priceText(P.pro), unit: `/월 · ${seatText(P.pro)}까지`, credits: "AI 채팅 넉넉히 · +Opus", highlight: false, cta: "시작하기", desc: ["스탠다드 전체 + 워크플로우·MCP 연동", "고급 AI 모델(Opus) 사용", `${seatText(P.pro)}이 넘으면 도입 문의 · 우선 지원`] },
 ]
 
 /** 요금별 기능 비교 (3티어) — false=미포함(—), true=체크, 문자열=값 표기 */
@@ -87,12 +99,12 @@ const PLAN_ROWS: { f: string; basic: string | boolean; std: string | boolean; pr
   // "시트"는 업계 용어라 처음 보는 사람에게 안 통한다(대표도 물어봤다) → 인원수로 직접 쓴다.
   // ⚠️ 이 숫자는 lib/plans.ts PLANS.seats · DB plan_seat_limit()과 **같은 값**이어야 한다.
   //    셋이 어긋나면 "파는 인원"과 "실제로 들어가지는 인원"이 달라진다(2026-08-15 사고 원인).
-  { f: "이용 인원 (초과 시 상위 요금제)", basic: "3명", std: "5명", pro: "10명" },
+  { f: "이용 인원 (초과 시 상위 요금제)", basic: seatText(P.basic), std: seatText(P.std), pro: seatText(P.pro) },
 ]
 
 const FAQS = [
   { q: "정말 무료로 시작할 수 있나요?", a: "네. Basic 플랜은 별도 카드 등록 없이 영구 무료입니다. 팀 협업 기능과 AI 맛보기가 포함되고, AI 사용량은 매일 조금씩 다시 채워집니다. 더 쓰려면 유료 플랜으로 올리면 됩니다." },
-  { q: "요금은 어떻게 되나요?", a: "회사 단위 정액입니다(Basic 무료 · Standard ₩29,000 · Pro ₩49,000). 요금제마다 이용 인원이 정해져 있고(3명·5명·10명), 인원이 늘면 상위 요금제로 올리시면 됩니다. 10명이 넘는 팀은 도입 문의를 남겨주세요. AI도 요금제에 포함된 사용량 안에서 쓰고, 더 필요하면 같은 방식으로 올리면 됩니다. 연간 결제 시 2개월 무료." },
+  { q: "요금은 어떻게 되나요?", a: `회사 단위 정액입니다(${P.basic.label} 무료 · ${P.std.label} ${priceText(P.std)} · ${P.pro.label} ${priceText(P.pro)}). 요금제마다 이용 인원이 정해져 있고(${seatText(P.basic)}·${seatText(P.std)}·${seatText(P.pro)}), 인원이 늘면 상위 요금제로 올리시면 됩니다. ${seatText(P.pro)}이 넘는 팀은 도입 문의를 남겨주세요. AI도 요금제에 포함된 사용량 안에서 쓰고, 더 필요하면 같은 방식으로 올리면 됩니다. 연간 결제 시 ${YEARLY_FREE_MONTHS}개월 무료.` },
   { q: "AI를 쓰다가 갑자기 막히지 않나요?", a: "사람이 직접 쓰는 AI 채팅과 보조 기능은 공정 사용 범위에서 막지 않습니다. 사용량 한도는 리서치·작업 제안·워크플로우 자동 실행처럼 사람 없이 도는 작업에만 적용되고, 그마저도 매일(무료) 또는 매달(유료) 다시 채워집니다." },
   { q: "우리 회사 데이터는 안전한가요?", a: "회사별로 데이터가 격리되고, 민감 정보는 암호화해 국내 리전에 저장합니다. 데이터의 소유권은 회사에 있습니다." },
   { q: "우리 회사 방식에 맞출 수 있나요?", a: "그게 컴플로우(Complow)의 출발점입니다. 손익 계산 수식, AI 에이전트, 결재선까지 회사 방식대로 직접 구성할 수 있습니다." },

@@ -21,6 +21,16 @@ const OPEN_PATHS = [
   "/offline.html",
   "/icons/",
   "/download",
+  // 🔴 결제 서버간 통신 — 여기 없으면 결제가 조용히 전부 실패한다.
+  //    ① /api/billing/nicepay/return: 나이스페이 결제창이 **크로스사이트로 POST**한다.
+  //       Supabase 세션 쿠키는 SameSite=Lax라 이 요청에 실리지 않아 user=null이 되고,
+  //       위 리다이렉트 규칙이 /login으로 튕겨 **승인 API 호출 자체가 실행되지 않는다.**
+  //    ② /api/billing/nicepay/webhook: 나이스페이 서버가 직접 호출한다(쿠키 없음).
+  //    ③ /api/billing/reconcile: Vercel 크론이 호출한다(쿠키 없음).
+  //    셋 다 요청자의 신원을 믿지 않는다 — ①②는 주문번호로 우리 DB를 찾고 PG 조회 API로
+  //    재확인하며, ③은 CRON_SECRET을 검증한다. 즉 공개해도 권한이 열리지 않는다.
+  "/api/billing/nicepay",
+  "/api/billing/reconcile",
 ]
 
 export async function proxy(request: NextRequest) {
