@@ -229,8 +229,14 @@ export function CardsView() {
       ) : cards.length === 0 ? (
         <EmptyState
           icon={Contact}
-          title="등록된 명함이 없습니다"
-          description="명함 사진을 올리면 Claude가 자동으로 스캔·정리합니다."
+          title="등록된 명함이 없어요."
+          description="명함 사진을 올리면 AI가 이름·회사·연락처를 자동으로 읽어 정리해요."
+          action={
+            <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={uploading}>
+              {uploading ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
+              {uploading ? "분석 중…" : "명함 올리기"}
+            </Button>
+          }
         />
       ) : (
         <div className="flex flex-col gap-6">

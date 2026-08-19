@@ -9,7 +9,8 @@ import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Select } from "@/components/shared/Select"
-import { Loading } from "@/components/shared/States"
+import { CalendarDays } from "lucide-react"
+import { Loading, EmptyState } from "@/components/shared/States"
 import { DateInput } from "@/components/shared/DateInput"
 import { fieldClass } from "@/components/shared/Modal"
 import { STATUS_BADGE } from "./status"
@@ -147,7 +148,12 @@ export function LeavePanel() {
       <div>
         <h2 className="mb-2 text-sm font-semibold">{isAdmin ? "전체 휴가 신청" : "내 휴가 신청"}</h2>
         {rows.length === 0 ? (
-          <p className="text-sm text-muted-foreground">아직 신청한 휴가가 없어요.</p>
+          <EmptyState
+            className="py-8"
+            icon={CalendarDays}
+            title={isAdmin ? "신청된 휴가가 없어요." : "아직 신청한 휴가가 없어요."}
+            description={isAdmin ? undefined : "위에서 종류와 기간을 고르고 신청하면 여기에 쌓여요."}
+          />
         ) : (
           <div className="flex flex-col divide-y rounded-xl border">
             {rows.map((r) => (

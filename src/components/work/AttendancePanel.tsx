@@ -10,7 +10,8 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Select } from "@/components/shared/Select"
 import { MonthStepper, currentYM, monthRange, type YM } from "@/components/shared/MonthStepper"
-import { Loading } from "@/components/shared/States"
+import { Clock } from "lucide-react"
+import { Loading, EmptyState } from "@/components/shared/States"
 
 type Rec = {
   id: string
@@ -190,7 +191,12 @@ export function AttendancePanel() {
           <MonthStepper value={ym} onChange={setYm} max={currentYM()} />
         </div>
         {recs.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">이 달 근태 기록이 없어요.</p>
+          <EmptyState
+            className="py-8"
+            icon={Clock}
+            title="이 달 근태 기록이 없어요."
+            description="위 ‘출근’ 버튼을 누르면 오늘 기록이 시작돼요."
+          />
         ) : (
           <div className="flex flex-col divide-y rounded-xl border">
             {recs.map((r) => {

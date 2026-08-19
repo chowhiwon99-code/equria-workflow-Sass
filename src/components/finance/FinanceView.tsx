@@ -592,10 +592,22 @@ export function FinanceView() {
           </div>
 
           {entries.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-16 text-center text-muted-foreground">
-              <Upload className="size-8" />
-              <p className="text-sm">이 조건에 해당하는 내역이 없어요.</p>
-            </div>
+            // 필터 때문에 비었는지, 데이터 자체가 없는지를 갈라 안내한다(같은 문구면 필터를 못 알아챈다).
+            <EmptyState
+              icon={Upload}
+              title={totalCount === 0 ? "아직 등록된 내역이 없어요." : "이 조건에 해당하는 내역이 없어요."}
+              description={
+                totalCount === 0 ? "영수증·세금계산서 사진을 올리면 AI가 금액·거래처를 읽어 정리해요." : undefined
+              }
+              action={
+                totalCount === 0 ? (
+                  <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={uploading}>
+                    {uploading ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
+                    {uploading ? "분석 중…" : "영수증 올리기"}
+                  </Button>
+                ) : undefined
+              }
+            />
           ) : (
             <div className="overflow-x-auto rounded-xl border bg-card shadow-[var(--shadow-sm)]">
               <table className="w-full min-w-[860px] text-sm tabular-nums [&_td]:align-middle [&_th]:align-middle">

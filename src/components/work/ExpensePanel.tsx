@@ -9,7 +9,8 @@ import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Select } from "@/components/shared/Select"
-import { Loading } from "@/components/shared/States"
+import { Receipt } from "lucide-react"
+import { Loading, EmptyState } from "@/components/shared/States"
 import { DateInput } from "@/components/shared/DateInput"
 import { fieldClass } from "@/components/shared/Modal"
 import { STATUS_BADGE } from "./status"
@@ -177,7 +178,12 @@ export function ExpensePanel() {
       <div>
         <h2 className="mb-2 text-sm font-semibold">{isAdmin ? "전체 지출결의서" : "내 지출결의서"}</h2>
         {rows.length === 0 ? (
-          <p className="text-sm text-muted-foreground">아직 제출된 지출결의서가 없어요.</p>
+          <EmptyState
+            className="py-8"
+            icon={Receipt}
+            title={isAdmin ? "제출된 지출결의서가 없어요." : "아직 제출한 지출결의서가 없어요."}
+            description={isAdmin ? undefined : "위에서 제목·금액을 적고 제출하면 여기에 쌓여요."}
+          />
         ) : (
           <div className="flex flex-col divide-y rounded-xl border">
             {rows.map((r) => (
