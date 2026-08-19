@@ -20,10 +20,14 @@ import { Bot, Check, Rocket, Sparkles, UserPlus, X, type LucideIcon } from "luci
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
 import { Surface } from "@/components/shared/Surface"
+import { FEATURES } from "@/lib/config/features"
 import { cn } from "@/lib/utils"
 import { SEED_AGENT_CATEGORY } from "@/lib/seedAgents"
 
 const DISMISS_KEY = "equria:onboarding-dismissed"
+
+/** 2단계 "AI로 진짜 일 한 번"을 실제로 일으키는 세 갈래(= 판정에 쓰는 그 세 가지와 같다). */
+const VALUE_SHORTCUTS = ["/meetings", "/finance", "/cards"] as const
 
 type Step = { key: string; icon: LucideIcon; title: string; hint: string; href: string; done: boolean }
 
@@ -115,6 +119,27 @@ export function GettingStartedCard() {
           <X className="size-3.5" />
         </button>
       </div>
+
+      {/* 3-9 첫날 가치 노출 — 2단계("AI로 진짜 일")를 클릭 한 번 거리로.
+          문구는 FEATURES의 description을 그대로 쓴다(사이드바·여기가 다른 말을 하면 안 된다). */}
+      {!state.usedAi && (
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {VALUE_SHORTCUTS.map((href) => {
+            const f = FEATURES.find((x) => x.href === href)
+            if (!f) return null
+            return (
+              <Link
+                key={href}
+                href={href}
+                className="inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-[var(--shadow-sm)] transition-colors hover:border-primary/40 hover:text-foreground"
+              >
+                <f.icon className="size-3.5 shrink-0" />
+                <span className="truncate">{f.description}</span>
+              </Link>
+            )
+          })}
+        </div>
+      )}
 
       <div className="grid gap-2 sm:grid-cols-3">
         {steps.map((s, i) => (

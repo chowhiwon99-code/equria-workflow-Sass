@@ -13,6 +13,7 @@ import {
   type WizardField,
   type WizardInputs,
 } from "@/lib/agentBuilder"
+import { AGENT_TEMPLATES } from "@/lib/agentTemplates"
 import { AgentBuilderForm } from "@/components/agents/AgentBuilderForm"
 import { KnowledgeFilePicker } from "@/components/agents/KnowledgeFilePicker"
 import { McpConnectorPicker } from "@/components/agents/McpConnectorPicker"
@@ -34,12 +35,15 @@ const EXAMPLE_PROMPTS = [
   { Icon: MessagesSquare, text: "고객 문의에 답하는 CS 응대 초안을 작성해줘" },
 ] as const
 
-export function AgentWizard({ mcpPrefill }: { mcpPrefill?: string[] } = {}) {
-  // /mcp에서 진입(커넥터 프리필)하면 갤러리 건너뛰고 바로 위저드; 그 외엔 예시 갤러리부터.
-  const [phase, setPhase] = useState<Phase>(mcpPrefill?.length ? "input" : "gallery")
+export function AgentWizard({ mcpPrefill, templateId }: { mcpPrefill?: string[]; templateId?: string } = {}) {
+  // /agents 예시 갤러리에서 넘어온 템플릿(?template=). 없는 id면 undefined = 평소 흐름.
+  const template = templateId ? AGENT_TEMPLATES.find((t) => t.id === templateId) : undefined
+  // /mcp 진입(커넥터 프리필)이나 예시 선택이면 첫 화면을 건너뛰고 바로 위저드; 그 외엔 열린 입력부터.
+  const [phase, setPhase] = useState<Phase>(mcpPrefill?.length || template ? "input" : "gallery")
   const [index, setIndex] = useState(0)
   const [dir, setDir] = useState<1 | -1>(1) // 슬라이드 방향(다음=1 오른쪽에서 / 이전=-1 왼쪽에서)
-  const [inputs, setInputs] = useState<WizardInputs>({})
+  // 예시에서 시작하면 답변이 채워진 채로 열린다 — 사용자는 훑어보며 고치기만 하면 된다.
+  const [inputs, setInputs] = useState<WizardInputs>(template ? { ...template.inputs } : {})
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
   const [generated, setGenerated] = useState("")

@@ -13,6 +13,8 @@ import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { renderAgentIcon } from "@/components/agents/AgentIcon"
+import { AGENT_TEMPLATES } from "@/lib/agentTemplates"
+import { SEED_AGENT_CATEGORY } from "@/lib/seedAgents"
 import type { Tables } from "@/lib/supabase/types"
 
 type AgentRow = Pick<
@@ -132,7 +134,7 @@ export default function AgentsPage() {
         <p className="text-sm text-muted-foreground">불러오는 중…</p>
       ) : (
         <>
-          <Section title="내 에이전트" empty="아직 만든 에이전트가 없어요. ‘새 에이전트’로 시작하세요.">
+          <Section title="내 에이전트">
             {mine.map((a) => (
               <AgentCard
                 key={a.id}
@@ -160,33 +162,63 @@ export default function AgentsPage() {
               ))}
             </Section>
           )}
+
+          {/* 예시 갤러리 — "내가 직접 만든" 에이전트가 아직 없을 때만.
+              시작 에이전트(category='시작하기')는 세지 않는다: 가입할 때 자동으로 생긴 것이라
+              그걸로 "만들어봤다"가 되면 골든패스 3단계(우리 회사 반복 업무를 에이전트로)를 건너뛴다. */}
+          {mine.filter((a) => a.category !== SEED_AGENT_CATEGORY).length === 0 && (
+            <TemplateGallery hasSeed={mine.length > 0} />
+          )}
         </>
       )}
     </div>
   )
 }
 
-function Section({
-  title,
-  empty,
-  children,
-}: {
-  title: string
-  empty?: string
-  children: React.ReactNode
-}) {
+// 비었을 때는 아무것도 그리지 않는다 — 빈 안내는 아래 TemplateGallery가 맡는다(예시가 문구보다 낫다).
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   const arr = Array.isArray(children) ? children : [children]
   const isEmpty = arr.flat().filter(Boolean).length === 0
+  if (isEmpty) return null
   return (
     <div className="flex flex-col gap-2">
       <h2 className="text-xs font-medium text-muted-foreground">{title}</h2>
-      {isEmpty ? (
-        empty ? (
-          <p className="rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">{empty}</p>
-        ) : null
-      ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{children}</div>
-      )}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{children}</div>
+    </div>
+  )
+}
+
+/**
+ * 예시에서 시작 — 만든 에이전트가 없을 때 빈 문구 대신 직무별 예시를 깔아준다.
+ * (agentTemplates.ts는 이 연결이 빠져 오랫동안 죽은 코드였다. 주석에 적힌 원래 의도가 이것이다.)
+ * 클릭 → /agents/new?template=<id> → 위저드 답변이 미리 채워진 채로 열린다.
+ */
+function TemplateGallery({ hasSeed }: { hasSeed: boolean }) {
+  return (
+    <div className="flex flex-col gap-3">
+      <h2 className="text-xs font-medium text-muted-foreground">예시에서 시작</h2>
+      <p className="text-sm text-muted-foreground">
+        {hasSeed
+          ? "우리 회사가 매번 하는 일을 맡길 에이전트를 만들어보세요."
+          : "아직 만든 에이전트가 없어요."}{" "}
+        아래 예시를 누르면 답변이 채워진 채로 시작해요 — 우리 회사에 맞게 고치기만 하면 돼요.
+      </p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {AGENT_TEMPLATES.map((t) => (
+          <Link
+            key={t.id}
+            href={`/agents/new?template=${t.id}`}
+            className="group flex flex-col gap-1.5 rounded-xl border border-dashed p-4 transition-colors hover:border-primary/40 hover:bg-muted/40"
+          >
+            <span className="text-xl leading-none">{t.emoji}</span>
+            <span className="text-sm font-semibold">{t.name}</span>
+            <span className="line-clamp-2 text-xs text-muted-foreground">{t.description}</span>
+            <span className="mt-auto pt-2 text-[11px] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
+              이걸로 시작 →
+            </span>
+          </Link>
+        ))}
+      </div>
     </div>
   )
 }
