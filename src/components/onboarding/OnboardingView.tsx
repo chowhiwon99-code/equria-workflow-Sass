@@ -8,6 +8,12 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { writeActiveWsCookie } from "@/lib/workspace-cookie"
+import { seedStarterAgents } from "@/lib/seedAgents"
+
+// 시작 에이전트 생성이 이 시간을 넘기면 기다리지 않고 대시보드로 보낸다(온보딩을 막지 않는다).
+// 정상값은 9번의 insert로 1~2초. 넉넉히 잡은 이유: 이 시간이 지나 페이지를 떠나면 진행 중이던
+// insert가 끊겨 "버전 없는 에이전트"가 남을 수 있으므로, 웬만하면 끝까지 기다리는 쪽이 낫다.
+const SEED_TIMEOUT_MS = 12_000
 
 /** 초대 링크/토큰에서 토큰만 추출 — 전체 URL을 붙여넣어도 동작. */
 function parseInviteToken(input: string): string | null {
@@ -45,7 +51,20 @@ export function OnboardingView() {
     }
     // 방금 만든 회사를 활성 워크스페이스로(전환기·RLS 헤더 정합)
     const newId = (data as { id?: string } | null)?.id
-    if (newId) writeActiveWsCookie(newId)
+    if (newId) {
+      writeActiveWsCookie(newId)
+      // 시작 에이전트 3개 — 빈 에이전트 목록으로 시작하지 않게 한다(§3-1).
+      // 전부 best-effort: seedStarterAgents는 throw하지 않고, 실패해도 아래 진입은 그대로 진행된다.
+      // 쿠키를 쓴 뒤 클라이언트를 다시 만들어야 x-workspace-id 헤더가 붙는다(createClient가 생성 시점에 쿠키를 읽는다).
+      const uid = (await supabase.auth.getUser()).data.user?.id
+      if (uid) {
+        const scoped = createClient()
+        await Promise.race([
+          seedStarterAgents(scoped, newId, uid),
+          new Promise((resolve) => setTimeout(resolve, SEED_TIMEOUT_MS)),
+        ])
+      }
+    }
     window.location.assign("/dashboard")
   }
 
@@ -78,7 +97,8 @@ export function OnboardingView() {
             <Building2 className="size-6 shrink-0 text-muted-foreground" />
             <span className="flex flex-col gap-0.5">
               <span className="text-sm font-semibold">새 워크스페이스 만들기</span>
-              <span className="text-xs text-muted-foreground">우리 회사의 AI 워크스페이스를 새로 시작해요. 기본 에이전트가 함께 준비됩니다.</span>
+              {/* 문구는 실제 동작(seedStarterAgents)과 일치시킨다 — 예전엔 "기본 에이전트"를 약속하고 0개를 만들었다. */}
+              <span className="text-xs text-muted-foreground">우리 회사의 AI 워크스페이스를 새로 시작해요. 바로 써볼 수 있는 에이전트 3개가 함께 만들어져요.</span>
             </span>
           </button>
           <button
