@@ -1,186 +1,195 @@
 // 나이스페이 연동 — **PG 규격 의존 코드는 전부 이 파일 안에만 있다.**
 //
-// 규격 출처(2026-08-18 공식 문서 확인, developers.nicepay.co.kr/manual-auth.php):
-//   · 결제창 SDK: https://pg-web.nicepay.co.kr/v3/common/js/nicepay-pgweb.js · `goPay(form)`
-//   · 결제창 필수 파라미터: GoodsName · Amt · MID · EdiDate(YYYYMMDDHHMISS) · Moid · SignData · PayMethod · ReturnURL
-//   · 결제창 SignData = **hex(sha256(EdiDate + MID + Amt + MerchantKey))**
-//   · ReturnURL 수신(POST): AuthResultCode · AuthToken · TxTid · NextAppURL · NetCancelURL
-//   · 승인 요청: NextAppURL로 POST · 바디 TID·AuthToken·MID·Amt·EdiDate·SignData·CharSet
-//   · 승인 SignData = **hex(sha256(AuthToken + MID + Amt + EdiDate + MerchantKey))**
-//   · 승인 응답 ResultCode: 카드 **3001** · 계좌이체 4000 · 가상계좌 4100
+// 규격 출처: https://github.com/nicepayments/nicepay-manual (2026-08-20 확인)
+//   + 나이스페이 포스타트 담당자 회신(2026-08-20):
+//     "포스타트에서는 홈페이지 연동 시 MID가 아닌 클라이언트키/시크릿키 통하여 연동이 가능합니다."
+//     "빌키 발급/승인/삭제 부분만 개발가이드로 안내드리고 있어, 그 외 상품 구축, 자동결제 기능,
+//      카드정보입력창 등은 귀사에서 직접 개발 및 구축해주셔야 합니다."
 //
-// 규격 출처(2026-08-19 추가 확인):
-//   · 거래조회(manual-status.php): POST https://webapi.nicepay.co.kr/webapi/inquery/trans_status.jsp
-//     바디 TID·MID·EdiDate·SignData(+CharSet·EdiType) · SignData = **hex(sha256(TID + MID + EdiDate + MerchantKey))**
-//     응답 ResultCode **0000**=조회성공 · **Status** 0=승인 / 1=취소 / 9=승인거래없음
-//     ⚠️ **TID로만 조회된다.** 주문번호(Moid)로 찾는 API는 문서에 없다 → TID를 모르는
-//        'ready' 고아 행은 조회로 대사할 수 없다(그래서 노티가 유일한 복구 경로다).
-//     ⚠️ 응답에 **Amt(금액)가 없다.** 금액 대조는 우리가 못박은 ready 행과 billing_apply_payment가 한다.
-//   · 결제통보/노티(manual-noti.php): 승인 완료 시 가맹점 URL로 통보. 파라미터 MID·MOID·TID·Amt·
-//     ResultCode·StateCd(0 승인 / 1 전취소 / 2 후취소)·AuthDate 등.
-//     ⚠️ **서명(Signature/SignData) 필드가 문서에 없다** → 서명검증이 불가능하다.
-//        대신 "MID 일치 확인 + TID로 조회 API 재확인"으로 판정한다(더 강한 검증이다).
-//     ⚠️ 수신 서버가 본문 **"OK"** 를 돌려주지 않으면 최대 **10회**(1~10분 간격) 재전송한다.
-//     ⚠️ 통보 URL은 **가맹점관리자 > 가맹점정보**에서 등록해야 발송된다(코드만으로는 안 온다).
+// ⚠️ **2026-08-20 전면 교체**: 이전 구현은 `MID + 상점키 + SignData(sha256)`를 쓰는 옛 결제창(PG Web)
+//    규격이었다. 실제 우리 상점은 REST 계열이고 정기결제는 결제창을 쓰지 않는다 → 통째로 갈았다.
+//    provider.ts의 경계 덕분에 라우트·DB·RPC는 그대로다.
 //
-// ⚠️ **미확정**: 나이스페이에는 `clientKey/secretKey` + Basic 인증을 쓰는 REST 계열도 있다.
-//    우리 상점이 어느 세대인지는 자격증명을 받아야 확정된다. 다르면 **이 파일만 교체**하면 되고
-//    provider.ts 인터페이스·라우트·DB는 그대로다(그래서 경계를 뒀다).
-//    담당자 확인 질문: "발급되는 게 MID+상점키(MerchantKey)입니까, clientKey/secretKey입니까?"
+// 확정 규격
+//   · 호스트: https://api.nicepay.co.kr
+//   · 인증:   Authorization: Basic base64(clientKey:secretKey)   (Access Token 방식은 30분 만료·갱신
+//             불가라 서버리스에 부적합해 상점 설정에서 Basic 인증을 택했다)
+//   · 빌키발급: POST /v1/subscribe/regist          바디 { encData, orderId, encMode, buyer* }
+//   · 빌키승인: POST /v1/subscribe/{bid}/payments  바디 { orderId, amount, goodsName, cardQuota, useShopInterest }
+//   · 빌키삭제: POST /v1/subscribe/{bid}/expire    바디 { orderId }
+//   · 승인취소: POST /v1/payments/{tid}/cancel     바디 { orderId, reason }
+//   · 거래조회: GET  /v1/payments/{tid}
+//   · 성공 판정: resultCode === "0000"  (옛 규격의 3001/4000/4100이 아니다)
+//
+// encData(카드 암호화)
+//   평문: `cardNo=...&expYear=YY&expMonth=MM&idNo=YYMMDD&cardPw=12`  (순서·구분자 그대로)
+//   AES-256: AES/CBC/PKCS5Padding · key=시크릿키 전체(32byte) · IV=시크릿키 앞 16자 · Hex · encMode="A2"
+//   AES-128: AES/ECB/PKCS5Padding · key=시크릿키 앞 16자 · Hex        (encMode 생략)
+//   → **AES-256(CBC)을 쓴다.** ECB는 같은 평문이 같은 암호문이 되어 카드정보에 부적합하다.
+//     시크릿키가 32자가 아닌 경우에만 AES-128로 떨어진다(문서 예시는 32자).
 import crypto from "node:crypto"
-import type { ApproveResult, BillingProvider, CheckoutParams, InquiryResult } from "./provider"
+import type {
+  BillingKeyResult,
+  BillingProvider,
+  CardInput,
+  ChargeResult,
+  InquiryResult,
+} from "./provider"
 import { BillingUnsupportedError } from "./provider"
 
-const sha256hex = (s: string) => crypto.createHash("sha256").update(s, "utf8").digest("hex")
-
-/** 거래조회 엔드포인트(승인·망취소는 결제창이 알려준 URL을 쓰므로 상수가 필요 없다). */
-const INQUIRY_URL = "https://webapi.nicepay.co.kr/webapi/inquery/trans_status.jsp"
+const API_BASE = "https://api.nicepay.co.kr"
 
 /**
- * 나이스페이 응답 파서. 응답은 JSON일 수도 key=value 폼일 수도 있어서(EdiType·연동세대에 따라
- * 다르다) 둘 다 받는다. 어느 쪽이든 실패하면 **빈 객체가 아니라 원문을 담아** 돌려준다 —
- * 파싱 실패를 "응답 없음"으로 오해하면 분쟁 시 증거가 사라진다.
+ * 나이스페이 응답 파서. JSON이 정상이지만, 장애 시 HTML 에러 페이지가 오는 경우가 있어
+ * 실패해도 **빈 객체가 아니라 원문을 담아** 돌려준다 — 파싱 실패를 "응답 없음"으로 오해하면
+ * 분쟁 시 증거가 사라진다.
  */
 function parsePgResponse(text: string): Record<string, unknown> {
   try {
     const j = JSON.parse(text) as unknown
     if (j && typeof j === "object") return j as Record<string, unknown>
   } catch {
-    // JSON이 아니면 form-encoded로 시도한다.
+    // JSON이 아니면 아래에서 원문을 담는다.
   }
-  const kv = Object.fromEntries(new URLSearchParams(text))
-  return Object.keys(kv).length > 0 ? kv : { _rawText: text }
+  return { _rawText: text.slice(0, 2000) }
 }
 
-/** YYYYMMDDHHMISS (KST). 서명에 들어가므로 결제창·승인에서 **같은 값**을 써야 한다. */
-export function ediDate(now = new Date()): string {
-  const kst = new Date(now.getTime() + 9 * 3600 * 1000)
-  return kst.toISOString().replace(/[-:T]/g, "").slice(0, 14)
+/**
+ * 카드 원문을 나이스페이 규격으로 암호화한다.
+ *
+ * 🔴 이 함수가 카드 원문을 만지는 **유일한 지점**이다. 반환값(encData)만 밖으로 나가고
+ *    평문은 여기서 끝난다. 절대 로그를 찍지 말 것.
+ */
+function encryptCard(card: CardInput, secretKey: string): { encData: string; encMode?: string } {
+  // 순서·구분자는 문서 그대로여야 한다. 바꾸면 발급이 실패한다.
+  const plain = `cardNo=${card.cardNo}&expYear=${card.expYear}&expMonth=${card.expMonth}&idNo=${card.idNo}&cardPw=${card.cardPw}`
+
+  if (secretKey.length === 32) {
+    // AES-256-CBC (권장) — key=시크릿키 전체, IV=앞 16자.
+    const cipher = crypto.createCipheriv("aes-256-cbc", Buffer.from(secretKey, "utf8"), Buffer.from(secretKey.slice(0, 16), "utf8"))
+    return { encData: Buffer.concat([cipher.update(plain, "utf8"), cipher.final()]).toString("hex"), encMode: "A2" }
+  }
+
+  // 폴백 — 시크릿키 길이가 32가 아니면 AES-128-ECB(문서 기본값).
+  const cipher = crypto.createCipheriv("aes-128-ecb", Buffer.from(secretKey.slice(0, 16), "utf8"), null)
+  return { encData: Buffer.concat([cipher.update(plain, "utf8"), cipher.final()]).toString("hex") }
 }
 
 export function createNicepayProvider(): BillingProvider {
-  const mid = process.env.NICEPAY_MID ?? ""
-  const merchantKey = process.env.NICEPAY_MERCHANT_KEY ?? ""
-  const recurring = process.env.NICEPAY_BILLING_ENABLED === "true"
+  const clientKey = process.env.NICEPAY_CLIENT_KEY ?? ""
+  const secretKey = process.env.NICEPAY_SECRET_KEY ?? ""
 
-  if (!mid || !merchantKey) {
+  if (!clientKey || !secretKey) {
     // 자격증명이 없으면 만들지 않는다 — 호출부가 isBillingConfigured()로 먼저 걸러야 한다.
     throw new BillingUnsupportedError("결제")
   }
 
+  const authHeader = `Basic ${Buffer.from(`${clientKey}:${secretKey}`, "utf8").toString("base64")}`
+
+  /** 공통 호출 — 네트워크 실패도 raw를 남긴다(증거 유실 방지). */
+  async function call(
+    path: string,
+    body: Record<string, unknown>,
+    method: "POST" | "GET" = "POST",
+  ): Promise<{ raw: Record<string, unknown>; networkError?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}${path}`, {
+        method,
+        headers: { Authorization: authHeader, "Content-Type": "application/json" },
+        body: method === "GET" ? undefined : JSON.stringify(body),
+      })
+      return { raw: parsePgResponse(await res.text()) }
+    } catch (e) {
+      return { raw: {}, networkError: e instanceof Error ? e.message : "요청 실패" }
+    }
+  }
+
+  const isOk = (raw: Record<string, unknown>) => String(raw.resultCode ?? "") === "0000"
+  const msgOf = (raw: Record<string, unknown>, fallback: string) => String(raw.resultMsg ?? fallback)
+
   return {
     name: "nicepay",
-    capabilities: { recurring },
+    capabilities: { recurring: true },
 
-    buildCheckout({ orderId, amountKrw, goodsName, returnUrl }): CheckoutParams {
-      const ed = ediDate()
-      return {
-        mid,
-        moid: orderId,
-        amt: amountKrw,
-        goodsName,
-        ediDate: ed,
-        // 결제창 서명 — 문서 공식 그대로. 순서를 바꾸면 결제창이 뜨지 않는다.
-        signData: sha256hex(`${ed}${mid}${amountKrw}${merchantKey}`),
-        returnUrl,
-      }
-    },
-
-    async approve({ nextAppUrl, authToken, tid, amountKrw }): Promise<ApproveResult> {
-      const ed = ediDate()
-      const body = new URLSearchParams({
-        TID: tid,
-        AuthToken: authToken,
-        MID: mid,
-        Amt: String(amountKrw),
-        EdiDate: ed,
-        // 승인 서명 — 결제창과 **순서가 다르다**(AuthToken이 앞).
-        SignData: sha256hex(`${authToken}${mid}${amountKrw}${ed}${merchantKey}`),
-        // 문서 기본 인코딩은 EUC-KR이다. 한글이 나오는 곳은 결과 메시지뿐이라 utf-8을 요청한다.
-        // ⚠️ 실키로 한 번 확인할 것 — 거부되면 EUC-KR 디코딩을 넣어야 한다.
-        CharSet: "utf-8",
+    async issueBillingKey({ orderId, card, buyerName, buyerEmail }): Promise<BillingKeyResult> {
+      const { encData, encMode } = encryptCard(card, secretKey)
+      // ⚠️ 이 시점 이후로 card를 참조하지 않는다. 아래 어떤 값에도 카드 원문이 섞이면 안 된다.
+      const { raw, networkError } = await call("/v1/subscribe/regist", {
+        encData,
+        orderId,
+        ...(encMode ? { encMode } : {}),
+        ...(buyerName ? { buyerName: buyerName.slice(0, 30) } : {}),
+        ...(buyerEmail ? { buyerEmail: buyerEmail.slice(0, 60) } : {}),
       })
-
-      let raw: Record<string, unknown> = {}
-      try {
-        const res = await fetch(nextAppUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body,
-        })
-        raw = parsePgResponse(await res.text())
-      } catch (e) {
-        return { ok: false, code: "NETWORK", message: e instanceof Error ? e.message : "요청 실패", raw }
-      }
-
-      const code = String(raw.ResultCode ?? "")
-      // 문서 확인값: 카드 3001 · 계좌이체 4000 · 가상계좌 4100. 그 외는 실패로 본다.
-      if (!["3001", "4000", "4100"].includes(code)) {
-        return { ok: false, code, message: String(raw.ResultMsg ?? "승인 실패"), raw }
+      if (networkError) return { ok: false, code: "NETWORK", message: networkError, raw }
+      if (!isOk(raw) || !raw.bid) {
+        return { ok: false, code: String(raw.resultCode ?? "UNKNOWN"), message: msgOf(raw, "빌링키 발급 실패"), raw }
       }
       return {
         ok: true,
-        tid: String(raw.TID ?? tid),
-        // ★PG가 말한 금액을 그대로 올린다. 우리 ready 행과의 대조는 billing_apply_payment가 한다.
-        amountKrw: Number(raw.Amt ?? 0),
-        method: (raw.PayMethod as string) ?? null,
-        approvedAt: new Date().toISOString(),
+        bid: String(raw.bid),
+        tid: String(raw.tid ?? ""),
+        cardName: raw.cardName ? String(raw.cardName) : null,
+        cardCode: raw.cardCode ? String(raw.cardCode) : null,
         raw,
       }
     },
 
-    async inquire({ tid }): Promise<InquiryResult> {
-      const ed = ediDate()
-      let raw: Record<string, unknown> = {}
-      try {
-        const res = await fetch(INQUIRY_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            TID: tid,
-            MID: mid,
-            EdiDate: ed,
-            // 조회 서명 — 승인·결제창과 **또 순서가 다르다**(TID가 맨 앞). 문서 그대로.
-            SignData: sha256hex(`${tid}${mid}${ed}${merchantKey}`),
-            CharSet: "utf-8",
-            EdiType: "JSON",
-          }),
-        })
-        raw = parsePgResponse(await res.text())
-      } catch (e) {
-        return { ok: false, code: "NETWORK", message: e instanceof Error ? e.message : "조회 실패", raw }
+    async charge({ bid, orderId, amountKrw, goodsName }): Promise<ChargeResult> {
+      const { raw, networkError } = await call(`/v1/subscribe/${encodeURIComponent(bid)}/payments`, {
+        orderId,
+        amount: amountKrw,
+        // 40자 제한. 넘치면 PG가 거부하므로 자른다.
+        goodsName: goodsName.slice(0, 40),
+        cardQuota: "0", // 일시불
+        useShopInterest: false, // 문서상 false만 지원
+      })
+      if (networkError) return { ok: false, code: "NETWORK", message: networkError, raw }
+      // status가 'paid'가 아니면 승인이 아니다(ready/failed/cancelled).
+      if (!isOk(raw) || String(raw.status ?? "") !== "paid") {
+        return { ok: false, code: String(raw.resultCode ?? "UNKNOWN"), message: msgOf(raw, "결제 승인 실패"), raw }
       }
-
-      const code = String(raw.ResultCode ?? "")
-      if (code !== "0000") {
-        // 조회 자체가 실패했다 = 승인 여부를 **모른다**. 이 경우 정산도 실패처리도 하지 않고
-        // 다음 노티/크론에서 다시 시도해야 한다(모르는 상태를 '실패'로 굳히면 돈만 빠진다).
-        return { ok: false, code, message: String(raw.ResultMsg ?? "조회 실패"), raw }
+      return {
+        ok: true,
+        tid: String(raw.tid ?? ""),
+        // ★PG가 말한 금액을 그대로 올린다. 우리 ready 행과의 대조는 billing_apply_payment가 한다.
+        amountKrw: Number(raw.amount ?? 0),
+        method: raw.payMethod ? String(raw.payMethod) : "card",
+        approvedAt: raw.paidAt ? String(raw.paidAt) : new Date().toISOString(),
+        receiptUrl: raw.receiptUrl ? String(raw.receiptUrl) : null,
+        raw,
       }
-      const status = String(raw.Status ?? "")
-      return { ok: true, approved: status === "0", canceled: status === "1", raw }
     },
 
-    async netCancel({ netCancelUrl, authToken, tid, amountKrw }): Promise<boolean> {
-      const ed = ediDate()
-      try {
-        const res = await fetch(netCancelUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            TID: tid,
-            AuthToken: authToken,
-            MID: mid,
-            Amt: String(amountKrw),
-            EdiDate: ed,
-            SignData: sha256hex(`${authToken}${mid}${amountKrw}${ed}${merchantKey}`),
-            NetCancel: "1",
-            CharSet: "utf-8",
-          }),
-        })
-        return res.ok
-      } catch {
-        return false
+    async expireBillingKey({ bid, orderId }): Promise<boolean> {
+      const { raw, networkError } = await call(`/v1/subscribe/${encodeURIComponent(bid)}/expire`, { orderId })
+      if (networkError) return false
+      return isOk(raw)
+    },
+
+    async cancel({ tid, orderId, reason }): Promise<boolean> {
+      const { raw, networkError } = await call(`/v1/payments/${encodeURIComponent(tid)}/cancel`, {
+        orderId,
+        reason: reason.slice(0, 100),
+      })
+      if (networkError) return false
+      return isOk(raw)
+    },
+
+    async inquire({ tid }): Promise<InquiryResult> {
+      const { raw, networkError } = await call(`/v1/payments/${encodeURIComponent(tid)}`, {}, "GET")
+      if (networkError) return { ok: false, code: "NETWORK", message: networkError, raw }
+      if (!isOk(raw)) {
+        // 조회 자체가 실패했다 = 승인 여부를 **모른다**. 이 경우 정산도 실패처리도 하지 않고
+        // 다음 노티/크론에서 다시 시도해야 한다(모르는 상태를 '실패'로 굳히면 돈만 빠진다).
+        return { ok: false, code: String(raw.resultCode ?? "UNKNOWN"), message: msgOf(raw, "조회 실패"), raw }
+      }
+      const status = String(raw.status ?? "")
+      return {
+        ok: true,
+        approved: status === "paid",
+        canceled: status === "cancelled" || status === "partialCancelled",
+        raw,
       }
     },
   }

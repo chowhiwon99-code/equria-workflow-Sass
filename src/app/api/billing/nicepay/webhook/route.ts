@@ -67,15 +67,21 @@ export async function POST(req: Request) {
   }
 
   const p = await readParams(req)
-  const mid = p.MID ?? p.Mid ?? ""
-  const moid = p.MOID ?? p.Moid ?? ""
-  const tid = p.TID ?? p.TxTid ?? ""
+  // 필드명은 REST 규격(camelCase)이 기본이고, 옛 결제창 규격(MOID·TID·StateCd)도 같이 받는다 —
+  // 통보 형식을 문서가 단정하지 않아서, 한쪽만 읽으면 통보를 통째로 무시하게 된다(조용한 실패).
+  const moid = p.orderId ?? p.MOID ?? p.Moid ?? ""
+  const tid = p.tid ?? p.TID ?? p.TxTid ?? ""
+  const status = p.status ?? ""
   const stateCd = p.StateCd ?? p.State ?? ""
-  const amt = Number(p.Amt ?? 0)
+  const amt = Number(p.amount ?? p.Amt ?? 0)
 
-  // ① 우리 MID가 아니면 우리 트래픽이 아니다. 재전송시킬 이유가 없으니 OK로 닫는다.
-  if (!mid || mid !== process.env.NICEPAY_MID) {
-    console.warn("[billing/webhook] mid mismatch:", mid)
+  // ① 발신자 확인 — REST 규격은 clientId를 준다(옛 MID 자리). 값이 오는데 우리 것이 아니면
+  //    우리 트래픽이 아니므로 재전송시킬 이유가 없다. **필드가 아예 없으면 통과시킨다** —
+  //    통보 규격이 불확실한데 여기서 막으면 정상 통보까지 버리게 되고, 실제 방어선은
+  //    아래 ②(우리가 만든 주문인지)와 ③(조회 API 재확인)이다.
+  const senderId = p.clientId ?? p.MID ?? p.Mid ?? ""
+  if (senderId && senderId !== process.env.NICEPAY_CLIENT_KEY) {
+    console.warn("[billing/webhook] sender mismatch")
     return ok()
   }
   if (!moid || !tid) {
@@ -101,7 +107,7 @@ export async function POST(req: Request) {
   // ⚠️ 자동 강등은 아직 구현하지 않는다 — 환불 처리(부분취소·일할 환불)와 한 묶음이어야 하고,
   //    반쪽만 만들면 "취소됐는데 요금제는 그대로"보다 나쁜 상태(회수 분쟁)가 생긴다.
   //    지금은 감사 로그로 남겨 오너 화면·대사에서 보이게만 한다.
-  if (stateCd === "1" || stateCd === "2") {
+  if (stateCd === "1" || stateCd === "2" || status === "cancelled" || status === "partialCancelled") {
     await admin.from("billing_events").insert({
       workspace_id: pay.workspace_id,
       kind: "webhook_received",

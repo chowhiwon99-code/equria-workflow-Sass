@@ -1,13 +1,15 @@
 // 결제대행사(PG) 추상화 — 나이스페이 의존을 한 파일(nicepay.ts)에 가두기 위한 경계.
 //
-// 왜 인터페이스를 두는가:
-//   ① 나이스페이 API는 **세대가 둘**이다. 지금 문서로 확인된 것은 `MID + MerchantKey + SignData`를
-//      쓰는 인증결제(PG Web) 규격이고, `clientKey/secretKey` + Basic 인증을 쓰는 REST 계열도 존재한다.
-//      **우리 상점이 어느 쪽인지는 자격증명을 받아야 확정된다.** 아니면 통째로 다시 짜야 하므로
-//      규격 의존 코드를 nicepay.ts 한 곳에만 둔다.
-//   ② 자동 갱신(빌링키)은 별도 신청 승인 전이라 못 쓴다. 호출부마다 `if (빌링되나?)`가 번식하지
-//      않도록 **capabilities.recurring**으로 표현하고, 미지원 메서드는 예외를 던진다.
-//      분기는 renew.ts 한 곳에만 존재한다.
+// 2026-08-20 규격 전환: 나이스페이 담당자 회신 + 공식 매뉴얼로 **두 가지가 확정**됐다.
+//   ① 자격증명은 `MID + 상점키`가 아니라 **`클라이언트키 + 시크릿키`**이고 인증은 `Authorization: Basic`이다.
+//      ("포스타트에서는 홈페이지 연동 시 MID가 아닌 클라이언트키/시크릿키 통하여 연동이 가능합니다.")
+//   ② 정기결제는 **결제창을 쓰지 않는다.** 빌키 발급/승인/삭제만 PG가 제공하고
+//      "상품 구축, 자동결제 기능, **카드정보입력창**"은 가맹점이 직접 만든다.
+//   → 그래서 인터페이스가 `buildCheckout/approve/netCancel`(결제창 3종)에서
+//     `issueBillingKey/charge/expireBillingKey/cancel`(빌키 4종)로 바뀌었다.
+//     경계를 둔 덕분에 라우트·DB·RPC는 그대로 두고 이 파일과 nicepay.ts만 갈았다.
+//
+// 매뉴얼: https://github.com/nicepayments/nicepay-manual
 
 import type { Json } from "@/lib/supabase/types"
 
@@ -25,7 +27,7 @@ export function toJson(v: unknown): Json {
 }
 
 export type BillingCapabilities = {
-  /** 자동 갱신(빌링키) 사용 가능 여부. 나이스페이 별도 신청 승인 + env 스위치가 둘 다 켜져야 true. */
+  /** 자동 갱신(빌링키) 사용 가능 여부. 자격증명이 주입돼야 true. */
   recurring: boolean
 }
 
@@ -37,8 +39,44 @@ export class BillingUnsupportedError extends Error {
   }
 }
 
-/** PG가 응답한 승인 결과. 금액은 **PG가 말한 값** 그대로 담는다(우리 ready 행과 대조할 대상이므로). */
-export type ApproveResult =
+/**
+ * 카드 원문 — 빌키를 발급받는 **그 한 번**만 존재해야 하는 값.
+ *
+ * 🔴 절대 규칙 (어기면 카드정보 유출 사고다)
+ *   · DB에 저장하지 않는다. 저장하는 건 발급받은 `bid`와 마지막 4자리뿐이다.
+ *   · 로그·에러 메시지·PG raw 응답 저장에 절대 섞지 않는다.
+ *   · 이 타입의 값은 nicepay.ts의 암호화 직전까지만 살아 있고 그 뒤 참조하지 않는다.
+ *   · 브라우저에서 암호화할 수 없다(시크릿키가 노출된다) → 서버를 반드시 경유한다.
+ */
+export type CardInput = {
+  /** 카드번호(숫자만, 15~16자리) */
+  cardNo: string
+  /** 유효기간 연도 2자리 "YY" */
+  expYear: string
+  /** 유효기간 월 2자리 "MM" */
+  expMonth: string
+  /** 생년월일 6자리(YYMMDD) 또는 사업자번호 10자리 */
+  idNo: string
+  /** 카드 비밀번호 **앞 2자리** */
+  cardPw: string
+}
+
+/** 빌키 발급 결과. 성공해도 카드 원문은 어디에도 남지 않는다(bid + 표시용 정보만). */
+export type BillingKeyResult =
+  | {
+      ok: true
+      /** NICEPAY가 발급한 빌링키. 이걸로 매달 청구한다. */
+      bid: string
+      /** 발급 거래의 TID(증빙용). */
+      tid: string
+      cardName: string | null
+      cardCode: string | null
+      raw: Record<string, unknown>
+    }
+  | { ok: false; code: string; message: string; raw: Record<string, unknown> }
+
+/** 빌키 승인(청구) 결과. 금액은 **PG가 말한 값** 그대로 담는다(우리 ready 행과 대조할 대상이므로). */
+export type ChargeResult =
   | {
       ok: true
       tid: string
@@ -46,6 +84,7 @@ export type ApproveResult =
       amountKrw: number
       method: string | null
       approvedAt: string
+      receiptUrl: string | null
       raw: Record<string, unknown>
     }
   | { ok: false; code: string; message: string; raw: Record<string, unknown> }
@@ -53,12 +92,8 @@ export type ApproveResult =
 /**
  * 조회 API 결과 — **승인 여부의 최종 판정자**.
  *
- * 리턴 URL·결제통보(노티)는 둘 다 브라우저/외부가 보내는 값이라 그대로 믿을 수 없다.
- * "이 거래가 실제로 승인됐는가"는 우리 MID+상점키로 서명해 조회 API에 물어본 답만 신뢰한다.
- *
- * ⚠️ 나이스페이 조회 API는 **TID로만** 조회된다(주문번호 Moid로는 못 찾는다). 그래서
- *    TID를 모르는 'ready' 고아 행은 조회로 대사할 수 없고, TID를 물어다 주는 노티가
- *    유일한 복구 경로다(2026-08-19 규격 확인: manual-status.php).
+ * 결제통보(노티)는 외부가 보내는 값이라 그대로 믿을 수 없다.
+ * "이 거래가 실제로 승인됐는가"는 우리 자격증명으로 조회 API에 물어본 답만 신뢰한다.
  */
 export type InquiryResult =
   | {
@@ -71,32 +106,36 @@ export type InquiryResult =
     }
   | { ok: false; code: string; message: string; raw: Record<string, unknown> }
 
-/** 결제창에 넘길 파라미터(서명 포함). 값 생성은 반드시 서버에서 한다. */
-export type CheckoutParams = {
-  mid: string
-  moid: string
-  amt: number
-  goodsName: string
-  ediDate: string
-  signData: string
-  returnUrl: string
-}
-
 export interface BillingProvider {
   readonly name: string
   readonly capabilities: BillingCapabilities
-  /** 결제창 호출용 파라미터 + 서명 생성. */
-  buildCheckout(input: { orderId: string; amountKrw: number; goodsName: string; returnUrl: string }): CheckoutParams
-  /** 인증 결과를 받아 **실제 승인**을 요청한다. 이 응답이 유일한 신뢰 소스다. */
-  approve(input: { nextAppUrl: string; authToken: string; tid: string; amountKrw: number }): Promise<ApproveResult>
+
+  /**
+   * 카드 원문으로 빌키를 발급받는다. **카드 원문이 존재하는 유일한 경로다.**
+   * 성공하면 호출부는 bid만 저장하고 CardInput 참조를 즉시 버려야 한다.
+   */
+  issueBillingKey(input: {
+    orderId: string
+    card: CardInput
+    buyerName?: string | null
+    buyerEmail?: string | null
+  }): Promise<BillingKeyResult>
+
+  /** 저장된 빌키로 청구한다. 첫 결제와 매달 갱신이 **같은 경로**를 쓴다. */
+  charge(input: { bid: string; orderId: string; amountKrw: number; goodsName: string }): Promise<ChargeResult>
+
+  /** 빌키 폐기(해지·카드 교체 시). 실패해도 우리 쪽 상태는 revoked로 두는 게 안전하다. */
+  expireBillingKey(input: { bid: string; orderId: string }): Promise<boolean>
+
+  /**
+   * 승인 취소 — 승인은 됐는데 우리 쪽 정산이 실패했을 때 되돌린다(옛 망취소의 역할).
+   * 금액 위변조로 billing_apply_payment가 예외를 던진 경우가 대표적이다. 이걸 안 하면 돈만 빠진다.
+   */
+  cancel(input: { tid: string; orderId: string; reason: string; amountKrw?: number }): Promise<boolean>
+
   /**
    * 거래 조회 — 승인 여부의 최종 판정자.
    * 결제통보(노티)를 받았을 때 **본문을 믿지 않고** 이걸로 다시 확인한 뒤에만 정산한다.
    */
   inquire(input: { tid: string }): Promise<InquiryResult>
-  /**
-   * 망취소 — 승인은 됐는데 우리 쪽 정산이 실패했을 때 되돌린다.
-   * 금액 위변조로 billing_apply_payment가 예외를 던진 경우가 대표적이다. 이걸 안 하면 돈만 빠진다.
-   */
-  netCancel(input: { netCancelUrl: string; authToken: string; tid: string; amountKrw: number }): Promise<boolean>
 }

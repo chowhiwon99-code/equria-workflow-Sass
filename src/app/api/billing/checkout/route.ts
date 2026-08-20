@@ -1,29 +1,61 @@
-// 결제 시작 — 결제창을 띄우기 **전에** 서버가 금액을 못박는 지점.
+// 구독 시작 — 카드정보를 받아 **빌키를 발급하고 첫 결제까지** 한 번에 끝내는 지점.
 //
 // 🔴 이 라우트의 존재 이유가 금액 위변조 방어다(한국 PG 사고 1순위).
-//    결제창 파라미터의 금액은 사용자가 브라우저에서 바꿀 수 있어서, 100원으로 고쳐 Pro를 열 수 있다.
-//    그래서 흐름을 이렇게 고정한다:
-//      ① 클라는 **plan/cycle만** 보낸다. 금액은 절대 받지 않는다.
+//    흐름을 이렇게 고정한다:
+//      ① 클라는 **plan/cycle + 카드정보만** 보낸다. 금액은 절대 받지 않는다.
 //      ② 서버가 quoteAmountKrw()로 금액을 산출한다(plans.ts를 읽는 유일한 함수).
 //      ③ billing_start_checkout이 그 금액을 'ready' 행에 못박는다.
-//      ④ 나중에 승인 응답·웹훅·조회 API의 금액을 ③과 대조한다(billing_apply_payment가 불일치 시 예외).
+//      ④ 빌키 승인 응답의 금액을 ③과 대조한다(billing_apply_payment가 불일치 시 예외).
 //    즉 **클라이언트가 보낸 금액은 어느 경로로도 DB에 닿지 않는다.**
+//
+// 🔴 카드 원문 취급 규칙 (나이스페이 포스타트는 결제창이 아니라 가맹점 카드입력창을 쓴다)
+//    · 이 라우트의 메모리에만 존재하고, provider.issueBillingKey()의 암호화 직전에 소멸한다.
+//    · **DB·로그·에러 메시지·PG raw 저장 어디에도 남기지 않는다.** 남기는 건 bid와 끝 4자리뿐.
+//    · 응답 본문에도 절대 되돌려주지 않는다.
+//
+// 🔴 승인은 됐는데 우리 정산이 실패하면 **돈만 빠지고 서비스는 안 열린다.**
+//    그 경우 즉시 provider.cancel()로 되돌린다(옛 망취소의 역할).
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { quoteAmountKrw, periodFor, newOrderId, isPayablePlan, type BillingCycle } from "@/lib/billing/orders"
 import { createNicepayProvider } from "@/lib/billing/nicepay"
+import { toJson, type CardInput } from "@/lib/billing/provider"
 import { AUTO_BILLING_TERMS_VERSION } from "@/app/terms/billing/page"
 
 export const runtime = "nodejs"
 
-/** PG 자격증명이 주입됐는지. 없으면 결제창을 띄울 수 없으므로 'ready' 행도 만들지 않는다(고아 방지). */
+/** PG 자격증명이 주입됐는지. 없으면 결제를 시작할 수 없으므로 'ready' 행도 만들지 않는다(고아 방지). */
 export function isBillingConfigured(): boolean {
-  return !!process.env.NICEPAY_MID && !!process.env.NICEPAY_MERCHANT_KEY
+  return !!process.env.NICEPAY_CLIENT_KEY && !!process.env.NICEPAY_SECRET_KEY
 }
 
-/** 자동 갱신(빌링키) 사용 가능 여부. 나이스페이 별도 신청 승인 후 env로 켠다. */
+/**
+ * 자동 갱신(빌키) 사용 가능 여부.
+ * 포스타트는 빌키가 기본 제공이라 자격증명만 있으면 켜진다(옛 별도 신청 스위치 제거).
+ */
 export function isRecurringEnabled(): boolean {
-  return isBillingConfigured() && process.env.NICEPAY_BILLING_ENABLED === "true"
+  return isBillingConfigured()
+}
+
+/** 카드 입력 검증 — 형식이 틀리면 PG를 부르기 전에 끊는다(불필요한 실패 거래 방지). */
+function parseCard(v: unknown): CardInput | null {
+  if (!v || typeof v !== "object") return null
+  const o = v as Record<string, unknown>
+  const digits = (x: unknown) => String(x ?? "").replace(/\D/g, "")
+  const cardNo = digits(o.cardNo)
+  const expYear = digits(o.expYear).slice(-2)
+  const expMonth = digits(o.expMonth).padStart(2, "0")
+  const idNo = digits(o.idNo)
+  const cardPw = digits(o.cardPw)
+
+  if (cardNo.length < 15 || cardNo.length > 16) return null
+  if (expYear.length !== 2) return null
+  if (expMonth.length !== 2 || Number(expMonth) < 1 || Number(expMonth) > 12) return null
+  // 생년월일 6자리(개인) 또는 사업자번호 10자리(법인)
+  if (idNo.length !== 6 && idNo.length !== 10) return null
+  if (cardPw.length !== 2) return null
+
+  return { cardNo, expYear, expMonth, idNo, cardPw }
 }
 
 export async function POST(req: Request) {
@@ -50,17 +82,27 @@ export async function POST(req: Request) {
   const { data: ws } = await admin.from("workspaces").select("owner_id").eq("id", wsId).maybeSingle()
   if (ws?.owner_id !== user.id) return new Response("관리자(대표)만 결제할 수 있어요.", { status: 403 })
 
-  // ⚠️ plan/cycle만 받는다. amount는 받지 않는다(위 주석 ①).
+  // ⚠️ plan/cycle/card만 받는다. amount는 받지 않는다(위 주석 ①).
   const body = (await req.json().catch(() => ({}))) as {
     plan?: string
     cycle?: string
     autoBillingConsent?: boolean
+    card?: unknown
   }
   const plan = body.plan ?? ""
   const cycle = (body.cycle === "yearly" ? "yearly" : "monthly") as BillingCycle
   if (!isPayablePlan(plan)) return new Response("결제할 수 없는 요금제예요.", { status: 400 })
 
-  // 자격증명이 없으면 결제창을 못 띄운다 → 여기서 끊어야 'ready' 고아 행이 안 생긴다.
+  // 법적 의무① — 자동결제는 회원가입 약관과 **별도로** 사전 동의를 받아야 한다.
+  // 이제 실제로 자동 갱신이 켜지므로 동의 없이는 진행하지 않는다.
+  if (!body.autoBillingConsent) {
+    return new Response("자동결제 약관에 동의해 주세요.", { status: 400 })
+  }
+
+  const card = parseCard(body.card)
+  if (!card) return new Response("카드 정보를 다시 확인해 주세요.", { status: 400 })
+
+  // 자격증명이 없으면 PG를 못 부른다 → 여기서 끊어야 'ready' 고아 행이 안 생긴다.
   if (!isBillingConfigured()) {
     return new Response("결제 준비 중이에요. 조금만 기다려 주세요.", { status: 503 })
   }
@@ -68,8 +110,10 @@ export async function POST(req: Request) {
   const amountKrw = quoteAmountKrw(plan, cycle) // ★서버 산출. 부가세 포함 총액.
   const { start, end } = periodFor(cycle)
   const orderId = newOrderId(wsId)
+  const goodsName = `Complow ${plan === "pro" ? "Pro" : "Standard"} ${cycle === "yearly" ? "연간" : "월"} 구독`
 
-  const { error } = await admin.rpc("billing_start_checkout", {
+  // ③ 금액을 'ready' 행에 못박는다.
+  const { error: startErr } = await admin.rpc("billing_start_checkout", {
     p_workspace_id: wsId,
     p_plan: plan,
     p_billing_cycle: cycle,
@@ -79,31 +123,95 @@ export async function POST(req: Request) {
     p_period_start: start.toISOString(),
     p_period_end: end.toISOString(),
   })
-  if (error) return new Response("결제를 시작하지 못했어요. 잠시 후 다시 시도해 주세요.", { status: 500 })
+  if (startErr) return new Response("결제를 시작하지 못했어요. 잠시 후 다시 시도해 주세요.", { status: 500 })
 
-  // 법적 의무① — 자동결제 약관 동의는 **자동 갱신을 실제로 켤 때** 의미가 있다.
-  // 지금은 빌링키 미승인이라 자동 갱신이 불가능하므로, 동의를 받았을 때만 감사 로그에 남긴다.
-  // (billing_record_consent는 구독 행이 아직 없어도 billing_events에 기록한다 — 그게 법적 증빙이다.)
-  if (body.autoBillingConsent && isRecurringEnabled()) {
-    await admin.rpc("billing_record_consent", {
-      p_workspace_id: wsId,
-      p_user_id: user.id,
-      p_terms_version: AUTO_BILLING_TERMS_VERSION,
-      p_payload: {
-        order_id: orderId,
-        user_agent: req.headers.get("user-agent") ?? null,
-      },
-    })
-  }
-
-  // 결제창 파라미터·서명 생성. 서명은 서버에서만 만든다(MerchantKey가 클라로 나가면 안 된다).
-  const provider = createNicepayProvider()
-  const checkout = provider.buildCheckout({
-    orderId,
-    amountKrw,
-    goodsName: `Complow ${plan === "pro" ? "Pro" : "Standard"} ${cycle === "yearly" ? "연간" : "월"} 구독`,
-    returnUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/api/billing/nicepay/return`,
+  // 법적 의무① 증빙 — 구독 행이 아직 없어도 billing_events에 남는다(그게 법적 증빙이다).
+  await admin.rpc("billing_record_consent", {
+    p_workspace_id: wsId,
+    p_user_id: user.id,
+    p_terms_version: AUTO_BILLING_TERMS_VERSION,
+    p_payload: { order_id: orderId, user_agent: req.headers.get("user-agent") ?? null },
   })
 
-  return Response.json({ ok: true, orderId, amountKrw, plan, cycle, checkout })
+  const provider = createNicepayProvider()
+
+  // ── 빌키 발급 (카드 원문이 존재하는 유일한 구간) ──
+  const last4 = card.cardNo.slice(-4)
+  const issued = await provider.issueBillingKey({
+    orderId,
+    card,
+    buyerName: user.user_metadata?.name ? String(user.user_metadata.name) : null,
+    buyerEmail: user.email ?? null,
+  })
+  if (!issued.ok) {
+    await admin.rpc("billing_fail_payment", {
+      p_order_id: orderId,
+      p_reason: `billingkey:${issued.code}`,
+      p_raw: toJson(issued.raw),
+    })
+    return new Response("카드 등록에 실패했어요. 카드 정보를 확인하거나 다른 카드를 사용해 주세요.", { status: 402 })
+  }
+
+  // 빌키 저장 — service_role로 직접 넣는다. 단일 행이라 원자성 요구가 없어 RPC를 두지 않았다
+  // (billing_keys는 RLS 정책 0개 = 브라우저에서 절대 못 읽는다. 그래서 구독 테이블과 분리돼 있다).
+  // 같은 워크스페이스의 이전 빌키는 revoked로 내린다 — 카드 교체 시 옛 카드로 청구되면 안 된다.
+  await admin
+    .from("billing_keys")
+    .update({ status: "revoked", revoked_at: new Date().toISOString() })
+    .eq("workspace_id", wsId)
+    .eq("status", "active")
+  await admin.from("billing_keys").insert({
+    workspace_id: wsId,
+    provider: "nicepay",
+    bid: issued.bid,
+    card_brand: issued.cardName,
+    card_last4: last4, // ★카드번호 전체는 어디에도 저장하지 않는다.
+    status: "active",
+  })
+
+  // ── 첫 결제 (매달 갱신도 완전히 같은 경로를 쓴다) ──
+  const charged = await provider.charge({ bid: issued.bid, orderId, amountKrw, goodsName })
+  if (!charged.ok) {
+    await admin.rpc("billing_fail_payment", {
+      p_order_id: orderId,
+      p_reason: `charge:${charged.code}`,
+      p_raw: toJson(charged.raw),
+    })
+    return new Response("결제에 실패했어요. 카드 한도나 정보를 확인해 주세요.", { status: 402 })
+  }
+
+  // ── 정산(원자 처리): 영수증·구독·plan 승급·사용량 재설정·감사로그 ──
+  const { error: applyErr } = await admin.rpc("billing_apply_payment", {
+    p_order_id: orderId,
+    p_tid: charged.tid,
+    p_amount_krw: charged.amountKrw, // ★PG가 말한 금액. ready 행과 다르면 RPC가 예외를 던진다.
+    p_approved_at: charged.approvedAt,
+    p_raw: toJson(charged.raw),
+  })
+  if (applyErr) {
+    // 🔴 승인은 됐는데 정산이 실패했다 = 돈만 빠진 상태. 즉시 되돌린다.
+    const reverted = await provider.cancel({
+      tid: charged.tid,
+      orderId,
+      reason: "정산 실패 자동 취소",
+      amountKrw: charged.amountKrw,
+    })
+    await admin.rpc("billing_fail_payment", {
+      p_order_id: orderId,
+      p_reason: `apply:${applyErr.message}${reverted ? "" : " (자동취소 실패 — 수동 확인 필요)"}`,
+      p_raw: toJson({ apply_error: applyErr.message, reverted }),
+    })
+    return new Response("결제 처리 중 문제가 생겨 자동으로 취소했어요. 잠시 후 다시 시도해 주세요.", { status: 500 })
+  }
+
+  return Response.json({
+    ok: true,
+    orderId,
+    amountKrw,
+    plan,
+    cycle,
+    cardLast4: last4,
+    cardName: issued.cardName,
+    receiptUrl: charged.receiptUrl,
+  })
 }
