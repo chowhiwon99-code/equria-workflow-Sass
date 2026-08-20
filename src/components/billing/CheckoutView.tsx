@@ -16,6 +16,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { fieldClass } from "@/components/shared/Modal"
 import { PLANS, YEARLY_FREE_MONTHS } from "@/lib/plans"
 import { quoteAmountKrw, formatKrw, type BillingCycle, type PayablePlan } from "@/lib/billing/orders"
 
@@ -31,107 +32,29 @@ const FAIL_MESSAGE: Record<string, string> = {
   bad_request: "결제 요청이 올바르지 않아요. 다시 시도해 주세요.",
 }
 
-// ── 나이스페이 결제창(PC/모바일) 호출부 ────────────────────────────────────────
+// ── 카드 입력 → 빌키 발급 ──────────────────────────────────────────────────
 //
-// 규격 출처(2026-08-19 확인, developers.nicepay.co.kr/manual-auth.php):
-//   · SDK: https://pg-web.nicepay.co.kr/v3/common/js/nicepay-pgweb.js
-//   · 호출: goPay(form)  — form 객체를 통째로 넘긴다
-//   · 필수 input: PayMethod · GoodsName · Amt · MID · Moid · EdiDate · SignData · ReturnURL
-//   · PC 결제창은 가맹점 페이지에 **전역 함수 2개**가 있어야 동작한다:
-//       nicepaySubmit() — 인증이 끝나면 SDK가 부른다. 우리는 form을 ReturnURL로 submit한다.
-//       nicepayClose()  — 사용자가 결제창을 닫으면 SDK가 부른다.
-//     모바일은 콜백 없이 ReturnURL로 바로 리다이렉트된다.
+// 나이스페이 포스타트 담당자 회신(2026-08-20):
+//   "빌키 발급/승인/삭제 부분만 개발가이드로 안내드리고 있어, 그 외 상품 구축, 자동결제 기능,
+//    카드정보입력창 등은 귀사에서 직접 개발 및 구축해주셔야 합니다."
+//   → 결제창 SDK를 띄우지 않는다. 이 화면이 카드정보 입력창이고, 서버가 암호화해 빌키를 받는다.
 //
-// 🔴 form을 React로 그리지 않고 **DOM에 직접 만든다.**
-//    SDK가 인증 결과(AuthToken·NextAppURL·TxTid…)를 이 form 안에 input으로 **써 넣은 뒤**
-//    submit하는데, React가 소유한 DOM이면 리렌더가 그 input들을 지워버릴 수 있다.
-//    그러면 승인에 필요한 값이 사라져 결제가 조용히 실패한다.
-const NICEPAY_SDK = "https://pg-web.nicepay.co.kr/v3/common/js/nicepay-pgweb.js"
+// 🔴 카드 원문은 이 컴포넌트 state → 서버 요청 본문까지만 존재한다.
+//    localStorage·URL·로그·에러 메시지에 절대 넣지 않는다. 성공하면 즉시 비운다.
+//    (서버 역시 암호화 직전까지만 들고 있고 DB에는 bid와 끝 4자리만 남긴다.)
 
-type CheckoutParams = {
-  mid: string
-  moid: string
-  amt: number
-  /** 상품명은 **서버가 만든 값**을 그대로 쓴다. 화면에서 다시 조립하면 영수증·심사자료와 어긋난다. */
-  goodsName: string
-  ediDate: string
-  signData: string
-  returnUrl: string
+type CardForm = { cardNo: string; exp: string; idNo: string; cardPw: string }
+
+const EMPTY_CARD: CardForm = { cardNo: "", exp: "", idNo: "", cardPw: "" }
+
+/** 카드번호 4자리씩 띄우기 — 입력 오류를 눈으로 잡게 한다. */
+function formatCardNo(v: string): string {
+  return v.replace(/\D/g, "").slice(0, 16).replace(/(.{4})/g, "$1 ").trim()
 }
-
-declare global {
-  interface Window {
-    goPay?: (form: HTMLFormElement) => void
-    nicepaySubmit?: () => void
-    nicepayClose?: () => void
-  }
-}
-
-/** SDK를 한 번만 로드한다. 이미 있으면 즉시 resolve. */
-function loadNicepaySdk(): Promise<void> {
-  if (typeof window === "undefined") return Promise.resolve()
-  if (window.goPay) return Promise.resolve()
-  return new Promise((resolve, reject) => {
-    const existing = document.querySelector<HTMLScriptElement>(`script[src="${NICEPAY_SDK}"]`)
-    if (existing) {
-      existing.addEventListener("load", () => resolve(), { once: true })
-      existing.addEventListener("error", () => reject(new Error("sdk")), { once: true })
-      return
-    }
-    const el = document.createElement("script")
-    el.src = NICEPAY_SDK
-    el.async = true
-    el.onload = () => resolve()
-    el.onerror = () => reject(new Error("sdk"))
-    document.head.appendChild(el)
-  })
-}
-
-function openNicepayWindow(c: CheckoutParams, onClosed: () => void) {
-  const form = document.createElement("form")
-  form.name = "payForm" // SDK가 document.payForm으로 참조할 수 있게 이름을 준다
-  form.method = "post"
-  form.action = c.returnUrl // 인증이 끝나면 이 주소로 POST된다(= 우리 return 라우트)
-  form.acceptCharset = "utf-8"
-  form.style.display = "none"
-
-  const add = (name: string, value: string | number) => {
-    const i = document.createElement("input")
-    i.type = "hidden"
-    i.name = name
-    i.value = String(value)
-    form.appendChild(i)
-  }
-  // 바로오픈 기간에는 신용카드만 즉시 승인된다(나이스페이 담당자 회신 2026-08-19).
-  add("PayMethod", "CARD")
-  add("GoodsName", c.goodsName)
-  add("Amt", c.amt)
-  add("MID", c.mid)
-  add("Moid", c.moid)
-  add("EdiDate", c.ediDate)
-  add("SignData", c.signData)
-  add("ReturnURL", c.returnUrl)
-  // ⚠️ 문서상 GoodsName은 euc-kr 규격이다. 페이지가 utf-8이라 CharSet=utf-8로 요청하는데,
-  //    실키로 결제창을 한 번 띄워 **상품명 한글이 깨지지 않는지** 반드시 확인할 것.
-  //    깨지면 상품명을 영문으로 바꾸거나 euc-kr 인코딩 폼으로 전환해야 한다.
-  add("CharSet", "utf-8")
-
-  document.body.appendChild(form)
-
-  const cleanup = () => {
-    delete window.nicepaySubmit
-    delete window.nicepayClose
-    form.remove()
-  }
-  // PC 결제창: 인증 완료 → SDK가 form에 결과를 채운 뒤 이걸 부른다.
-  window.nicepaySubmit = () => form.submit()
-  // PC 결제창: 사용자가 창을 닫음. 'ready' 행은 크론이 정리한다(결제는 일어나지 않았다).
-  window.nicepayClose = () => {
-    cleanup()
-    onClosed()
-  }
-
-  window.goPay?.(form)
+/** MM/YY */
+function formatExp(v: string): string {
+  const d = v.replace(/\D/g, "").slice(0, 4)
+  return d.length <= 2 ? d : `${d.slice(0, 2)}/${d.slice(2)}`
 }
 
 export function CheckoutView({
@@ -148,12 +71,19 @@ export function CheckoutView({
   const [cycle, setCycle] = useState<BillingCycle>("monthly")
   const [agreed, setAgreed] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [card, setCard] = useState<CardForm>(EMPTY_CARD)
 
   const amount = quoteAmountKrw(plan, cycle)
   const def = PLANS[plan]
-  // 자동 갱신을 쓸 수 있을 때만 동의가 의미 있다. 못 쓰는 지금은 동의를 강제하지 않는다.
+  // 자동 갱신이 기본이므로 동의는 항상 필수다(법적 의무① — 회원가입 약관과 별도 사전 동의).
   const needConsent = recurringEnabled
-  const blocked = !billingConfigured || (needConsent && !agreed)
+  // 카드 4칸이 형식상 채워졌는가. 최종 검증은 서버(parseCard)와 카드사가 한다.
+  const cardFilled =
+    card.cardNo.replace(/\D/g, "").length >= 15 &&
+    card.exp.replace(/\D/g, "").length === 4 &&
+    [6, 10].includes(card.idNo.replace(/\D/g, "").length) &&
+    card.cardPw.replace(/\D/g, "").length === 2
+  const blocked = !billingConfigured || (needConsent && !agreed) || !cardFilled
 
   // 결제창에서 돌아왔을 때(return 라우트가 /billing?result=... 로 보낸다) 결과를 알린다.
   // 함께 **지연 대사**를 한 번 돌린다 — 크론이 하루 1회뿐이라(Vercel Hobby 제한) 화면 상태가
@@ -177,23 +107,36 @@ export function CheckoutView({
   async function start() {
     setBusy(true)
     try {
+      const digits = (v: string) => v.replace(/\D/g, "")
+      const exp = digits(card.exp)
       const res = await fetch("/api/billing/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         // ★금액을 보내지 않는다. 서버가 plan/cycle로 다시 계산한다.
-        body: JSON.stringify({ plan, cycle, autoBillingConsent: agreed }),
+        // 카드 원문은 이 요청에만 담기고, 서버는 암호화 후 즉시 버린다(DB 저장 없음).
+        body: JSON.stringify({
+          plan,
+          cycle,
+          autoBillingConsent: agreed,
+          card: {
+            cardNo: digits(card.cardNo),
+            expMonth: exp.slice(0, 2),
+            expYear: exp.slice(2, 4),
+            idNo: digits(card.idNo),
+            cardPw: digits(card.cardPw),
+          },
+        }),
       })
       if (!res.ok) {
         toast.error(await res.text())
         return
       }
-      const data = (await res.json()) as { checkout: CheckoutParams }
-      await loadNicepaySdk()
-      // 여기서부터는 나이스페이 결제창이 화면을 가져간다. 인증이 끝나면 SDK가
-      // nicepaySubmit()을 불러 return 라우트로 POST하고, 승인·정산은 서버가 한다.
-      openNicepayWindow(data.checkout, () => toast("결제를 취소했어요."))
+      // 성공 — 카드 원문을 즉시 비운다(화면에 남겨둘 이유가 없다).
+      setCard(EMPTY_CARD)
+      toast.success("결제가 완료됐어요. 요금제가 바로 적용됩니다.")
+      router.refresh()
     } catch {
-      toast.error("결제창을 여는 데 실패했어요. 잠시 후 다시 시도해 주세요.")
+      toast.error("결제에 실패했어요. 잠시 후 다시 시도해 주세요.")
     } finally {
       setBusy(false)
     }
@@ -269,6 +212,68 @@ export function CheckoutView({
           </div>
         </div>
 
+        {/* 🔴 카드정보 입력창 — 카드사 승인심사 필수 요건(카드번호·유효기간·생년월일·비밀번호 앞2자리).
+            나이스페이 포스타트는 결제창을 주지 않으므로 이 화면이 곧 결제 수단 입력창이다.
+            값은 서버로만 보내고 저장하지 않는다(autoComplete="off" · 비밀번호는 password 타입). */}
+        <div className="flex flex-col gap-3 rounded-xl border p-3.5">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold">카드 정보</h3>
+            <span className="text-[11px] text-muted-foreground">안전하게 암호화되어 전송돼요</span>
+          </div>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs text-muted-foreground">카드번호</span>
+            <input
+              className={fieldClass}
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="0000 0000 0000 0000"
+              value={card.cardNo}
+              onChange={(e) => setCard((c) => ({ ...c, cardNo: formatCardNo(e.target.value) }))}
+            />
+          </label>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs text-muted-foreground">유효기간 (MM/YY)</span>
+              <input
+                className={fieldClass}
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="MM/YY"
+                value={card.exp}
+                onChange={(e) => setCard((c) => ({ ...c, exp: formatExp(e.target.value) }))}
+              />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs text-muted-foreground">비밀번호 앞 2자리</span>
+              <input
+                className={fieldClass}
+                type="password"
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="••"
+                maxLength={2}
+                value={card.cardPw}
+                onChange={(e) => setCard((c) => ({ ...c, cardPw: e.target.value.replace(/\D/g, "").slice(0, 2) }))}
+              />
+            </label>
+          </div>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs text-muted-foreground">생년월일 6자리 (법인카드는 사업자번호 10자리)</span>
+            <input
+              className={fieldClass}
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="YYMMDD"
+              maxLength={10}
+              value={card.idNo}
+              onChange={(e) => setCard((c) => ({ ...c, idNo: e.target.value.replace(/\D/g, "").slice(0, 10) }))}
+            />
+          </label>
+        </div>
+
         {/* 🔴 자동결제 동의 — 회원가입 약관과 물리적으로 분리된 별도 체크박스 */}
         <div className="flex flex-col gap-2 rounded-xl border p-3.5">
           <label className="flex items-start gap-2.5">
@@ -290,11 +295,8 @@ export function CheckoutView({
               </span>
             </span>
           </label>
-          {!recurringEnabled && (
-            <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
-              자동 갱신은 아직 준비 중이에요. 이번 결제는 <b>1회 결제</b>로 진행되고, 기간이 끝나면 다시 결제하시면 돼요.
-            </p>
-          )}
+          {/* 자동 갱신은 이제 기본이다(빌키). recurringEnabled가 false인 경우는 자격증명이 없을
+              때뿐이고, 그건 아래 "결제 준비 중" 안내가 이미 알려주므로 여기서 중복 설명하지 않는다. */}
         </div>
 
         {!billingConfigured && (
