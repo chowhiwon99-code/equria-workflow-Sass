@@ -19,11 +19,11 @@
 
 ---
 
-## 🎯 지금 상태 (2026-08-20)
+## 🎯 지금 상태 (2026-08-21)
 
 | 항목 | 값 |
 |---|---|
-| 프로덕션 | **`913cc16`** · `complow.kr` (Vercel `icn1` · **플랜 = Hobby**) · 배포 2026-08-20 READY 확인(HTTP 200) · **롤백 후보 `aca75fe`** |
+| 프로덕션 | **`e70e0ee`** · `complow.kr` (Vercel `icn1` · **플랜 = Hobby**) · 배포 2026-08-21 READY 확인(HTTP 200 · `dpl_83jFzG…`) · **롤백 후보 `a616c19`** |
 | 작업 브랜치 | `worktree-gmail-scope-narrow` (= main과 동일 SHA). ⚠️ `feat/toss-ui-refresh`(`4b7fe08`)는 **main보다 뒤처진 낡은 브랜치**다 — 미배포 작업 없음 |
 | 마이그레이션 | **001~141** 적용 · drift 없음 (135~137은 결번) |
 | 게이트 | `tsc` 0 · `pnpm lint` **29 errors/0 warnings**(전부 기존 부채, **신규 0이 베이스라인**) · `next build` 성공 |
@@ -139,27 +139,23 @@ DB·로그·에러 메시지·PG raw 어디에도 남기지 않는다. 저장하
 
 ### 🔜 다음
 
-**🔴 남은 1건 — 기존 구독의 `auto_renew` 켜기** ⏰ **기한 = 2026-09-20**
+### ⏰ 예약된 실제 청구 — 2026-09-21 (대표 카드에서 돈이 나간다)
 
-코드는 **새 결제**에만 적용된다. 8/20 실결제 건은 이미 만들어진 행이라 **한 줄 UPDATE가 필요**하다.
-안 켜면 9/20에 아무도 청구하지 않아 `past_due` → 유예 3일 → **`free` 강등**된다.
+기존 구독(8/20 결제분)의 `auto_renew`를 **2026-08-21 배포 직후 켰다**(대표 승인).
+동의 증빙은 원래 있던 것을 그대로 인용했다 — `billing_events` `consent_auto_billing`
+(2026-08-20 06:56:52Z · 약관 `2026-08-18` · actor=대표). 컬럼 반영만 누락됐던 건이다.
 
-```sql
--- 동의 증빙은 이미 있다: billing_events kind='consent_auto_billing'
---   (2026-08-20 06:56:52Z · 약관 2026-08-18 · actor=대표). 컬럼 반영만 누락됐던 건이다.
-update public.billing_subscriptions
-   set auto_renew = true,
-       next_charge_at = current_period_end,
-       consent_auto_billing_at = coalesce(consent_auto_billing_at, '2026-08-20 06:56:52.579473+00'),
-       consent_terms_version   = coalesce(consent_terms_version, '2026-08-18'),
-       updated_at = now()
- where workspace_id = '42f70fa1-3bbd-4652-8f4c-a17ffb282293'
-   and status = 'active';
-```
-→ 켜면 **2026-09-13 크론**에 7일 전 고지가 나가고, **2026-09-21 09:00 KST 크론**에 29,000원이
-자동 청구된다(기간 종료가 9/20 15:56 KST라 그날 00:00 UTC 크론에는 아직 대상이 아니다.
-새 기간은 밀리지 않고 9/20 15:56 → 10/20 15:56으로 이어진다).
-⚠️ **대표 카드에서 실제로 돈이 나간다.** 되돌리려면 `auto_renew=false`로 다시 끄면 된다.
+| 언제 | 무슨 일 |
+|---|---|
+| **2026-09-13** 09:00 KST 크론 | 7일 전 고지 알림 — "곧 구독료가 결제돼요 · 9월 20일에 29,000원" (법적 의무②) |
+| **2026-09-20** 15:56 KST | 현재 기간 종료 (그날 09:00 크론에는 아직 대상 아님 — 기간이 안 끝났다) |
+| **2026-09-21** 09:00 KST 크론 | **29,000원 자동 청구.** 새 기간 = 9/20 15:56 → 10/20 15:56 (결제일이 밀리지 않는다) |
+
+**되돌리려면** — `update public.billing_subscriptions set auto_renew=false, next_charge_at=null
+where workspace_id='42f70fa1-3bbd-4652-8f4c-a17ffb282293';` (또는 설정 화면에서 해지)
+
+**실측값**: `auto_renew=true` · `next_charge_at=2026-09-20 15:56 KST` ·
+`consent_auto_billing_at=2026-08-20 06:56:52Z` · `consent_terms_version=2026-08-18` ✅
 
 **자격증명 없이 가능 (나머지)**
 2. `computeFairRefundKrw()` — `/refund` 일할 계산식과 **글자 단위로 같아야** 한다.
