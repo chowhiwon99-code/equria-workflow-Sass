@@ -1,10 +1,16 @@
 // 결제 자동 점검(대사) — 크론이 하루 한 번 부르고, 결제 화면 진입 시에도 한 번 부른다.
 //
-// 이게 없으면 아무도 안 도는 일 4가지:
+// 이게 없으면 아무도 안 도는 일 5가지:
+//   ⓪ 🔴 **매달 자동청구가 아무도 안 한다** = 한 달 뒤 모든 유료 고객이 free로 강등된다 (runRenewals)
 //   ① 결제창만 띄우고 닫은 'ready' 행이 영원히 쌓인다
 //   ② 해지 예약일이 지나도 구독이 안 닫힌다 (billing_expire_due)
 //   ③ 🔴 기간이 끝나도 구독이 active로 남는다 = **한 번 결제로 평생 이용** (billing_lapse_due)
 //   ④ 🔴 결제 7일 전 고지가 안 나간다 = **법적 의무② 위반** (billing_notice_upcoming)
+//
+// 🔴 실행 순서를 바꾸지 말 것 — ⓪이 반드시 맨 앞이다.
+//   · ①보다 먼저: stale 정리가 "승인 여부를 모르는 갱신 시도"를 먼저 닫으면 재청구 판단이 흐려진다.
+//   · ③보다 먼저: 청구에 성공한 구독까지 past_due를 한 번 찍고 지나간다.
+//   · ④보다 먼저: 갱신으로 기간이 밀린 뒤에 고지해야 날짜가 맞는다.
 //
 // 🔴 스케줄을 "하루 1회"로 잡은 이유 (vercel.json과 세트로 읽을 것)
 //   Vercel **Hobby 플랜은 크론이 하루 1회로 제한**되고, 그보다 잦은 cron 식은
@@ -19,6 +25,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { isRecurringEnabled } from "@/app/api/billing/checkout/route"
+import { runRenewals, type RenewSummary } from "@/lib/billing/renew"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -33,6 +40,7 @@ const NOTICE_DAYS = 7
 
 type Summary = {
   ranAt: string
+  renew: RenewSummary | null
   staleClosed: number | null
   cancelEffected: number | null
   lapsed: number | null
@@ -42,20 +50,36 @@ type Summary = {
   errors: string[]
 }
 
-async function runSweep(): Promise<Summary> {
+/**
+ * @param charge 실제로 카드를 긁어도 되는 실행인가.
+ *   🔴 **크론(GET)만 true다.** 화면 진입 시의 지연 대사(POST)는 로그인한 아무나 부를 수 있어,
+ *   거기서 청구까지 돌면 남의 워크스페이스 결제를 임의 시점에 촉발할 수 있다.
+ *   (주문번호가 하루 단위라 이중 결제는 안 되지만, 돈이 나가는 동작의 방아쇠는 좁을수록 좋다.)
+ *   지연 대사의 목적은 "화면 상태를 최신으로"이지 청구가 아니다.
+ */
+async function runSweep(charge: boolean): Promise<Summary> {
   const admin = createAdminClient()
   const errors: string[] = []
+  const recurring = isRecurringEnabled()
   const out: Summary = {
     ranAt: new Date().toISOString(),
+    renew: null,
     staleClosed: null,
     cancelEffected: null,
     lapsed: null,
     expired: null,
     noticesSent: null,
-    // 자동 갱신(빌링키)은 아직 미승인이라 갱신 결제를 시도할 수 없다.
-    // 승인되면 여기서 renew를 부르게 되고, 그 전까지는 lapse가 만료를 처리한다.
-    recurring: isRecurringEnabled(),
+    // 자격증명이 없으면 PG를 부를 수 없으므로 갱신 청구를 건너뛴다(lapse가 만료를 처리한다).
+    recurring,
     errors,
+  }
+
+  // ⓪ 🔴 매달 자동청구 — 갱신일이 지난 구독을 저장된 빌키로 청구한다.
+  //    중복 청구 방지 설계는 lib/billing/renew.ts 헤더 주석에 있다. 순서는 위 주석 참조.
+  if (charge) {
+    const renew = await runRenewals(admin, recurring)
+    out.renew = renew
+    for (const e of renew.errors) errors.push(`renew:${e}`)
   }
 
   // ① 승인되지 않은 채 남은 결제 시도 정리
@@ -106,7 +130,7 @@ export async function GET(req: Request) {
   if (!secret || auth !== `Bearer ${secret}`) {
     return new Response("Unauthorized", { status: 401 })
   }
-  const summary = await runSweep()
+  const summary = await runSweep(true) // 크론만 실제 청구를 한다.
   return Response.json({ ok: summary.errors.length === 0, ...summary })
 }
 
@@ -125,6 +149,6 @@ export async function POST() {
   } = await supabase.auth.getUser()
   if (!user) return new Response("로그인이 필요해요.", { status: 401 })
 
-  const summary = await runSweep()
+  const summary = await runSweep(false) // ★청구는 하지 않는다(위 runSweep 주석).
   return Response.json({ ok: summary.errors.length === 0, ...summary })
 }

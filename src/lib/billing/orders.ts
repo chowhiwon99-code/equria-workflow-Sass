@@ -65,6 +65,47 @@ export function newOrderId(workspaceId: string): string {
   return `CPL-${ws}-${ts}${rand}`.toUpperCase()
 }
 
+/**
+ * 매달 자동청구(갱신) 주문번호의 접두사. 첫 결제(`CPL-`)와 **반드시 구분돼야 한다** —
+ * "결과를 모르는 갱신 시도가 남아 있는가"를 이 접두사로 찾기 때문이다(renew.ts).
+ */
+export const RENEW_ORDER_PREFIX = "RNW"
+
+/** 오늘 날짜(한국시간, YYYYMMDD). 결제·정산은 전부 한국 기준이라 UTC로 계산하면 하루 어긋난다. */
+export function kstYmd(at: Date = new Date()): string {
+  // sv-SE 로캘이 YYYY-MM-DD를 준다(ko-KR은 "2026. 8. 21." 형태라 파싱이 지저분해진다).
+  return new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Seoul" }).format(at).replace(/-/g, "")
+}
+
+/**
+ * 갱신 청구의 주문번호. 형식: `RNW-<워크스페이스8>-<YYYYMMDD>`
+ *
+ * 🔴 날짜를 넣는 이유가 **중복 청구 방지**다. 같은 워크스페이스·같은 날짜면 주문번호가 같고,
+ *    `billing_payments.order_id`가 unique라 **두 번째 시도는 DB가 거부한다.**
+ *    크론이 중복 실행되거나(Vercel 크론은 중복 실행이 가능하다고 문서에 명시) 화면에서 지연
+ *    대사가 동시에 돌아도 청구는 하루 한 번을 넘을 수 없다.
+ * 🔴 날짜는 PG 주문번호 조회(`orderDate` 필수 파라미터)에도 그대로 쓰인다 —
+ *    승인 여부를 모르게 됐을 때 이 주문번호만으로 다시 물어볼 수 있어야 하기 때문이다.
+ */
+export function renewOrderId(workspaceId: string, ymdKst: string = kstYmd()): string {
+  const ws = workspaceId.replace(/-/g, "").slice(0, 8)
+  return `${RENEW_ORDER_PREFIX}-${ws}-${ymdKst}`.toUpperCase()
+}
+
+/** 갱신 주문번호에서 주문일자(YYYYMMDD)를 되꺼낸다. PG 주문번호 조회에 필요. */
+export function orderDateOfRenewOrderId(orderId: string): string | null {
+  const m = /-(\d{8})$/.exec(orderId)
+  return m ? m[1] : null
+}
+
+/**
+ * PG에 보낼 상품명. 첫 결제와 갱신이 **같은 문구**여야 카드 명세서에서 같은 구독으로 읽힌다.
+ * ⚠️ "충전·크레딧·포인트" 금지(PG 위험업종 분류 회피) · 40자 제한은 nicepay.ts가 자른다.
+ */
+export function goodsNameFor(plan: PayablePlan, cycle: BillingCycle): string {
+  return `Complow ${plan === "pro" ? "Pro" : "Standard"} ${cycle === "yearly" ? "연간" : "월"} 구독`
+}
+
 /** 화면 표기용 — "₩29,000". 문구에 "충전·크레딧·포인트"를 쓰지 않는다(PG 위험업종 분류 회피). */
 export function formatKrw(krw: number): string {
   return `₩${krw.toLocaleString("ko-KR")}`

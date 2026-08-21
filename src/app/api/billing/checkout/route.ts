@@ -17,9 +17,17 @@
 //    그 경우 즉시 provider.cancel()로 되돌린다(옛 망취소의 역할).
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { quoteAmountKrw, periodFor, newOrderId, isPayablePlan, type BillingCycle } from "@/lib/billing/orders"
+import {
+  quoteAmountKrw,
+  periodFor,
+  newOrderId,
+  isPayablePlan,
+  goodsNameFor,
+  type BillingCycle,
+} from "@/lib/billing/orders"
 import { createNicepayProvider } from "@/lib/billing/nicepay"
 import { toJson, type CardInput } from "@/lib/billing/provider"
+import { getUserWorkspaceId } from "@/lib/workspace"
 import { AUTO_BILLING_TERMS_VERSION } from "@/app/terms/billing/page"
 
 export const runtime = "nodejs"
@@ -67,16 +75,12 @@ export async function POST(req: Request) {
 
   const admin = createAdminClient()
 
-  // 워크스페이스는 클라 값을 믿지 않고 서버가 판정한다(guest 제외 + created_at 명시 — budget.ts 관례).
-  const { data: mem } = await admin
-    .from("workspace_members")
-    .select("workspace_id")
-    .eq("user_id", user.id)
-    .neq("role", "guest")
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle()
-  const wsId = mem?.workspace_id
+  // 🔴 결제 대상 회사는 **지금 화면에서 보고 있는 회사**여야 한다.
+  //    이전 구현은 "가장 오래된 멤버십"을 골랐다. 여러 회사에 속한 오너(대표가 그렇다)가
+  //    B사 화면에서 결제해도 A사가 결제되는 실제 사고가 났다(2026-08-20 실결제에서 확인).
+  //    getUserWorkspaceId()가 활성 워크스페이스 쿠키를 우선하고, **내 비게스트 멤버십일 때만**
+  //    인정한다(스푸핑 방지). 쿠키가 없으면 기존과 같이 첫 멤버십으로 폴백한다.
+  const wsId = await getUserWorkspaceId(admin, user.id)
   if (!wsId) return new Response("워크스페이스를 찾을 수 없어요.", { status: 404 })
 
   const { data: ws } = await admin.from("workspaces").select("owner_id").eq("id", wsId).maybeSingle()
@@ -110,7 +114,8 @@ export async function POST(req: Request) {
   const amountKrw = quoteAmountKrw(plan, cycle) // ★서버 산출. 부가세 포함 총액.
   const { start, end } = periodFor(cycle)
   const orderId = newOrderId(wsId)
-  const goodsName = `Complow ${plan === "pro" ? "Pro" : "Standard"} ${cycle === "yearly" ? "연간" : "월"} 구독`
+  // 상품명은 갱신 청구와 **같은 문구**여야 카드 명세서에서 같은 구독으로 읽힌다(orders.ts SSOT).
+  const goodsName = goodsNameFor(plan, cycle)
 
   // ③ 금액을 'ready' 행에 못박는다.
   const { error: startErr } = await admin.rpc("billing_start_checkout", {
@@ -202,6 +207,29 @@ export async function POST(req: Request) {
       p_raw: toJson({ apply_error: applyErr.message, reverted }),
     })
     return new Response("결제 처리 중 문제가 생겨 자동으로 취소했어요. 잠시 후 다시 시도해 주세요.", { status: 500 })
+  }
+
+  // 🔴 자동 갱신을 **여기서** 켠다. 구독 행은 방금 billing_apply_payment가 처음 만들었기 때문이다.
+  //    위쪽 billing_record_consent는 결제 **전에** 부르는데(사전 동의가 법적 요건이라 순서를 못 바꾼다),
+  //    그 시점엔 구독 행이 아직 없어 RPC 안의 UPDATE가 0행을 건드리고 끝난다.
+  //    → 2026-08-20 실결제에서 동의를 받고도 auto_renew=false·consent_auto_billing_at=null로 남았다.
+  //      그 상태로 두면 다음 달에 아무도 청구하지 않아 past_due → free로 강등된다.
+  //    동의 증빙(billing_events)은 결제 전 시각 그대로 남아 있고, 여기서는 구독 행에 반영만 한다.
+  const { error: renewErr } = await admin
+    .from("billing_subscriptions")
+    .update({
+      auto_renew: true,
+      // 청구 판정은 current_period_end가 하고(renew.ts), 이 값은 7일 전 고지의 날짜·문구에 쓰인다.
+      next_charge_at: end.toISOString(),
+      consent_auto_billing_at: new Date().toISOString(),
+      consent_terms_version: AUTO_BILLING_TERMS_VERSION,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("workspace_id", wsId)
+  if (renewErr) {
+    // 결제 자체는 끝났다 — 실패로 응답하면 안 된다(고객은 돈을 냈고 서비스도 열렸다).
+    // 자동 갱신만 안 켜진 상태이고, 다음 달 청구가 없으면 유예 후 만료된다(안전한 방향).
+    console.error("[billing/checkout] auto_renew 설정 실패:", wsId, renewErr.message)
   }
 
   return Response.json({

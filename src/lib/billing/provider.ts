@@ -102,6 +102,12 @@ export type InquiryResult =
       approved: boolean
       /** 취소된 거래인가(전취소·후취소). */
       canceled: boolean
+      /** 승인 거래번호. 주문번호로 조회한 경우 **이걸로만 tid를 알 수 있다**(정산 RPC에 필요). */
+      tid: string | null
+      /** PG가 말한 승인 금액. ready 행과의 대조는 billing_apply_payment가 한다. */
+      amountKrw: number | null
+      /** 승인 시각(ISO). 없으면 호출부가 now()로 대체한다. */
+      approvedAt: string | null
       raw: Record<string, unknown>
     }
   | { ok: false; code: string; message: string; raw: Record<string, unknown> }
@@ -138,4 +144,16 @@ export interface BillingProvider {
    * 결제통보(노티)를 받았을 때 **본문을 믿지 않고** 이걸로 다시 확인한 뒤에만 정산한다.
    */
   inquire(input: { tid: string }): Promise<InquiryResult>
+
+  /**
+   * 🔴 주문번호로 거래 조회 — **중복 청구를 막는 유일한 수단.**
+   *
+   * 청구 요청이 타임아웃·네트워크 오류로 끊기면 우리는 승인 여부를 **모른다**(tid도 못 받았다).
+   * 이때 실패로 굳히고 다음날 다시 긁으면 **같은 달에 두 번 결제된다.** 그래서 tid가 아니라
+   * **우리가 만든 주문번호**로 PG에 직접 물어 확정한다. 이 경로가 없으면 자동청구를 켤 수 없다.
+   *
+   * `orderDateYmd`는 주문 생성일(KST, YYYYMMDD) — 규격상 필수 파라미터라 주문번호에 박아 둔다.
+   * 규격: GET /v1/payments/find/{orderId}?orderDate=YYYYMMDD (nicepay-manual/api/status-transaction.md)
+   */
+  inquireByOrderId(input: { orderId: string; orderDateYmd: string }): Promise<InquiryResult>
 }

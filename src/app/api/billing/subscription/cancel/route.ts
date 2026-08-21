@@ -14,26 +14,21 @@
 //    인증·인가는 여기서, 원자성은 DB가 맡는 분담이다.
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { getUserWorkspaceId } from "@/lib/workspace"
 
 export const runtime = "nodejs"
 
 /**
  * 요청자의 워크스페이스를 **서버가 판정**한다. 클라가 보낸 workspace_id는 믿지 않는다.
  *
- * guest 제외 + created_at 오름차순 명시는 이 코드베이스의 필수 관례다(budget.ts:42-49).
- * 비결정 limit(1)을 쓰면 멀티 멤버십일 때 엉뚱한 워크스페이스의 구독을 해지할 수 있다.
+ * 🔴 **지금 화면에서 보고 있는 회사**를 해지해야 한다. 이전 구현은 "가장 오래된 멤버십"을
+ *    골라서, 여러 회사에 속한 오너가 B사 화면에서 해지를 눌러도 A사가 해지될 수 있었다
+ *    (결제 라우트에서 같은 원인의 사고가 실제로 났다). getUserWorkspaceId()가 활성 워크스페이스
+ *    쿠키를 우선하되 **내 비게스트 멤버십일 때만** 인정한다(스푸핑 방지) + 첫 멤버십 폴백.
  */
 async function resolveOwnedWorkspace(userId: string): Promise<string | null> {
   const admin = createAdminClient()
-  const { data: mem } = await admin
-    .from("workspace_members")
-    .select("workspace_id")
-    .eq("user_id", userId)
-    .neq("role", "guest")
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle()
-  const wsId = mem?.workspace_id
+  const wsId = await getUserWorkspaceId(admin, userId)
   if (!wsId) return null
 
   // 해지는 오너만. (구독 조회는 멤버도 되지만 돈을 끊는 건 오너 권한이다.)

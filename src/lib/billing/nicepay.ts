@@ -19,6 +19,7 @@
 //   · 빌키삭제: POST /v1/subscribe/{bid}/expire    바디 { orderId }
 //   · 승인취소: POST /v1/payments/{tid}/cancel     바디 { orderId, reason }
 //   · 거래조회: GET  /v1/payments/{tid}
+//   · 거래조회(주문번호): GET /v1/payments/find/{orderId}?orderDate=YYYYMMDD  ← 중복청구 방지의 핵심
 //   · 성공 판정: resultCode === "0000"  (옛 규격의 3001/4000/4100이 아니다)
 //
 // encData(카드 암호화)
@@ -184,13 +185,37 @@ export function createNicepayProvider(): BillingProvider {
         // 다음 노티/크론에서 다시 시도해야 한다(모르는 상태를 '실패'로 굳히면 돈만 빠진다).
         return { ok: false, code: String(raw.resultCode ?? "UNKNOWN"), message: msgOf(raw, "조회 실패"), raw }
       }
-      const status = String(raw.status ?? "")
-      return {
-        ok: true,
-        approved: status === "paid",
-        canceled: status === "cancelled" || status === "partialCancelled",
-        raw,
-      }
+      return readInquiry(raw)
     },
+
+    async inquireByOrderId({ orderId, orderDateYmd }): Promise<InquiryResult> {
+      // orderDate는 규격상 필수다(YYYYMMDD). 빠뜨리면 조회가 통째로 실패해
+      // "승인 여부를 모르는" 상태가 영원히 안 풀린다.
+      const qs = `?orderDate=${encodeURIComponent(orderDateYmd)}`
+      const { raw, networkError } = await call(`/v1/payments/find/${encodeURIComponent(orderId)}${qs}`, {}, "GET")
+      if (networkError) return { ok: false, code: "NETWORK", message: networkError, raw }
+      if (!isOk(raw)) {
+        // PG가 답은 했지만 성공이 아니다. **"거래 없음"과 "일시 장애"를 코드만으로 구분할 수
+        // 없으므로** 호출부가 판단한다(renew.ts) — 여기서는 있는 그대로 돌려준다.
+        return { ok: false, code: String(raw.resultCode ?? "UNKNOWN"), message: msgOf(raw, "조회 실패"), raw }
+      }
+      return readInquiry(raw)
+    },
+  }
+}
+
+/** 조회 응답(tid·주문번호 공통) → InquiryResult. 승인 판정은 status 하나로만 한다. */
+function readInquiry(raw: Record<string, unknown>): InquiryResult {
+  const status = String(raw.status ?? "")
+  const amount = Number(raw.amount ?? 0)
+  return {
+    ok: true,
+    approved: status === "paid",
+    canceled: status === "cancelled" || status === "partialCancelled",
+    tid: raw.tid ? String(raw.tid) : null,
+    amountKrw: Number.isFinite(amount) && amount > 0 ? amount : null,
+    // paidAt은 미완료 시 "0"이 온다(규격) — 그 경우 승인 시각이 없는 것으로 본다.
+    approvedAt: raw.paidAt && String(raw.paidAt) !== "0" ? String(raw.paidAt) : null,
+    raw,
   }
 }
