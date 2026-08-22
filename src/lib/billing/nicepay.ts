@@ -208,12 +208,16 @@ export function createNicepayProvider(): BillingProvider {
 function readInquiry(raw: Record<string, unknown>): InquiryResult {
   const status = String(raw.status ?? "")
   const amount = Number(raw.amount ?? 0)
+  // 취소 누적 금액. 문서 표기는 영국식 cancelledAmount이지만(status도 cancelled/partialCancelled),
+  // 미국식 철자로 오는 경우까지 받아 둔다 — 못 읽으면 전액 취소로 오판해 부분환불이 전액으로 처리된다.
+  const canceled = Number(raw.cancelledAmount ?? raw.canceledAmount ?? 0)
   return {
     ok: true,
     approved: status === "paid",
     canceled: status === "cancelled" || status === "partialCancelled",
     tid: raw.tid ? String(raw.tid) : null,
     amountKrw: Number.isFinite(amount) && amount > 0 ? amount : null,
+    canceledAmountKrw: Number.isFinite(canceled) && canceled > 0 ? canceled : null,
     // paidAt은 미완료 시 "0"이 온다(규격) — 그 경우 승인 시각이 없는 것으로 본다.
     approvedAt: raw.paidAt && String(raw.paidAt) !== "0" ? String(raw.paidAt) : null,
     raw,

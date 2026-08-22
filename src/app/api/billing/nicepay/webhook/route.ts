@@ -103,15 +103,54 @@ export async function POST(req: Request) {
     return ok()
   }
 
-  // 취소 통보(StateCd 1=전취소 · 2=후취소). 관리자 화면에서 취소한 경우가 대표적이다.
-  // ⚠️ 자동 강등은 아직 구현하지 않는다 — 환불 처리(부분취소·일할 환불)와 한 묶음이어야 하고,
-  //    반쪽만 만들면 "취소됐는데 요금제는 그대로"보다 나쁜 상태(회수 분쟁)가 생긴다.
-  //    지금은 감사 로그로 남겨 오너 화면·대사에서 보이게만 한다.
+  // ── 취소 통보(StateCd 1=전취소 · 2=후취소). 상점관리자에서 환불 처리한 경우가 대표적이다. ──
+  //
+  // 🔴 여기서도 **본문을 믿지 않는다.** 이건 승인 통보보다 오히려 더 위험하다 —
+  //    주문번호만 알면 가짜 취소 통보로 **돈 낸 고객을 무료로 강등**시킬 수 있기 때문이다.
+  //    (발신자 확인은 clientId 필드가 없으면 통과시키므로 방어선이 되지 못한다.)
+  //    그래서 TID로 조회 API를 때려 "정말 취소된 거래인가"를 확인한 뒤에만 반영한다.
+  //
+  // 2026-08-21 변경: 예전에는 감사 로그만 남기고 요금제를 그대로 뒀다. 환불 금액 계산
+  // (`lib/billing/refund.ts`, 법적 의무④)이 없어 반쪽짜리가 되기 때문이었는데, 그게 생겨서 짝이 맞았다.
+  // 이제 billing_apply_cancellation(마이그142)이 영수증·구독 종료·요금제 강등을 한 트랜잭션으로 처리한다.
   if (stateCd === "1" || stateCd === "2" || status === "cancelled" || status === "partialCancelled") {
+    const inq = await createNicepayProvider().inquire({ tid })
+    if (!inq.ok) {
+      // 취소 여부를 **모른다**. 멀쩡한 유료 고객을 강등시킬 수는 없으니 재전송받아 다시 판정한다.
+      return retryLater(`cancel_inquiry:${inq.code}:${inq.message}`)
+    }
+    if (!inq.canceled) {
+      // 조회해보니 취소된 거래가 아니다 = 통보가 틀렸거나 위조다. 기록만 남기고 아무것도 바꾸지 않는다.
+      await admin.from("billing_events").insert({
+        workspace_id: pay.workspace_id,
+        kind: "webhook_received",
+        payload: { order_id: moid, tid, note: "cancel_not_confirmed", inquiry: toJson(inq.raw) },
+      })
+      return ok()
+    }
+
+    const { data: result, error } = await admin.rpc("billing_apply_cancellation", {
+      p_order_id: moid,
+      p_tid: tid,
+      // 조회 API가 말한 **누적 취소 금액**. 못 읽으면 null → RPC가 전액 취소로 본다.
+      p_canceled_amount_krw: inq.canceledAmountKrw ?? undefined,
+      p_canceled_at: new Date().toISOString(),
+      p_raw: toJson({ source: "noti_cancel", body: p, inquiry: inq.raw }),
+    })
+    if (error) {
+      // 일시적 DB 오류일 수 있다 → 재전송받아 다시 시도한다(취소 반영을 놓치면 공짜 이용이 남는다).
+      await admin.from("billing_events").insert({
+        workspace_id: pay.workspace_id,
+        kind: "webhook_received",
+        payload: { order_id: moid, tid, note: "cancel_error", error: error.message },
+      })
+      return retryLater(`cancel_apply:${error.message}`)
+    }
+
     await admin.from("billing_events").insert({
       workspace_id: pay.workspace_id,
       kind: "webhook_received",
-      payload: { order_id: moid, tid, state_cd: stateCd, note: "cancel_notified", raw: toJson(p) },
+      payload: { order_id: moid, tid, state_cd: stateCd, note: "cancel_applied", result },
     })
     return ok()
   }

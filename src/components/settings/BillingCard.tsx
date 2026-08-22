@@ -19,13 +19,15 @@ import { createClient } from "@/lib/supabase/client"
 import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
 import { Button } from "@/components/ui/button"
 import { planOf } from "@/lib/plans"
-import { formatKrw } from "@/lib/billing/orders"
+import { formatKrw, isPayablePlan } from "@/lib/billing/orders"
+import { COOLING_OFF_DAYS, computeFairRefundKrw } from "@/lib/billing/refund"
 
 type Sub = {
   plan: string
   status: string
   billing_cycle: string
   amount_krw: number
+  current_period_start: string
   current_period_end: string
   cancel_effective_at: string | null
 }
@@ -62,6 +64,8 @@ export function BillingCard() {
   const [plan, setPlan] = useState<string | null>(null)
   const [sub, setSub] = useState<Sub | null>(null)
   const [loaded, setLoaded] = useState(false)
+  /** 조회 시점 시각(ms). 환불 안내 계산에 쓴다 — 렌더 중에는 현재 시각을 읽을 수 없다. */
+  const [loadedAt, setLoadedAt] = useState(0)
   const [confirming, setConfirming] = useState(false)
   const [reason, setReason] = useState("")
   const [busy, setBusy] = useState(false)
@@ -72,12 +76,15 @@ export function BillingCard() {
       supabase.from("workspaces").select("plan").eq("id", wsId).maybeSingle(),
       supabase
         .from("billing_subscriptions")
-        .select("plan, status, billing_cycle, amount_krw, current_period_end, cancel_effective_at")
+        .select(
+          "plan, status, billing_cycle, amount_krw, current_period_start, current_period_end, cancel_effective_at",
+        )
         .eq("workspace_id", wsId)
         .maybeSingle(),
     ])
     setPlan(ws?.plan ?? null)
     setSub((s as Sub | null) ?? null)
+    setLoadedAt(Date.now())
     setLoaded(true)
   }, [supabase, wsId])
 
@@ -152,6 +159,30 @@ export function BillingCard() {
   const cycleLabel = sub.billing_cycle === "yearly" ? "연간" : "월"
   const canceling = !!sub.cancel_effective_at
 
+  // ── 환불 안내 (법적 의무④ · /refund 제1·2조) ──
+  // 해지 버튼 자체는 **환불이 아니라 자동갱신 중단**이다(billing_request_cancel = 기간 만료 시 종료).
+  // 환불은 제6조 2항대로 별도 신청이라, 여기서는 "얼마 돌려받는지"만 미리 알려준다.
+  const periodStart = new Date(sub.current_period_start)
+  // ⚠️ 렌더 중에 Date.now()를 부르면 안 된다(react-hooks/purity — 렌더가 순수해야 한다).
+  //    그래서 조회 시점의 시각을 load()에서 못박아 두고 그 값으로 계산한다.
+  const daysSinceStart = (loadedAt - periodStart.getTime()) / 86_400_000
+  // 갱신 결제는 기간 시작보다 최대 하루 늦게 승인된다(크론이 하루 1회). 그만큼 여유를 둬야
+  // 실제로는 청약철회가 가능한데 "환불 없음"으로 잘못 안내하는 일이 없다.
+  const maybeCoolingOff = Number.isFinite(daysSinceStart) && daysSinceStart <= COOLING_OFF_DAYS + 1
+
+  const refund =
+    !maybeCoolingOff && sub.billing_cycle === "yearly" && isPayablePlan(sub.plan)
+      ? computeFairRefundKrw({
+          amountKrw: sub.amount_krw,
+          plan: sub.plan,
+          billingCycle: "yearly",
+          periodStart,
+          periodEnd: new Date(sub.current_period_end),
+          approvedAt: periodStart,
+          used: true, // 7일이 지난 시점이라 이 값은 계산에 쓰이지 않는다(제2조 2항 경로).
+        })
+      : null
+
   return (
     <Shell>
       <div className="flex flex-col divide-y overflow-hidden rounded-xl border">
@@ -184,6 +215,18 @@ export function BillingCard() {
           <p className="text-xs">
             <b>{fmtDate(sub.current_period_end)}</b>까지는 그대로 이용할 수 있고, 그다음 결제부터 청구되지 않아요.
           </p>
+          {/* 환불은 해지와 별개다(제6조 2항 — 별도 신청). 금액만 미리 알려준다. */}
+          {maybeCoolingOff ? (
+            <p className="text-xs text-muted-foreground">
+              결제하신 지 {COOLING_OFF_DAYS}일이 지나지 않아 <b>청약철회(환불)</b>를 요청하실 수 있어요.
+              문의 주시면 확인 후 안내드릴게요.
+            </p>
+          ) : refund && refund.refundKrw > 0 ? (
+            <p className="text-xs text-muted-foreground">
+              지금 바로 환불을 원하시면 문의 주세요. 이용하신 기간을 뺀{" "}
+              <b>약 {formatKrw(refund.refundKrw)}</b>을 돌려드려요. ({refund.clause})
+            </p>
+          ) : null}
           <input
             value={reason}
             onChange={(e) => setReason(e.target.value)}

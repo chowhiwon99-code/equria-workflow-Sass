@@ -106,6 +106,8 @@ export type InquiryResult =
       tid: string | null
       /** PG가 말한 승인 금액. ready 행과의 대조는 billing_apply_payment가 한다. */
       amountKrw: number | null
+      /** 취소된 금액(누적). 부분취소면 결제액보다 작다. 취소 반영(billing_apply_cancellation)에 쓴다. */
+      canceledAmountKrw: number | null
       /** 승인 시각(ISO). 없으면 호출부가 now()로 대체한다. */
       approvedAt: string | null
       raw: Record<string, unknown>

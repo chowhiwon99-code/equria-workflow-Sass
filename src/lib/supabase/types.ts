@@ -3765,6 +3765,16 @@ export type Database = {
       auth_is_workspace_owner: { Args: { ws_id: string }; Returns: boolean }
       auth_user_department: { Args: never; Returns: string }
       auth_user_workspace_ids: { Args: never; Returns: string[] }
+      billing_apply_cancellation: {
+        Args: {
+          p_canceled_amount_krw?: number
+          p_canceled_at?: string
+          p_order_id: string
+          p_raw?: Json
+          p_tid?: string
+        }
+        Returns: string
+      }
       billing_apply_payment: {
         Args: {
           p_amount_krw: number
