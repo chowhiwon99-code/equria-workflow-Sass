@@ -6,16 +6,18 @@
 
 ---
 
-## 📣 다음 세션 시작하자마자 대표에게 말할 것 (2026-08-21 대표 지시)
+## 📣 남은 미검증 하나 — 부분취소 금액 필드명
 
-> **"나이스페이 주문번호 조회 API(`inquireByOrderId`)가 아직 실호출로 검증되지 않았습니다.
-> `.env.local`에 `NICEPAY_CLIENT_KEY`·`NICEPAY_SECRET_KEY` 두 줄을 넣어주시면,
-> 8/20 주문(`CPL-42F70FA1-MT163NNW35KVS9`, 주문일자 `20260820`)을 조회해 바로 확인하겠습니다.
-> 돈이 나가지 않는 읽기 전용 조회입니다."**
+> **`readInquiry`가 읽는 `cancelledAmount`/`canceledAmount`가 실물 응답에 있는지 아직 모른다.**
+> 2026-08-22 조회 실호출로 확인한 건 **승인 거래**(`status:"paid"`)뿐이고, 그 응답엔 두 이름이
+> **둘 다 없었다**. 취소 거래에서만 나타나는 필드라 정상일 수 있지만 확인된 게 아니다.
 >
-> 왜 중요한가 — 이 경로는 **"청구했는데 응답을 못 받았을 때"** 승인 여부를 확정하는 유일한 수단이다.
-> 평소엔 안 돌지만, 돌아야 하는 순간에 안 되면 그 구독은 미결로 묶여 유예 후 만료된다(이중 결제는 안 남).
-> 대표가 2026-08-21에 "다음 세션 열 때 알려달라"고 보류한 항목이다.
+> 왜 중요한가 — 못 읽으면 `canceledAmountKrw`가 null이 되고, `billing_apply_cancellation`이
+> **전액 취소로 본다**. 즉 **부분환불이 전액 환불로 처리되어 유료 고객이 통째로 강등**된다.
+>
+> **확인 방법**: 실취소 1건(최소금액) 후 같은 조회를 돌려 필드명을 눈으로 볼 것 → 아래 §남은 것 3번.
+> 후보 대안: 응답에 **`balanceAmt`(잔액)**·**`cancels`(배열)**가 실재하므로,
+> 필드명이 다르면 `amount − balanceAmt`로 유도하는 편이 철자 추측보다 안전하다.
 
 ---
 
@@ -95,10 +97,10 @@ where workspace_id='42f70fa1-3bbd-4652-8f4c-a17ffb282293';` 또는 설정 화면
 
 | # | 남은 것 | 막고 있는 것 |
 |---|---|---|
-| 1 | **`inquireByOrderId` 실API 왕복 검증** | `.env.local`에 나이스페이 키 2줄(대표) — 돈 안 드는 읽기 전용 GET |
-| 2 | **웹훅 URL 등록** — 상점관리자 > 개발정보 | 대표 액션. 등록 안 하면 승인 유실·취소 통보가 **코드만으론 안 온다** |
-| 3 | 실승인 1건 + 실취소(최소금액) | 카드사 심사 통과 후. ⚠️ 옛 EUC-KR 우려는 **해소됐다**(REST는 JSON/UTF-8) |
-| 4 | **웹훅 통보 규격 실물 확인** | 문서가 Content-Type·필드명을 단정하지 않아 REST(camelCase)와 옛 필드를 **둘 다** 읽게 해뒀다. 통보 1건 받아 확정할 것 |
+| ~~1~~ | ~~`inquireByOrderId` 실API 왕복 검증~~ | ✅ **2026-08-22 통과.** 8/20 주문 조회 → `resultCode "0000"` · `approved=true` · 29,000원 · tid `UT0036025m01162608201556531803`. Basic 인증·URL 조립·`readInquiry` 해석 전부 정상. 시크릿키 32자 = AES-256-CBC 경로 확정 |
+| ~~2~~ | ~~웹훅 URL 등록~~ | ✅ **2026-08-22 등록.** 상점관리자 > 개발정보 > 웹훅에 `https://complow.kr/api/billing/nicepay/webhook` · 결제수단 **4종 전부** 체크(가상계좌는 입금 통보가 이 콜백뿐이라 미리 켜둠). ⚠️ 같은 화면 **IP보안은 비워 둔 상태 유지** |
+| 3 | 실승인 1건 + 실취소(최소금액) | 카드사 심사 통과 후. ⚠️ 옛 EUC-KR 우려는 **해소됐다**(REST는 JSON/UTF-8). 🔴 **취소 시 위 §📣의 부분취소 필드명을 반드시 같이 확인할 것** |
+| 4 | **웹훅 통보 규격 실물 확인** | 문서가 Content-Type·필드명을 단정하지 않아 REST(camelCase)와 옛 필드를 **둘 다** 읽게 해뒀다. 통보 1건 받아 확정할 것. 등록은 끝났으니 이제 **통보가 오기만 하면 된다** — `billing_events`에서 `kind='webhook_received'`로 조회 |
 
 ✅ **Vercel 플랜은 `Hobby`** — 크론 **하루 1회가 상한**(더 잦으면 배포 실패). `0 0 * * *`가 유일한 선택.
 
@@ -125,7 +127,7 @@ where workspace_id='42f70fa1-3bbd-4652-8f4c-a17ffb282293';` 또는 설정 화면
 
 | # | 할 일 | 왜 |
 |---|---|---|
-| 1 | 개발정보 > **웹훅(URL 통보)** 등록 — `https://complow.kr/api/billing/nicepay/webhook` | 🔴 **가장 급함.** 등록 안 하면 승인 유실 복구도, **취소·환불 반영도 안 온다**(코드만으론 안 온다) |
+| ~~1~~ | ~~웹훅(URL 통보) 등록~~ | ✅ **2026-08-22 완료** |
 | 2 | 계약서 사본 보관 — 알림톡 「이메일 전달」 | 카톡 삭제 시 열람 불가 |
 | 3 | 심사용 계정 | 담당자가 요청하면 |
 
@@ -358,7 +360,7 @@ Sonnet 4.6 **1,024** · Opus 4.7 **2,048** · Haiku 4.5 **4,096**토큰. 그보�
 - **Vercel**: team `team_wcW0NMU7oiIxNndyV1afigbp` · project `prj_CcCTUr8eIYpaStaj6RNq7VoLPZG6` · 배포보호 **off**
 - **Supabase**: project `dutovtfdckhayyvhtuxu` (ap-northeast-2 서울) · 마이그 **001~142**
 - **사업자**: 개인사업자 · 등록번호 592-58-00892 · 통신판매업 제2026-인천계양-0642호
-- **.env.local**: ANTHROPIC · Supabase 3종 · Google 4종 · `WORKSPACE_PASSWORD` · **나이스페이 2종(미입력) = `NICEPAY_CLIENT_KEY`·`NICEPAY_SECRET_KEY`** · `CRON_SECRET`(Vercel 전용)
+- **.env.local**: ANTHROPIC · Supabase 3종 · Google 4종 · `WORKSPACE_PASSWORD` · **나이스페이 2종 = `NICEPAY_CLIENT_KEY`·`NICEPAY_SECRET_KEY`(2026-08-22 입력 완료)** · `CRON_SECRET`(Vercel 전용)
   ⚠️ **시크릿 값을 문서·채팅에 적지 말 것** (HANDOFF는 git 추적됨)
 - 링크: [GitHub](https://github.com/chowhiwon99-code/equria-workflow-Sass) · [Vercel](https://vercel.com/chowhiwon99-2151s-projects/equria-workflow-sass) · [Supabase](https://supabase.com/dashboard/project/dutovtfdckhayyvhtuxu)
 
