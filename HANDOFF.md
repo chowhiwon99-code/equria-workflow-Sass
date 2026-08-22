@@ -23,7 +23,7 @@
 
 | 항목 | 값 |
 |---|---|
-| 프로덕션 | **`e70e0ee`** · `complow.kr` (Vercel `icn1` · **플랜 = Hobby**) · 배포 2026-08-21 READY 확인(HTTP 200 · `dpl_83jFzG…`) · **롤백 후보 `a616c19`** |
+| 프로덕션 | **`89a5dcb`** · `complow.kr` (Vercel `icn1` · **플랜 = Hobby**) · 배포 2026-08-22 READY 확인(HTTP 200 · `dpl_74g6Zq…`) · **롤백 후보 `e70e0ee`** |
 | 작업 브랜치 | `worktree-gmail-scope-narrow` (= main과 동일 SHA). ⚠️ `feat/toss-ui-refresh`(`4b7fe08`)는 **main보다 뒤처진 낡은 브랜치**다 — 미배포 작업 없음 |
 | 마이그레이션 | **001~142** 적용 · drift 없음 (135~137은 결번) |
 | 게이트 | `tsc` 0 · `pnpm lint` **29 errors/0 warnings**(전부 기존 부채, **신규 0이 베이스라인**) · `next build` 성공 |
