@@ -271,7 +271,21 @@ export async function POST(
       }
     }
   }
-  const tools: ToolSet = Object.assign({}, ...toolSets)
+  // 🔴 **이름순 정렬은 프롬프트 캐시를 살리는 장치다(장식이 아니다).**
+  //    도구 정의는 프롬프트의 **맨 앞(position 0)** 에 렌더된다 — 렌더 순서는 tools → system → messages.
+  //    따라서 도구 배열이 1바이트만 달라져도 tools·system·messages 캐시가 **통째로** 무효가 된다.
+  //    그런데 여기 들어오는 순서는 우리가 정하지 않는다:
+  //      · MCP 서버가 tools()로 돌려주는 순서는 규격상 보장되지 않고,
+  //      · 커넥터 하나가 토큰 만료로 재연결 경로를 타면 그 서버 도구가 뒤늦게 push된다(위 재시도 블록).
+  //    즉 같은 대화 안에서도 호출마다 순서가 바뀔 수 있다. MCP 도구는 여기서 가장 큰 덩어리라
+  //    (실측: Notion clean 입력 91,706토큰) 무효화되면 그 비용을 매번 정가로 낸다.
+  //    Object.keys 순서가 그대로 전송 배열 순서가 되므로, 이름순으로 고정해 바이트를 안정시킨다.
+  const mergedTools: ToolSet = Object.assign({}, ...toolSets)
+  const tools: ToolSet = Object.fromEntries(
+    Object.keys(mergedTools)
+      .sort()
+      .map((name) => [name, mergedTools[name]]),
+  )
   const hasTools = Object.keys(tools).length > 0
   const closeMcp = () => Promise.allSettled(mcpClients.map((c) => c.close()))
 
