@@ -1,5 +1,10 @@
 import { CardsView } from "@/components/cards/CardsView"
+import { PlanGate } from "@/components/shared/PlanGate"
 
 export default function CardsPage() {
-  return <CardsView />
+  return (
+    <PlanGate>
+      <CardsView />
+    </PlanGate>
+  )
 }

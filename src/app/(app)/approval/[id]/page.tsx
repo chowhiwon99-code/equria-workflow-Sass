@@ -1,4 +1,5 @@
 import { DocumentDetail } from "@/components/approval/DocumentDetail"
+import { PlanGate } from "@/components/shared/PlanGate"
 
 export default async function ApprovalDocumentPage({
   params,
@@ -6,5 +7,9 @@ export default async function ApprovalDocumentPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  return <DocumentDetail docId={id} />
+  return (
+    <PlanGate>
+      <DocumentDetail docId={id} />
+    </PlanGate>
+  )
 }

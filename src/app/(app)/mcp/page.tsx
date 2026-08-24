@@ -1,5 +1,10 @@
 import { McpView } from "@/components/mcp/McpView"
+import { PlanGate } from "@/components/shared/PlanGate"
 
 export default function McpPage() {
-  return <McpView />
+  return (
+    <PlanGate>
+      <McpView />
+    </PlanGate>
+  )
 }

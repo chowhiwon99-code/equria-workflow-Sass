@@ -75,11 +75,27 @@ export function planOf(plan: string | null | undefined): PlanDef {
   return PLANS[(plan ?? "free") as PlanId] ?? PLANS.free
 }
 
+/** 플랜 등급 순서(낮음→높음) — nextPlan·planRank가 공유. */
+const PLAN_ORDER: PlanId[] = ["free", "standard", "pro", "premium"]
+
 /** 다음 상위 플랜(업그레이드 안내용). premium이면 null. */
 export function nextPlan(plan: string | null | undefined): PlanDef | null {
-  const order: PlanId[] = ["free", "standard", "pro", "premium"]
-  const i = order.indexOf(planOf(plan).id)
-  return i >= 0 && i < order.length - 1 ? PLANS[order[i + 1]] : null
+  const i = PLAN_ORDER.indexOf(planOf(plan).id)
+  return i >= 0 && i < PLAN_ORDER.length - 1 ? PLANS[PLAN_ORDER[i + 1]] : null
+}
+
+/** 플랜 등급(0=free~3=premium) — 기능별 게이팅(minPlan 비교)에 사용. */
+export function planRank(plan: string | null | undefined): number {
+  return PLAN_ORDER.indexOf(planOf(plan).id)
+}
+
+/**
+ * 이 플랜이 minPlan 이상인지(포함) — 기능별 게이팅 화면(PlanGate)에서 사용.
+ * ⚠️ 화면 안내용이다. 실제 강제는 각 테이블의 BEFORE INSERT 트리거(마이그143)가 한다 —
+ * 여기 로직을 바꿔도 서버 게이트는 안 바뀌니, 기준을 바꿀 땐 마이그레이션도 같이 고칠 것.
+ */
+export function meetsMinPlan(plan: string | null | undefined, minPlan: PlanId): boolean {
+  return planRank(plan) >= planRank(minPlan)
 }
 
 /** 시트가 꽉 찼는지 — seatsUsed(비게스트 멤버 수) 기준. 무제한(null)이면 항상 여유. */

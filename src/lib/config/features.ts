@@ -24,6 +24,7 @@ import {
   Stamp,
   type LucideIcon,
 } from "lucide-react"
+import type { PlanId } from "@/lib/plans"
 
 export type FeatureStatus = "ready" | "wip" | "planned"
 export type FeatureGroup = "main" | "work" | "ai" | "connect" | "account"
@@ -46,6 +47,12 @@ export interface Feature {
   hiddenFromNav?: boolean
   /** true면 게스트(프로젝트 단위 초대)에게 허용 — 나머지는 GuestGuard·네비에서 차단(보안은 RLS가 담당). */
   guestAllowed?: boolean
+  /**
+   * 이 기능을 쓰려면 최소 이 요금제 이상이어야 함(랜딩 PLAN_ROWS와 반드시 일치).
+   * 미지정이면 무료 포함. PlanGate(components/shared)가 이 값으로 화면을 막고,
+   * 실제 강제는 각 테이블의 BEFORE INSERT 트리거(마이그143)가 담당한다.
+   */
+  minPlan?: PlanId
 }
 
 /** 사이드바 그룹 순서 + 헤더 라벨 (label=null 이면 헤더 없이 최상단)
@@ -115,6 +122,7 @@ export const FEATURES: Feature[] = [
     status: "ready",
     phase: 5,
     group: "work",
+    minPlan: "standard",
   },
   {
     href: "/cards",
@@ -124,6 +132,7 @@ export const FEATURES: Feature[] = [
     status: "ready",
     phase: 5,
     group: "work",
+    minPlan: "standard",
   },
   {
     href: "/files",
@@ -142,6 +151,7 @@ export const FEATURES: Feature[] = [
     status: "ready",
     phase: 6,
     group: "work",
+    minPlan: "standard",
   },
   {
     href: "/work",
@@ -151,6 +161,7 @@ export const FEATURES: Feature[] = [
     status: "ready",
     phase: 6,
     group: "work",
+    minPlan: "standard",
   },
   {
     href: "/meetings",
@@ -160,6 +171,7 @@ export const FEATURES: Feature[] = [
     status: "ready",
     phase: 6,
     group: "work",
+    minPlan: "standard",
   },
   // ── AI ──
   {
@@ -179,6 +191,7 @@ export const FEATURES: Feature[] = [
     status: "wip",
     phase: 6,
     group: "ai",
+    minPlan: "pro",
   },
   // ── 연동 ──
   {
@@ -202,6 +215,7 @@ export const FEATURES: Feature[] = [
     status: "wip",
     phase: 5,
     group: "connect",
+    minPlan: "pro",
   },
   // ── 계정 ──
   {

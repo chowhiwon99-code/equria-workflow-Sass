@@ -1,4 +1,5 @@
 import { WorkflowEditor } from "@/components/workflows/WorkflowEditor"
+import { PlanGate } from "@/components/shared/PlanGate"
 
 export default async function WorkflowDetailPage({
   params,
@@ -6,5 +7,9 @@ export default async function WorkflowDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  return <WorkflowEditor id={id} />
+  return (
+    <PlanGate>
+      <WorkflowEditor id={id} />
+    </PlanGate>
+  )
 }
