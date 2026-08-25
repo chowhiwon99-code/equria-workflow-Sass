@@ -121,6 +121,27 @@ export async function POST(req: Request) {
       // 취소 여부를 **모른다**. 멀쩡한 유료 고객을 강등시킬 수는 없으니 재전송받아 다시 판정한다.
       return retryLater(`cancel_inquiry:${inq.code}:${inq.message}`)
     }
+    // 🔴 tid가 정말 이 주문(moid)의 거래인지 대조한다. tid는 "취소된 거래인가"만 증명하고
+    //    "그 취소가 이 주문의 취소인가"는 증명하지 않는다 — 대조 없이 반영하면 공격자가
+    //    자기 자신의(무관한) 취소 거래 tid로 남의 주문번호를 지정해 위조 통보를 보낼 수 있다.
+    // ⚠️ orderId가 null(=조회 응답에 필드가 없음)이면 "불일치"가 아니라 "모른다"다 — 매뉴얼상
+    //    필수 필드라 정상이면 항상 오지만, 혹시라도 빠지면 재전송받아 다시 판정한다(적대검증 발견).
+    //    실제로 다른 주문임이 확인된 경우에만 거부한다.
+    if (inq.orderId === null) {
+      return retryLater("cancel_inquiry:missing_order_id")
+    }
+    if (inq.orderId !== moid) {
+      console.warn("[billing/webhook] tid/order mismatch on cancel:", { moid, tid, inqOrderId: inq.orderId })
+      // ⚠️ 원본 조회응답(inq.raw)은 **공격자 자신의** 무관한 거래 정보(구매자명·카드사 등 PII 가능)다.
+      //    피해자 워크스페이스 로그에 그대로 남기면 공격자 정보가 남의 감사로그에 섞인다(적대검증 발견) —
+      //    식별에 필요한 최소 필드만 남긴다.
+      await admin.from("billing_events").insert({
+        workspace_id: pay.workspace_id,
+        kind: "webhook_received",
+        payload: { order_id: moid, tid, note: "order_mismatch", inquiry_order_id: inq.orderId },
+      })
+      return ok()
+    }
     if (!inq.canceled) {
       // 조회해보니 취소된 거래가 아니다 = 통보가 틀렸거나 위조다. 기록만 남기고 아무것도 바꾸지 않는다.
       await admin.from("billing_events").insert({
@@ -166,6 +187,24 @@ export async function POST(req: Request) {
   if (!inq.ok) {
     // 승인 여부를 **모르는** 상태다. 실패로 굳히면 돈만 빠진다 → 재전송받아 다시 판정한다.
     return retryLater(`inquiry:${inq.code}:${inq.message}`)
+  }
+  // 🔴 위 취소 분기와 같은 이유로 대조한다 — tid가 승인 거래인 것과 "이 주문(moid)의 승인
+  //    거래인 것"은 별개다. 대조 없이 정산하면 자신의 승인 거래 tid로 남의 order_id를 지정한
+  //    위조 통보가 그대로 billing_apply_payment까지 도달한다.
+  // ⚠️ null은 "불일치"가 아니라 "모른다"다 — 특히 이 통보는 **첫 결제(CPL-)의 유일한 복구
+  //    경로**라 여기서 잘못 거부하면 승인은 됐는데 서비스가 영영 안 열릴 수 있다(적대검증 발견).
+  if (inq.orderId === null) {
+    return retryLater("inquiry:missing_order_id")
+  }
+  if (inq.orderId !== moid) {
+    console.warn("[billing/webhook] tid/order mismatch on settle:", { moid, tid, inqOrderId: inq.orderId })
+    // ⚠️ inq.raw는 공격자 자신의 무관한 거래 정보(PII 가능) — 피해자 로그에 그대로 남기지 않는다.
+    await admin.from("billing_events").insert({
+      workspace_id: pay.workspace_id,
+      kind: "webhook_received",
+      payload: { order_id: moid, tid, note: "order_mismatch", inquiry_order_id: inq.orderId },
+    })
+    return ok()
   }
   if (!inq.approved) {
     // 승인된 거래가 아니다(취소됨·승인거래없음). 정산하지 않고 기록만 남긴다.

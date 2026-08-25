@@ -104,6 +104,14 @@ export type InquiryResult =
       canceled: boolean
       /** 승인 거래번호. 주문번호로 조회한 경우 **이걸로만 tid를 알 수 있다**(정산 RPC에 필요). */
       tid: string | null
+      /**
+       * 🔴 이 거래가 실제로 속한 주문번호(PG가 돌려준 값, 매뉴얼상 필수 필드).
+       * `inquire({tid})`로 조회한 결과를 쓰는 호출부는 **반드시 이 값을 통보 본문의 moid와
+       * 대조**해야 한다 — tid는 승인/취소 여부만 증명하고 "그 tid가 주장하는 주문의 것인가"는
+       * 증명하지 않는다. 대조 없이 쓰면 공격자가 자기 자신의 무관한 tid로 남의 order_id를
+       * 지정한 위조 통보를 보내 유료 고객을 강등시킬 수 있다(2026-08-25 리뷰 발견).
+       */
+      orderId: string | null
       /** PG가 말한 승인 금액. ready 행과의 대조는 billing_apply_payment가 한다. */
       amountKrw: number | null
       /** 취소된 금액(누적). 부분취소면 결제액보다 작다. 취소 반영(billing_apply_cancellation)에 쓴다. */

@@ -216,6 +216,7 @@ function readInquiry(raw: Record<string, unknown>): InquiryResult {
     approved: status === "paid",
     canceled: status === "cancelled" || status === "partialCancelled",
     tid: raw.tid ? String(raw.tid) : null,
+    orderId: raw.orderId ? String(raw.orderId) : null,
     amountKrw: Number.isFinite(amount) && amount > 0 ? amount : null,
     canceledAmountKrw: Number.isFinite(canceled) && canceled > 0 ? canceled : null,
     // paidAt은 미완료 시 "0"이 온다(규격) — 그 경우 승인 시각이 없는 것으로 본다.
