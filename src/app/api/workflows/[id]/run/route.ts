@@ -272,7 +272,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             // 이 에이전트에 붙은 MCP 도구 + 내 개인 연결 도구(GitHub 등) 병합 — 채팅과 동일하게 다단계 도구호출 허용.
             const mcpTools: ToolSet = { ...personalToolsFor(v.mcp_connectors ?? []), ...(v.mcp_servers?.length ? await mcpToolsFor(v.mcp_servers) : {}) }
             const hasTools = Object.keys(mcpTools).length > 0
-            const { text, usage, totalUsage } = await generateText({
+            const { text, steps, usage, totalUsage } = await generateText({
               model: anthropic(v.model),
               system: v.system_prompt,
               messages,
@@ -282,7 +282,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             })
             // 다단계(도구) 실행이면 totalUsage가 전체 합산 — 비용은 합산 기준.
             const u = totalUsage ?? usage
-            previousOutput = text
+            // ⚠️ `text`는 SDK 정의상 **마지막 스텝**의 텍스트다 — 도구 호출로 스텝이 끝나면 빈
+            //    문자열이 되어, 앞 단계 결과가 빈 값으로 다음 노드에 전파되며 체인이 조용히
+            //    깨진다(agents/[id]/chat 라우트에서 이미 겪고 고친 버그와 같은 클래스,
+            //    2026-08-25 리뷰 발견). 전 스텝의 텍스트를 이어붙여 이 노드의 결과로 쓴다.
+            const fullText =
+              steps
+                .map((s) => s.text)
+                .filter((t) => t && t.trim().length > 0)
+                .join("\n\n") || text
+            previousOutput = fullText
 
             // 도구(행동) 실행 — webhook(외부 POST) · save_file(파일 저장) · notify(내 알림).
             let toolNote: string | undefined
@@ -301,7 +310,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
                       workflowId: id,
                       nodeId: node.id,
                       agent: node.agent_name,
-                      output: text,
+                      output: fullText,
                     }),
                     signal: AbortSignal.timeout(15000),
                     maxRedirects: 0,
@@ -317,7 +326,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
                 const path = `${user.id}/workflow/${Date.now()}-${node.id}.md`
                 const { error: upErr } = await supabase.storage
                   .from("files")
-                  .upload(path, text, { contentType: "text/markdown", upsert: false })
+                  .upload(path, fullText, { contentType: "text/markdown", upsert: false })
                 if (upErr) throw upErr
                 const { error: insErr } = await supabase.from("files").insert(
                   withWorkspace(
@@ -325,7 +334,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
                       source: "workflow",
                       name: `${node.agent_name || "워크플로우"} 결과.md`,
                       mime_type: "text/markdown",
-                      size_bytes: new TextEncoder().encode(text).length,
+                      size_bytes: new TextEncoder().encode(fullText).length,
                       owner_id: user.id,
                       metadata: { storage_path: path },
                     },
@@ -350,7 +359,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
                       user_id: user.id,
                       type: "workflow",
                       title: `워크플로우 완료 — ${node.agent_name || "단계"}`,
-                      body: text.slice(0, 280),
+                      body: fullText.slice(0, 280),
                       link: `/workflows/${id}`,
                     },
                     workspaceId,
@@ -363,8 +372,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
               }
             }
 
-            nodeResults.push({ nodeId: node.id, agent_name: node.agent_name, status: "done", output: text, toolNote })
-            send({ type: "node", nodeId: node.id, status: "done", output: text, toolNote })
+            nodeResults.push({ nodeId: node.id, agent_name: node.agent_name, status: "done", output: fullText, toolNote })
+            send({ type: "node", nodeId: node.id, status: "done", output: fullText, toolNote })
 
             // 사용량 로깅(best-effort, 실패 무시) + 실행당 누적 비용
             const nodeCost = computeCostUsd(v.model, u.inputTokens ?? 0, u.outputTokens ?? 0)

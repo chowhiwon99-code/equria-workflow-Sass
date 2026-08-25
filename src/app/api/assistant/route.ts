@@ -110,7 +110,16 @@ export async function POST(req: Request) {
     tools,
     stopWhen: stepCountIs(5), // 도구 조회 후 답변까지 다단계 허용
     maxOutputTokens: 3072,
-    async onFinish({ text, totalUsage }) {
+    async onFinish({ text, steps, totalUsage }) {
+      // ⚠️ `text`는 SDK 정의상 **마지막 스텝**의 텍스트다 — 도구 호출로 턴이 끝나면 빈 문자열이 되어
+      //    앞선 스텝에서 실제로 낸 답변까지 "빈 답변"으로 오판해 통째로 유실된다(agents/[id]/chat
+      //    라우트에서 2026-08-14 실측 후 고친 것과 같은 버그, 이 라우트엔 그때 안 옮겨졌었다 —
+      //    2026-08-25 리뷰 발견). 전 스텝의 텍스트를 이어붙여 저장한다.
+      const fullText =
+        steps
+          .map((s) => s.text)
+          .filter((t) => t && t.trim().length > 0)
+          .join("\n\n") || text
       // 비용 추적: 도구(다단계) 턴은 마지막 스텝 usage가 아니라 전체 합산 totalUsage로 기록 — 과소집계 방지(리뷰 D4).
       const inT = totalUsage.inputTokens ?? 0
       const outT = totalUsage.outputTokens ?? 0
@@ -142,11 +151,11 @@ export async function POST(req: Request) {
           .update({ updated_at: new Date().toISOString() })
           .eq("id", convId),
       ]
-      // 빈 답변(도구 스텝에서 상한 소진 등)은 저장 안 함 — 빈 말풍선 방지(리뷰 D7).
-      if (text.trim()) {
+      // 빈 답변(정말로 모든 스텝이 텍스트 없이 도구호출만 한 경우)만 저장 안 함 — 빈 말풍선 방지(리뷰 D7).
+      if (fullText.trim()) {
         writes.push(
           supabase.from("assistant_messages").insert(
-            withWorkspace({ conversation_id: convId, role: "assistant", content: text }, workspaceId),
+            withWorkspace({ conversation_id: convId, role: "assistant", content: fullText }, workspaceId),
           ),
         )
       }
