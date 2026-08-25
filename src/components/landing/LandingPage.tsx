@@ -14,7 +14,7 @@ import { LandingFooter } from "./LandingFooter"
 import { AuthModal } from "./AuthModal"
 import { INK, CONTACT } from "./const"
 import type { AuthMode } from "@/components/auth/AuthForm"
-import { PLANS as PLAN_DEFS, YEARLY_FREE_MONTHS, type PlanDef } from "@/lib/plans"
+import { PLANS as PLAN_DEFS, type PlanDef } from "@/lib/plans"
 import { formatKrw } from "@/lib/billing/orders"
 
 /**
@@ -104,7 +104,7 @@ const PLAN_ROWS: { f: string; basic: string | boolean; std: string | boolean; pr
 
 const FAQS = [
   { q: "정말 무료로 시작할 수 있나요?", a: "네. Basic 플랜은 별도 카드 등록 없이 영구 무료입니다. 팀 협업 기능과 AI 맛보기가 포함되고, AI 사용량은 매일 조금씩 다시 채워집니다. 더 쓰려면 유료 플랜으로 올리면 됩니다." },
-  { q: "요금은 어떻게 되나요?", a: `회사 단위 정액입니다(${P.basic.label} 무료 · ${P.std.label} ${priceText(P.std)} · ${P.pro.label} ${priceText(P.pro)}). 요금제마다 이용 인원이 정해져 있고(${seatText(P.basic)}·${seatText(P.std)}·${seatText(P.pro)}), 인원이 늘면 상위 요금제로 올리시면 됩니다. ${seatText(P.pro)}이 넘는 팀은 도입 문의를 남겨주세요. AI도 요금제에 포함된 사용량 안에서 쓰고, 더 필요하면 같은 방식으로 올리면 됩니다. 연간 결제 시 ${YEARLY_FREE_MONTHS}개월 무료.` },
+  { q: "요금은 어떻게 되나요?", a: `회사 단위 정액입니다(${P.basic.label} 무료 · ${P.std.label} ${priceText(P.std)} · ${P.pro.label} ${priceText(P.pro)}). 요금제마다 이용 인원이 정해져 있고(${seatText(P.basic)}·${seatText(P.std)}·${seatText(P.pro)}), 인원이 늘면 상위 요금제로 올리시면 됩니다. ${seatText(P.pro)}이 넘는 팀은 도입 문의를 남겨주세요. AI도 요금제에 포함된 사용량 안에서 쓰고, 더 필요하면 같은 방식으로 올리면 됩니다.` },
   { q: "AI를 쓰다가 갑자기 막히지 않나요?", a: "사람이 직접 쓰는 AI 채팅과 보조 기능은 공정 사용 범위에서 막지 않습니다. 사용량 한도는 리서치·작업 제안·워크플로우 자동 실행처럼 사람 없이 도는 작업에만 적용되고, 그마저도 매일(무료) 또는 매달(유료) 다시 채워집니다." },
   { q: "우리 회사 데이터는 안전한가요?", a: "회사별로 데이터가 격리되고, 민감 정보는 암호화해 국내 리전에 저장합니다. 데이터의 소유권은 회사에 있습니다." },
   { q: "우리 회사 방식에 맞출 수 있나요?", a: "그게 컴플로우(Complow)의 출발점입니다. 손익 계산 수식, AI 에이전트, 결재선까지 회사 방식대로 직접 구성할 수 있습니다." },
@@ -507,8 +507,8 @@ export default function LandingPage() {
           인원이 더 많거나 별도 요건이 있나요?{" "}
           <a href={CONTACT} className="font-semibold text-black/70 underline underline-offset-2 hover:text-black">도입 문의</a>
         </p>
-        {/* 프로모션 틀 — 연간·리퍼럴 자리 */}
-        <p className="mt-2 text-center text-[13px] text-black/40">연간 결제 시 2개월 무료 · 추천한 회사가 시작하면 양쪽 모두 1개월 무료</p>
+        {/* 프로모션 틀 — 리퍼럴 자리 (연간 프로모션 문구는 나이스페이 심사 요구로 제거, 2026-08-25) */}
+        <p className="mt-2 text-center text-[13px] text-black/40">추천한 회사가 시작하면 양쪽 모두 1개월 무료</p>
       </section>
 
       {/* ── FAQ ── */}

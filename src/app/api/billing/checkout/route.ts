@@ -94,7 +94,10 @@ export async function POST(req: Request) {
     card?: unknown
   }
   const plan = body.plan ?? ""
-  const cycle = (body.cycle === "yearly" ? "yearly" : "monthly") as BillingCycle
+  // ⚠️ 연간 결제는 나이스페이 심사 요구("서비스 제공기간 3개월 초과 상품 판매불가")로
+  //    2026-08-25 판매 중단. body.cycle은 무시하고 항상 월 결제로 고정한다
+  //    (UI 토글만 없애면 크래프팅된 요청으로 yearly가 여전히 통과하던 구멍 — 여기서 막는다).
+  const cycle: BillingCycle = "monthly"
   if (!isPayablePlan(plan)) return new Response("결제할 수 없는 요금제예요.", { status: 400 })
 
   // 법적 의무① — 자동결제는 회원가입 약관과 **별도로** 사전 동의를 받아야 한다.

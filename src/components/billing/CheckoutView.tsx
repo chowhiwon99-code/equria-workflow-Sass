@@ -17,8 +17,12 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/shared/Modal"
-import { PLANS, YEARLY_FREE_MONTHS } from "@/lib/plans"
-import { quoteAmountKrw, formatKrw, type BillingCycle, type PayablePlan } from "@/lib/billing/orders"
+import { PLANS } from "@/lib/plans"
+import { quoteAmountKrw, formatKrw, type PayablePlan } from "@/lib/billing/orders"
+
+// ⚠️ 연간 결제는 나이스페이 심사 요구("서비스 제공기간 3개월 초과 상품 판매불가")로
+//    2026-08-25 판매 중단. 월 결제만 받는다. 재개 시 git history의 토글 UI 참고.
+const CYCLE = "monthly" as const
 
 const PAYABLE: PayablePlan[] = ["standard", "pro"]
 
@@ -68,12 +72,11 @@ export function CheckoutView({
 }) {
   const router = useRouter()
   const [plan, setPlan] = useState<PayablePlan>("standard")
-  const [cycle, setCycle] = useState<BillingCycle>("monthly")
   const [agreed, setAgreed] = useState(false)
   const [busy, setBusy] = useState(false)
   const [card, setCard] = useState<CardForm>(EMPTY_CARD)
 
-  const amount = quoteAmountKrw(plan, cycle)
+  const amount = quoteAmountKrw(plan, CYCLE)
   const def = PLANS[plan]
   // 자동 갱신이 기본이므로 동의는 항상 필수다(법적 의무① — 회원가입 약관과 별도 사전 동의).
   const needConsent = recurringEnabled
@@ -116,7 +119,7 @@ export function CheckoutView({
         // 카드 원문은 이 요청에만 담기고, 서버는 암호화 후 즉시 버린다(DB 저장 없음).
         body: JSON.stringify({
           plan,
-          cycle,
+          cycle: CYCLE,
           autoBillingConsent: agreed,
           card: {
             cardNo: digits(card.cardNo),
@@ -151,26 +154,10 @@ export function CheckoutView({
           <p className="text-xs text-muted-foreground">회사 단위로 결제하고, 인원은 요금제에 포함돼요.</p>
         </div>
 
-        {/* 월/연 토글 — 연간은 2개월치가 빠진다 */}
-        <div className="flex items-center gap-1 self-start rounded-full border p-1">
-          {(["monthly", "yearly"] as const).map((c) => (
-            <button
-              key={c}
-              type="button"
-              onClick={() => setCycle(c)}
-              className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${
-                cycle === c ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {c === "monthly" ? "월 결제" : `연 결제 · ${YEARLY_FREE_MONTHS}개월 무료`}
-            </button>
-          ))}
-        </div>
-
         <div className="grid gap-3 sm:grid-cols-2">
           {PAYABLE.map((p) => {
             const on = plan === p
-            const price = quoteAmountKrw(p, cycle)
+            const price = quoteAmountKrw(p, CYCLE)
             return (
               <button
                 key={p}
@@ -182,9 +169,7 @@ export function CheckoutView({
               >
                 <span className="text-sm font-bold">{PLANS[p].label}</span>
                 <span className="text-lg font-extrabold">{formatKrw(price)}</span>
-                <span className="text-xs text-muted-foreground">
-                  {cycle === "yearly" ? "/년" : "/월"} · {PLANS[p].seats}명까지
-                </span>
+                <span className="text-xs text-muted-foreground">/월 · {PLANS[p].seats}명까지</span>
                 {currentPlan === p && <span className="text-[11px] font-medium text-muted-foreground">현재 요금제</span>}
               </button>
             )
@@ -198,9 +183,7 @@ export function CheckoutView({
         <div className="flex flex-col divide-y overflow-hidden rounded-xl border">
           <div className="flex items-center justify-between px-3.5 py-2.5">
             <span className="text-sm text-muted-foreground">상품</span>
-            <span className="text-sm font-medium">
-              {def.label} {cycle === "yearly" ? "연간 구독" : "월 정액 구독"}
-            </span>
+            <span className="text-sm font-medium">{def.label} 월 정액 구독</span>
           </div>
           <div className="flex items-center justify-between px-3.5 py-2.5">
             <span className="text-sm text-muted-foreground">결제 금액</span>
