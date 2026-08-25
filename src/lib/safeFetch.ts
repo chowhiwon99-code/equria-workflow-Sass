@@ -61,7 +61,7 @@ function isPrivateIp(address: string, family: number): boolean {
  * 문자열 가드(safeHttpUrl)만으로는 "공개 도메인이 사설 IP로 풀리는" DNS 리바인딩을 못 막으므로 필요.
  * 하나라도 사설/로컬이면 throw.
  */
-async function assertPublicHost(hostname: string): Promise<void> {
+export async function assertPublicHost(hostname: string): Promise<void> {
   let addrs: { address: string; family: number }[]
   try {
     addrs = await lookup(hostname, { all: true })

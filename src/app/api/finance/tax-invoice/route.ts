@@ -24,9 +24,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "항목을 선택해 주세요." }, { status: 400 })
   }
 
+  // 🔴 활성 워크스페이스로 명시 스코프한다. RLS는 "내가 속한 워크스페이스 전부"를 허용하므로
+  //    (여러 회사에 속한 사용자가 있다), 이걸 빼면 B사 화면에서 A사 재무 항목 id를 넣어
+  //    A사 데이터로 B사 세금계산서를 만들 수 있다(2026-08-25 리뷰 발견 — IDOR).
+  const wsId = await getUserWorkspaceId(supabase, user.id)
+  if (!wsId) return NextResponse.json({ error: "워크스페이스를 찾을 수 없어요." }, { status: 404 })
+
   const { data: entries, error: selErr } = await supabase
     .from("finance_entries")
     .select("*")
+    .eq("workspace_id", wsId)
     .in("id", entryIds)
     .is("deleted_at", null)
   if (selErr) return NextResponse.json({ error: selErr.message }, { status: 500 })
@@ -45,11 +52,10 @@ export async function POST(req: Request) {
     date: e.entry_date,
   }))
 
-  const wsId = await getUserWorkspaceId(supabase, user.id) // B1-b: 쓰기에 워크스페이스 명시
   const { data: inserted, error: insErr } = await supabase
     .from("tax_invoices")
     .insert({
-      workspace_id: wsId as string,
+      workspace_id: wsId, // B1-b: 쓰기에 워크스페이스 명시(위에서 이미 조회·null 체크됨)
       direction: direction ?? "purchase",
       supplier_name: entries[0].vendor || null,
       issue_date: new Date().toISOString().slice(0, 10),

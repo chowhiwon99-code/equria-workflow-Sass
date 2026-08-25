@@ -2,6 +2,7 @@
 // stdio는 서버리스(Vercel)에서 자식 프로세스 불가라 미지원(http/sse만). 호출측은 반드시 close().
 import { experimental_createMCPClient as createMCPClient } from "@ai-sdk/mcp"
 import { isSafeWebhookUrl } from "@/lib/workflowTools"
+import { assertPublicHost } from "@/lib/safeFetch"
 import { decryptToken } from "@/lib/google/crypto"
 import { MCP_CONNECTORS } from "@/lib/mcp"
 import { McpOAuthRuntimeProvider } from "./oauth"
@@ -27,6 +28,16 @@ export async function connectMcp(server: McpServerConfig) {
   if (!server.url) throw new Error("MCP 서버 URL이 없습니다.")
   const safe = isSafeWebhookUrl(server.url)
   if (!safe.ok) throw new Error(`허용되지 않는 MCP 주소: ${safe.reason}`)
+  // 🔴 문자열 검사(isSafeWebhookUrl)만으론 "공개 도메인이 DNS로 사설/내부 IP로 풀리는" 리바인딩을
+  //    못 막는다 — 워크스페이스 관리자가 등록한 URL로 내부망(예: 클라우드 메타데이터)을 스캔할 수
+  //    있었다(2026-08-25 리뷰 발견). safeFetch와 같은 실제 DNS IP 공인 검증을 연결 전에 건다.
+  //    (@ai-sdk/mcp가 내부적으로 리다이렉트를 추가로 따라갈 경우까지는 커버 못 함 — safeFetch의
+  //    알려진 잔여 위험과 같은 종류, known-issues 참조.)
+  try {
+    await assertPublicHost(new URL(server.url).hostname)
+  } catch (e) {
+    throw new Error(e instanceof Error ? e.message : "MCP 서버 주소를 확인할 수 없습니다.")
+  }
 
   // oauth = 토큰을 헤더에 직접 넣지 않고 authProvider로 위임(401 시 refresh_token 자동 갱신, @ai-sdk/mcp 내장).
   if (server.auth_type === "oauth" && server.oauth && server.encrypted_token) {
