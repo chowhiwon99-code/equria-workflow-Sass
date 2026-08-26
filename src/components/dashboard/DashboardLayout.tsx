@@ -68,8 +68,11 @@ export function DashboardLayout() {
       <AnnouncementsBoard />
       <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row">
         {/* 좌: 작업 카드들 — 카드 내부 스크롤, 페이지는 한 화면 유지.
-            @container: AI 칸을 넓혀 좌측이 좁아지면 카드가 자동으로 세로 스택(뷰포트가 아니라 실제 남은 폭 기준 반응) */}
-        <div className="@container flex min-h-0 min-w-0 flex-1 flex-col gap-3">
+            @container: AI 칸을 넓혀 좌측이 좁아지면 카드가 자동으로 세로 스택(뷰포트가 아니라 실제 남은 폭 기준 반응)
+            ⚠️ overflow-y-auto 필수 — 없으면(2026-08-26 발견) lg: 고정높이(var(--app-content-height))인데
+            좌측이 세로 스택(@2xl 미만)될 때, 카드들이 눌려도 Surface/EmptyState가 clip을 안 해서
+            내용이 다음 카드 뒤로 겹쳐 보인다. min-h-0만으론 "안 눌리고 스크롤됨"이 보장 안 됨. */}
+        <div className="@container flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto">
           <div className="grid min-h-0 flex-1 gap-3 @2xl:grid-cols-2">
             <TodayTasks />
             <TaskSuggestions />

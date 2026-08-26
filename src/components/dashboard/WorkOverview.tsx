@@ -87,7 +87,7 @@ export function WorkOverview() {
           <EmptyState
             className="border-0 py-4"
             icon={CircleDot}
-            title="진행 중인 프로젝트가 없어요."
+            title="진행 중인 작업이 없어요."
             action={
               <Link href="/projects" className="text-xs text-primary underline underline-offset-2">
                 프로젝트 만들기
@@ -104,7 +104,7 @@ export function WorkOverview() {
           <span className="text-xs font-normal text-muted-foreground tabular-nums">{planned.length}</span>
         </h2>
         {planned.length === 0 ? (
-          <EmptyState className="border-0 py-4" icon={CircleDashed} title="예정된 프로젝트가 없어요." />
+          <EmptyState className="border-0 py-4" icon={CircleDashed} title="예정된 작업이 없어요." />
         ) : (
           <div className="flex max-h-48 flex-col overflow-y-auto">{planned.map(row)}</div>
         )}
