@@ -21,13 +21,13 @@
 
 ---
 
-## 🎯 지금 상태 (2026-08-25)
+## 🎯 지금 상태 (2026-08-26)
 
 | 항목 | 값 |
 |---|---|
-| 프로덕션 | **`d044e9a`** · `complow.kr` (Vercel `icn1` · **플랜 = Hobby**) · 배포 2026-08-25 READY 확인(`dpl_C9e2RB6…`) · **롤백 후보 `4a8b517`** |
+| 프로덕션 | **`9c3bd97`** · `complow.kr` (Vercel `icn1` · **플랜 = Hobby**) · 배포 2026-08-26 READY 확인(`dpl_6cM1vbp…`) · **롤백 후보 `d044e9a`** |
 | 작업 브랜치 | **`main` 직접**(루트 체크아웃이 main). `worktree-gmail-scope-narrow`도 있으나 51f4100에 정지. ⚠️ `feat/toss-ui-refresh`(`4b7fe08`)는 **죽은 브랜치** — 쓰지 말 것 |
-| 스모크(배포 직후) | `/` 200 · 웹훅 GET 200 · `/api/billing/reconcile` **401**(크론 시크릿 가드) · `/refund` 200 · `/terms/billing` 200 · `/billing` 307(로그인) |
+| 스모크(배포 직후) | `/` 200 · 웹훅 GET 200 · `/api/billing/reconcile` **401**(크론 시크릿 가드) · `/billing` 307(로그인) |
 | 마이그레이션 | **001~143** 적용 · drift 없음 (135~137은 결번) |
 | 게이트 | `tsc` 0 · `pnpm lint` **29 errors/0 warnings**(전부 기존 부채, **신규 0이 베이스라인**) · `next build` 성공 |
 | 유료 고객 | **외부 고객 0명.** 워크스페이스 3개 = premium 2(EQURIA·이큐리아2, 자사 내부 무제한) + **standard 1**(테스트 — 대표 실결제, 9/21 자동갱신 예정). 가격·스키마 변경 리스크가 아직 낮은 시점 |
