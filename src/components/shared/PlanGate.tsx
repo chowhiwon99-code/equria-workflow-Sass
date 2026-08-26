@@ -30,10 +30,10 @@ export function PlanGate({ children }: { children: React.ReactNode }) {
           <p className="text-lg font-semibold">{feature?.label ?? "이 기능"}은 {minPlanDef.label} 요금제부터 사용할 수 있어요.</p>
           <p className="text-sm text-muted-foreground">지금 요금제를 올리면 바로 이용할 수 있어요.</p>
           <Link
-            href="/#pricing"
+            href="/billing"
             className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
           >
-            <ArrowUpCircle className="size-4" /> 요금제 보기
+            <ArrowUpCircle className="size-4" /> 요금제 올리기
           </Link>
         </div>
       </div>

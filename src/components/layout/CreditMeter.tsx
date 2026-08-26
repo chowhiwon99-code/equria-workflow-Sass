@@ -80,7 +80,7 @@ export function CreditMeter() {
       {(empty || low) && (
         <p className="mt-1.5 text-[10px] leading-tight text-muted-foreground/80">
           {empty ? "자동 실행만 멈췄어요. 채팅은 그대로 쓸 수 있어요." : "곧 소진돼요. 조금씩 다시 채워집니다."}{" "}
-          <Link href="/#pricing" className="underline underline-offset-2 hover:text-foreground">
+          <Link href="/billing" className="underline underline-offset-2 hover:text-foreground">
             더 필요하면
           </Link>
         </p>

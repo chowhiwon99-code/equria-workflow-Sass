@@ -8,6 +8,7 @@ import { Check, SlidersHorizontal, ChevronDown } from "lucide-react"
 import { FEATURES, FEATURE_GROUPS } from "@/lib/config/features"
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider"
 import { WorkspaceSwitcher } from "@/components/workspace/WorkspaceSwitcher"
+import { PlanBadge } from "@/components/layout/PlanBadge"
 import { CreditMeter } from "@/components/layout/CreditMeter"
 import { TeamInviteLink } from "@/components/layout/TeamInviteLink"
 import { cn } from "@/lib/utils"
@@ -294,6 +295,9 @@ export function Sidebar({
           )
         })}
       </nav>
+
+      {/* 현재 요금제 — 항상 보이는 자리에(2026-08-26, 이전엔 설정 안까지 들어가야 보였다) */}
+      <PlanBadge />
 
       {/* AI 사용량 — 소진되면 자동 실행이 멈추므로 항상 보이는 자리에(무제한 플랜은 자동 숨김) */}
       <CreditMeter />
