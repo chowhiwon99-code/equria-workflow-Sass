@@ -152,9 +152,9 @@ export function TodayTasks() {
       {/* 목록 */}
       {tasks.length === 0 ? (
         // 추가 입력이 바로 위에 있으므로 CTA 버튼 대신 어디에 적으면 되는지만 알린다.
+        // 아이콘 제거 — 카드가 좁아질 때 필요 높이가 줄어 겹침 재발 가능성도 함께 낮춘다(대표 지적 2026-08-27).
         <EmptyState
           className="border-0 py-5"
-          icon={ListTodo}
           title="오늘 할 일이 없어요."
           description="위 칸에 적으면 바로 추가돼요. 나만 보는 목록이에요."
         />

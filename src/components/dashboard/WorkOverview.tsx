@@ -84,9 +84,9 @@ export function WorkOverview() {
           <span className="text-xs font-normal text-muted-foreground tabular-nums">{inProgress.length}</span>
         </h2>
         {inProgress.length === 0 ? (
+          // 아이콘 제거 — 카드가 좁아질 때 필요 높이가 줄어 겹침 재발 가능성도 함께 낮춘다(대표 지적 2026-08-27).
           <EmptyState
             className="border-0 py-4"
-            icon={CircleDot}
             title="진행 중인 작업이 없어요."
             action={
               <Link href="/projects" className="text-xs text-primary underline underline-offset-2">
@@ -104,7 +104,7 @@ export function WorkOverview() {
           <span className="text-xs font-normal text-muted-foreground tabular-nums">{planned.length}</span>
         </h2>
         {planned.length === 0 ? (
-          <EmptyState className="border-0 py-4" icon={CircleDashed} title="예정된 작업이 없어요." />
+          <EmptyState className="border-0 py-4" title="예정된 작업이 없어요." />
         ) : (
           <div className="flex max-h-48 flex-col overflow-y-auto">{planned.map(row)}</div>
         )}
