@@ -105,7 +105,7 @@ export function TaskSuggestions() {
   const editTitle = (s: Suggestion, title: string) => setItems((prev) => (prev ?? []).map((x) => (x._id === s._id ? { ...x, title } : x)))
 
   return (
-    <Surface padding="none" className="flex min-h-0 flex-col rounded-xl p-3">
+    <Surface padding="none" className="flex min-h-0 flex-col overflow-y-auto rounded-xl p-3">
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <h2 className="inline-flex items-center gap-2 text-sm font-semibold">
           <Sparkles className="size-4 text-primary" /> 작업 제안

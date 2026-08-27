@@ -123,7 +123,7 @@ export function TodayTasks() {
   const remaining = tasks.filter((t) => !t.done).length
 
   return (
-    <Surface padding="none" className="flex min-h-0 flex-col rounded-xl p-3">
+    <Surface padding="none" className="flex min-h-0 flex-col overflow-y-auto rounded-xl p-3">
       <div className="mb-1.5 flex items-center justify-between">
         <h2 className="inline-flex items-center gap-2 text-sm font-semibold">
           <ListTodo className="size-4 text-primary" /> 오늘 할 일

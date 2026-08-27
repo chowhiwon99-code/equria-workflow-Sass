@@ -73,7 +73,12 @@ export function DashboardLayout() {
             좌측이 세로 스택(@2xl 미만)될 때, 카드들이 눌려도 Surface/EmptyState가 clip을 안 해서
             내용이 다음 카드 뒤로 겹쳐 보인다. min-h-0만으론 "안 눌리고 스크롤됨"이 보장 안 됨. */}
         <div className="@container flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto">
-          <div className="grid min-h-0 flex-1 gap-3 @2xl:grid-cols-2">
+          {/* min-h — Playwright로 재현·수정 확인(2026-08-26): TodayTasks/TaskSuggestions 카드 자체에
+              overflow-y-auto를 걸어 겹침은 없앴지만(각 카드 파일), flex-1이 이 그리드를 한도 없이
+              누를 수 있어 최소한(제목+입력줄)도 못 담을 만큼 눌리면 카드가 스크롤된 채로 시작해
+              입력창 윗부분이 잘린 것처럼 보였다. 최소 높이를 줘서 그 밑으로는 안 눌리게 하고,
+              그래도 화면이 부족하면 위 overflow-y-auto가 전체 좌측 컬럼을 스크롤시킨다. */}
+          <div className="grid min-h-[260px] flex-1 gap-3 @2xl:grid-cols-2">
             <TodayTasks />
             <TaskSuggestions />
           </div>
