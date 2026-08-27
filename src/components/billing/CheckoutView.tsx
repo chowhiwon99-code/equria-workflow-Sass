@@ -17,7 +17,7 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/shared/Modal"
-import { PLANS } from "@/lib/plans"
+import { PLANS, planOf } from "@/lib/plans"
 import { quoteAmountKrw, formatKrw, type PayablePlan } from "@/lib/billing/orders"
 
 // ⚠️ 연간 결제는 나이스페이 심사 요구("서비스 제공기간 3개월 초과 상품 판매불가")로
@@ -152,6 +152,14 @@ export function CheckoutView({
         <div className="flex flex-col gap-1">
           <h2 className="text-base font-semibold">요금제 선택</h2>
           <p className="text-xs text-muted-foreground">회사 단위로 결제하고, 인원은 요금제에 포함돼요.</p>
+          {/* Standard/Pro가 아니면(무료 Basic 등) 아래 카드엔 "현재 요금제" 표시가 안 붙는다 —
+              지금 뭘 쓰고 있는지 이 화면 어디에도 안 보이던 것(대표 지적 2026-08-26,
+              나이스페이 심사 계정처럼 무료 플랜인 경우 특히). 여기서 한 번 명시한다. */}
+          {!PAYABLE.includes(currentPlan as PayablePlan) && (
+            <p className="text-xs text-muted-foreground">
+              지금 <span className="font-semibold text-foreground">{planOf(currentPlan).label}</span> 요금제를 쓰고 있어요.
+            </p>
+          )}
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">

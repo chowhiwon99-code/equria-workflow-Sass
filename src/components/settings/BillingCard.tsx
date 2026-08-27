@@ -194,6 +194,16 @@ export function BillingCard() {
         />
       </div>
 
+      {/* 요금제 변경(업그레이드/다운그레이드) — 지금까지 여기 없어서 해지 말고는 할 게 없었다(대표 지적
+          2026-08-26). /billing(CheckoutView)이 재결제 = billing_apply_payment upsert라 안전하게 그대로
+          쓴다 — 해지 예약 중이었어도 재결제하면 RPC가 cancel_effective_at을 자동으로 풀어준다. */}
+      <Link
+        href="/billing"
+        className="inline-flex h-9 w-full items-center justify-center rounded-lg border text-sm font-medium transition-colors hover:bg-accent"
+      >
+        요금제 변경
+      </Link>
+
       {/* 결제 실패 — 요금제를 즉시 내리지 않는다(한도초과·카드 재발급은 정상 빈도라 유예를 둔다). */}
       {sub.status === "past_due" && (
         <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
