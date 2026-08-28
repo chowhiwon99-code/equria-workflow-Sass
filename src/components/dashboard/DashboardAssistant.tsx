@@ -43,22 +43,36 @@ export function DashboardAssistant() {
   const [convos, setConvos] = useState<Convo[]>([])
   // 대화 사이드바 폭 — 경계 드래그로 조절(세션41), 기기별 기억
   const [sidebarW, setSidebarW] = useState(240)
+  const [sidebarResizing, setSidebarResizing] = useState(false)
   useEffect(() => {
     const saved = Number(localStorage.getItem("equria:assistant-sidebar-w"))
     // eslint-disable-next-line react-hooks/set-state-in-effect -- 마운트 1회 저장 폭 복원(SSR 240과 하이드레이션 정합)
     if (saved >= 160 && saved <= 420) setSidebarW(saved)
   }, [])
+  const SIDEBAR_MIN = 160
+  const SIDEBAR_MAX = 420
+  const clampSidebar = (n: number) => Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, n))
+  // 경계 밖으로 끌면 고무줄처럼 저항만 주고(초과분의 1/4만 반영), 손을 떼면 clampSidebar 값으로 튕겨 돌아온다 —
+  // 드래그를 반대로 되돌릴 때 "끼인" 것처럼 안 움직이던 느낌 방지(대표 지적).
+  const elasticSidebar = (n: number) => {
+    if (n < SIDEBAR_MIN) return SIDEBAR_MIN - (SIDEBAR_MIN - n) * 0.25
+    if (n > SIDEBAR_MAX) return SIDEBAR_MAX + (n - SIDEBAR_MAX) * 0.25
+    return n
+  }
   const startSidebarResize = (e: React.PointerEvent) => {
     e.preventDefault()
     const startX = e.clientX
     const startW = sidebarW
-    const clamp = (n: number) => Math.min(420, Math.max(160, n))
-    const onMove = (ev: PointerEvent) => setSidebarW(clamp(startW + (ev.clientX - startX)))
+    setSidebarResizing(true)
+    const onMove = (ev: PointerEvent) => setSidebarW(elasticSidebar(startW + (ev.clientX - startX)))
     const onUp = (ev: PointerEvent) => {
       window.removeEventListener("pointermove", onMove)
       window.removeEventListener("pointerup", onUp)
       window.removeEventListener("pointercancel", onUp)
-      localStorage.setItem("equria:assistant-sidebar-w", String(clamp(startW + (ev.clientX - startX))))
+      const clamped = clampSidebar(startW + (ev.clientX - startX))
+      setSidebarResizing(false) // 다음 렌더의 transition을 켜서 아래 setSidebarW가 스냅백 애니메이션을 타게 한다
+      setSidebarW(clamped)
+      localStorage.setItem("equria:assistant-sidebar-w", String(clamped))
     }
     window.addEventListener("pointermove", onMove)
     window.addEventListener("pointerup", onUp)
@@ -132,7 +146,13 @@ export function DashboardAssistant() {
   return (
     <div className="flex h-full">
       {/* 좌측: 대화 사이드바 — 폭 드래그 조절(세션41 대표 요청·기기별 기억) */}
-      <aside className="hidden shrink-0 flex-col border-r bg-muted/20 md:flex" style={{ width: sidebarW }}>
+      <aside
+        className="hidden shrink-0 flex-col border-r bg-muted/20 md:flex"
+        style={{
+          width: sidebarW,
+          transition: sidebarResizing ? "none" : "width 220ms cubic-bezier(0.34,1.56,0.64,1)",
+        }}
+      >
         <div className="p-2">
           <button
             onClick={newChat}
