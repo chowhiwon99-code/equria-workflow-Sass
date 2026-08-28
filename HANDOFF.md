@@ -25,7 +25,7 @@
 
 | 항목 | 값 |
 |---|---|
-| 프로덕션 | **`2755c3b`** · `complow.kr` (Vercel `icn1` · **플랜 = Hobby**) · 배포 2026-08-27 READY 확인(`dpl_EiTLPcj…`) · **롤백 후보 `88b996c`** |
+| 프로덕션 | **`b2d55ab`** · `complow.kr` (Vercel `icn1` · **플랜 = Hobby**) · 배포 2026-08-28 READY 확인(`dpl_DgGRM6d…`) · **롤백 후보 `f48d813`** |
 | 작업 브랜치 | **`main` 직접**(루트 체크아웃이 main). `worktree-gmail-scope-narrow`도 있으나 51f4100에 정지. ⚠️ `feat/toss-ui-refresh`(`4b7fe08`)는 **죽은 브랜치** — 쓰지 말 것 |
 | 스모크(배포 직후) | `/` 200 · 웹훅 GET 200 · `/api/billing/reconcile` **401**(크론 시크릿 가드) · `/billing` 307(로그인) · Playwright로 **프로덕션에서 직접 로그인해 대시보드·결제화면 렌더 확인**(아래 §참고) |
 | 마이그레이션 | **001~143** 적용 · drift 없음 (135~137은 결번) |
