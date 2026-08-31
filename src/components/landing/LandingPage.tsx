@@ -7,11 +7,12 @@ import { createClient } from "@/lib/supabase/client"
 import {
   ArrowRight, Bot, LineChart, MessagesSquare, Stamp, Plug, ShieldCheck, Sparkles,
   LayoutDashboard, Calendar, FolderKanban, Receipt, CheckCircle2, Check,
-  BookOpen, Wrench, Lock, Server, KeyRound,
+  BookOpen, Wrench, Lock, Server, KeyRound, Network, Layers,
 } from "lucide-react"
 import { LandingHeader } from "./LandingHeader"
 import { LandingFooter } from "./LandingFooter"
 import { AuthModal } from "./AuthModal"
+import { Reveal } from "./Reveal"
 import { INK, CONTACT } from "./const"
 import type { AuthMode } from "@/components/auth/AuthForm"
 import { PLANS as PLAN_DEFS, type PlanDef } from "@/lib/plans"
@@ -44,6 +45,14 @@ const AI_BLOCKS = [
   { icon: BookOpen, t: "회사를 아는 AI", d: "회사 문서와 지식을 학습하고 대화를 기억합니다. 일반 챗봇이 아니라, 우리 회사 기준으로 답하는 AI입니다." },
   { icon: Wrench, t: "직접 만드는 에이전트", d: "개발자 없이 직원이 빌더로 에이전트를 만듭니다. 세금계산서·CS·번역 등 8종은 기본 제공." },
   { icon: Plug, t: "도구를 쓰는 AI", d: "구글 캘린더·메일 등 외부 도구를 AI가 직접 다룹니다. 에이전트를 이어 붙여 반복 업무를 자동화합니다." },
+]
+
+/** "이런 분들에게 추천드려요" — 2026-08-13 대표 타겟 진술(소규모 팀·스타트업, "5~10명 팀에게
+ *  필요한가"가 판단기준)을 방문자용 카피로 옮긴 것. 역할·업종이 아니라 규모·조직형태 기준. */
+const TARGETS = [
+  { icon: Network, t: "직원 각자 AI를 따로 쓰는 대신, 팀 전체가 하나로 씁니다", d: "구성원마다 ChatGPT를 따로 켜놓는 대신, 회사 지식을 아는 같은 에이전트를 다 같이 씁니다. 누가 얼마나 쓰는지도 회사 차원에서 보입니다." },
+  { icon: Layers, t: "이것저것 따로 쓰던 도구를 하나로 합치고 싶은 초기 스타트업", d: "캘린더·채팅·회의노트·장부·결재를 앱 여러 개로 나눠 쓰는 대신, 하나로 합쳐서 씁니다." },
+  { icon: Sparkles, t: "회사 업무 하나부터 AI에게 맡겨보고 싶은 조직", d: "기본 에이전트 3개로 오늘부터 시작하고, 손에 익으면 하나씩 늘려갑니다." },
 ]
 
 const SECURITY = [
@@ -133,6 +142,12 @@ export default function LandingPage() {
 
       {/* ── 히어로 — 타이포 중심 + 잔디식 플로팅 AI 말풍선 ── */}
       <section className="relative mx-auto max-w-5xl px-6 pt-28 text-center sm:pt-36">
+        {/* 은은한 배경 글로우 — 목업 뒤에서 있어보이게 */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute left-1/2 top-[120px] h-[560px] w-[900px] -translate-x-1/2"
+          style={{ background: "radial-gradient(ellipse at center, rgba(17,17,17,0.055) 0%, rgba(17,17,17,0) 68%)" }}
+        />
         {/* 떠다니는 AI 프롬프트 칩(장식) — 데스크톱만, 각기 다른 딜레이로 둥둥 */}
         <div aria-hidden className="pointer-events-none absolute inset-0 hidden lg:block">
           <span className="animate-float absolute left-2 top-24 inline-flex items-center gap-1.5 rounded-full border border-black/[0.07] bg-white px-3.5 py-2 text-[13px] font-medium text-black/60 shadow-[0_8px_24px_rgba(0,0,0,0.07)]">
@@ -173,7 +188,7 @@ export default function LandingPage() {
 
         {/* ── 제품 화면(실제 디자인 재현·데모 숫자) — 스르륵 등장 ── */}
         <div className="animate-fade-up relative mx-auto mt-16 max-w-4xl pb-24 text-left" style={{ animationDelay: "0.35s" }}>
-          <div className="overflow-hidden rounded-2xl border border-black/[0.08] bg-white shadow-[0_24px_60px_rgba(0,0,0,0.10)]">
+          <div className="overflow-hidden rounded-2xl border border-black/[0.08] bg-white shadow-[0_2px_4px_rgba(17,17,17,0.04),0_18px_40px_rgba(17,17,17,0.08),0_50px_90px_rgba(17,17,17,0.10)]">
             {/* 브라우저 바 */}
             <div className="flex items-center gap-2 border-b border-black/[0.06] bg-[#fafafa] px-4 py-2.5">
               <span className="size-2.5 rounded-full bg-[#ff5f57]" />
@@ -206,6 +221,15 @@ export default function LandingPage() {
                   <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-600">매출 ₩128,400,000</span>
                   <span className="rounded-full bg-rose-500/10 px-2.5 py-1 text-[11px] font-semibold text-rose-500">비용 ₩41,200,000</span>
                   <span className="rounded-full bg-blue-500/10 px-2.5 py-1 text-[11px] font-semibold text-blue-600">순이익 ₩87,200,000</span>
+                </div>
+                <div className="mt-4 flex h-11 items-end gap-1.5" aria-hidden>
+                  {[38, 52, 46, 70, 64, 88, 80].map((h, i) => (
+                    <div
+                      key={i}
+                      className={`flex-1 rounded-t ${i === 5 ? "bg-black" : "bg-emerald-500/80"}`}
+                      style={{ height: `${h}%` }}
+                    />
+                  ))}
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-3">
                   <div className="rounded-xl border border-black/[0.05] bg-white p-3.5 shadow-sm">
@@ -248,56 +272,100 @@ export default function LandingPage() {
       {/* ── 숫자 스트립 ── */}
       <section className="mx-auto max-w-4xl border-t border-black/[0.06] px-6 py-16">
         <div className="grid grid-cols-1 gap-10 text-center sm:grid-cols-3">
-          {STATS.map((s) => (
-            <div key={s.l}>
+          {STATS.map((s, i) => (
+            <Reveal key={s.l} delay={i * 90}>
               <p className="text-4xl font-extrabold tracking-tight">{s.n}</p>
               <p className="mt-2 text-[14px] text-black/45">{s.l}</p>
-            </div>
+            </Reveal>
           ))}
         </div>
       </section>
 
       {/* ── AI — 심화 ── */}
       <section id="ai" className="mx-auto max-w-4xl scroll-mt-16 border-t border-black/[0.06] px-6 py-24">
-        <div className="text-center">
+        <Reveal>
           <h2 className="text-[clamp(1.6rem,4vw,2.2rem)] font-extrabold tracking-[-0.02em]">
             AI가 따로 있지 않고,
             <br />
             업무 흐름 안에 있습니다.
           </h2>
-          <p className="mx-auto mt-4 max-w-lg text-[15px] leading-relaxed text-black/45">
+          <p className="mt-4 max-w-lg text-[15px] leading-relaxed text-black/45">
             메뉴 하나가 아니라 바탕입니다. 손익을 묻고, 문서를 쓰고, 일정을 잡는 모든 순간에 AI가 함께 움직입니다.
           </p>
-        </div>
+        </Reveal>
         <div className="mt-14 grid gap-x-10 gap-y-12 sm:grid-cols-3">
-          {AI_BLOCKS.map((b) => (
-            <div key={b.t}>
+          {AI_BLOCKS.map((b, i) => (
+            <Reveal key={b.t} delay={i * 90}>
               <b.icon className="size-5" strokeWidth={1.75} />
               <h3 className="mt-3.5 text-[15px] font-semibold">{b.t}</h3>
               <p className="mt-1.5 text-[14px] leading-relaxed text-black/45">{b.d}</p>
-            </div>
+            </Reveal>
           ))}
         </div>
+
+        {/* 실제 화면 1 — 컴피(대시보드 어시스턴트가 실제로 회의 공지 초안을 쓴 화면) */}
+        <Reveal className="mt-20 grid items-stretch gap-10 sm:grid-cols-2">
+          <div className="flex flex-col justify-center">
+            <p className="text-[13px] font-bold text-black/40">AI 어시스턴트</p>
+            <h3 className="mt-2 text-[22px] font-extrabold tracking-tight">물어보면, 컴피가 바로 처리합니다.</h3>
+            <ul className="mt-4 space-y-2.5 text-[14px] leading-relaxed text-black/55">
+              <li>회사 워크스페이스를 다 아는 개인 비서 — 프로젝트·캘린더·할 일을 알고 답합니다</li>
+              <li>공지·이메일·요약 같은 글쓰기를 초안으로 바로 받아 고쳐 씁니다</li>
+              <li>대화가 계속 저장돼, 지난 이야기를 이어서 물어볼 수 있습니다</li>
+            </ul>
+          </div>
+          <div className="overflow-hidden rounded-2xl border border-black/[0.06] bg-white shadow-[0_1px_2px_rgba(17,17,17,0.03),0_20px_44px_rgba(17,17,17,0.055)]">
+            <div className="flex items-center gap-2 border-b border-black/[0.06] bg-white px-4 py-3">
+              <span className="grid size-6 place-items-center rounded-md bg-blue-500/10"><Sparkles className="size-3.5 text-blue-600" strokeWidth={1.75} /></span>
+              <span className="text-[12.5px] font-bold text-black/55">컴피</span>
+            </div>
+            <Image src="/marketing/compi-panel.png" alt="컴피가 실제로 회의 공지 초안을 작성하는 화면" width={900} height={958} className="w-full" />
+          </div>
+        </Reveal>
+
+        {/* 실제 화면 2 — 워크플로우(에이전트 3개를 실제로 연결한 캔버스) */}
+        <Reveal className="mt-20 grid items-stretch gap-10 sm:grid-cols-2">
+          <div className="order-last overflow-hidden rounded-2xl border border-black/[0.06] bg-white shadow-[0_1px_2px_rgba(17,17,17,0.03),0_20px_44px_rgba(17,17,17,0.055)] sm:order-first">
+            <div className="flex items-center gap-2 border-b border-black/[0.06] bg-white px-4 py-3">
+              <span className="grid size-6 place-items-center rounded-md bg-emerald-500/10"><Network className="size-3.5 text-emerald-600" strokeWidth={1.75} /></span>
+              <span className="text-[12.5px] font-bold text-black/55">신규 문의 처리 자동화</span>
+            </div>
+            <Image src="/marketing/workflow-canvas.png" alt="에이전트 3개를 이어 붙인 워크플로우 캔버스" width={1000} height={396} className="w-full" />
+          </div>
+          <div className="flex flex-col justify-center">
+            <p className="text-[13px] font-bold text-black/40">워크플로우 자동화</p>
+            <h3 className="mt-2 text-[22px] font-extrabold tracking-tight">에이전트를 이어 붙이면, 일이 끝까지 갑니다.</h3>
+            <p className="mt-4 text-[14px] leading-relaxed text-black/55">
+              한 번 만들어두면 사람이 단계마다 넘겨줄 필요가 없습니다. 예를 들어 위 예시는 고객 문의 응대 초안을
+              쓰고 → 관련 회의 내용을 정리하고 → 경리 마감까지, 실행 버튼 한 번으로 끝까지 이어집니다.
+            </p>
+            <ul className="mt-4 space-y-2.5 text-[14px] leading-relaxed text-black/55">
+              <li>에이전트 여러 개를 순서대로 연결해 한 번에 실행합니다</li>
+              <li>앞 단계 결과가 다음 단계로 자동으로 넘어갑니다</li>
+              <li>직접 만든 에이전트도, 기본 제공 에이전트도 그대로 이어붙입니다</li>
+            </ul>
+          </div>
+        </Reveal>
       </section>
 
       {/* ── 기능 — 개요 그리드 + 심화 블록 ── */}
       <section id="features" className="mx-auto max-w-4xl scroll-mt-16 border-t border-black/[0.06] px-6 py-24">
-        <div className="text-center">
+        <Reveal>
           <h2 className="text-[clamp(1.6rem,4vw,2.2rem)] font-extrabold tracking-[-0.02em]">일에 필요한 전부, 여기에.</h2>
           <p className="mt-3 text-[15px] text-black/45">흩어져 있던 도구를 하나로 합쳤습니다.</p>
-        </div>
+        </Reveal>
         <div className="mt-14 grid gap-x-10 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
-          {FEATURES.map((f) => (
-            <div key={f.t}>
+          {FEATURES.map((f, i) => (
+            <Reveal key={f.t} delay={i * 90}>
               <f.icon className="size-5" strokeWidth={1.75} />
               <h3 className="mt-3.5 text-[15px] font-semibold">{f.t}</h3>
               <p className="mt-1 text-[14px] leading-relaxed text-black/45">{f.d}</p>
-            </div>
+            </Reveal>
           ))}
         </div>
 
         {/* 심화 1 — 손익·현금흐름 */}
-        <div className="mt-24 grid items-center gap-10 sm:grid-cols-2">
+        <Reveal className="mt-24 grid items-center gap-10 sm:grid-cols-2">
           <div>
             <p className="text-[13px] font-bold text-black/40">손익·현금흐름</p>
             <h3 className="mt-2 text-[22px] font-extrabold tracking-tight">기록 한 번에, 장부 전체가 움직입니다.</h3>
@@ -321,10 +389,10 @@ export default function LandingPage() {
               <p className="mt-1 text-[11px] text-black/35">월급 × (1 + 사업주 부담 10.8%) 자동 계산</p>
             </div>
           </div>
-        </div>
+        </Reveal>
 
         {/* 심화 2 — 팀 협업 */}
-        <div className="mt-20 grid items-center gap-10 sm:grid-cols-2">
+        <Reveal className="mt-20 grid items-center gap-10 sm:grid-cols-2">
           <div className="order-last sm:order-first">
             <div className="rounded-2xl border border-black/[0.06] bg-[#fbfbfc] p-5">
               <p className="text-[12px] font-semibold text-black/40">전체방</p>
@@ -344,10 +412,10 @@ export default function LandingPage() {
               <li>팀 캘린더와 프로젝트로 일정·할 일을 공유</li>
             </ul>
           </div>
-        </div>
+        </Reveal>
 
         {/* 심화 3 — 전자결재·근태 */}
-        <div className="mt-20 grid items-center gap-10 sm:grid-cols-2">
+        <Reveal className="mt-20 grid items-center gap-10 sm:grid-cols-2">
           <div>
             <p className="text-[13px] font-bold text-black/40">전자결재·근태</p>
             <h3 className="mt-2 text-[22px] font-extrabold tracking-tight">종이 없이, 기다림 없이 승인.</h3>
@@ -373,24 +441,18 @@ export default function LandingPage() {
               ))}
             </div>
           </div>
-        </div>
+        </Reveal>
 
-        {/* 심화 4 — 외부 연동 */}
-        <div className="mt-20 grid items-center gap-10 sm:grid-cols-2">
-          <div className="order-last sm:order-first">
-            <div className="rounded-2xl border border-black/[0.06] bg-[#fbfbfc] p-5">
-              <p className="text-[12px] font-semibold text-black/40">연결된 도구</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {["구글 캘린더", "Gmail", "Notion", "Slack", "환율·세금계산서"].map((t) => (
-                  <span key={t} className="inline-flex items-center gap-1.5 rounded-full border border-black/[0.07] bg-white px-3 py-1.5 text-[12px] font-medium text-black/60 shadow-sm">
-                    <Plug className="size-3" /> {t}
-                  </span>
-                ))}
-              </div>
-              <p className="mt-3 text-[11px] text-black/35">연결하면 AI 에이전트가 도구를 직접 사용합니다.</p>
+        {/* 심화 4 — 외부 연동(실제 화면 — 에이전트가 문서 조회 도구를 두 단계로 실제 호출) */}
+        <Reveal className="mt-20 grid items-stretch gap-10 sm:grid-cols-2">
+          <div className="order-last overflow-hidden rounded-2xl border border-black/[0.06] bg-white shadow-[0_1px_2px_rgba(17,17,17,0.03),0_20px_44px_rgba(17,17,17,0.055)] sm:order-first">
+            <div className="flex items-center gap-2 border-b border-black/[0.06] bg-white px-4 py-3">
+              <span className="grid size-6 place-items-center rounded-md bg-black/[0.05]"><Plug className="size-3.5" strokeWidth={1.75} /></span>
+              <span className="text-[12.5px] font-bold text-black/55">고객 응대 도우미</span>
             </div>
+            <Image src="/marketing/agent-tool-chain.png" alt="에이전트가 문서 조회 도구를 두 단계로 실제 호출하는 화면" width={900} height={900} className="w-full" />
           </div>
-          <div>
+          <div className="flex flex-col justify-center">
             <p className="text-[13px] font-bold text-black/40">외부 도구 연동</p>
             <h3 className="mt-2 text-[22px] font-extrabold tracking-tight">쓰던 도구는 버리지 않아도 됩니다.</h3>
             <ul className="mt-4 space-y-2.5 text-[14px] leading-relaxed text-black/55">
@@ -399,22 +461,39 @@ export default function LandingPage() {
               <li>회사가 허용한 도구만 연결되도록 관리자가 통제</li>
             </ul>
           </div>
-        </div>
+        </Reveal>
       </section>
 
       {/* ── 보안 ── */}
       <section className="mx-auto max-w-4xl border-t border-black/[0.06] px-6 py-24">
-        <div className="text-center">
+        <Reveal>
           <h2 className="text-[clamp(1.6rem,4vw,2.2rem)] font-extrabold tracking-[-0.02em]">회사 데이터는 회사의 것.</h2>
           <p className="mt-3 text-[15px] text-black/45">보안은 기능이 아니라 기본값입니다.</p>
-        </div>
+        </Reveal>
         <div className="mt-12 grid gap-x-10 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
-          {SECURITY.map((s) => (
-            <div key={s.t}>
+          {SECURITY.map((s, i) => (
+            <Reveal key={s.t} delay={i * 90}>
               <s.icon className="size-5" strokeWidth={1.75} />
               <h3 className="mt-3 text-[15px] font-semibold">{s.t}</h3>
               <p className="mt-1 text-[13px] leading-relaxed text-black/45">{s.d}</p>
-            </div>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      {/* ── 타겟 — 이런 분들에게 추천드려요 (2026-08-13 대표 타겟 진술을 방문자 카피로) ── */}
+      <section className="mx-auto max-w-4xl border-t border-black/[0.06] px-6 py-24">
+        <Reveal>
+          <h2 className="text-[clamp(1.6rem,4vw,2.2rem)] font-extrabold tracking-[-0.02em]">이런 분들에게 추천드려요.</h2>
+          <p className="mt-3 text-[15px] text-black/45">컴플로우는 대기업용 도구가 아닙니다. 작은 조직이 AI를 프로페셔널하게 쓰게 하는 도구입니다.</p>
+        </Reveal>
+        <div className="mt-14 grid gap-x-10 gap-y-12 sm:grid-cols-3">
+          {TARGETS.map((t, i) => (
+            <Reveal key={t.t} delay={i * 90}>
+              <t.icon className="size-5" strokeWidth={1.75} />
+              <h3 className="mt-3.5 text-[15px] font-semibold">{t.t}</h3>
+              <p className="mt-1.5 text-[14px] leading-relaxed text-black/45">{t.d}</p>
+            </Reveal>
           ))}
         </div>
       </section>
