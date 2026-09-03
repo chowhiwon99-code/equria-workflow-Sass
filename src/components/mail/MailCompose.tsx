@@ -3,6 +3,8 @@
 import { useRef, useState, type ReactNode } from "react"
 import { useEditor, EditorContent } from "@tiptap/react"
 import Placeholder from "@tiptap/extension-placeholder"
+import { TextStyle, Color } from "@tiptap/extension-text-style"
+import TextAlign from "@tiptap/extension-text-align"
 import { toast } from "sonner"
 import {
   Bold,
@@ -12,6 +14,9 @@ import {
   List,
   ListOrdered,
   Link2,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
   Paperclip,
   X,
   Send,
@@ -37,6 +42,35 @@ type Attachment = { filename: string; mimeType: string; contentBase64: string; s
 // Vercel 서버리스 요청 본문 4.5MB 제한 + base64 팽창(×1.33) 감안 → 합계 3MB 가드.
 // (더 큰 첨부는 Gmail 미디어 업로드 직접 경로 필요 — known-issues 참고)
 const MAX_TOTAL = 3 * 1024 * 1024
+
+// 기본(null)은 unsetColor — 인라인 color 마크 제거(상속 색으로 복귀).
+const TEXT_COLORS: { label: string; value: string | null }[] = [
+  { label: "기본", value: null },
+  { label: "빨강", value: "#dc2626" },
+  { label: "주황", value: "#ea580c" },
+  { label: "초록", value: "#16a34a" },
+  { label: "파랑", value: "#2563eb" },
+]
+
+/** 글자색 스와치 버튼. */
+function ColorSwatch({ color, active, on }: { color: string | null; active: boolean; on: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label={color ? `글자색 ${color}` : "기본 글자색"}
+      aria-pressed={active}
+      title={color ? `글자색 ${color}` : "기본 글자색"}
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={on}
+      className={cn(
+        "flex size-7 items-center justify-center rounded-md transition-colors hover:bg-muted",
+        active && "bg-muted"
+      )}
+    >
+      <span className="size-3.5 rounded-full border border-black/15" style={{ backgroundColor: color ?? "#111111" }} />
+    </button>
+  )
+}
 
 /** 서식 툴바 버튼 — onMouseDown preventDefault로 에디터 선택 유지. */
 function Tool({ on, active, label, children }: { on: () => void; active?: boolean; label: string; children: ReactNode }) {
@@ -99,7 +133,13 @@ export default function MailCompose({
 
   const editor = useEditor({
     immediatelyRender: false,
-    extensions: [...CHAT_EXTENSIONS, Placeholder.configure({ placeholder: "내용을 입력하세요" })],
+    extensions: [
+      ...CHAT_EXTENSIONS,
+      TextStyle,
+      Color,
+      TextAlign.configure({ types: ["paragraph"] }),
+      Placeholder.configure({ placeholder: "내용을 입력하세요" }),
+    ],
     editorProps: {
       attributes: {
         spellcheck: "true",
@@ -225,7 +265,7 @@ export default function MailCompose({
 
         {/* 서식 툴바 */}
         {editor && (
-          <div className="flex items-center gap-0.5 rounded-lg border bg-muted/30 px-1.5 py-1">
+          <div className="flex flex-wrap items-center gap-0.5 rounded-lg border bg-muted/30 px-1.5 py-1">
             <Tool label="굵게" active={editor.isActive("bold")} on={() => editor.chain().focus().toggleBold().run()}>
               <Bold className="size-3.5" />
             </Tool>
@@ -239,6 +279,19 @@ export default function MailCompose({
               <Strikethrough className="size-3.5" />
             </Tool>
             <span className="mx-0.5 h-4 w-px bg-border" />
+            {TEXT_COLORS.map((c) => (
+              <ColorSwatch
+                key={c.label}
+                color={c.value}
+                active={c.value ? editor.isActive("textStyle", { color: c.value }) : !editor.getAttributes("textStyle").color}
+                on={() =>
+                  c.value
+                    ? editor.chain().focus().setColor(c.value).run()
+                    : editor.chain().focus().unsetColor().run()
+                }
+              />
+            ))}
+            <span className="mx-0.5 h-4 w-px bg-border" />
             <Tool label="글머리 목록" active={editor.isActive("bulletList")} on={() => editor.chain().focus().toggleBulletList().run()}>
               <List className="size-3.5" />
             </Tool>
@@ -247,6 +300,16 @@ export default function MailCompose({
             </Tool>
             <Tool label="링크" active={editor.isActive("link")} on={setLink}>
               <Link2 className="size-3.5" />
+            </Tool>
+            <span className="mx-0.5 h-4 w-px bg-border" />
+            <Tool label="왼쪽 정렬" active={editor.isActive({ textAlign: "left" })} on={() => editor.chain().focus().setTextAlign("left").run()}>
+              <AlignLeft className="size-3.5" />
+            </Tool>
+            <Tool label="가운데 정렬" active={editor.isActive({ textAlign: "center" })} on={() => editor.chain().focus().setTextAlign("center").run()}>
+              <AlignCenter className="size-3.5" />
+            </Tool>
+            <Tool label="오른쪽 정렬" active={editor.isActive({ textAlign: "right" })} on={() => editor.chain().focus().setTextAlign("right").run()}>
+              <AlignRight className="size-3.5" />
             </Tool>
           </div>
         )}
