@@ -9,3 +9,6 @@
 | `PLAN.md` | 최초 비전·기획(단일테넌트 사내툴 프레이밍, Build-vs-Buy, 비용모델) | 대부분 `CLAUDE.md`로 흡수. 마이그/로드맵 표기 낡음(B2B 전환은 `PRODUCTIZATION.md`) |
 | `CHAT-HUB-ARCHITECTURE.md` | 1:1 DM → "메인+AI" 확장 설계 | **전부 구현 완료**(상태·반응·리치·다중첨부·디렉터리·AI보조). 마이그 022·엔드포인트명은 코드와 불일치 |
 | `GOOGLE-MCP-ARCHITECTURE.md` | Google(Gmail/Drive)+MCP 연동 설계 | OAuth·Gmail·MCP **구현 완료**. **Google Drive 탭만 미구현**(유일한 잔여 — `HANDOFF.md` 다음할일 참고) |
+| `B1-DESIGN.md` | 테넌트 격리(B1) 상세 설계 — RLS 재작성·헬퍼함수·마이그 033~046 | **B1-a·B1-b 모두 구현 완료**(마이그033~043 읽기 격리 + 마이그112 쓰기 강제). 문서 본문은 "B1-b는 잔여 forward"로 서술돼 있으나 이미 낡음 — 현재 상태는 `HANDOFF.md` §🏢멀티테넌시 참고 |
+| `PRODUCTIZATION-B1B2-리스크.md` | `PRODUCTIZATION.md` 원본(2026-06-09)의 §0·§1·§2-BLOCKER(B1~B6 리스크) 발췌 | **B1·B2 모두 해소**. 현재 `PRODUCTIZATION.md`는 이 부분을 압축 요약으로 교체하고 B3~B6 로드맵만 유지 |
+| `WORKLOG-초기.md` | `WORKLOG.md`의 세션33 이하 + 세션번호 도입 전 초기 기록(2026-05~07-13, 약 890줄) | 2026-09-03 분리(파일이 2,108줄로 비대해져 세션34 "에이전트 시스템 재설계" 착수를 경계로 절단). 최신 로그는 `WORKLOG.md` |

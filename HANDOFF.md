@@ -431,7 +431,7 @@ Sonnet 4.6 **1,024** · Opus 4.7 **2,048** · Haiku 4.5 **4,096**토큰. 그보�
   이제 신규 워크스페이스 데이터가 equria로 오귀속될 수 없다.
 - **B2 가입 개방 = 완료**(마이그113~116): 초대 링크 + guest role + `create_workspace` + 온보딩.
   신규가입은 **이미 켜져 있다**(GoTrue `disable_signup: false` 라이브 확인). 구글 로그인 동작 확인됨.
-- 로드맵(B3~B6) 상세 = `PRODUCTIZATION.md` · 격리 설계 = `B1-DESIGN.md`.
+- 로드맵(B3~B6) 상세 = `PRODUCTIZATION.md` · 격리 설계(구현 완료·과거 기록) = `docs/archive/B1-DESIGN.md`.
 - ⏸️ **보류(재촉 금지)**: 제3자 구글 계정 신규가입 E2E 검증 — 대표가 꺼낼 때 진행.
 
 ---
@@ -445,7 +445,7 @@ Sonnet 4.6 **1,024** · Opus 4.7 **2,048** · Haiku 4.5 **4,096**토큰. 그보�
 | `CLAUDE.md` | 정체성·스택·절대원칙·파일구조·DB요약 (브랜드 규칙은 위 §합의된 정책이 최신) |
 | **`BILLING-PLAN.md`** | **결제 연동 설계·작업 순서 + 놓치기 쉬운 함정** — 결제 작업 전 필독 (레포 추적, 모바일에서도 열림) |
 | **`ACTIVATION-PLAN.md`** | **제품 점검 결과 + 첫 사용 경험 개선 계획** — 제품(비결제) 작업 전 필독 |
-| `PRODUCTIZATION.md` / `B1-DESIGN.md` | B2B 로드맵·리스크 / 테넌트 격리 상세 |
+| `PRODUCTIZATION.md` | B2B 로드맵·리스크(B1·B2는 완료, 상세는 `docs/archive/`) |
 | `AGENTS-MCP-STRATEGY.md` / `AGENTS-LEARNING-DESIGN.md` | 에이전트·MCP 전략 / 학습·기억 설계 |
 | `.claude/skills/safe-changes.md` | 변경 안전 원칙 — **모든 코드/DB 변경 전 최우선** |
 | `.claude/skills/{latest-stack,known-issues,work-harness}.md` | 최신 패턴 / 기술부채 / 작업 SOP·검증 게이트 |
@@ -461,7 +461,7 @@ Sonnet 4.6 **1,024** · Opus 4.7 **2,048** · Haiku 4.5 **4,096**토큰. 그보�
 
 - **GitHub**: `chowhiwon99-code/equria-workflow-Sass` (main=프로덕션)
 - **Vercel**: team `team_wcW0NMU7oiIxNndyV1afigbp` · project `prj_CcCTUr8eIYpaStaj6RNq7VoLPZG6` · 배포보호 **off**
-- **Supabase**: project `dutovtfdckhayyvhtuxu` (ap-northeast-2 서울) · 마이그 **001~142**
+- **Supabase**: project `dutovtfdckhayyvhtuxu` (ap-northeast-2 서울) · 마이그 **001~143**
 - **사업자**: 개인사업자 · 등록번호 592-58-00892 · 통신판매업 제2026-인천계양-0642호
 - **.env.local**: ANTHROPIC · Supabase 3종 · Google 4종 · `WORKSPACE_PASSWORD` · **나이스페이 2종 = `NICEPAY_CLIENT_KEY`·`NICEPAY_SECRET_KEY`(2026-08-22 입력 완료)** · `CRON_SECRET`(Vercel 전용)
   ⚠️ **시크릿 값을 문서·채팅에 적지 말 것** (HANDOFF는 git 추적됨)

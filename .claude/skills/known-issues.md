@@ -6,7 +6,7 @@ description: EQURIA Workspace의 알려진 이슈·기술부채 백로그. 다�
 # 알려진 이슈 / 기술부채 백로그
 
 > 지금 당장 안 깨지지만 **나중에 해결해야 하는** 것들. 위험도순. 해결하면 이 파일에서 제거.
-> 최종 정리: 2026-05-31 (세션 4) · 갱신: 2026-06-05 (세션 7 — I1b 카운트·I13 신설)
+> 최종 정리: 2026-05-31 (세션 4) · 갱신: 2026-08-19 (I1b 29/0 재확정 + 해소분 정리)
 
 ## 🔴 우선 (다음 세션 후보)
 
@@ -17,7 +17,7 @@ description: EQURIA Workspace의 알려진 이슈·기술부채 백로그. 다�
 
 ## 🟡 중간
 
-### I1b. eslint 부채 30건 — 배포는 안 막지만 코드품질 부채 (세션7 갱신)
+### I1b. eslint 부채 29건 — 배포는 안 막지만 코드품질 부채 (세션7 갱신)
 - `next build`(=Vercel 빌드)는 **exit 0 통과**. **Next 16 Turbopack 빌드는 eslint를 게이트하지 않음** → 아래 에러들은 배포를 막지 않음.
 - `pnpm lint`는 **29 errors + 0 warnings**(2026-08-19 `npx eslint src --format json`으로 실측·재확정):
   `react-hooks/set-state-in-effect` ×26(전 컴포넌트 공통 `useEffect(()=>{load()},[load])` 패턴) ·
@@ -39,7 +39,6 @@ description: EQURIA Workspace의 알려진 이슈·기술부채 백로그. 다�
 ## 🟢 낮음 / 비차단
 
 - **I5. 웹훅 응답 본문 미검증**: run 라우트가 webhook POST 후 status code만 봄(외부 처리 성공 여부 모름 — 웹훅 특성상 정상).
-- ~~**I6. DB drift 미확인**~~ → ✅ **세션5 해소**: `list_migrations` 대조 결과 디스크 18개 ↔ 원격 18개 **1:1 일치, drift 없음**(001~017 + 001a baseline).
 - **I7. 기존 부채(세션3부터)**: `agent_usage` onError 누락(성공 시만 기록) · Anthropic transient 500 재시도 없음 · `.or()` 특수문자 escape 부재 · NotificationBell UPDATE 미구독 · 그룹채팅/위젯 모바일/md 다크모드 미대응 · **채팅 이모지 팝오버가 스크롤 컨테이너(`overflow-y-auto`) 상단 근처서 클리핑**(pre-existing, 최신 메시지엔 무영향 · Portal/Floating UI로 해소 가능, 세션7 검증).
 - **I8. 핀 교체 비원자성**: delete→insert 사이 실패 시 빈 핀(에러표시+resync로 방어, 완전방지엔 upsert RPC).
 - **I10. 워크플로우 노드 순서 UI 다듬기(세션5, 나중에)**: 노드 좌상단 번호를 편집 가능한 입력으로 만들어 순서 변경+끈 자동연결(`OrderBadge` 컴포넌트, `WorkflowCanvas.tsx`). 동작은 하지만 ①20px 원형 입력이 작아 클릭/타깃 작음 ②노드 1개일 땐 변경 불가(자연스러움) ③Tab `tabIndex=order`가 페이지 전역 탭순서에 영향. 후속에서 "선택 노드 사이드 패널의 큰 순서 컨트롤" 또는 "위/아래 버튼"으로 교체 고려. **코드가 `OrderBadge`로 분리돼 있어 교체 쉬움.**
@@ -52,20 +51,15 @@ description: EQURIA Workspace의 알려진 이슈·기술부채 백로그. 다�
 - **I16. 메일 첨부 3MB 한도 + 배치 파싱 엣지(세션27 적대리뷰, 비차단)**: ① Gmail 첨부를 JSON 본문(base64)으로 `/api/google/gmail/send`에 전송 → **Vercel 서버리스 요청 본문 4.5MB 제한** 때문에 base64 팽창(×1.33) 감안 **클라 가드 합계 3MB**(`MailCompose` MAX_TOTAL, 초과 시 toast). 더 큰 첨부는 Gmail 미디어 업로드(resumable) 직접 경로 필요 — 후속 개선. ② `batchGetThreadsMetadata`(스레드 목록 batch)는 파트 JSON을 첫`{`~마지막`}`로 추출·id로 순서 복원 → **파싱 실패/오류 스레드는 조용히 목록 누락**(그레이스풀이나 특이 메일에서 빠질 수 있음). ③ **수정 완료분**: 헤더 인젝션(CRLF)·첨부 파일명 따옴표·base64 비문자 = `buildRawMessage`(`oneLine`/`encodeHeaderValue`)에서 제거. Drive 다운로드=본인 OAuth 토큰이라 IDOR 없음 · Drive 쿼리=`esc()` 인젝션 방지 · 캐시=클라측(브라우저별) 교차유출 없음 — **리뷰 확인됨**.
 
 - **I18. SSRF 잔여 위험(세션36 하드닝 후, 비차단·LOW)**: `lib/safeFetch.ts`가 문자열 검사에 더해 **DNS 실제 IP 공인검증**(v4/v6 사설·loopback·링크로컬·CGNAT·IPv4-mapped) + **리다이렉트 수동 매 홉 재검증**으로 강화됨(웹훅=`maxRedirects:0` 차단, 리서치 이미지 2곳=3홉). **잔여**: `assertPublicHost`의 검증 시점과 실제 `fetch`의 소켓 connect 사이에 DNS가 바뀌는 **초고속 리바인딩**은 검증된 IP로의 소켓 핀(undici dispatcher `connect.lookup`) 없이는 이론상 잔여. 내부툴·인증 직원 한정이라 LOW. 완전차단 원하면 undici Agent로 검증 IP 핀. (세션36 이전엔 최초 URL 호스트명 **문자열만** 검사해 리다이렉트·리바인딩 우회가 열려 있었음.)
-- **✅ 세션36 해소분**: ① 워크플로우 `save_file`/`notify` CHECK 위반(마이그104) ② 채팅 비용 `usage`→`totalUsage` 과소집계 ③ 구글 OAuth 토큰 저장 `void`→`await`(lazy-thenable) ④ 알림 읽음 `void`→`await`(I7의 NotificationBell write 부분). — 상세 WORKLOG 세션36.
-
 - **I17. 세션29 MCP 개인연결 마이너(세션30 전체 코드리뷰 발견, 비차단·미픽스)**: ① 개인 커넥터의 도구명이 다른 커넥터와 충돌하면 **조용히 덮어쓰기**(경고 없음). ② **GitHub 커넥터가 Copilot MCP 엔드포인트**라 일반 PAT로는 권한 범위 확인 필요. ③ MCP 도구 캐시 Map 키에 **프리픽스 없음**(서버 간 키 충돌 이론상 가능). 전부 비차단이나 커넥터 다중 사용 확대 시 점검.
 
-## ✅ 세션4 신규 기능의 미검증(E2E) — 코드/빌드는 통과, 화면 동작만 미확인
-- **워크플로우 실행을 실제로 한 번도 안 돌려봄**(인증 필요). 실제 Claude가 순서대로 도는지 사용자 확인 필요 = **다음 세션 최우선**.
-- 6개 섹션·캔버스 드래그/끈 연결·다크모드·설정 저장·파일 업로드 = 브라우저 E2E 미확인.
-- 세션3 코드리뷰 15건 E2E(계속 이월): 캘린더 멀티데이 lane·재무삭제→프로젝트합계·⌘Z연타·이모지.
+> 세션4 시점(2026-05-31) E2E 미검증 목록(워크플로우 실행·6개 섹션 브라우저 확인 등)은 이후 40여 세션에서
+> 대부분 재검증됐다(예: I9·I15·I19). 상세는 git 이력·WORKLOG 세션4~7 참고, 여기선 압축.
 
 ## 🆕 세션41 리뷰 보류분 (2026-07-30, 비차단)
 - **I19. 손익 계산 슬롯 표시(세전) vs 총계(부가세 포함) 불일치**: CashGrid 금액 열=계산값(amount), tfoot·pool=total_amount 합산 — VAT 넣은 슬롯은 행 100,000/총계 110,000. 표기 기준 통일 필요(LOW).
 - **I20. 매출·비용 슬롯→보유금 전환 시 이번 달 자동 기록 유령 잔존**: kind=reserve면 sync 스킵이라 기존 귀속 기록이 미귀속 잔여로 pool에 이중 표현(LOW·엣지).
 - **I21. AI 라우트 rate limit 부재 + 예산 기본 무제한**: monthly_budget_usd null=무제한, checkBudget은 커밋된 합계만(병렬 통과 가능). 완화=배포 후 예산 설정(설정→AI 비용 예산). B3 크레딧 시스템에서 정식 해결 예정(MED·수용).
-- ~~**I22. finance_snapshot_open(마이그121) 죽은 컬럼**~~ → ✅ **해소(2026-08-01·마이그127 `drop_finance_snapshot_open`)**: 의존성 0(정책·함수·뷰·제약)·코드 참조 0(생성 types.ts 제외) 검증 + begin/rollback 시뮬 통과 후 drop. 원격 적용+파일화·advisors 신규 ERROR 0. 롤백=마이그127 주석의 add column. **동반 정리**: `.app-ambient` 중복 배경(마운트 div + CSS)도 제거 — 세션41 평탄화로 `body`와 동일 `var(--background)`만 칠하던 무영향 잔재(픽셀 무변화). ⚠️ 코드 2커밋은 **로컬(미푸시)**, 마이그127은 **프로덕션 DB 적용됨**(컬럼이 배포 코드에서 미사용이라 라이브 무영향).
 - **I23. AttendanceAdmin workspaces.select limit(1) 비결정**: 멀티 멤버십 유저의 isOwner UI 오판 가능(권한은 RLS가 강제 — 표시 문제만, LOW).
 - **I24. 어시스턴트/사이드바 리사이즈 핸들 4px 침범**: thin 스크롤바 위 일부를 핸들이 덮음(히트 확률 낮음, LOW).
 
@@ -74,7 +68,6 @@ description: EQURIA Workspace의 알려진 이슈·기술부채 백로그. 다�
 - **I28. 근태 잔여 셀프조회 부재**: `attendance_balances` RPC는 `can_view_attendance`(오너/위임자)만 → 일반 직원의 본인 연차 잔여 조회 경로 없음. 컴피도 오너/위임자 문맥만 답변. 셀프조회는 후속(RPC에 self 분기). LOW.
 - **I29. 컴피 도구 커버리지·수집 중복**: `agentTools`는 근태·프로젝트·일정·할일 4종만(재무·회의·채팅 도구 미구현 — 같은 패턴으로 추가). `task-suggestions` 인라인 수집과 `workspaceContext` 스냅샷이 유사 로직 중복(통합 후속). LOW.
 - **I30. 옛 기본 8종 기존 워크스페이스 잔존**: `created_by IS NULL` 활성 시드 16개(3워크스페이스). 신규는 마이그130 clean-slate로 미복제. 기존은 **컴피 라이브 검증 후 `is_active=false` 소프트삭제**(대표 결정). 되돌림=is_active 토글.
-- **I31. ~~크레딧 차감 계수 적자~~ → 해소(2026-08-14 마이그138)**: 옛 기록은 "Standard 포함 **3,000** 소진 = 원가 $30 > 매출"이었으나, 마이그138에서 **원가율 40% 역산**으로 포함량을 Standard **750** · Pro **1,300**으로 내렸다. 지금은 포함량 원가율 39.2%(Standard)·40.2%(Pro), 공정사용 배수 1.3을 곱한 최악값도 50.9%·52.2%다 → **만재 소진해도 적자가 아니다.** 계수(`lib/credits.ts USD_PER_CREDIT = $0.01`)는 그대로 유지가 맞다(대표 결정 2026-08-10 — 캐싱으로 크레딧당 대화량이 이미 ~4배 늘었다). ⚠️ 환율·모델 단가가 크게 움직이면 `lib/plans.ts` 주석의 역산표로 재계산할 것.
 - **I32. 크레딧 잔액 음수 허용(by design)**: 스트리밍이라 호출 전엔 비용을 모른다 → 사전 검사는 "잔액>0"만 보고 실제 차감은 응답 완료 후. 따라서 마지막 호출 하나는 잔액을 넘길 수 있고 그다음 호출에서 차단된다. 정상 동작이며 UI는 0으로 클램프해 표시. LOW.
 - **I33. CreditMeter는 마운트 시 1회만 조회**: 사용 중 잔액이 줄어도 화면 숫자는 새로고침 전까지 그대로. 소진 시 차단 자체는 서버가 하므로 기능 문제는 없으나, "썼는데 안 줄어드네" 오해 소지. 채팅 응답 후 갱신 이벤트를 붙이면 해소. LOW.
 - **I34. 모델 라우팅 미적용(원가·기회)**: `MODELS.cheap`(Haiku, Sonnet의 정확히 1/3 단가)을 기억 추출에만 사용 중. 요약·분류·간단질의를 Haiku로 보내면 전체 원가 ~27% 절감 추정(대화 40% 전환 가정). 품질 민감 영역 구분이 필요해 대표 확인 후 적용. **캐싱 다음으로 가장 큰 남은 레버.**

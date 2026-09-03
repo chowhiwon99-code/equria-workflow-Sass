@@ -17,15 +17,15 @@ if [ "$tsc_rc" -ne 0 ]; then
 $(printf '%s' "$tsc_out" | tail -15)"
 fi
 
-# 2) lint — 베이스라인 30 errors / 0 warnings. 회귀(에러>30 또는 경고>0)면 차단.
+# 2) lint — 베이스라인 29 errors / 0 warnings. 회귀(에러>29 또는 경고>0)면 차단.
 #    파싱 실패 시엔 차단하지 않음(안전 우선 — 영구 차단 방지).
 lint_out=$(pnpm lint 2>&1)
 counts=$(printf '%s' "$lint_out" | grep -oE '[0-9]+ errors?, [0-9]+ warnings?' | tail -1)
 if [ -n "$counts" ]; then
   errs=$(printf '%s' "$counts" | grep -oE '^[0-9]+')
   warns=$(printf '%s' "$counts" | grep -oE '[0-9]+ warnings?' | grep -oE '^[0-9]+')
-  if [ "${errs:-0}" -gt 30 ] || [ "${warns:-0}" -gt 0 ]; then
-    deny "🚫 배포 차단 — lint 회귀(에러 ${errs}/경고 ${warns}, 베이스라인 30/0). 신규 lint를 고치고 다시 push."
+  if [ "${errs:-0}" -gt 29 ] || [ "${warns:-0}" -gt 0 ]; then
+    deny "🚫 배포 차단 — lint 회귀(에러 ${errs}/경고 ${warns}, 베이스라인 29/0). 신규 lint를 고치고 다시 push."
   fi
 fi
 
