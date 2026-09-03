@@ -142,10 +142,10 @@ export default function LandingPage() {
 
       {/* ── 히어로 — 타이포 중심 + 잔디식 플로팅 AI 말풍선 ── */}
       <section className="relative mx-auto max-w-5xl px-6 pt-28 text-center sm:pt-36">
-        {/* 은은한 배경 글로우 — 목업 뒤에서 있어보이게 */}
+        {/* 은은한 배경 글로우 — 목업 뒤에서 있어보이게. w-[min(...)]로 좁은 화면에서 가로 스크롤 방지, -z-10으로 실제로 콘텐츠 뒤에 그려지게 */}
         <div
           aria-hidden
-          className="pointer-events-none absolute left-1/2 top-[120px] h-[560px] w-[900px] -translate-x-1/2"
+          className="pointer-events-none absolute left-1/2 top-[120px] -z-10 h-[560px] w-[min(900px,92vw)] -translate-x-1/2"
           style={{ background: "radial-gradient(ellipse at center, rgba(17,17,17,0.055) 0%, rgba(17,17,17,0) 68%)" }}
         />
         {/* 떠다니는 AI 프롬프트 칩(장식) — 데스크톱만, 각기 다른 딜레이로 둥둥 */}
@@ -323,8 +323,8 @@ export default function LandingPage() {
           </div>
         </Reveal>
 
-        {/* 실제 화면 2 — 워크플로우(에이전트 3개를 실제로 연결한 캔버스) */}
-        <Reveal className="mt-20 grid items-stretch gap-10 sm:grid-cols-2">
+        {/* 실제 화면 2 — 워크플로우(에이전트 3개를 실제로 연결한 캔버스). 스크린샷이 옆 텍스트보다 짧아 items-center로 세로 중앙정렬(stretch면 카드 하단에 빈 공간 생김) */}
+        <Reveal className="mt-20 grid items-center gap-10 sm:grid-cols-2">
           <div className="order-last overflow-hidden rounded-2xl border border-black/[0.06] bg-white shadow-[0_1px_2px_rgba(17,17,17,0.03),0_20px_44px_rgba(17,17,17,0.055)] sm:order-first">
             <div className="flex items-center gap-2 border-b border-black/[0.06] bg-white px-4 py-3">
               <span className="grid size-6 place-items-center rounded-md bg-emerald-500/10"><Network className="size-3.5 text-emerald-600" strokeWidth={1.75} /></span>
@@ -457,7 +457,7 @@ export default function LandingPage() {
             <h3 className="mt-2 text-[22px] font-extrabold tracking-tight">쓰던 도구는 버리지 않아도 됩니다.</h3>
             <ul className="mt-4 space-y-2.5 text-[14px] leading-relaxed text-black/55">
               <li>구글·노션 등 기존 도구를 계정 연결 한 번으로</li>
-              <li>AI가 일정을 읽고, 메일 초안을 쓰고, 문서를 찾습니다</li>
+              <li>AI가 필요한 도구를 스스로 찾아 호출해, 답변에 바로 반영합니다</li>
               <li>회사가 허용한 도구만 연결되도록 관리자가 통제</li>
             </ul>
           </div>
