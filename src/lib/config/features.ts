@@ -197,7 +197,8 @@ export const FEATURES: Feature[] = [
   {
     // 메일은 **작성·발송 전용**(2026-08-12 대표 결정 A안 — `GOOGLE_SCOPES`=gmail.send만).
     // 받은편지함 읽기는 gmail.readonly/modify가 구글 '제한' 스코프라 CASA 연간 보안감사를 부르므로 중단.
-    // ⚠️ hiddenFromNav를 유지하면 사용자가 발송 화면에 도달할 경로가 없다(현재 상태). 노출 여부는 대표 결정 대기.
+    // ✅ 2026-09-03 대표 결정: 사이드바 노출 안 함(계속 hiddenFromNav) — Gmail은 에이전트(MCP)로만
+    // 쓰는 게 의도된 경로. `/mail` 라우트 자체는 살아있어(직접 URL 접근 가능) 코드는 유지.
     href: "/mail",
     label: "메일",
     description: "Gmail 연동 — 메일 작성·발송 (개인 계정 연결)",
