@@ -186,7 +186,7 @@ export function TaskTimeline({
     if (!me || !wsId) return
     setUploading(true)
     try {
-      const up = await uploadFile(FILES_BUCKET, file)
+      const up = await uploadFile(FILES_BUCKET, file, wsId ?? undefined)
       await mustOk(
         supabase.from("files").insert({
           workspace_id: wsId as string,

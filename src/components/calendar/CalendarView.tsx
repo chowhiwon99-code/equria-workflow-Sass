@@ -626,7 +626,7 @@ function CreateEventModal({
     try {
       const uploaded = await Promise.all(
         Array.from(files).map(async (f) => {
-          const up = await uploadFile(CALENDAR_BUCKET, f)
+          const up = await uploadFile(CALENDAR_BUCKET, f, wsId ?? undefined)
           return { path: up.path, name: up.name, mime_type: up.mimeType, size: up.size }
         })
       )

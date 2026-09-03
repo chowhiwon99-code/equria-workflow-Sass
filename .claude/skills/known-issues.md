@@ -76,3 +76,8 @@ description: EQURIA Workspace의 알려진 이슈·기술부채 백로그. 다�
 ## 🆕 세션41 /code-review 보류분 (2026-07-31, by-design/cleanup)
 - **I25. 계산 슬롯 값→0 시 이번 달 장부 기록 soft-delete(Undo 없음)**: "계산값=결과값" 모델상 계산값 0=이번 달 금액 0이라 자동 휴지통 처리(recordEntry와 달리 undo push 없음). 수동 tax/memo 기록이 있으면 손실 — 휴지통에서만 복구. 모델 근본이라 by-design 수용(LOW·엣지).
 - **I26. 날짜 헬퍼 중복(cleanup)**: ProjectTimeline/TaskTimeline/WorkOverview/AttendanceAdmin이 d0/fmt/shiftDate/addDays/todayStr를 각자 재구현 — `@/lib/calendar`(toDateInputValue·isSameDay 등)로 통합 후보. 동작 정상, 유지보수 부채(LOW).
+
+## 🆕 세션55 워크스페이스 스토리지 상한 (2026-09-03, by-design/미커버 · 비차단)
+- **I35. 워크스페이스 총량 상한(마이그145~146) 클라이언트 전용 강제**: `storage.objects` 경로가 `{user_id}/...`라 workspace_id가 없어, 버킷 파일당 상한(마이그144)처럼 DB 레벨로 완전히 막을 수 없다. `workspace_storage_status()` RPC를 `lib/upload.ts`가 업로드 전에 호출해 막는 방식이라 **API 직접호출로 우회 가능**(권한상승은 아님 — 본인 워크스페이스 상한만 자기 손해로 우회). 내부툴·인증 직원 한정이라 LOW.
+- **I36. 여러 워크스페이스 소속 유저의 사용량 중복 집계**: `workspace_storage_status()`가 "이 업로드가 어느 회사 것인지"를 경로만으로 구분 못해, 유저가 올린 모든 파일이 그 유저가 속한 **모든** 워크스페이스 사용량에 동시 집계된다. 대부분 유저가 워크스페이스 1곳뿐이라 현재 영향 낮음(LOW·엣지). 정확히 하려면 경로에 workspace_id 포함(RLS 재작성 필요·큰 변경) 또는 업로드 시 워크스페이스별 파일 테이블에 명시 기록.
+- **I37. CardsView(명함)·agentKnowledge(지식파일)는 총량 상한 미적용**: 이 두 호출부는 업로드 시점에 워크스페이스 id가 스코프에 없음(명함=서버 OCR 라우트 경유, 지식파일=에이전트 소유로 간접 격리). 실사용량 낮음(명함 6.7MB·infra-limits.md 2026-08-10 측정 기준)이라 이번 패스에서 제외. 버킷 파일당 50MB 상한(마이그144)은 이 둘도 적용됨 — 완전 무방비는 아님.

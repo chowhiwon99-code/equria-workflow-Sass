@@ -20,11 +20,33 @@ function assertUnderBucketLimit(bucket: string, file: File) {
 }
 
 /**
+ * 워크스페이스 총 스토리지 사용량이 이 파일을 더해도 상한(마이그146, 요금제별 — premium은 무제한) 안인지 확인.
+ * ⚠️ 클라이언트 사전 체크일 뿐(진짜 방어선 아님) — storage.objects 경로엔 workspace_id가 없어
+ * 버킷 파일당 상한(마이그144)처럼 DB 레벨로 완전히 막을 수 없다. API 직접호출로 우회 가능(수용된 LOW 리스크,
+ * known-issues.md 참고). 조회 실패 시엔 차단하지 않는다(가용성 우선 — 안전 우선의 반대급부는 영구 차단 방지).
+ */
+async function assertWorkspaceStorageRoom(workspaceId: string, addBytes: number) {
+  const supabase = createClient()
+  const { data, error } = await supabase.rpc("workspace_storage_status", { ws_id: workspaceId }).single()
+  if (error || !data) return
+  const limitBytes = data.limit_bytes == null ? null : Number(data.limit_bytes)
+  if (limitBytes == null) return // premium = 무제한
+  const usedBytes = Number(data.used_bytes)
+  if (usedBytes + addBytes > limitBytes) {
+    throw new Error(
+      `워크스페이스 저장공간이 가득 찼어요(${Math.round(limitBytes / 1024 / 1024)}MB 중 ${Math.round(usedBytes / 1024 / 1024)}MB 사용 중). 기존 파일을 정리하거나 요금제를 확인해주세요.`
+    )
+  }
+}
+
+/**
  * 이미지를 지정 버킷의 본인 폴더({uid}/{uuid}.{ext})로 업로드하고 경로를 반환.
  * Storage RLS가 본인 폴더만 허용하므로 uid 프리픽스 필수.
+ * workspaceId를 주면 워크스페이스 총량 상한도 사전 체크(비우면 스킵 — 기존 호출부 하위호환).
  */
-export async function uploadImage(bucket: string, file: File): Promise<string> {
+export async function uploadImage(bucket: string, file: File, workspaceId?: string): Promise<string> {
   assertUnderBucketLimit(bucket, file)
+  if (workspaceId) await assertWorkspaceStorageRoom(workspaceId, file.size)
   const supabase = createClient()
   const {
     data: { user },
@@ -44,12 +66,15 @@ export async function uploadImage(bucket: string, file: File): Promise<string> {
 /**
  * 임의 파일을 지정 버킷의 본인 폴더({uid}/{uuid}.{ext})로 업로드.
  * 이미지 전용 uploadImage와 달리 확장자/콘텐츠 타입을 보존한다.
+ * workspaceId를 주면 워크스페이스 총량 상한도 사전 체크(비우면 스킵 — 기존 호출부 하위호환).
  */
 export async function uploadFile(
   bucket: string,
-  file: File
+  file: File,
+  workspaceId?: string
 ): Promise<{ path: string; name: string; size: number; mimeType: string }> {
   assertUnderBucketLimit(bucket, file)
+  if (workspaceId) await assertWorkspaceStorageRoom(workspaceId, file.size)
   const supabase = createClient()
   const {
     data: { user },

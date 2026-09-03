@@ -255,7 +255,7 @@ export function GroupChat({ roomId: roomIdProp }: { roomId?: string }) {
       if (files.length) setUploading(true)
       try {
         const uploaded = await Promise.all(
-          files.map(async (f) => ({ path: await uploadImage("chat-files", f), name: f.name, type: f.type, size: f.size }))
+          files.map(async (f) => ({ path: await uploadImage("chat-files", f, wsId ?? undefined), name: f.name, type: f.type, size: f.size }))
         )
         const { data: msg, error: insErr } = await supabase
           .from("group_messages")

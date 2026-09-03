@@ -192,7 +192,7 @@ export function FilesView() {
       // 순차 업로드(스토리지) → 메타데이터는 한 번에 insert. 공개범위·내 부서·현재 폴더 기록.
       const newRows = []
       for (const file of ok) {
-        const up = await uploadFile(FILES_BUCKET, file)
+        const up = await uploadFile(FILES_BUCKET, file, wsId ?? undefined)
         newRows.push({
           workspace_id: wsId as string,
           source: "local",

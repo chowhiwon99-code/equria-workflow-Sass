@@ -3790,7 +3790,10 @@ export type Database = {
         Args: { p_order_id: string; p_raw?: Json; p_reason?: string }
         Returns: string
       }
-      billing_fail_stale_checkouts: { Args: { p_minutes?: number }; Returns: number }
+      billing_fail_stale_checkouts: {
+        Args: { p_minutes?: number }
+        Returns: number
+      }
       billing_lapse_due: { Args: { p_grace_days?: number }; Returns: Json }
       billing_notice_upcoming: { Args: { p_days?: number }; Returns: number }
       billing_record_consent: {
@@ -3897,6 +3900,7 @@ export type Database = {
       mark_room_read: { Args: { p_room: string }; Returns: undefined }
       owner_can_set_role: { Args: { target: string }; Returns: boolean }
       plan_monthly_credits: { Args: { p_plan: string }; Returns: number }
+      plan_rank: { Args: { p_plan: string }; Returns: number }
       plan_seat_limit: { Args: { p_plan: string }; Returns: number }
       recall_document: { Args: { doc_id: string }; Returns: undefined }
       remind_due_personal_tasks: { Args: never; Returns: number }
@@ -3946,6 +3950,13 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: number
       }
+      workspace_storage_status: {
+        Args: { ws_id: string }
+        Returns: {
+          limit_bytes: number
+          used_bytes: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
@@ -3964,12 +3975,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3993,11 +4004,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4018,11 +4029,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4043,11 +4054,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4060,11 +4071,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

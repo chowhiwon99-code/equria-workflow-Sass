@@ -148,7 +148,7 @@ export function FinanceView() {
     setUploading(true)
     setError(null)
     try {
-      const path = await uploadImage("receipts", file)
+      const path = await uploadImage("receipts", file, wsId ?? undefined)
       const res = await fetch("/api/finance/ocr", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
