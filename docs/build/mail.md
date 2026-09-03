@@ -16,11 +16,11 @@
 - **효과**: 신입도 회사 표준 메일을 즉시 작성 → 전사 메일 톤 일관 → **raw Gmail 대신 Complow 쓸 이유.**
 - → `agents.md`와 연결(메일 에이전트 = 회사 커스터마이징 에이전트의 대표 사례).
 
-## 현재 상태
-- ✅ Gmail 라우트 존재: 스레드 목록/상세·라벨·**전송(send)**·수정·첨부 (`/api/google/gmail/*`)
-- ✅ `buildRawMessage()`(RFC2822, `src/lib/google/gmail.ts`) — **CC/BCC/HTML/첨부 지원 여부 확인·확장 필요**
-- ✅ **Tiptap 리치 에디터**·서식 이미 사용 중(채팅 `RichComposer`, 회의노트 `MeetingEditor`) → 재사용
-- ⚠️ MailShell 3-pane(목록·상세·**작성창**) UI 미완 — 특히 리치 작성창 없음
+## 현재 상태 (2026-09-03 코드 재확인)
+- ✅ Gmail 라우트: 스레드 목록/상세·라벨·**전송(send)**·수정·첨부 (`/api/google/gmail/*`)
+- ✅ `buildRawMessage()`(`src/lib/google/gmail.ts`) — **CC/BCC/HTML/multipart 첨부 지원 확인됨**(`walkParts`가 html·attachments 파싱)
+- ✅ **`MailCompose.tsx`(311줄)로 1차 핵심 작성창 완료** — Tiptap 에디터, 받는사람·**참조·숨은참조 토글**, 서식 툴바(굵게·기울임·밑줄·글머리/번호 목록·링크), 첨부(3MB 합계 가드), AI 다듬기(`MailAiAssist.tsx`)까지 전부 코드로 존재·배선 확인.
+- ⚠️ 서식 툴바에 **글자색·정렬**은 없음(아래 목록의 굵게/기울임/밑줄/리스트/링크만 구현) — 1차 스펙에 있었으나 빠진 유일한 항목.
 
 ## 작업 (순서)
 ### 1차 — 핵심 작성창
@@ -37,9 +37,10 @@
 `RichComposer`/Tiptap 확장(chat·meetings) · `buildRawMessage`·gmail 라우트(gmail.ts) · `uploadFile`(upload.ts) · Drive 첨부는 `google/drive.ts` 재사용.
 
 ## 🔴 블로커 / 주의
-- **전송 라우트 검증**: 현재 send가 CC/BCC/첨부/HTML을 지원하는지 먼저 확인 → 부족하면 `buildRawMessage`부터 확장.
-- Vercel 60s·용량: 큰 첨부는 스트림/제한. Gmail API 전송은 base64url MIME.
+- ~~전송 라우트 검증~~ → ✅ 확인됨(CC/BCC/HTML/multipart 첨부 전부 지원).
+- Vercel 60s·용량: 큰 첨부는 스트림/제한. Gmail API 전송은 base64url MIME. (클라 가드=합계 3MB, `known-issues.md` I16 참고)
 - B1-b 무관(개인 Gmail 연동).
+- **남은 것**: 서식 툴바 글자색·정렬 추가(1차 잔여, 작음) · 2차(예약 발송·서명·Drive 첨부·이모지·인라인 이미지·임시보관)는 착수 전.
 
 ## 검증 (E2E)
-tsc0·lint30/0·build0 → 연결된 계정으로 새 메일: 받는사람·참조·숨은참조·서식(굵게/색/리스트)·첨부 → 전송 → 실제 수신 확인 → 답장 스레드 유지 확인.
+tsc0·lint29/0·build0 → 연결된 계정으로 새 메일: 받는사람·참조·숨은참조·서식(굵게/색/리스트)·첨부 → 전송 → 실제 수신 확인 → 답장 스레드 유지 확인.

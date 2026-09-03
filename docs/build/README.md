@@ -16,11 +16,11 @@
 | 3 | [`workflows.md`](./workflows.md) | ✅ **대부분 완료(세션28 `75d5944`)** — MCP 노드 UI·에이전트 노드 MCP 사용. 남음: 자동 트리거(스케줄·웹훅)=C | ❌ 무관 |
 | 4 | [`agents.md`](./agents.md) | 빌더 고도화(커스텀 아이콘·프리뷰 — MCP-attach는 완료) | ❌ 무관 |
 | 5 | [`mail.md`](./mail.md) | ✅ **완료(세션27)** — 리치 작성창·AI 다듬기·배치 최적화 | ❌ 무관 |
-| 6 | [`mobile-responsive.md`](./mobile-responsive.md) | 🔴 **다음 세션 최우선** — 모바일 전 화면 안 깨지게(1차 사이드바 드로어 골격) | ❌ 무관 |
+| 6 | [`mobile-responsive.md`](./mobile-responsive.md) | 🟡 **1차·3차 완료(세션29, `237ab82`+`921d7b7`)** — 사이드바 드로어 골격 + 메일/채팅 등 복잡화면 스택 확인됨(코드 재검증 2026-09-03). 남은 건 **2차 단순화면 375px 실뷰포트 확인**(코드상 grid-cols-1·flex-wrap은 이미 있어 위험 낮음) · 4차 터치 UX(후순위) | ❌ 무관 |
 
-**추천 순서(현재): 6 모바일 골격 → C 자동 트리거(workflows 잔여) → MCP Phase B(GitHub 실연동) → 4 Agents 잔여.**
+**추천 순서(현재): 6의 2차(단순화면 375px 실확인) → C 자동 트리거(workflows 잔여) → MCP Phase B(GitHub 실연동) → 4 Agents 잔여.**
 
 ## 공통 전제 (모든 스펙)
 - **멀티테넌트 강화**(등록 시 workspace_id·회사별 시크릿·채팅 워크스페이스 검증)의 **완전판은 B1-b(쓰기 격리) 선행.** 지금은 **단일 워크스페이스(equria) 기준**으로 만들고, B1-b 시 격리 강화. 각 스펙의 "🔴 블로커" 참고.
-- **검증 게이트(공통)**: `npx tsc --noEmit` 0 · `pnpm lint` 30/0(신규 0) · `pnpm build` 0 · dev(localhost:3000) E2E.
+- **검증 게이트(공통)**: `npx tsc --noEmit` 0 · `pnpm lint` 29/0(신규 0) · `pnpm build` 0 · dev(localhost:3000) E2E.
 - **안전 원칙**: `.claude/skills/safe-changes.md` — 추가는 자유, 파괴는 검증 후, 되돌릴 수 있고 재현 가능하게. DB 변경은 `supabase/migrations/`에 새 파일(기존 수정 금지).
