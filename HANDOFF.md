@@ -28,7 +28,7 @@
 | 프로덕션 | **`536609a`** · `complow.kr` (Vercel `icn1` · **플랜 = Hobby**) · 배포 2026-08-31 READY 확인(`dpl_J2b7iG8…`) · **롤백 후보 `e58fe2d`** |
 | 작업 브랜치 | **`main` 직접**(루트 체크아웃이 main). `worktree-gmail-scope-narrow`도 있으나 51f4100에 정지. ⚠️ `feat/toss-ui-refresh`(`4b7fe08`)는 **죽은 브랜치** — 쓰지 말 것 |
 | 스모크(배포 직후) | `/` 200 · 웹훅 GET 200 · `/api/billing/reconcile` **401**(크론 시크릿 가드) · `/billing` 307(로그인) · Playwright로 **프로덕션에서 직접 로그인해 대시보드·결제화면 렌더 확인**(아래 §참고) |
-| 마이그레이션 | **001~143** 적용 · drift 없음 (135~137은 결번) |
+| 마이그레이션 | **001~144** 적용 · drift 없음 (135~137은 결번) |
 | 게이트 | `tsc` 0 · `pnpm lint` **29 errors/0 warnings**(전부 기존 부채, **신규 0이 베이스라인**) · `next build` 성공 |
 | 유료 고객 | **외부 고객 0명.** 워크스페이스 3개 = premium 2(EQURIA·이큐리아2, 자사 내부 무제한) + **standard 1**(테스트 — 2026-08-27 대표 요청으로 **해지 처리 완료**, `auto_renew=false`·9/21 자동청구 취소됨. 9/20까지는 정상 이용 후 free로 자동 전환). 가격·스키마 변경 리스크가 아직 낮은 시점 |
 | 결제 | **빌키(정기결제) 전 구간 완료**. 실결제 1건 성공(08-20) · **매달 자동청구**(`d21716a`) · **환불 계산 + 취소 통보 반영**(`8b4a188`·마이그142). 코드로 할 건 다 했다 — 남은 건 **카드사 심사**와 실물 확인뿐 |
@@ -56,9 +56,9 @@ HANDOFF를 읽고** 이미 끝난 과제를 "다음 할 일"로 잘못 집계했
 ⚠️ **브라우저 실사용 확인은 못 함**(Claude-in-Chrome 확장 미연결) — 아래 §마케팅 개시 조건 D참고 계정으로 직접 볼 것.
 `lib/plans.ts`에 새 기능/플랜을 추가할 때는 `features.ts`의 `minPlan`과 마이그143 트리거 인자를 **같이** 고칠 것.
 
-**같이 하면 좋은 것 — 파일 용량 상한 (미착수)**
-5개 버킷 중 `meeting-media`(50MB)만 상한이 있고 나머지는 무제한, 워크스페이스별 총량 상한도 없다.
-Supabase Free는 1GB고 **넘으면 과금이 아니라 중단**이라 **한 사람이 큰 파일을 올려 전 서비스를 멈출 수 있다.**
+**✅ 파일당 크기 상한 완료(2026-09-03, 마이그144)** — 6개 버킷 전부 50MB(`storage.buckets.file_size_limit`,
+서버측 강제) + `lib/upload.ts` 클라 사전체크. **남은 것: 워크스페이스별 총량 상한**(무제한) — 작은 파일
+여러 개로 누적 소진하는 경로는 아직 안 막힘. Supabase Free는 1GB고 **넘으면 과금이 아니라 중단**이다.
 상세 = `docs/ops/infra-limits.md` §아직 안 한 것.
 
 ### 🚦 마케팅 개시 조건 (2026-08-23 판정 = 아직 아니다)
@@ -66,7 +66,7 @@ Supabase Free는 1GB고 **넘으면 과금이 아니라 중단**이라 **한 사
 | # | 조건 | 상태 |
 |---|---|---|
 | A | **기능별 게이팅** | ✅ 완료(2026-08-24, 배포됨) |
-| B | **파일 용량 상한** | ⬜ 미착수(서비스 중단 리스크) |
+| B | **파일 용량 상한** | 🟡 파일당 50MB 완료(마이그144, 2026-09-03) · 워크스페이스 총량 상한은 아직(서비스 중단 리스크 잔존) |
 | C | **제3자 신규가입 E2E 1회** | ⬜ 대표 보류 항목. 광고로 온 첫 사람이 가입 실패하면 그날 유입을 통째로 잃는다 |
 | D | **카드사 심사 통과** | ⬜ 대기(시한 **9/17**). 기록상 지금은 **정산(입금)이 안 열려 돈이 안 들어온다** — 담당자에게 한 번 직접 확인할 것 |
 | E | Vercel Pro + Supabase Pro | ⬜ **첫 유료 고객 직전**에만(그전에 사면 돈만 나감). Hobby는 *"non-commercial only"* = 돈 받는 순간 약관 위반 |
@@ -461,7 +461,7 @@ Sonnet 4.6 **1,024** · Opus 4.7 **2,048** · Haiku 4.5 **4,096**토큰. 그보�
 
 - **GitHub**: `chowhiwon99-code/equria-workflow-Sass` (main=프로덕션)
 - **Vercel**: team `team_wcW0NMU7oiIxNndyV1afigbp` · project `prj_CcCTUr8eIYpaStaj6RNq7VoLPZG6` · 배포보호 **off**
-- **Supabase**: project `dutovtfdckhayyvhtuxu` (ap-northeast-2 서울) · 마이그 **001~143**
+- **Supabase**: project `dutovtfdckhayyvhtuxu` (ap-northeast-2 서울) · 마이그 **001~144**
 - **사업자**: 개인사업자 · 등록번호 592-58-00892 · 통신판매업 제2026-인천계양-0642호
 - **.env.local**: ANTHROPIC · Supabase 3종 · Google 4종 · `WORKSPACE_PASSWORD` · **나이스페이 2종 = `NICEPAY_CLIENT_KEY`·`NICEPAY_SECRET_KEY`(2026-08-22 입력 완료)** · `CRON_SECRET`(Vercel 전용)
   ⚠️ **시크릿 값을 문서·채팅에 적지 말 것** (HANDOFF는 git 추적됨)

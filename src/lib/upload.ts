@@ -1,10 +1,30 @@
 import { createClient } from "@/lib/supabase/client"
 
+// 버킷별 파일당 크기 상한(바이트) — Supabase Free 스토리지 1GB를 파일 하나가 독식하지 못하게 막는 방어선.
+// 진짜 강제는 storage.buckets.file_size_limit(마이그144, 서버측·API 직접호출도 우회 불가)이 한다.
+// 여기 값은 그와 반드시 같게 유지 — 네트워크 왕복 전에 즉시 에러를 보여주는 UX용 사전 체크일 뿐.
+const BUCKET_MAX_BYTES: Record<string, number> = {
+  files: 50 * 1024 * 1024,
+  "chat-files": 50 * 1024 * 1024,
+  receipts: 50 * 1024 * 1024,
+  "business-cards": 50 * 1024 * 1024,
+  "calendar-files": 50 * 1024 * 1024,
+  "meeting-media": 50 * 1024 * 1024, // 마이그049에서 이미 서버측 적용됨
+}
+
+function assertUnderBucketLimit(bucket: string, file: File) {
+  const max = BUCKET_MAX_BYTES[bucket]
+  if (max && file.size > max) {
+    throw new Error(`파일이 너무 커요(최대 ${Math.round(max / 1024 / 1024)}MB까지 업로드할 수 있어요).`)
+  }
+}
+
 /**
  * 이미지를 지정 버킷의 본인 폴더({uid}/{uuid}.{ext})로 업로드하고 경로를 반환.
  * Storage RLS가 본인 폴더만 허용하므로 uid 프리픽스 필수.
  */
 export async function uploadImage(bucket: string, file: File): Promise<string> {
+  assertUnderBucketLimit(bucket, file)
   const supabase = createClient()
   const {
     data: { user },
@@ -29,6 +49,7 @@ export async function uploadFile(
   bucket: string,
   file: File
 ): Promise<{ path: string; name: string; size: number; mimeType: string }> {
+  assertUnderBucketLimit(bucket, file)
   const supabase = createClient()
   const {
     data: { user },
