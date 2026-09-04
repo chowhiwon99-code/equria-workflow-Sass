@@ -9,7 +9,6 @@ export type Agent = Tables<"agents">
 export type AgentVersion = Tables<"agent_versions">
 export type Conversation = Tables<"conversations">
 export type Message = Tables<"messages">
-export type Workflow = Tables<"workflows">
 export type CalendarEvent = Tables<"calendar_events">
 export type McpServer = Tables<"mcp_servers">
 

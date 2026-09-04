@@ -411,20 +411,14 @@ function CreateProjectModal({
   const [dueDate, setDueDate] = useState("")
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // AI 연동(세션41 대표 결정 — 연동은 생성 시) — 선택한 에이전트/워크플로우를 metadata에 저장
+  // AI 연동(세션41 대표 결정 — 연동은 생성 시) — 선택한 에이전트를 metadata에 저장
   const [agents, setAgents] = useState<{ id: string; name: string; icon: string | null }[]>([])
-  const [workflows, setWorkflows] = useState<{ id: string; name: string }[]>([])
   const [linkedAgents, setLinkedAgents] = useState<string[]>([])
-  const [linkedWfs, setLinkedWfs] = useState<string[]>([])
 
   useEffect(() => {
     const loadTools = async () => {
-      const [{ data: ag }, { data: wf }] = await Promise.all([
-        supabase.from("agents").select("id, name, icon").eq("is_active", true).order("name"),
-        supabase.from("workflows").select("id, name").order("name"),
-      ])
+      const { data: ag } = await supabase.from("agents").select("id, name, icon").eq("is_active", true).order("name")
       setAgents(ag ?? [])
-      setWorkflows(wf ?? [])
     }
     loadTools()
   }, [supabase])
@@ -459,9 +453,7 @@ function CreateProjectModal({
         due_date: dueDate || null,
         created_by: me,
         // AI 연동 — 상세 '연동된 AI'가 이 metadata를 읽는다(빈 선택은 저장 안 함)
-        ...(linkedAgents.length || linkedWfs.length
-          ? { metadata: { ...(linkedAgents.length ? { linked_agents: linkedAgents } : {}), ...(linkedWfs.length ? { linked_workflows: linkedWfs } : {}) } }
-          : {}),
+        ...(linkedAgents.length ? { metadata: { linked_agents: linkedAgents } } : {}),
       })
       .select()
       .single()
@@ -584,10 +576,10 @@ function CreateProjectModal({
             <DateInput className="w-full" value={dueDate} onChange={setDueDate} min={startDate || undefined} />
           </label>
         </div>
-        {/* AI 연동 — 이 프로젝트에서 쓸 에이전트·워크플로우(선택). 상세 '연동된 AI'에 표시 */}
-        {(agents.length > 0 || workflows.length > 0) && (
+        {/* AI 연동 — 이 프로젝트에서 쓸 에이전트(선택). 상세 '연동된 AI'에 표시 */}
+        {agents.length > 0 && (
           <div className="text-xs text-muted-foreground">
-            AI 연동 {linkedAgents.length + linkedWfs.length > 0 && <span className="text-foreground">· {linkedAgents.length + linkedWfs.length}개</span>}
+            AI 연동 {linkedAgents.length > 0 && <span className="text-foreground">· {linkedAgents.length}개</span>}
             <div className="mt-1 flex max-h-28 flex-wrap gap-1.5 overflow-y-auto rounded-lg border bg-card p-2">
               {agents.map((a) => {
                 const on = linkedAgents.includes(a.id)
@@ -603,23 +595,6 @@ function CreateProjectModal({
                   >
                     {on && <Check className="size-3" />}
                     {a.icon ?? "🤖"} {a.name}
-                  </button>
-                )
-              })}
-              {workflows.map((w) => {
-                const on = linkedWfs.includes(w.id)
-                return (
-                  <button
-                    key={w.id}
-                    type="button"
-                    onClick={() => toggleIn(setLinkedWfs)(w.id)}
-                    className={cn(
-                      "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors",
-                      on ? "border-primary bg-primary/10 text-foreground" : "text-muted-foreground hover:bg-muted"
-                    )}
-                  >
-                    {on && <Check className="size-3" />}
-                    ⚙️ {w.name}
                   </button>
                 )
               })}

@@ -76,14 +76,13 @@ export async function POST() {
   const sources: Src[] = []
   const used: string[] = []
 
-  const [projRes, taskRes, myTaskRes, evRes, notiRes, runRes] = await Promise.all([
+  const [projRes, taskRes, myTaskRes, evRes, notiRes] = await Promise.all([
     supabase.from("projects").select("id, name, status, start_date, due_date, importance").is("deleted_at", null).in("status", ["planned", "in_progress", "on_hold"]).limit(30),
     supabase.from("project_tasks").select("title, due_date, done, project_id").eq("done", false).not("due_date", "is", null).lte("due_date", weekLater).limit(60),
     supabase.from("personal_tasks").select("title, done, due_date").eq("user_id", user.id).eq("done", false).limit(50),
     // KST 오프셋 명시 — 종일 이벤트는 KST 자정(=전날 15:00Z) 저장이라 타임존 없는 비교면 오늘 일정이 빠진다(리뷰 H1)
     supabase.from("calendar_events").select("title, start_time").gte("start_time", `${todayS}T00:00:00+09:00`).lte("start_time", `${weekLater}T23:59:59+09:00`).limit(30),
     supabase.from("notifications").select("title, body, type, created_at").eq("user_id", user.id).eq("is_read", false).order("created_at", { ascending: false }).limit(20),
-    supabase.from("workflow_runs").select("status, created_at, workflows(name)").order("created_at", { ascending: false }).limit(5),
   ])
 
   const projects = projRes.data ?? []
@@ -117,19 +116,6 @@ export async function POST() {
       lines: notiRes.data.map((n) => `- [${n.type}] ${n.title}${n.body ? ` — ${String(n.body).slice(0, 80)}` : ""}`),
     })
   }
-  if (runRes.data?.length) {
-    used.push("워크플로우")
-    sources.push({
-      title: "최근 워크플로우 실행",
-      lines: runRes.data.map((r) => {
-        const wfName = (r as { workflows?: { name?: string } | null }).workflows?.name ?? "워크플로우"
-        // KST 날짜(리뷰 D4 — UTC slice면 자정 근처 하루 어긋남, 이 파일 다른 곳과 일관)
-        const d = r.created_at ? new Date(r.created_at).toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" }) : ""
-        return `- ${wfName}: ${r.status} (${d})`
-      }),
-    })
-  }
-
   // 🔴 Gmail 소스는 제거했다(2026-08-19).
   //    여기서 `messages.list`를 부르고 있었는데, 우리 OAuth 스코프는 `gmail.send`뿐이라
   //    (lib/google/oauth.ts GOOGLE_SCOPES) **누구에게도 성공할 수 없는 호출**이었다.

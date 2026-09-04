@@ -1,8 +1,7 @@
 // MCP 직접 연결 런타임 — mcp_servers 행 → 원격 MCP 서버(Streamable HTTP/SSE) 클라이언트. 서버 전용.
 // stdio는 서버리스(Vercel)에서 자식 프로세스 불가라 미지원(http/sse만). 호출측은 반드시 close().
 import { experimental_createMCPClient as createMCPClient } from "@ai-sdk/mcp"
-import { isSafeWebhookUrl } from "@/lib/workflowTools"
-import { assertPublicHost } from "@/lib/safeFetch"
+import { isSafeWebhookUrl, assertPublicHost } from "@/lib/safeFetch"
 import { decryptToken } from "@/lib/google/crypto"
 import { MCP_CONNECTORS } from "@/lib/mcp"
 import { McpOAuthRuntimeProvider } from "./oauth"

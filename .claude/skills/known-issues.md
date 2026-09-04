@@ -6,43 +6,25 @@ description: EQURIA Workspace의 알려진 이슈·기술부채 백로그. 다�
 # 알려진 이슈 / 기술부채 백로그
 
 > 지금 당장 안 깨지지만 **나중에 해결해야 하는** 것들. 위험도순. 해결하면 이 파일에서 제거.
-> 최종 정리: 2026-05-31 (세션 4) · 갱신: 2026-08-19 (I1b 29/0 재확정 + 해소분 정리)
-
-## 🔴 우선 (다음 세션 후보)
-
-### I2. 워크플로우 실행 60초 타임아웃
-- `/api/workflows/[id]/run`은 노드를 **순차** generateText 호출. Vercel Hobby `maxDuration=60s` 한계.
-- 방어: `MAX_RUN_NODES=6`(workflowTools.ts). 그래도 opus 노드 여럿·max_tokens 큰 경우 60초 초과 가능 → 중간 노드에서 끊김.
-- **할 일**: Vercel Pro(300초)면 한도 상향 / 또는 노드별 토큰·모델 가드 / 또는 백그라운드 잡 큐로 전환(고도화).
+> 최종 정리: 2026-05-31 (세션 4) · 갱신: 2026-09-04 (워크플로우 기능 삭제로 I1b 27/0 재확정, I2·I10 해소)
 
 ## 🟡 중간
 
-### I1b. eslint 부채 29건 — 배포는 안 막지만 코드품질 부채 (세션7 갱신)
+### I1b. eslint 부채 27건 — 배포는 안 막지만 코드품질 부채 (세션7 갱신)
 - `next build`(=Vercel 빌드)는 **exit 0 통과**. **Next 16 Turbopack 빌드는 eslint를 게이트하지 않음** → 아래 에러들은 배포를 막지 않음.
-- `pnpm lint`는 **29 errors + 0 warnings**(2026-08-19 `npx eslint src --format json`으로 실측·재확정):
-  `react-hooks/set-state-in-effect` ×26(전 컴포넌트 공통 `useEffect(()=>{load()},[load])` 패턴) ·
+- `pnpm lint`는 **27 errors + 0 warnings**(2026-09-04 `npx eslint src --format json`으로 실측·재확정):
+  `react-hooks/set-state-in-effect` ×24(전 컴포넌트 공통 `useEffect(()=>{load()},[load])` 패턴) ·
   `react-hooks/refs` ×2 · **`react-hooks/immutability` ×1(`McpView.tsx:217`)**.
-  **신규 작업은 이 29/0을 절대 넘기지 말 것**(신규 범주 발견 시 중단).
-  ⚠️ 종전 기록은 30(28+2)이었는데 실측과 달랐고, `immutability`는 **문서에 없던 신규 범주**가 이미 들어와 있었다
-  (= "신규 범주 발견 시 중단" 규칙이 작동하지 않은 채로 통과했다). HANDOFF는 29로 적혀 있어 두 문서가 서로 달랐던 것도 이번에 맞췄다.
-- **할 일(비차단)**: set-state-in-effect 26건은 데이터 로딩 패턴이라 진짜 수정은 위험(동작 변경). 일괄 처리 시 (a) 각 effect에 `eslint-disable-next-line` 또는 (b) `load()`를 effect 밖 패턴으로 리팩터(범위 큼). 급하지 않음 — 배포 안전 확인됨.
-
-### I3. 016 마이그레이션 = 죽은 정책(혼란)
-- `016_workflows_team_editable`(wf_update를 누구나로 완화)을 만든 직후 사용자 의도와 반대임을 알고 `017_workflows_ownership_share`로 정정(소유자만). 원격엔 017만 유효.
-- 신규 환경에서 016→017 순서 적용 시 결과 동일(017이 덮음). 단 016 파일은 의미 없음.
-- **할 일**: (선택) 016 내용을 주석/no-op로 비우거나 그대로 둠(히스토리 보존). 급하지 않음.
-
-### I4. 레거시 steps 변환이 저장 전까지 미반영
-- 옛 배열형 `workflows.steps`는 편집기에서 열 때 `normalizeGraph`로 그래프 변환되지만, **저장 전까진 DB는 옛 형태**. 실행도 변환본으로 정상 동작.
-- **할 일**: 없음(설계상 정상). 한 번 저장하면 `{nodes,edges}`로 영구 변환.
+  **신규 작업은 이 27/0을 절대 넘기지 말 것**(신규 범주 발견 시 중단).
+  ⚠️ 종전 29/0에서 2건 줄었는데, 새로 고쳐서가 아니라 **`WorkflowsView.tsx` 삭제(워크플로우 기능 전면 제거,
+  2026-09-04)로 그 파일의 set-state-in-effect 2건이 코드째 사라진 것** — 착시 주의.
+- **할 일(비차단)**: set-state-in-effect 24건은 데이터 로딩 패턴이라 진짜 수정은 위험(동작 변경). 일괄 처리 시 (a) 각 effect에 `eslint-disable-next-line` 또는 (b) `load()`를 effect 밖 패턴으로 리팩터(범위 큼). 급하지 않음 — 배포 안전 확인됨.
 
 ## 🟢 낮음 / 비차단
 
-- **I5. 웹훅 응답 본문 미검증**: run 라우트가 webhook POST 후 status code만 봄(외부 처리 성공 여부 모름 — 웹훅 특성상 정상).
 - **I7. 기존 부채(세션3부터)**: `agent_usage` onError 누락(성공 시만 기록) · Anthropic transient 500 재시도 없음 · `.or()` 특수문자 escape 부재 · NotificationBell UPDATE 미구독 · 그룹채팅/위젯 모바일/md 다크모드 미대응 · **채팅 이모지 팝오버가 스크롤 컨테이너(`overflow-y-auto`) 상단 근처서 클리핑**(pre-existing, 최신 메시지엔 무영향 · Portal/Floating UI로 해소 가능, 세션7 검증).
 - **I8. 핀 교체 비원자성**: delete→insert 사이 실패 시 빈 핀(에러표시+resync로 방어, 완전방지엔 upsert RPC).
-- **I10. 워크플로우 노드 순서 UI 다듬기(세션5, 나중에)**: 노드 좌상단 번호를 편집 가능한 입력으로 만들어 순서 변경+끈 자동연결(`OrderBadge` 컴포넌트, `WorkflowCanvas.tsx`). 동작은 하지만 ①20px 원형 입력이 작아 클릭/타깃 작음 ②노드 1개일 땐 변경 불가(자연스러움) ③Tab `tabIndex=order`가 페이지 전역 탭순서에 영향. 후속에서 "선택 노드 사이드 패널의 큰 순서 컨트롤" 또는 "위/아래 버튼"으로 교체 고려. **코드가 `OrderBadge`로 분리돼 있어 교체 쉬움.**
-- **I11. 코드 꼬임 감사 보류분(세션6, 전부 비차단·동작 정상)**: 전체 감사에서 나왔으나 위험/가치 대비 보류 — ① **CalendarView 자체 `ModalShell`**(620줄): 다른 5개 뷰는 공용 `components/shared/Modal` 사용, Calendar만 자체 구현(이벤트 상세 로직 얽혀 마이그레이션 신중). ② **서명URL 컴포넌트 중복**: FilesView(60s)·CardDetail(300s)·DirectChat(3600s)가 `createSignedUrl` 패턴 반복(TTL 상이, 에러처리 불일치) → `lib/storage.ts`에 `getSignedUrl(supabase,bucket,path,ttl)` 추출 후보(OCR는 세션6에 이미 `buildOcrFilePart`로 추출 완료). ③ **에러 표기 불일치**: Mail/Mcp=toast, Finance/Projects/Calendar=모달내 setError, WorkflowsView.create()=피드백 없음(silent) → 최소한 WorkflowsView에 toast.error 추가 권장. ④ **빈/로딩 상태 UI 분산**: 6개 뷰가 제각각 → 공용 `EmptyState` 후보. ⑤ **내부전용 export 5건**: `Connector`(mcp.ts)·`ToolCatalogItem`(workflowTools.ts)·`WizardFieldType`(agentBuilder.ts)·`TempPreset`(agents.ts)·`toCsv`(csv.ts) — 외부 import 0, 캡슐화 위해 export 제거 가능(가치 낮음). ⑥ **pagination 패턴 중복**(Cards/Projects/Finance) → `useTablePagination` 후보(필터 구조 달라 추상화 복잡, 낮은 우선도).
+- **I11. 코드 꼬임 감사 보류분(세션6, 전부 비차단·동작 정상)**: 전체 감사에서 나왔으나 위험/가치 대비 보류 — ① **CalendarView 자체 `ModalShell`**(620줄): 다른 5개 뷰는 공용 `components/shared/Modal` 사용, Calendar만 자체 구현(이벤트 상세 로직 얽혀 마이그레이션 신중). ② **서명URL 컴포넌트 중복**: FilesView(60s)·CardDetail(300s)·DirectChat(3600s)가 `createSignedUrl` 패턴 반복(TTL 상이, 에러처리 불일치) → `lib/storage.ts`에 `getSignedUrl(supabase,bucket,path,ttl)` 추출 후보(OCR는 세션6에 이미 `buildOcrFilePart`로 추출 완료). ③ **에러 표기 불일치**: Mail/Mcp=toast, Finance/Projects/Calendar=모달내 setError → 화면별로 다른 패턴이 계속 섞여 씀. ④ **빈/로딩 상태 UI 분산**: 6개 뷰가 제각각 → 공용 `EmptyState` 후보. ⑤ **내부전용 export 4건**: `Connector`(mcp.ts)·`WizardFieldType`(agentBuilder.ts)·`TempPreset`(agents.ts)·`toCsv`(csv.ts) — 외부 import 0, 캡슐화 위해 export 제거 가능(가치 낮음). ⑥ **pagination 패턴 중복**(Cards/Projects/Finance) → `useTablePagination` 후보(필터 구조 달라 추상화 복잡, 낮은 우선도).
 - **I15. 현금흐름 손익계산기(세션21 적대리뷰 보류분, 비차단)**: ① **회사 기본 계산 유형 시드**(`cash_calc_types` insert=`is_workspace_member`)가 RLS로 막히면 조용히 null 폴백(표는 '계산' 단일컬럼) — 현재 단일 테넌트(equria 멤버)는 통과, B1-b 멀티테넌트 시 에러 노출/재시도로 견고화 필요(`CashFlowView` load 시드 블록 error 미체크). ② **pool(가용현금) 통화**는 슬롯 최빈 통화 1개로 표시 — 다통화 워크스페이스의 2차 통화는 pool 시각화 미반영(표는 통화별 분리 유지, buildSlotGraph). (7칸 초과 계산필드 엑셀 잘림은 세션21 동적컬럼으로 픽스됨.)
 - **I14. 채팅 '작성 중' broadcast 미게이팅(세션9, 비차단·LOW)**: 타이핑 인디케이터는 `dm-<conversationId>` 채널의 Supabase **broadcast**로 전송하는데, broadcast/presence는 `private:true`+`realtime.messages` RLS가 있어야만 인가됨(현재 미적용). 따라서 인증된 워크스페이스 사용자가 **특정 대화 UUID를 알면** 그 채널을 구독해 ① 누가 입력 중인지(user_id) 수신 ② 가짜 '작성 중' 주입 가능. **단 위험 LOW**: 페이로드는 user_id뿐(메시지 내용 X), conversationId는 `gen_random_uuid()`+`dc_select` RLS로 **열거 불가**, 가짜 표시는 3.5s 자동소멸. **메시지 내용은 안전**(같은 채널의 postgres_changes 4종은 `038` 참여자 RLS로 서버 강제). 정식 차단=채널 `private:true`+`realtime.messages` 참여자 RLS+`setAuth`. 내부툴 수용 범위.
 - **I13. 캘린더 일정 첨부(세션7, 마이그 026 · 비차단·동작 정상)**: ① 첨부 메타는 `calendar_events.attachments`(jsonb)에 이벤트와 **원자적**으로 저장(별도 테이블 아님) — message_attachments식 2단계 비원자성 없음. ② 단, 첨부를 폼에서 제거하거나 이벤트를 삭제해도 `calendar-files` 버킷의 실파일은 **남는다(orphan)** — 프로젝트의 storage cleanup 미사용 정책(마이그 008 이후)과 일관, 내부툴 수용 범위. ③ `mime_type`은 클라 제공값(신뢰도 한계). ④ Undo로 이벤트 삭제 복원 시 jsonb attachments도 함께 복원되나, orphan 정리는 없음. ⑤ 버킷 읽기 정책=인증 사용자 전체(팀 캘린더 공유 의도) — 워크스페이스 외부 비공개라 OK.

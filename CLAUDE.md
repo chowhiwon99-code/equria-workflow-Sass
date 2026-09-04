@@ -24,7 +24,6 @@
 - AI 에이전트 허브 (Claude 기반, 8개 기본 + 커스텀 등록)
 - 팀 캘린더 (일정 공유)
 - 에이전트 빌더 (직원이 직접 에이전트 생성/등록)
-- 워크플로우 자동화 (에이전트 체이닝)
 - MCP 연결 (Google Workspace, Supabase, Higgsfield 등)
 
 ---
@@ -106,13 +105,12 @@ equria-workspace/
     │   ├── page.tsx                    ← / → 리다이렉트
     │   ├── (auth)/                     ← login · signup · 워크스페이스 게이트
     │   ├── (app)/                      ← 로그인 필요 (layout = Sidebar+Header+UndoProvider+AgentChatProvider)
-    │   │   ├── dashboard  agents  calendar  workflows  settings  mypage
+    │   │   ├── dashboard  agents  calendar  settings  mypage
     │   │   └── chat  files  finance  cards  mail  mcp  projects   ← 세션4 섹션
     │   └── api/                        ← 서버 라우트
     │       ├── agents/[id]/chat        ← Claude 스트리밍 프록시 (streamText)
     │       ├── agents/generate-prompt  ← 에이전트 시스템프롬프트 생성
     │       ├── assistant + assistant/conversations[/[id]]  ← 대시보드 어시스턴트
-    │       ├── workflows/[id]/run      ← 워크플로우 순차 실행(NDJSON)
     │       ├── cards/ocr  finance/ocr  finance/tax-invoice
     │       ├── google/{connect,callback,disconnect,gmail/*}   ← OAuth + Gmail BFF
     │       └── mcp/servers[/[id][/test]]                      ← MCP 서버 CRUD/테스트
@@ -120,7 +118,7 @@ equria-workspace/
     ├── components/
     │   ├── ui/                         ← shadcn/ui (수정 금지)
     │   ├── layout/  shared/  theme/  undo/  agent-chat/
-    │   ├── agents/  calendar/  workflows/  chat/  dashboard/
+    │   ├── agents/  calendar/  chat/  dashboard/
     │   └── files/ finance/ cards/ mail/ mcp/ projects/ settings/ mypage/
     │
     ├── lib/
@@ -129,7 +127,7 @@ equria-workspace/
     │   ├── google/                     ← oauth · client · gmail · crypto(AES-256-GCM)
     │   ├── config/features.ts          ← 섹션/기능 SSOT
     │   ├── agents.ts  agentBuilder.ts  ← 에이전트 프리셋·빌더 위저드
-    │   ├── workflows.ts  workflowTools.ts  mcp.ts  mcp/connect.ts
+    │   ├── mcp.ts  mcp/connect.ts
     │   ├── finance.ts  projects.ts  calendar.ts  files.ts  figma.ts
     │   └── upload.ts  csv.ts  auth.ts  utils.ts
     │
@@ -139,7 +137,7 @@ equria-workspace/
 
 ---
 
-## 6. DB 스키마 요약 (약 61개 테이블 · 마이그 001~146)
+## 6. DB 스키마 요약 (약 59개 테이블 · 마이그 001~147)
 
 | 영역 | 테이블 |
 |------|--------|
@@ -149,7 +147,6 @@ equria-workspace/
 | 어시스턴트(대시보드) | `assistant_conversations` · `assistant_messages` |
 | 팀 채팅(DM) | `direct_conversations` · `direct_messages` · `message_attachments` · `message_reactions` |
 | 그룹 채팅 | `group_rooms` · `group_messages` · `group_message_attachments` · `group_message_reactions` · `group_read_state` · `room_members` (전체방+다중방·읽음, 마이그 071~075) |
-| 워크플로우 | `workflows` · `workflow_runs` |
 | 캘린더 | `calendar_events` |
 | MCP | `mcp_servers` · `mcp_tools` · `mcp_user_connections`(개인연결·마이그088) · `mcp_oauth_clients`(DCR·`redirect_uri` 자가치유 102) |
 | 프로젝트/개인 | `projects` · `project_members` · `project_tasks`(094) · `personal_tasks`(092) |
@@ -164,7 +161,8 @@ equria-workspace/
 | AI 사용량(크레딧) | `workspace_credits` · `credit_ledger` (마이그132~133 — 차감은 **DB 트리거**가 한다) |
 | 결제/구독 | `billing_subscriptions` · `billing_payments` · `billing_keys`(**RLS 정책 0개 = 전면 거부**) · `billing_events`(감사로그) — 마이그139~142. 쓰기는 전부 `security definer` RPC(service_role 전용). 갱신 청구=`lib/billing/renew.ts`, 환불 계산=`lib/billing/refund.ts` |
 
-> 전체 SQL: `supabase/migrations/` (001~146, 135~137은 결번). 원격 적용·drift 없음. **세부 진행상황·최신 변경은 HANDOFF.md가 SSOT.**
+> 전체 SQL: `supabase/migrations/` (001~147, 135~137은 결번). 원격 적용·drift 없음. **세부 진행상황·최신 변경은 HANDOFF.md가 SSOT.**
+> ⚠️ 마이그147이 `workflows`·`workflow_runs`를 DROP했다(2026-09-04, 워크플로우 기능 전면 삭제 — 대표 결정, 에이전트에 집중).
 > 기본 에이전트 8개 시드: `supabase/seed.sql` 참고
 
 ---
@@ -221,7 +219,7 @@ Phase 2 [에이전트 허브] — 에이전트 목록, 채팅 UI, Claude API 연
 Phase 3 [에이전트 빌더] — 에이전트 생성/수정 폼, 버전 관리
 Phase 4 [캘린더] — 팀 일정 관리
 Phase 5 [MCP 연결] — Google Workspace, Supabase MCP
-Phase 6 [워크플로우] — 에이전트 체이닝, 자동화
+Phase 6 [워크플로우] — 에이전트 체이닝, 자동화 (⚠️ 2026-09-04 전면 삭제 — 대표 결정, 에이전트에 집중)
 ```
 
 > 각 Phase 상세: `docs/archive/PLAN.md`(아카이브) 참고

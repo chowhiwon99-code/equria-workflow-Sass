@@ -36,4 +36,4 @@
 - 프로덕션 재동의: 스코프 추가 시 `HANDOFF §C 대표작업`의 구글 콘솔 스코프도 갱신.
 
 ## 검증 (E2E)
-tsc0·lint29/0·build0 → dev에서 구글 연결 → Files의 Drive 탭에서 목록·검색·미리보기·다운로드 동작 → Docs/Sheets export 스팟체크 → 미연결 상태 안내 확인.
+tsc0·lint27/0·build0 → dev에서 구글 연결 → Files의 Drive 탭에서 목록·검색·미리보기·다운로드 동작 → Docs/Sheets export 스팟체크 → 미연결 상태 안내 확인.

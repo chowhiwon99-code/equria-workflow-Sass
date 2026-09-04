@@ -6,7 +6,7 @@ EQURIA 프로덕션 배포를 `HANDOFF.md` 배포 규칙대로 안전하게 진�
 
 ## 1. 검증 게이트 (하나라도 실패 시 중단·보고)
 - `npx tsc --noEmit` → 0 에러
-- `pnpm lint` → 29 errors / 0 warnings(신규 0)
+- `pnpm lint` → 27 errors / 0 warnings(신규 0)
 - `pnpm build` → 통과(Vercel 빌드가 실제 게이트)
 
 ## 2. 커밋

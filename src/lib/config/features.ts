@@ -8,7 +8,6 @@ import {
   LayoutDashboard,
   Bot,
   Calendar,
-  Workflow,
   MessagesSquare,
   Users,
   Plug,
@@ -182,16 +181,6 @@ export const FEATURES: Feature[] = [
     status: "ready",
     phase: 3,
     group: "ai",
-  },
-  {
-    href: "/workflows",
-    label: "워크플로우",
-    description: "에이전트를 체이닝해 업무 자동화",
-    icon: Workflow,
-    status: "wip",
-    phase: 6,
-    group: "ai",
-    minPlan: "pro",
   },
   // ── 연동 ──
   {

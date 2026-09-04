@@ -148,7 +148,7 @@ export const taskSuggestionsSchema = z.object({
         title: z.string().describe("실행형 할 일 제목 한 줄(한국어). 예: 'PortOne 구비서류 제출'"),
         reason: z.string().describe("왜 지금 해야 하는지 1~2문장 — 데이터의 실제 근거(날짜·이름) 포함"),
         priority: z.enum(["urgent", "high", "medium"]).describe("긴급=오늘 안 하면 문제 / 높음=수일 내 / 중간=여유"),
-        source_type: z.enum(["gmail", "project", "calendar", "notification", "workflow", "app"]).describe("근거가 된 소스"),
+        source_type: z.enum(["gmail", "project", "calendar", "notification", "app"]).describe("근거가 된 소스"),
         source_label: z.string().describe("출처 구체 표기. 예: '메일: PortOne 심사팀' '프로젝트: 결제 연동' '일정: 채용 면접'"),
         suggested_due: z.string().nullable().describe("권장 기한 YYYY-MM-DD, 특정 못 하면 null"),
       })

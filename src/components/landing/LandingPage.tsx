@@ -90,7 +90,7 @@ const priceText = (p: PlanDef) => (p.priceKrw == null ? "문의" : formatKrw(p.p
 const PLANS: { name: string; price: string; unit: string; credits: string; highlight: boolean; cta: string; desc: string[] }[] = [
   { name: P.basic.label, price: priceText(P.basic), unit: `${seatText(P.basic)}까지 · 영구 무료`, credits: "AI 맛보기 · 매일 사용량 제공", highlight: false, cta: "무료로 시작", desc: ["팀 협업 (채팅·캘린더·프로젝트)", "AI 에이전트 맛보기", "회사별 데이터 격리"] },
   { name: P.std.label, price: priceText(P.std), unit: `/월 · ${seatText(P.std)}까지`, credits: "AI 채팅 넉넉히 · Sonnet", highlight: true, cta: "시작하기", desc: ["모든 업무 기능 (+결재·근태·회의·재무)", "AI 에이전트 전체 사용", `인원이 늘면 ${P.pro.label}로 · 이메일 지원`] },
-  { name: P.pro.label, price: priceText(P.pro), unit: `/월 · ${seatText(P.pro)}까지`, credits: "AI 채팅 넉넉히 · +Opus", highlight: false, cta: "시작하기", desc: ["스탠다드 전체 + 워크플로우·MCP 연동", "고급 AI 모델(Opus) 사용", `${seatText(P.pro)}이 넘으면 도입 문의 · 우선 지원`] },
+  { name: P.pro.label, price: priceText(P.pro), unit: `/월 · ${seatText(P.pro)}까지`, credits: "AI 채팅 넉넉히 · +Opus", highlight: false, cta: "시작하기", desc: ["스탠다드 전체 + MCP 연동", "고급 AI 모델(Opus) 사용", `${seatText(P.pro)}이 넘으면 도입 문의 · 우선 지원`] },
 ]
 
 /** 요금별 기능 비교 (3티어) — false=미포함(—), true=체크, 문자열=값 표기 */
@@ -100,11 +100,9 @@ const PLAN_ROWS: { f: string; basic: string | boolean; std: string | boolean; pr
   { f: "회의노트(AI 요약)·명함(OCR)·비용·매출", basic: false, std: true, pro: true },
   { f: "AI 에이전트 (직접 제작 + 지식파일 첨부)", basic: "맛보기", std: true, pro: true },
   { f: "AI 채팅·보조 (공정 사용)", basic: "맛보기", std: true, pro: true },
-  // ⚠️ 워크플로우는 아래 별도 행에서 Pro 전용이다 → 이 행 이름에 워크플로우를 넣으면
-  //    Basic/Standard에 없는 기능의 한도를 적어놓는 모순이 된다. 전 플랜에 있는 것만 예시로.
   { f: "자동 실행 사용량 (리서치·작업 제안)", basic: "맛보기", std: "포함", pro: "2배 이상" },
   { f: "AI 모델", basic: "Sonnet", std: "Sonnet", pro: "+Opus" },
-  { f: "워크플로우·MCP 연동", basic: false, std: false, pro: true },
+  { f: "MCP 연동", basic: false, std: false, pro: true },
   // "시트"는 업계 용어라 처음 보는 사람에게 안 통한다(대표도 물어봤다) → 인원수로 직접 쓴다.
   // ⚠️ 이 숫자는 lib/plans.ts PLANS.seats · DB plan_seat_limit()과 **같은 값**이어야 한다.
   //    셋이 어긋나면 "파는 인원"과 "실제로 들어가지는 인원"이 달라진다(2026-08-15 사고 원인).
@@ -114,7 +112,7 @@ const PLAN_ROWS: { f: string; basic: string | boolean; std: string | boolean; pr
 const FAQS = [
   { q: "정말 무료로 시작할 수 있나요?", a: "네. Basic 플랜은 별도 카드 등록 없이 영구 무료입니다. 팀 협업 기능과 AI 맛보기가 포함되고, AI 사용량은 매일 조금씩 다시 채워집니다. 더 쓰려면 유료 플랜으로 올리면 됩니다." },
   { q: "요금은 어떻게 되나요?", a: `회사 단위 정액입니다(${P.basic.label} 무료 · ${P.std.label} ${priceText(P.std)} · ${P.pro.label} ${priceText(P.pro)}). 요금제마다 이용 인원이 정해져 있고(${seatText(P.basic)}·${seatText(P.std)}·${seatText(P.pro)}), 인원이 늘면 상위 요금제로 올리시면 됩니다. ${seatText(P.pro)}이 넘는 팀은 도입 문의를 남겨주세요. AI도 요금제에 포함된 사용량 안에서 쓰고, 더 필요하면 같은 방식으로 올리면 됩니다.` },
-  { q: "AI를 쓰다가 갑자기 막히지 않나요?", a: "사람이 직접 쓰는 AI 채팅과 보조 기능은 공정 사용 범위에서 막지 않습니다. 사용량 한도는 리서치·작업 제안·워크플로우 자동 실행처럼 사람 없이 도는 작업에만 적용되고, 그마저도 매일(무료) 또는 매달(유료) 다시 채워집니다." },
+  { q: "AI를 쓰다가 갑자기 막히지 않나요?", a: "사람이 직접 쓰는 AI 채팅과 보조 기능은 공정 사용 범위에서 막지 않습니다. 사용량 한도는 리서치·작업 제안처럼 사람 없이 도는 작업에만 적용되고, 그마저도 매일(무료) 또는 매달(유료) 다시 채워집니다." },
   { q: "우리 회사 데이터는 안전한가요?", a: "회사별로 데이터가 격리되고, 민감 정보는 암호화해 국내 리전에 저장합니다. 데이터의 소유권은 회사에 있습니다." },
   { q: "우리 회사 방식에 맞출 수 있나요?", a: "그게 컴플로우(Complow)의 출발점입니다. 손익 계산 수식, AI 에이전트, 결재선까지 회사 방식대로 직접 구성할 수 있습니다." },
   { q: "도입은 어떻게 진행되나요?", a: "도입 문의를 남기면 세팅부터 온보딩까지 함께합니다. 쓰던 도구(구글·노션 등)는 연동으로 그대로 이어집니다." },
@@ -320,30 +318,6 @@ export default function LandingPage() {
               <span className="text-[12.5px] font-bold text-black/55">컴피</span>
             </div>
             <Image src="/marketing/compi-panel.png" alt="컴피가 실제로 회의 공지 초안을 작성하는 화면" width={900} height={958} className="w-full" />
-          </div>
-        </Reveal>
-
-        {/* 실제 화면 2 — 워크플로우(에이전트 3개를 실제로 연결한 캔버스). 스크린샷이 옆 텍스트보다 짧아 items-center로 세로 중앙정렬(stretch면 카드 하단에 빈 공간 생김) */}
-        <Reveal className="mt-20 grid items-center gap-10 sm:grid-cols-2">
-          <div className="order-last overflow-hidden rounded-2xl border border-black/[0.06] bg-white shadow-[0_1px_2px_rgba(17,17,17,0.03),0_20px_44px_rgba(17,17,17,0.055)] sm:order-first">
-            <div className="flex items-center gap-2 border-b border-black/[0.06] bg-white px-4 py-3">
-              <span className="grid size-6 place-items-center rounded-md bg-emerald-500/10"><Network className="size-3.5 text-emerald-600" strokeWidth={1.75} /></span>
-              <span className="text-[12.5px] font-bold text-black/55">신규 문의 처리 자동화</span>
-            </div>
-            <Image src="/marketing/workflow-canvas.png" alt="에이전트 3개를 이어 붙인 워크플로우 캔버스" width={1000} height={396} className="w-full" />
-          </div>
-          <div className="flex flex-col justify-center">
-            <p className="text-[13px] font-bold text-black/40">워크플로우 자동화</p>
-            <h3 className="mt-2 text-[22px] font-extrabold tracking-tight">에이전트를 이어 붙이면, 일이 끝까지 갑니다.</h3>
-            <p className="mt-4 text-[14px] leading-relaxed text-black/55">
-              한 번 만들어두면 사람이 단계마다 넘겨줄 필요가 없습니다. 예를 들어 위 예시는 고객 문의 응대 초안을
-              쓰고 → 관련 회의 내용을 정리하고 → 경리 마감까지, 실행 버튼 한 번으로 끝까지 이어집니다.
-            </p>
-            <ul className="mt-4 space-y-2.5 text-[14px] leading-relaxed text-black/55">
-              <li>에이전트 여러 개를 순서대로 연결해 한 번에 실행합니다</li>
-              <li>앞 단계 결과가 다음 단계로 자동으로 넘어갑니다</li>
-              <li>직접 만든 에이전트도, 기본 제공 에이전트도 그대로 이어붙입니다</li>
-            </ul>
           </div>
         </Reveal>
       </section>

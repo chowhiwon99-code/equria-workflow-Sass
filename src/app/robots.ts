@@ -7,7 +7,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: ["/", "/privacy", "/terms", "/refund"],
-        disallow: ["/api/", "/dashboard", "/agents", "/calendar", "/workflows", "/settings", "/mypage", "/chat", "/files", "/finance", "/cards", "/mail", "/mcp", "/projects"],
+        disallow: ["/api/", "/dashboard", "/agents", "/calendar", "/settings", "/mypage", "/chat", "/files", "/finance", "/cards", "/mail", "/mcp", "/projects"],
       },
     ],
     sitemap: "https://complow.kr/sitemap.xml",

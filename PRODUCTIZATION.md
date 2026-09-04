@@ -48,7 +48,7 @@
 | M4 | 데이터 export/삭제(GDPR) 없음 | finance만 CSV·export 엔드포인트 부재 | M |
 | M5 | 알림 트리거가 workspace 무관(DM RLS 깨지면 미리보기 누출) | `002_features.sql:184`(handle_new_dm) | S |
 | M6 | 비번정책·이메일인증·MFA 없음 | `(auth)/actions.ts`(length 미체크) | M |
-| M7 | 교차 테넌트 FK/Join 검증 없음(conversation이 타사 agent 참조 가능) | `030`(FK만)·`018_workflow_runs.sql` | M |
+| M7 | 교차 테넌트 FK/Join 검증 없음(conversation이 타사 agent 참조 가능) | `030`(FK만) | M |
 | M8 | 신규 워크스페이스에 프리셋 에이전트 없음(빈 화면 시작) | `seed.sql`(equria만) | M |
 | M9 | Storage 쿼터 미강제 | `lib/upload.ts` | S |
 | M10 | PII 컬럼 revoke 불완전(023b 누락 의심) | `023`·`001` | S |

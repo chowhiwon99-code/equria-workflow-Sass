@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { X, Plus, ExternalLink, Frame, FileText, Trash2, CalendarClock, Bot, Workflow as WorkflowIcon, ListChecks, Check, Loader2 } from "lucide-react"
+import { X, Plus, ExternalLink, Frame, FileText, Trash2, CalendarClock, Bot, ListChecks, Check, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
@@ -893,30 +893,24 @@ function PeriodBar({ start, due }: { start: string | null; due: string | null })
 
 /** 연결된 AI 도구 — 연동은 프로젝트 생성 시(대표 확정), 상세는 표시+해제만.
  *  연동 없으면 '연동된 AI 없음' 한 줄. projects.metadata(jsonb) 저장(DDL 0). */
-type ToolLinks = { linked_agents?: string[]; linked_workflows?: string[] }
+type ToolLinks = { linked_agents?: string[] }
 
 function LinkedToolsSection({ projectId, metadata, onChanged }: { projectId: string; metadata: Json; onChanged: () => void }) {
   const supabase = createClient()
   const [agents, setAgents] = useState<{ id: string; name: string; icon: string | null }[]>([])
-  const [workflows, setWorkflows] = useState<{ id: string; name: string }[]>([])
 
   const links = (metadata as ToolLinks | null) ?? {}
   const linkedAgents = useMemo(() => links.linked_agents ?? [], [links.linked_agents])
-  const linkedWorkflows = useMemo(() => links.linked_workflows ?? [], [links.linked_workflows])
-  const hasLinks = linkedAgents.length > 0 || linkedWorkflows.length > 0
+  const hasLinks = linkedAgents.length > 0
 
   useEffect(() => {
     if (!hasLinks) return
     const loadTools = async () => {
-      const [{ data: ag }, { data: wf }] = await Promise.all([
-        linkedAgents.length ? supabase.from("agents").select("id, name, icon").in("id", linkedAgents) : Promise.resolve({ data: [] }),
-        linkedWorkflows.length ? supabase.from("workflows").select("id, name").in("id", linkedWorkflows) : Promise.resolve({ data: [] }),
-      ])
+      const { data: ag } = await supabase.from("agents").select("id, name, icon").in("id", linkedAgents)
       setAgents(ag ?? [])
-      setWorkflows(wf ?? [])
     }
     loadTools()
-  }, [supabase, hasLinks, linkedAgents, linkedWorkflows])
+  }, [supabase, hasLinks, linkedAgents])
 
   const save = async (patch: ToolLinks) => {
     const base = (metadata as Record<string, unknown> | null) ?? {}
@@ -925,7 +919,6 @@ function LinkedToolsSection({ projectId, metadata, onChanged }: { projectId: str
   }
 
   const agentById = new Map(agents.map((a) => [a.id, a]))
-  const wfById = new Map(workflows.map((w) => [w.id, w]))
 
   return (
     <section className="rounded-2xl glass p-5">
@@ -945,20 +938,6 @@ function LinkedToolsSection({ projectId, metadata, onChanged }: { projectId: str
                     {a ? `${a.icon ?? "🤖"} ${a.name}` : "…"}
                   </Link>
                   <button onClick={() => save({ linked_agents: linkedAgents.filter((x) => x !== id) })} className="text-muted-foreground hover:text-destructive" aria-label="연동 해제">
-                    <X className="size-3" />
-                  </button>
-                </span>
-              )
-            })}
-            {linkedWorkflows.map((id) => {
-              const w = wfById.get(id)
-              return (
-                <span key={id} className="inline-flex items-center gap-1 rounded-full border bg-card py-0.5 pl-2 pr-1.5 text-xs shadow-[var(--shadow-sm)]">
-                  <WorkflowIcon className="size-3 text-muted-foreground" />
-                  <Link href={`/workflows/${id}`} className="font-medium hover:underline">
-                    {w ? w.name : "…"}
-                  </Link>
-                  <button onClick={() => save({ linked_workflows: linkedWorkflows.filter((x) => x !== id) })} className="text-muted-foreground hover:text-destructive" aria-label="연동 해제">
                     <X className="size-3" />
                   </button>
                 </span>

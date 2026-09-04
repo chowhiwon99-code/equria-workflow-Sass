@@ -41,7 +41,7 @@
 | 실제 | `clone_seed_agents`가 `return 0` → **에이전트 0개** | `130_clone_seed_agents_noop.sql:13-15` |
 | 대시보드 | 5개 카드 **전부 빈칸** | `AnnouncementsBoard`·`TodayTasks`·`TaskSuggestions`·`WorkOverview` |
 | 컴피 첫 질문 | 예시칩 3개가 **전부 조회형** → 0건이면 "없어요"만 | `lib/agentTools.ts`(툴 4개 전부 조회) |
-| 워크플로우 | 에이전트가 0이라 **잠김** | `NewWorkflowModal.tsx:62` |
+| ~~워크플로우~~ | ~~에이전트가 0이라 **잠김**~~ | 2026-09-04 워크플로우 기능 전면 삭제로 항목 자체 소멸 |
 | 제품 투어·체크리스트 | **코드 0건** | — |
 
 **대표가 못 느낀 이유**(DB 실측): 자사 메인 워크스페이스 `EQURIA`엔 직접 만든 에이전트 2개가 있다.
