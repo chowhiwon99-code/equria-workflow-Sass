@@ -36,7 +36,11 @@ export function DashboardAssistant() {
       }),
     [setConversation]
   )
-  const { messages, sendMessage, status, error, setMessages } = useChat({ transport })
+  const { messages, sendMessage, status, error, setMessages } = useChat({
+    transport,
+    // 스트리밍 렌더 스로틀(50ms 배칭) — 마크다운 재파싱 비용을 초당 20회로 제한(위젯과 동일, 육안 차이 없음)
+    experimental_throttle: 50,
+  })
 
   const [input, setInput] = useState("")
   const [files, setFiles] = useState<File[]>([])

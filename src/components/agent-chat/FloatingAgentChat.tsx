@@ -2,7 +2,7 @@
 
 import { useChat } from "@ai-sdk/react"
 import { DefaultChatTransport, type UIMessage } from "ai"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -657,7 +657,12 @@ function ChatBody({ agent }: { agent: Agent }) {
     [agent.id, setConversationId]
   )
 
-  const { messages, sendMessage, status, error, setMessages, stop, regenerate } = useChat({ transport })
+  const { messages, sendMessage, status, error, setMessages, stop, regenerate, clearError } = useChat({
+    transport,
+    // 스트리밍 렌더 스로틀(50ms 배칭) — 토큰마다 전체 리스트+마크다운을 재렌더하던 것을 초당 20회로 제한.
+    // 육안 차이 없이 긴 답변에서의 프레임 드랍을 없앤다(세션56 품질 기준: 스무스·무끊김).
+    experimental_throttle: 50,
+  })
 
   // 자동 스크롤 제어 ref — 진입·대화전환은 즉시(auto) 하단, 스트리밍은 smooth.
   const jumpToBottom = useRef(true)
@@ -689,12 +694,15 @@ function ChatBody({ agent }: { agent: Agent }) {
   )
 
   // 위젯 열 때(마운트) 이어지던 대화가 있으면 화면 복원 — "닫으면 사라짐" 해소. 1회만.
+  // 복원 fetch가 도는 동안엔 빈 화면(시작 칩 포함)을 그리지 않는다 — 그 틈에 칩/전송을 누르면
+  // 샘플 질문이 이전 대화에 저장되고 setMessages(전체 교체)가 방금 보낸 말풍선을 지운다(적대리뷰 발견).
   const hydrated = useRef(false)
+  const [hydrating, setHydrating] = useState<boolean>(() => Boolean(conversationIdByAgent[agent.id]))
   useEffect(() => {
     if (hydrated.current) return
     hydrated.current = true
     const cid = conversationIdRef.current
-    if (cid) void openConvo(cid)
+    if (cid) void openConvo(cid).finally(() => setHydrating(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -748,7 +756,10 @@ function ChatBody({ agent }: { agent: Agent }) {
 
   const submit = () => {
     const text = input.trim()
-    if (!text || status !== "ready") return
+    // 에러 상태에서도 새 메시지로 바로 이어갈 수 있게 — 종전엔 "다시 시도"만 탈출구라
+    // 전송 버튼이 살아 보이는데 안 눌리는 사각지대가 있었다(적대리뷰 발견).
+    if (!text || (status !== "ready" && status !== "error")) return
+    clearError()
     sendMessage({ text })
     setInput("")
   }
@@ -828,7 +839,7 @@ function ChatBody({ agent }: { agent: Agent }) {
         ref={scrollRef}
         className="flex-1 space-y-3 overflow-y-auto p-3 [scrollbar-width:thin]"
       >
-        {messages.length === 0 ? (
+        {messages.length === 0 && !hydrating ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center">
             <span className="text-4xl">{renderAgentIcon(agent.icon, "size-9")}</span>
             <p className="text-sm font-medium">{agent.name}</p>
@@ -852,12 +863,13 @@ function ChatBody({ agent }: { agent: Agent }) {
           </div>
         ) : (
           messages.map((m) => (
-            <Bubble
+            <MemoBubble
               key={m.id}
               message={m}
               agentIcon={agent.icon}
               agentId={agent.id}
               conversationId={conversationIdByAgent[agent.id] ?? null}
+              active={loading}
             />
           ))
         )}
@@ -949,16 +961,23 @@ function ChatBody({ agent }: { agent: Agent }) {
 
 type MemState = "idle" | "loading" | "draft" | "saving" | "saved"
 
+// 스트리밍 중 토큰이 올 때마다 메시지 "전체" 리스트가 재렌더되던 것을, 참조가 바뀐(=스트리밍 중인)
+// 말풍선만 재렌더되게 memo — 대화가 길수록 마크다운 재파싱 비용이 누적돼 프레임이 떨어지던 지점.
+const MemoBubble = memo(Bubble)
+
 function Bubble({
   message,
   agentIcon,
   agentId,
   conversationId,
+  active,
 }: {
   message: UIMessage
   agentIcon: string
   agentId: string
   conversationId: string | null
+  /** 스트림이 실제로 돌고 있는가 — 중단/에러 후 도구 칩 스피너가 영원히 남지 않게(적대리뷰 발견) */
+  active: boolean
 }) {
   const text = message.parts
     .map((p) => (p.type === "text" ? p.text : ""))
@@ -972,7 +991,13 @@ function Bubble({
     const part = p as { type: string; toolName?: string; state?: string }
     const name = (isDyn ? part.toolName : p.type.slice(5)) || "도구"
     const state: "running" | "done" | "error" =
-      part.state === "output-error" ? "error" : part.state === "output-available" ? "done" : "running"
+      part.state === "output-error" || part.state === "output-denied"
+        ? "error"
+        : part.state === "output-available"
+          ? "done"
+          : active
+            ? "running" // input-streaming/input-available — 실제 스트림 중일 때만 스피너
+            : "done" // 중단/에러로 스트림이 끝났으면 스피너 대신 중립 표시
     return [{ key: `${i}-${name}`, name, state }]
   })
   const isUser = message.role === "user"

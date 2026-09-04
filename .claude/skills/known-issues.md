@@ -59,6 +59,23 @@ description: EQURIA Workspace의 알려진 이슈·기술부채 백로그. 다�
 - **I25. 계산 슬롯 값→0 시 이번 달 장부 기록 soft-delete(Undo 없음)**: "계산값=결과값" 모델상 계산값 0=이번 달 금액 0이라 자동 휴지통 처리(recordEntry와 달리 undo push 없음). 수동 tax/memo 기록이 있으면 손실 — 휴지통에서만 복구. 모델 근본이라 by-design 수용(LOW·엣지).
 - **I26. 날짜 헬퍼 중복(cleanup)**: ProjectTimeline/TaskTimeline/WorkOverview/AttendanceAdmin이 d0/fmt/shiftDate/addDays/todayStr를 각자 재구현 — `@/lib/calendar`(toDateInputValue·isSameDay 등)로 통합 후보. 동작 정상, 유지보수 부채(LOW).
 
+## 🆕 세션56 채팅 경험 개선 보류분 (2026-09-04, 적대리뷰 발견 · 비차단)
+
+- **I38. 위젯 "응답 중단" 버튼이 서버 생성을 멈추지 않음(의미 불일치·MED)**: 중단을 눌러도 서버는
+  `consumeStream`으로 끝까지 생성한다 — 전체 답변이 messages에 저장되고 토큰 전액 과금, 대화를 다시
+  열면 "중단했던" 전체 답변이 나타난다(UI엔 부분, DB엔 전체). 또 중단 직후 바로 다음 질문을 보내면
+  이전 턴의 assistant insert(onFinish 진행 중)와 경쟁해 **복원 순서가 꼬일 수 있다**(user2가 assistant1보다
+  먼저). 원인 = H2 설계(클라 끊겨도 답변 보존 — 위젯 닫힘·unread 배지가 이 성질에 의존)와 "명시적 중단"이
+  같은 신호(fetch abort)로 구별 불가. 제대로 하려면 별도 중단 신호(예: conversationId 키의 abort 엔드포인트
+  + streamText abortSignal) 설계 필요. 현 상태 = 중단은 "표시 멈춤"으로 동작(과금·저장은 진행). LOW-MED.
+- **I39. 도구 칩 approval 상태 미대응(방어적·LOW)**: ToolUIPart state 7종 중 `approval-requested/responded`는
+  스피너로 표시된다(`output-denied`는 실패로 처리, 2026-09-04 반영). 현재 `needsApproval` 도구를 안 써
+  실영향 0 — 도구 승인 UX를 도입할 때 칩 상태 매핑을 같이 확장할 것.
+- **I40. 스트리밍 중 다른 대화 열기(openConvo) 교차 오염 레이스(기존·LOW)**: 스트리밍 도중 대화 목록에서
+  다른 대화를 열면 `setMessages`(전체 교체)와 진행 중 스트림 write가 섞일 수 있다 — 세션56 이전부터 있던
+  구조(시드 칩 hydrate 레이스는 2026-09-04 가드 추가로 해소, 이 일반 케이스는 잔존). 스트리밍 중 목록
+  진입을 잠그거나 openConvo 시 stop()을 먼저 부르는 것이 후보.
+
 ## 🆕 세션55 워크스페이스 스토리지 상한 (2026-09-03, by-design/미커버 · 비차단)
 - **I35. 워크스페이스 총량 상한(마이그145~146) 클라이언트 전용 강제**: `storage.objects` 경로가 `{user_id}/...`라 workspace_id가 없어, 버킷 파일당 상한(마이그144)처럼 DB 레벨로 완전히 막을 수 없다. `workspace_storage_status()` RPC를 `lib/upload.ts`가 업로드 전에 호출해 막는 방식이라 **API 직접호출로 우회 가능**(권한상승은 아님 — 본인 워크스페이스 상한만 자기 손해로 우회). 내부툴·인증 직원 한정이라 LOW.
 - **I36. 여러 워크스페이스 소속 유저의 사용량 중복 집계**: `workspace_storage_status()`가 "이 업로드가 어느 회사 것인지"를 경로만으로 구분 못해, 유저가 올린 모든 파일이 그 유저가 속한 **모든** 워크스페이스 사용량에 동시 집계된다. 대부분 유저가 워크스페이스 1곳뿐이라 현재 영향 낮음(LOW·엣지). 정확히 하려면 경로에 workspace_id 포함(RLS 재작성 필요·큰 변경) 또는 업로드 시 워크스페이스별 파일 테이블에 명시 기록.

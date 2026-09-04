@@ -54,9 +54,6 @@ export async function POST(
   } = await supabase.auth.getUser()
   if (!user) return new Response("Unauthorized", { status: 401 })
 
-  const budget = await checkBudget(user.id, "interactive")
-  if (!budget.ok) return new Response(budget.message ?? BUDGET_EXCEEDED_MSG, { status: 429 })
-
   const body = (await req.json()) as {
     messages: UIMessage[]
     conversationId?: string | null
@@ -67,19 +64,23 @@ export async function POST(
   const userTurns = messages.filter((m) => m.role === "user").length
   let conversationId = body.conversationId ?? null
 
-  const { data: agentVersion } = await supabase
-    .from("agent_versions")
-    .select("system_prompt, model, max_tokens, temperature, mcp_servers, mcp_connectors")
-    .eq("agent_id", agentId)
-    .eq("is_current", true)
-    .maybeSingle()
-
+  // TTFT(첫 토큰까지 지연) 단축 — 예산·버전·워크스페이스는 서로 의존이 없어 병렬 조회(세션56 품질 기준:
+  // "스무스·빠름을 토큰이 아니라 효율로"). 종전엔 직렬 await 3회 = DB 왕복 3회분 지연이었다.
+  const [budget, { data: agentVersion }, workspaceId] = await Promise.all([
+    checkBudget(user.id, "interactive"),
+    supabase
+      .from("agent_versions")
+      .select("system_prompt, model, max_tokens, temperature, mcp_servers, mcp_connectors")
+      .eq("agent_id", agentId)
+      .eq("is_current", true)
+      .maybeSingle(),
+    // B1-b: 이 사용자의 워크스페이스 id(첫 멤버십). 이후 conversations/messages/agent_usage INSERT에 명시.
+    getUserWorkspaceId(supabase, user.id),
+  ])
+  if (!budget.ok) return new Response(budget.message ?? BUDGET_EXCEEDED_MSG, { status: 429 })
   if (!agentVersion) {
     return new Response("Agent not found", { status: 404 })
   }
-
-  // B1-b: 이 사용자의 워크스페이스 id(첫 멤버십). 이후 conversations/messages/agent_usage INSERT에 명시.
-  const workspaceId = await getUserWorkspaceId(supabase, user.id)
 
   if (!conversationId) {
     const firstUser = messages.find((m) => m.role === "user")
@@ -103,172 +104,218 @@ export async function POST(
     conversationId = conv.id
   }
 
-  // 이번 턴의 사용자 메시지를 스트리밍 전에 먼저 저장한다(H2).
-  // onFinish는 클라이언트가 스트림을 끝까지 소비해야 실행되므로, 중단/에러 시 유실되지 않게 선저장.
+  // ── 스트리밍 전 준비를 전부 병렬로(TTFT 단축, 세션56 품질 기준) ──────────────────────
+  // 종전: 선저장 → 요약 → 지식(+파일 서명 순차) → 기억 → MCP서버 연결(순차) → 개인커넥터 연결(순차)의
+  // 직렬 체인이라 커넥터 있는 에이전트는 첫 토큰까지 수 초가 걸렸다. 서로 의존이 없으므로 병렬로 시작하고
+  // 아래 Promise.all에서 한 번에 기다린다. Supabase 빌더는 lazy thenable이라 Promise.all 시점에 실행된다.
+  // ⚠️ 도구 정렬(이름순)·시스템 문자열 조립 순서는 그대로다 — 캐시 프리픽스 바이트가 달라지면 안 된다.
+
+  // 이번 턴의 사용자 메시지 선저장(H2) — onFinish는 클라이언트가 스트림을 끝까지 소비해야 실행되므로,
+  // 중단/에러 시 유실되지 않게 스트리밍 시작 전 완료를 보장한다(아래 Promise.all이 await).
   const lastUser = [...messages].reverse().find((m) => m.role === "user")
   const lastUserText =
     lastUser?.parts
       .map((p) => (p.type === "text" ? p.text : ""))
       .join("\n")
       .trim() ?? ""
-  await supabase.from("messages").insert(
-    withWorkspace({ conversation_id: conversationId, role: "user", content: lastUserText }, workspaceId),
-  )
+  // regenerate(위젯 "다시 시도")는 같은 user 메시지를 그대로 재전송한다 — 직전 저장 행과 동일하면
+  // insert를 건너뛴다(적대리뷰: 재시도마다 user 행이 쌓여 복원·요약·기억 추출 입력이 오염되던 버그).
+  // 정상적인 같은 말 반복("응" 2회)은 사이에 assistant 행이 끼므로 여기 걸리지 않는다.
+  const userInsertP = supabase
+    .from("messages")
+    .select("role, content")
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .then(async ({ data: lastRow }) => {
+      if (lastRow?.[0]?.role === "user" && lastRow[0].content === lastUserText) return
+      await supabase.from("messages").insert(
+        withWorkspace({ conversation_id: conversationId, role: "user", content: lastUserText }, workspaceId),
+      )
+    })
 
-  // 대화 요약 압축(트랙2): 기존 대화면 저장된 요약을 불러와 시스템 프롬프트에 주입.
-  // 갱신은 onFinish 백그라운드(다음 턴부터 반영) — 사용자 대기 0.
-  let convSummary: string | null = null
-  let summaryUpto = 0
-  if (body.conversationId) {
-    const { data: convRow } = await supabase
-      .from("conversations")
-      .select("summary, summary_upto")
-      .eq("id", body.conversationId)
-      .maybeSingle()
-    convSummary = convRow?.summary ?? null
-    summaryUpto = convRow?.summary_upto ?? 0
-  }
+  // 대화 요약 압축(트랙2): 기존 대화면 저장된 요약을 시스템 프롬프트에 주입. 갱신은 onFinish 백그라운드.
+  const summaryP = body.conversationId
+    ? supabase
+        .from("conversations")
+        .select("summary, summary_upto")
+        .eq("id", body.conversationId)
+        .maybeSingle()
+    : null
 
   const startedAt = Date.now()
   const windowed = messages.slice(-HISTORY_WINDOW)
+  // ⚠️ 직렬 유지 — CPU 작업이라 병렬화 이득이 없고, 클라이언트가 보낸 이력의 잘못된 파트로 throw할 수
+  //    있다. 네트워크 leg(.then 체인)들이 시작되기 **전에** 실행해, 여기서 죽어도 열린 MCP 연결이
+  //    0개이도록 한다(적대리뷰: 합류점 fail-fast가 비행 중 MCP 연결을 누수시키는 경로 차단).
   const modelMessages = await convertToModelMessages(windowed)
 
-  // 에이전트 지식파일(참고 자료) 주입 — 텍스트는 시스템 프롬프트에, PDF/이미지는 파일 파트로.
+  // 에이전트 지식파일(참고 자료) — 텍스트는 시스템 프롬프트에, PDF/이미지는 파일 파트로.
   // 공유 에이전트를 다른 멤버가 대화할 수 있으므로 admin 클라로 서명(소유자 폴더 RLS 우회).
+  // ⚠️ order 필수 — 이 결과가 그대로 캐시 프리픽스(stableSystem)의 일부가 된다. 파일 서명은
+  //    행 순서를 보존한 채 병렬(Promise.all + map)로 처리한다.
+  type KnowledgeFilePart =
+    | { type: "file"; data: string; mediaType: string }
+    | { type: "image"; image: string }
+  const knowledgeP = supabase
+    .from("agent_knowledge")
+    .select("storage_path, name, mime_type, extracted_text")
+    .eq("agent_id", agentId)
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true })
+    .then(async ({ data: kn }) => {
+      const textBlocks: string[] = []
+      const fileParts: KnowledgeFilePart[] = []
+      if (!kn || kn.length === 0) return { textBlocks, fileParts }
+      // ⚠️ 이 leg는 reject하면 안 된다 — 합류점 Promise.all이 fail-fast라, 여기가 던지면 비행 중인
+      //    MCP 연결이 정리자 없이 누수된다. 실패 시 지식 없이 진행(MCP 실패 격리와 동일 철학).
+      try {
+        const admin = createAdminClient()
+        const resolved = await Promise.all(
+          kn.map(async (k): Promise<{ text: string } | { part: KnowledgeFilePart } | null> => {
+            if (k.extracted_text) return { text: `### ${k.name}\n${k.extracted_text}` }
+            const { data: signed } = await admin.storage.from("files").createSignedUrl(k.storage_path, 300)
+            if (!signed?.signedUrl) return null
+            return (k.mime_type ?? "").startsWith("image/")
+              ? { part: { type: "image", image: signed.signedUrl } }
+              : { part: { type: "file", data: signed.signedUrl, mediaType: k.mime_type || "application/pdf" } }
+          }),
+        )
+        for (const r of resolved) {
+          if (!r) continue
+          if ("text" in r) textBlocks.push(r.text)
+          else fileParts.push(r.part)
+        }
+        return { textBlocks, fileParts }
+      } catch {
+        return { textBlocks: [], fileParts: [] }
+      }
+    })
+
+  // 학습된 기억(v1, 개인용) — 이 사용자×이 에이전트의 활성 기억. RLS가 "본인 것만" 강제.
+  // 저장은 다 하되 대화엔 최근 것 위주로 소수만(상한 30) 넣는다(컨텍스트/비용 방어).
+  const memoriesP = supabase
+    .from("agent_memories")
+    .select("kind, content")
+    .eq("agent_id", agentId)
+    .is("deleted_at", null)
+    .order("importance", { ascending: false }) // 중요한 규칙이 최근 잡담에 안 밀리게(마이그106)
+    .order("created_at", { ascending: false })
+    .limit(30)
+
+  // MCP 서버 + 개인 커넥터의 도구 로드 — 서버·커넥터별로 **병렬** 연결(TTFT의 최대 지분).
+  // ⚠️ 실패는 종전과 같이 개별 무시 — 커넥터 하나의 실패가 채팅 전체를 죽이면 안 된다.
+  //    tools() 실패 시 이미 열린 클라이언트는 즉시 닫는다(누수 방지). 연결 완료 순서가 섞여도
+  //    Promise.all이 쿼리 행 순서를 보존하고, 최종적으로 아래 이름순 정렬이 바이트를 고정한다.
+  type McpLoaded = { client: Awaited<ReturnType<typeof connectMcp>>; tools: ToolSet } | null
+  const connectSafely = async (cfg: Parameters<typeof connectMcp>[0]): Promise<McpLoaded> => {
+    let client: Awaited<ReturnType<typeof connectMcp>> | null = null
+    try {
+      client = await connectMcp(cfg)
+      return { client, tools: await client.tools() }
+    } catch {
+      if (client) void client.close().catch(() => {})
+      return null
+    }
+  }
+
+  const mcpIds = agentVersion.mcp_servers ?? []
+  // ⚠️ order 필수 — 도구 정의는 렌더 순서상 system보다 **앞**이라, 도구 키 순서가 흔들리면
+  //    프롬프트 캐시가 system까지 통째로 무효가 된다(캐시는 prefix 완전 일치).
+  const serverToolsP: PromiseLike<McpLoaded[]> =
+    mcpIds.length === 0
+      ? Promise.resolve([])
+      : supabase
+          .from("mcp_servers")
+          .select("id, name, type, url, auth_type, is_active, encrypted_token")
+          .in("id", mcpIds)
+          .eq("is_active", true)
+          .order("created_at", { ascending: true })
+          .order("id", { ascending: true })
+          .then(({ data }) => Promise.all((data ?? []).map((srv) => connectSafely(srv))))
+
+  // 에이전트에 바인딩된 개인 MCP 커넥터만 — 실행자(요청자) 본인의 연결로 해석(공유 에이전트도 쓰는 사람 계정 기준).
+  const boundConnectors = agentVersion.mcp_connectors ?? []
+  const CONN_COLS = "id, connector_id, auth_method, encrypted_token, encrypted_refresh_token"
+  const connectorToolsP: PromiseLike<McpLoaded[]> =
+    boundConnectors.length === 0
+      ? Promise.resolve([])
+      : supabase
+          .from("mcp_user_connections")
+          .select(CONN_COLS)
+          .eq("user_id", user.id)
+          .in("connector_id", boundConnectors)
+          .order("created_at", { ascending: true }) // ⚠️ order 필수 — 위 mcp_servers와 같은 이유
+          .order("id", { ascending: true })
+          .then(({ data }) =>
+            Promise.all(
+              (data ?? []).map(async (row): Promise<McpLoaded> => {
+                const cfg = resolveUserConnectionConfig(row, user.id)
+                if (!cfg) return null
+                const first = await connectSafely(cfg)
+                if (first) return first
+                // access token 만료 시 일부 서버(구글 gmailmcp 등)가 첫 호출에 401을 던지는데,
+                // 그 과정에서 SDK OAuth 프로바이더가 refresh_token으로 갱신해 DB에 저장한다.
+                // → 갱신된 행을 다시 읽어 1회만 재연결(이게 없으면 만료 직후 첫 요청이 항상 실패).
+                try {
+                  const { data: fresh } = await supabase
+                    .from("mcp_user_connections")
+                    .select(CONN_COLS)
+                    .eq("id", row.id)
+                    .maybeSingle()
+                  const retryCfg = fresh ? resolveUserConnectionConfig(fresh, user.id) : null
+                  return retryCfg ? await connectSafely(retryCfg) : null
+                } catch {
+                  return null /* 재시도도 실패하면 이 커넥터 없이 진행 — 채팅 자체는 계속된다 */
+                }
+              }),
+            ),
+          )
+
+  // ── 병렬 준비 합류점 — 여기까지가 첫 토큰 전 대기의 전부다 ──────────────────────────
+  // ⚠️ 어떤 leg도 reject하지 않아야 한다(빌더는 {error} 반환·MCP는 connectSafely·지식은 내부 catch).
+  //    fail-fast가 일어나면 비행 중인 MCP 연결이 누수된다 — 새 leg를 추가할 때 이 규칙을 지킬 것.
+  const [, convRow, knowledge, { data: mems }, serverResults, connectorResults] =
+    await Promise.all([userInsertP, summaryP, knowledgeP, memoriesP, serverToolsP, connectorToolsP])
+
+  const convSummary: string | null = convRow?.data?.summary ?? null
+  const summaryUpto = convRow?.data?.summary_upto ?? 0
+
   // 프롬프트 캐싱 경계 — 시스템 프롬프트를 두 구간으로 나눈다.
   //   stable  : 에이전트 프롬프트·지식파일·커넥터 사용규칙 (턴이 바뀌어도 그대로 → 캐시)
   //   volatile: 기억·대화요약 (턴마다 갱신될 수 있음 → 캐시 뒤)
   // 캐싱은 '프리픽스 완전 일치'라 1바이트만 달라져도 그 뒤가 전부 무효다. 큰 지식파일이 변동 텍스트보다
-  // 반드시 앞에 와야 캐시가 산다. 입력이 원가의 93~99%를 차지하므로 여기가 비용의 핵심.
+  // 반드시 앞에 와야 캐시가 산다. 입력이 원가의 93~99%를 차지하므로 여기가 비용의 핵심. **조립 순서 변경 금지.**
   let stableSystem = agentVersion.system_prompt + OUTPUT_STYLE_RULE // 전 에이전트 공통 — AI 티 나는 기호(-, *, **) 절제
   let volatileSystem = ""
-  {
-    // ⚠️ order 필수 — 이 결과가 그대로 캐시 프리픽스(stableSystem)의 일부가 된다.
-    //    행 순서가 흔들리면 프롬프트 앞부분이 1바이트 달라져 프롬프트 캐시가 통째로 무효가 된다.
-    const { data: kn } = await supabase
-      .from("agent_knowledge")
-      .select("storage_path, name, mime_type, extracted_text")
-      .eq("agent_id", agentId)
-      .order("created_at", { ascending: true })
-      .order("id", { ascending: true })
-    if (kn && kn.length > 0) {
-      const textBlocks: string[] = []
-      const fileParts: Array<
-        { type: "file"; data: string; mediaType: string } | { type: "image"; image: string }
-      > = []
-      const admin = createAdminClient()
-      for (const k of kn) {
-        if (k.extracted_text) {
-          textBlocks.push(`### ${k.name}\n${k.extracted_text}`)
-        } else {
-          const { data: signed } = await admin.storage.from("files").createSignedUrl(k.storage_path, 300)
-          if (!signed?.signedUrl) continue
-          if ((k.mime_type ?? "").startsWith("image/")) fileParts.push({ type: "image", image: signed.signedUrl })
-          else fileParts.push({ type: "file", data: signed.signedUrl, mediaType: k.mime_type || "application/pdf" })
-        }
-      }
-      if (textBlocks.length > 0) {
-        stableSystem += `\n\n# 참고 자료(회사가 첨부한 지식)\n아래 자료를 우선 근거로 삼아 답하세요. 자료에 없으면 지어내지 말고 모른다고 하세요.\n\n${textBlocks.join("\n\n")}`
-      }
-      if (fileParts.length > 0) {
-        modelMessages.unshift({
-          role: "user",
-          content: [
-            { type: "text", text: "다음은 이 에이전트의 참고 자료 파일입니다. 답변의 근거로 활용하세요." },
-            ...fileParts,
-          ],
-        })
-      }
-    }
+  if (knowledge.textBlocks.length > 0) {
+    stableSystem += `\n\n# 참고 자료(회사가 첨부한 지식)\n아래 자료를 우선 근거로 삼아 답하세요. 자료에 없으면 지어내지 말고 모른다고 하세요.\n\n${knowledge.textBlocks.join("\n\n")}`
   }
-
-  // 학습된 기억 주입(v1, 개인용) — 이 사용자×이 에이전트의 활성 기억. RLS가 "본인 것만" 강제.
-  // 저장은 다 하되 대화엔 최근 것 위주로 소수만(상한 30) 넣는다(컨텍스트/비용 방어).
-  {
-    const { data: mems } = await supabase
-      .from("agent_memories")
-      .select("kind, content")
-      .eq("agent_id", agentId)
-      .is("deleted_at", null)
-      .order("importance", { ascending: false }) // 중요한 규칙이 최근 잡담에 안 밀리게(마이그106)
-      .order("created_at", { ascending: false })
-      .limit(30)
-    volatileSystem += buildMemoryBlock(mems ?? [])
+  if (knowledge.fileParts.length > 0) {
+    modelMessages.unshift({
+      role: "user",
+      content: [
+        { type: "text", text: "다음은 이 에이전트의 참고 자료 파일입니다. 답변의 근거로 활용하세요." },
+        ...knowledge.fileParts,
+      ],
+    })
   }
-
+  volatileSystem += buildMemoryBlock(mems ?? [])
   // 오래된 턴 압축 요약 주입 — HISTORY_WINDOW 밖으로 밀려난 맥락의 망각 방지(트랙2)
   volatileSystem += summaryBlock(convSummary)
-
-  // 에이전트에 연결된 MCP 서버의 도구 로드(있으면). 연결/도구로딩 실패 서버는 건너뜀.
-  // ⚠️ tools()도 반드시 try 안에서 — 커넥터 하나의 실패가 채팅 전체를 죽이면 안 된다(워크플로우 run 라우트와 동일 규약).
-  const mcpClients: Awaited<ReturnType<typeof connectMcp>>[] = []
-  const toolSets: ToolSet[] = []
-  const mcpIds = agentVersion.mcp_servers ?? []
-  if (mcpIds.length > 0) {
-    // ⚠️ order 필수 — 도구 정의는 렌더 순서상 system보다 **앞**이라, 도구 키 순서가 흔들리면
-    //    프롬프트 캐시가 system까지 통째로 무효가 된다(캐시는 prefix 완전 일치).
-    const { data: mcpServers } = await supabase
-      .from("mcp_servers")
-      .select("id, name, type, url, auth_type, is_active, encrypted_token")
-      .in("id", mcpIds)
-      .eq("is_active", true)
-      .order("created_at", { ascending: true })
-      .order("id", { ascending: true })
-    for (const srv of mcpServers ?? []) {
-      try {
-        const client = await connectMcp(srv)
-        mcpClients.push(client)
-        toolSets.push(await client.tools())
-      } catch {
-        /* 연결/도구로딩 실패 MCP 서버는 건너뜀 — 도구 없이 진행 */
-      }
-    }
-  }
-  // 에이전트에 바인딩된 개인 MCP 커넥터만 — 실행자(요청자) 본인의 연결로 해석(공유 에이전트도 쓰는 사람 계정 기준).
-  const boundConnectors = agentVersion.mcp_connectors ?? []
-  // 커넥터 사용 규칙(권한 한계) 자동 주입 — 안 되는 도구를 시도하거나 "재인증하라"고 오안내하지 않게(예: Gmail=작성 전용)
+  // 커넥터 사용 규칙(권한 한계) 자동 주입 — 안 되는 도구를 시도하거나 "재인증하라"고 오안내하지 않게(예: Gmail=작성 전용).
+  // 바인딩된 커넥터에서만 나오므로 턴과 무관 → 캐시되는 안정 구간에 둔다.
   const usageNotes = MCP_CONNECTORS.filter((c) => boundConnectors.includes(c.id) && c.usageNote).map(
     (c) => `[${c.name} 사용 규칙] ${c.usageNote}`
   )
-  // 커넥터 사용규칙은 바인딩된 커넥터에서만 나오므로 턴과 무관 → 캐시되는 안정 구간에 둔다.
   if (usageNotes.length > 0) stableSystem += `\n\n${usageNotes.join("\n")}`
-  if (boundConnectors.length > 0) {
-    const CONN_COLS = "id, connector_id, auth_method, encrypted_token, encrypted_refresh_token"
-    // ⚠️ order 필수 — 위 mcp_servers와 같은 이유(도구 키 순서 = 캐시 프리픽스).
-    const { data: myConnections } = await supabase
-      .from("mcp_user_connections")
-      .select(CONN_COLS)
-      .eq("user_id", user.id)
-      .in("connector_id", boundConnectors)
-      .order("created_at", { ascending: true })
-      .order("id", { ascending: true })
-    for (const row of myConnections ?? []) {
-      const cfg = resolveUserConnectionConfig(row, user.id)
-      if (!cfg) continue
-      try {
-        const client = await connectMcp(cfg)
-        mcpClients.push(client)
-        toolSets.push(await client.tools())
-      } catch {
-        // access token 만료 시 일부 서버(구글 gmailmcp 등)가 첫 호출에 401을 던지는데,
-        // 그 과정에서 SDK OAuth 프로바이더가 refresh_token으로 갱신해 DB에 저장한다.
-        // → 갱신된 행을 다시 읽어 1회만 재연결(이게 없으면 만료 직후 첫 요청이 항상 실패).
-        try {
-          const { data: fresh } = await supabase
-            .from("mcp_user_connections")
-            .select(CONN_COLS)
-            .eq("id", row.id)
-            .maybeSingle()
-          const retryCfg = fresh ? resolveUserConnectionConfig(fresh, user.id) : null
-          if (retryCfg) {
-            const retryClient = await connectMcp(retryCfg)
-            mcpClients.push(retryClient)
-            toolSets.push(await retryClient.tools())
-          }
-        } catch {
-          /* 재시도도 실패하면 이 커넥터 없이 진행 — 채팅 자체는 계속된다 */
-        }
-      }
+
+  const mcpClients: Awaited<ReturnType<typeof connectMcp>>[] = []
+  const toolSets: ToolSet[] = []
+  for (const r of [...serverResults, ...connectorResults]) {
+    if (r) {
+      mcpClients.push(r.client)
+      toolSets.push(r.tools)
     }
   }
   // 🔴 **이름순 정렬은 프롬프트 캐시를 살리는 장치다(장식이 아니다).**
