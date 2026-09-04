@@ -5,6 +5,7 @@ import { useChat } from "@ai-sdk/react"
 import { DefaultChatTransport, type UIMessage } from "ai"
 import { ArrowUp, Sparkles, Loader2, Plus, Paperclip, Globe, Plug, X, SquarePen, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Markdown } from "@/components/shared/Markdown"
 
 type Convo = { id: string; title: string | null; updated_at: string }
 
@@ -257,8 +258,13 @@ export function DashboardAssistant() {
                     <div className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
                       <Sparkles className="size-3.5" />
                     </div>
-                    <div className="max-w-[82%] whitespace-pre-wrap break-words rounded-2xl rounded-tl-sm bg-muted px-3.5 py-2.5 text-sm leading-relaxed">
-                      {messageText(m) || <span className="text-muted-foreground">생각 중…</span>}
+                    <div className="max-w-[82%] break-words rounded-2xl rounded-tl-sm bg-muted px-3.5 py-2.5 text-sm leading-relaxed">
+                      {/* 시스템 프롬프트가 "표는 마크다운으로"를 지시하므로 렌더도 마크다운이어야 한다(평문이면 원문 노출) */}
+                      {messageText(m) ? (
+                        <Markdown>{messageText(m)}</Markdown>
+                      ) : (
+                        <span className="text-muted-foreground">생각 중…</span>
+                      )}
                     </div>
                   </div>
                 )

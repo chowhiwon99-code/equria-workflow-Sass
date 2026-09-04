@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { ArrowUp, ArrowLeft, X, Plus, Maximize2, Minimize2, Copy, Check, Sparkles, SlidersHorizontal, Wrench, Brain, Loader2, SquarePen, History, Trash2 } from "lucide-react"
+import { ArrowUp, ArrowLeft, X, Plus, Maximize2, Minimize2, Copy, Check, Sparkles, SlidersHorizontal, Wrench, Brain, Loader2, SquarePen, History, Trash2, Square } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { renderAgentIcon } from "@/components/agents/AgentIcon"
 import { useAgentChat, type Agent, type WidgetPosition } from "./AgentChatContext"
@@ -656,7 +656,7 @@ function ChatBody({ agent }: { agent: Agent }) {
     [agent.id, setConversationId]
   )
 
-  const { messages, sendMessage, status, error, setMessages } = useChat({ transport })
+  const { messages, sendMessage, status, error, setMessages, stop, regenerate } = useChat({ transport })
 
   // 자동 스크롤 제어 ref — 진입·대화전환은 즉시(auto) 하단, 스트리밍은 smooth.
   const jumpToBottom = useRef(true)
@@ -845,7 +845,17 @@ function ChatBody({ agent }: { agent: Agent }) {
             />
           ))
         )}
-        {error && <p className="text-xs text-destructive">오류: {error.message}</p>}
+        {error && (
+          <div className="flex flex-wrap items-center gap-2 text-xs text-destructive">
+            <span>{error.message || "응답 중 오류가 발생했어요."}</span>
+            <button
+              onClick={() => void regenerate()}
+              className="rounded-md border border-destructive/30 px-2 py-0.5 font-medium transition-colors hover:bg-destructive/10"
+            >
+              다시 시도
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="border-t bg-card p-3">
@@ -895,16 +905,25 @@ function ChatBody({ agent }: { agent: Agent }) {
             placeholder="메시지 입력…"
             rows={1}
             className="max-h-32 flex-1 resize-none self-center bg-transparent py-1 text-sm outline-none placeholder:text-muted-foreground"
-            disabled={status !== "ready"}
           />
-          <button
-            onClick={submit}
-            disabled={status !== "ready" || !input.trim()}
-            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:hover:scale-100"
-            aria-label="전송"
-          >
-            <ArrowUp className="size-4" />
-          </button>
+          {loading ? (
+            <button
+              onClick={() => void stop()}
+              className="flex size-8 shrink-0 items-center justify-center rounded-full bg-foreground text-background transition-all hover:scale-105 active:scale-95"
+              aria-label="응답 중단"
+            >
+              <Square className="size-3 fill-current" />
+            </button>
+          ) : (
+            <button
+              onClick={submit}
+              disabled={!input.trim()}
+              className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:hover:scale-100"
+              aria-label="전송"
+            >
+              <ArrowUp className="size-4" />
+            </button>
+          )}
           </div>
         </div>
       </div>
@@ -928,16 +947,18 @@ function Bubble({
   const text = message.parts
     .map((p) => (p.type === "text" ? p.text : ""))
     .join("")
-  // MCP 등 도구 호출 parts(tool-*/dynamic-tool)에서 도구명 추출 — "🔧 사용" 칩으로 가시화
-  const toolNames = [
-    ...new Set(
-      message.parts
-        .map((p) =>
-          p.type === "dynamic-tool" ? p.toolName : p.type.startsWith("tool-") ? p.type.slice(5) : null
-        )
-        .filter((n): n is string => !!n)
-    ),
-  ]
+  // MCP 등 도구 호출 parts(tool-*/dynamic-tool)를 상태와 함께 가시화 —
+  // 실행 중(input-streaming/input-available)은 스피너, 완료는 렌치, 실패는 빨간 칩.
+  // 도구가 도는 동안 사용자가 "지금 뭘 하는지"를 실시간으로 보게 하는 게 목적(세션56 계획 1-3).
+  const toolChips = message.parts.flatMap((p, i) => {
+    const isDyn = p.type === "dynamic-tool"
+    if (!isDyn && !p.type.startsWith("tool-")) return []
+    const part = p as { type: string; toolName?: string; state?: string }
+    const name = (isDyn ? part.toolName : p.type.slice(5)) || "도구"
+    const state: "running" | "done" | "error" =
+      part.state === "output-error" ? "error" : part.state === "output-available" ? "done" : "running"
+    return [{ key: `${i}-${name}`, name, state }]
+  })
   const isUser = message.role === "user"
   const [copied, setCopied] = useState(false)
 
@@ -1008,14 +1029,25 @@ function Bubble({
             : "bg-muted text-foreground"
         )}
       >
-        {!isUser && toolNames.length > 0 && (
+        {!isUser && toolChips.length > 0 && (
           <div className="mb-1.5 flex flex-wrap gap-1">
-            {toolNames.map((n) => (
+            {toolChips.map((t) => (
               <span
-                key={n}
-                className="inline-flex items-center gap-1 rounded-full bg-background/70 px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+                key={t.key}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
+                  t.state === "error"
+                    ? "bg-destructive/10 text-destructive"
+                    : "bg-background/70 text-muted-foreground"
+                )}
               >
-                <Wrench className="size-3" /> {n}
+                {t.state === "running" ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <Wrench className="size-3" />
+                )}
+                {t.name}
+                {t.state === "running" ? " 실행 중…" : t.state === "error" ? " 실패" : ""}
               </span>
             ))}
           </div>
