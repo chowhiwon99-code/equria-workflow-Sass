@@ -247,6 +247,40 @@ export const SEED_AGENTS: SeedAgentSpec[] = SEED_TEMPLATE_IDS.flatMap((id) => {
   return [{ templateId: id, name, description: t.description, icon: p.icon, systemPrompt: p.systemPrompt }]
 })
 
+/** 채팅 빈 화면의 시작 제안 칩 — 라벨은 짧게, 클릭 시 보내는 text는 프롬프트 §예시의 입력을 그대로 쓴다
+ *  (샘플 데이터가 들어 있어 클릭 한 번으로 실제 결과를 보여주는 게 목적 — 세션56 계획 1-6). */
+export type SeedStarter = { label: string; text: string }
+
+const SEED_STARTERS: Record<(typeof SEED_TEMPLATE_IDS)[number], SeedStarter[]> = {
+  bookkeeping: [
+    {
+      label: "카드 내역 분류해보기",
+      text: "3월 카드 내역 정리해줘. 3/2 카페 12,000 / 3/5 문구점 A4용지 8,900 / 3/9 주유소 70,000",
+    },
+    { label: "부가세 신고 전 체크리스트", text: "부가가치세 신고 전에 확인해야 할 것들을 체크리스트로 만들어줘." },
+    { label: "내가 뭘 주면 돼?", text: "어떤 자료를 어떤 형식으로 주면 되는지 알려줘." },
+  ],
+  "cs-firstline": [
+    { label: "환불 문의 응대 초안", text: "어제 받은 상품이 파손됐어요. 환불해 주세요." },
+    { label: "배송 지연 문의 응대", text: "주문한 지 일주일이 지났는데 아직 배송 준비 중이에요. 언제 오나요?" },
+    { label: "내가 뭘 주면 돼?", text: "어떤 내용을 주면 되는지, 어떤 형식으로 답을 주는지 알려줘." },
+  ],
+  "meeting-summary": [
+    {
+      label: "회의 메모 → 할 일 정리",
+      text: "가격 두 안 놓고 얘기함. B안으로 가기로. 랜딩 문구는 다음에. 디자인은 지영님이 이번 주까지.",
+    },
+    { label: "내가 뭘 주면 돼?", text: "회의 메모를 어떤 식으로 주면 정리가 제일 잘 되는지 알려줘." },
+  ],
+}
+
+/** 에이전트 이름으로 시작 제안을 찾는다 — 시드 에이전트(카테고리 '시작하기')에서만 쓰인다. */
+export function getSeedStarters(agentName: string): SeedStarter[] {
+  const spec = SEED_AGENTS.find((s) => s.name === agentName)
+  if (!spec) return []
+  return SEED_STARTERS[spec.templateId as (typeof SEED_TEMPLATE_IDS)[number]] ?? []
+}
+
 /**
  * 신규 워크스페이스에 시작 에이전트 3개를 만든다. **전부 best-effort**다.
  *

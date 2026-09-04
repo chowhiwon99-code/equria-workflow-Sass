@@ -10,6 +10,7 @@ import { ArrowUp, ArrowLeft, X, Plus, Maximize2, Minimize2, Copy, Check, Sparkle
 import { cn } from "@/lib/utils"
 import { renderAgentIcon } from "@/components/agents/AgentIcon"
 import { useAgentChat, type Agent, type WidgetPosition } from "./AgentChatContext"
+import { SEED_AGENT_CATEGORY, getSeedStarters } from "@/lib/seedAgents"
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider"
 import { AgentMemoryPanel } from "./AgentMemoryPanel"
 import { MEMORY_KINDS, MEMORY_KIND_LABEL, isMemoryKind, type AgentMemoryKind } from "@/lib/agentMemory"
@@ -832,7 +833,22 @@ function ChatBody({ agent }: { agent: Agent }) {
             <span className="text-4xl">{renderAgentIcon(agent.icon, "size-9")}</span>
             <p className="text-sm font-medium">{agent.name}</p>
             <p className="text-xs text-muted-foreground">{agent.description}</p>
-            <p className="mt-2 text-xs text-muted-foreground">메시지를 입력해 시작하세요.</p>
+            {agent.category === SEED_AGENT_CATEGORY && getSeedStarters(agent.name).length > 0 ? (
+              // 시드 에이전트: 프롬프트 §예시의 샘플 입력을 원클릭 시작 칩으로 — 첫 대화의 빈 화면 제거(세션56 계획 1-6)
+              <div className="mt-3 flex w-full max-w-[280px] flex-col items-stretch gap-1.5">
+                {getSeedStarters(agent.name).map((s) => (
+                  <button
+                    key={s.label}
+                    onClick={() => sendMessage({ text: s.text })}
+                    className="rounded-xl border bg-card px-3 py-2 text-left text-xs transition-colors hover:border-primary/40 hover:bg-primary/5"
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-xs text-muted-foreground">메시지를 입력해 시작하세요.</p>
+            )}
           </div>
         ) : (
           messages.map((m) => (
