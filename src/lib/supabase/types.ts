@@ -2372,6 +2372,76 @@ export type Database = {
           },
         ]
       }
+      ideas: {
+        Row: {
+          body: string
+          created_at: string
+          created_by: string
+          id: string
+          last_surfaced_at: string | null
+          source_note_id: string | null
+          source_snippet: string | null
+          status: string
+          surface_count: number
+          tags: string[]
+          title: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          body?: string
+          created_at?: string
+          created_by: string
+          id?: string
+          last_surfaced_at?: string | null
+          source_note_id?: string | null
+          source_snippet?: string | null
+          status?: string
+          surface_count?: number
+          tags?: string[]
+          title: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          last_surfaced_at?: string | null
+          source_note_id?: string | null
+          source_snippet?: string | null
+          status?: string
+          surface_count?: number
+          tags?: string[]
+          title?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ideas_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ideas_source_note_id_fkey"
+            columns: ["source_note_id"]
+            isOneToOne: false
+            referencedRelation: "meeting_notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ideas_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leave_requests: {
         Row: {
           created_at: string
@@ -2721,6 +2791,7 @@ export type Database = {
           meeting_date: string | null
           meeting_time: string | null
           title: string
+          transcript: Json | null
           updated_at: string
           user_id: string
           workspace_id: string
@@ -2740,6 +2811,7 @@ export type Database = {
           meeting_date?: string | null
           meeting_time?: string | null
           title?: string
+          transcript?: Json | null
           updated_at?: string
           user_id: string
           workspace_id: string
@@ -2759,6 +2831,7 @@ export type Database = {
           meeting_date?: string | null
           meeting_time?: string | null
           title?: string
+          transcript?: Json | null
           updated_at?: string
           user_id?: string
           workspace_id?: string
@@ -3821,6 +3894,8 @@ export type Database = {
         Returns: undefined
       }
       shares_workspace_with: { Args: { other_user: string }; Returns: boolean }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
       submit_document: { Args: { doc_id: string }; Returns: string }
       workspace_seat_limit: {
         Args: { p_workspace_id: string }

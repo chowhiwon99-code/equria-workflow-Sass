@@ -2,7 +2,7 @@
 
 import { BubbleMenu } from "@tiptap/react/menus"
 import type { Editor } from "@tiptap/react"
-import { Minus, Trash2, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Bold, Italic, Strikethrough, Code, Highlighter, Link as LinkIcon, AlignLeft, AlignCenter, AlignRight } from "lucide-react"
+import { Minus, Trash2, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Bold, Italic, Strikethrough, Code, Highlighter, Link as LinkIcon, AlignLeft, AlignCenter, AlignRight, Lightbulb } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const bar = "flex items-center gap-0.5 rounded-lg border bg-popover p-1 text-xs shadow-[var(--shadow-lg)]"
@@ -108,8 +108,8 @@ export function TableMenu({ editor }: { editor: Editor }) {
 
 const mbtn = "rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 
-/** 텍스트 선택 시 뜨는 인라인 서식 툴바 — 굵게·기울임·취소선·코드·형광펜·링크. (표/코드블록 안에선 숨김) */
-export function TextMenu({ editor }: { editor: Editor }) {
+/** 텍스트 선택 시 뜨는 인라인 서식 툴바 — 굵게·기울임·취소선·코드·형광펜·링크 (+아이디어 캡처, P1). (표/코드블록 안에선 숨김) */
+export function TextMenu({ editor, onIdea }: { editor: Editor; onIdea?: (selectedText: string) => void }) {
   const item = (active: boolean) => cn(mbtn, active && "bg-muted text-foreground")
   const toggleLink = () => {
     if (editor.isActive("link")) {
@@ -153,6 +153,21 @@ export function TextMenu({ editor }: { editor: Editor }) {
         <button className={item(editor.isActive("link"))} title="링크" onClick={toggleLink}>
           <LinkIcon className="size-3.5" />
         </button>
+        {onIdea && (
+          <>
+            <div className={sep} />
+            <button
+              className={mbtn}
+              title="아이디어로 저장 (창고에 보관)"
+              onClick={() => {
+                const { from, to } = editor.state.selection
+                onIdea(editor.state.doc.textBetween(from, to, "\n").trim())
+              }}
+            >
+              <Lightbulb className="size-3.5" />
+            </button>
+          </>
+        )}
       </div>
     </BubbleMenu>
   )

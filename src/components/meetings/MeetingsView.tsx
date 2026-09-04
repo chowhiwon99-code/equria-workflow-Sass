@@ -15,6 +15,7 @@ import { SelectionBar } from "@/components/shared/SelectionBar"
 import { Loading, EmptyState } from "@/components/shared/States"
 import { MeetingEditor } from "./MeetingEditor"
 import { MeetingTable } from "./MeetingTable"
+import { IdeasPanel } from "@/components/ideas/IdeasPanel"
 import type { Tables } from "@/lib/supabase/types"
 
 type Note = Tables<"meeting_notes">
@@ -66,7 +67,7 @@ export function MeetingsView() {
   const [editing, setEditing] = useState<Note | null>(null)
   const [editLoading, setEditLoading] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
-  const [listMode, setListMode] = useState<"grid" | "table">("grid")
+  const [listMode, setListMode] = useState<"grid" | "table" | "ideas">("grid")
 
   const load = useCallback(async () => {
     if (!me) return setLoading(false)
@@ -105,7 +106,8 @@ export function MeetingsView() {
   }
 
   // 목록은 메타만 들고 있으므로 열 때 본문(content·graph)을 lazy fetch(P0). 새 노트(null)는 즉시.
-  const openNote = async (n: NoteMeta | null) => {
+  // id만 있으면 열 수 있다 — 아이디어 창고의 "원문" 점프(P1)·딥링크(P2)가 재사용.
+  const openNote = async (n: Pick<NoteMeta, "id"> | null) => {
     if (!n) {
       setEditing(null)
       setView("edit")
@@ -262,30 +264,30 @@ export function MeetingsView() {
             <Select value={folderSort} onChange={(v) => setFolderSort(v as FolderSort)} options={SORT_OPTIONS} align="end" className="h-8" />
           )}
           <div className="inline-flex rounded-full bg-muted p-0.5 text-xs">
-            <button
-              onClick={() => setListMode("grid")}
-              className={cn(
-                "min-w-14 rounded-full px-3 py-1 text-center font-medium transition-colors",
-                listMode === "grid" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              그리드
-            </button>
-            <button
-              onClick={() => setListMode("table")}
-              className={cn(
-                "min-w-14 rounded-full px-3 py-1 text-center font-medium transition-colors",
-                listMode === "table" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              표
-            </button>
+            {([
+              ["grid", "그리드"],
+              ["table", "표"],
+              ["ideas", "아이디어"],
+            ] as const).map(([mode, label]) => (
+              <button
+                key={mode}
+                onClick={() => setListMode(mode)}
+                className={cn(
+                  "min-w-14 rounded-full px-3 py-1 text-center font-medium transition-colors",
+                  listMode === mode ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
       {listMode === "table" ? (
         <MeetingTable notes={notes} categories={categories} onOpen={openNote} onReload={load} />
+      ) : listMode === "ideas" ? (
+        me && <IdeasPanel me={me} onOpenNote={(id) => void openNote({ id })} />
       ) : (
         <>
       {/* 루트에서만 폴더 그리드 */}

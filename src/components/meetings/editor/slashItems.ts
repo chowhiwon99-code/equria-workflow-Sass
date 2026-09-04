@@ -17,10 +17,16 @@ import {
   Image as ImageIcon,
   Paperclip,
   Calendar,
+  Lightbulb,
   type LucideIcon,
 } from "lucide-react"
 
-export type SlashHandlers = { onImage: (editor: Editor) => void; onFile: (editor: Editor) => void }
+export type SlashHandlers = {
+  onImage: (editor: Editor) => void
+  onFile: (editor: Editor) => void
+  /** 아이디어 캡처(P1) — 캡처 다이얼로그를 여는 콜백. 미주입 시 슬래시 메뉴에 항목이 안 뜬다. */
+  onIdea?: (editor: Editor) => void
+}
 
 export type SlashItem = {
   key: string
@@ -211,6 +217,23 @@ export function buildSlashItems(handlers: SlashHandlers): SlashItem[] {
         handlers.onFile(editor)
       },
     },
+    // 아이디어 캡처(P1) — 핸들러가 주입된 화면(회의록 에디터)에서만 노출
+    ...(handlers.onIdea
+      ? [
+          {
+            key: "idea",
+            title: "아이디어",
+            hint: "창고에 저장",
+            section: "아이디어",
+            icon: Lightbulb,
+            keywords: ["idea", "아이디어", "창고", "저장"],
+            command: ({ editor, range }) => {
+              editor.chain().focus().deleteRange(range).run()
+              handlers.onIdea?.(editor)
+            },
+          } satisfies SlashItem,
+        ]
+      : []),
   ]
 }
 

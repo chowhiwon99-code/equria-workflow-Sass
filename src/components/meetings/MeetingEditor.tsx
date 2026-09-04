@@ -14,8 +14,11 @@ import { MeetingDocEditor } from "./editor/MeetingDocEditor"
 import { MeetingHeader } from "./MeetingHeader"
 import { AiAssistPanel } from "./AiAssistPanel"
 import { ResearchPanel } from "./ResearchPanel"
+import { TranscriptPanel } from "./TranscriptPanel"
+import { IdeaCaptureDialog } from "@/components/ideas/IdeaCaptureDialog"
 import { PRINT_CSS, escapeHtml, type GraphData } from "./meetingContent"
-import type { Tables } from "@/lib/supabase/types"
+import type { ParsedTranscript } from "@/lib/transcript"
+import type { Tables, Json } from "@/lib/supabase/types"
 
 type Note = Tables<"meeting_notes">
 
@@ -52,6 +55,7 @@ export function MeetingEditor({
       attendees: note?.attendees ?? "",
       content: note?.content ?? "",
       graph: (note?.graph as GraphData | null) ?? null,
+      transcript: (note?.transcript as ParsedTranscript | null) ?? null,
     }),
     [note]
   )
@@ -61,6 +65,9 @@ export function MeetingEditor({
   const [attendees, setAttendees] = useState(init.attendees)
   const [content, setContent] = useState(init.content) // 본문 HTML
   const [graphData, setGraphData] = useState<GraphData | null>(init.graph)
+  const [transcript, setTranscript] = useState<ParsedTranscript | null>(init.transcript) // P1 전사(본문과 분리)
+  const [pendingRaw, setPendingRaw] = useState<string | null>(null) // 붙여넣기에서 감지된 전사(선택 대기)
+  const [ideaDraft, setIdeaDraft] = useState<string | null>(null) // 아이디어 캡처 다이얼로그(null=닫힘)
   const [busy, setBusy] = useState(false)
   const [researchOpen, setResearchOpen] = useState(false)
   const editorRef = useRef<Editor | null>(null)
@@ -75,7 +82,8 @@ export function MeetingEditor({
       meetingDate !== init.meetingDate ||
       attendees !== init.attendees ||
       content !== init.content ||
-      JSON.stringify(graphData) !== JSON.stringify(init.graph))
+      JSON.stringify(graphData) !== JSON.stringify(init.graph) ||
+      JSON.stringify(transcript) !== JSON.stringify(init.transcript))
 
   useEffect(() => {
     if (!dirty) return
@@ -102,6 +110,7 @@ export function MeetingEditor({
         meeting_date: meetingDate || null,
         attendees: attendees.trim() || null,
         graph: graphData,
+        transcript: transcript as unknown as Json,
       }
       if (note?.id) {
         // 편집 충돌 완화(P0) — 라스트라이트윈이라, 내가 여는 사이 다른 사람이 저장했으면 덮어쓰기 전에 확인.
@@ -189,6 +198,17 @@ export function MeetingEditor({
         <AiAssistPanel editorRef={editorRef} disabled={busy} onToggleResearch={() => setResearchOpen((o) => !o)} />
       )}
 
+      {/* 전사(P1) — 붙여넣기 감지 배너 + 보관된 전사 + 메모 완성(Enhance) */}
+      <TranscriptPanel
+        canEdit={canEdit}
+        transcript={transcript}
+        setTranscript={setTranscript}
+        pendingRaw={pendingRaw}
+        setPendingRaw={setPendingRaw}
+        editorRef={editorRef}
+        meta={[title, meetingDate, attendees].filter(Boolean).join(" · ")}
+      />
+
       {/* 리서치 워크벤치 + 저장된 꼬리물기 그래프 복원 */}
       <ResearchPanel
         open={researchOpen}
@@ -207,8 +227,20 @@ export function MeetingEditor({
           editable={canEdit}
           onChange={setContent}
           editorRef={editorRef}
+          onIdeaCapture={canEdit ? (text) => setIdeaDraft(text) : undefined}
+          onTranscriptDetected={canEdit ? setPendingRaw : undefined}
         />
       </div>
+
+      {/* 아이디어 캡처(P1) — 선택 텍스트 또는 빈 손으로 창고에 담기 */}
+      {ideaDraft !== null && (
+        <IdeaCaptureDialog
+          me={me}
+          sourceNoteId={note?.id ?? null}
+          initialText={ideaDraft}
+          onClose={() => setIdeaDraft(null)}
+        />
+      )}
     </div>
   )
 }
