@@ -886,7 +886,8 @@ function ChatBody({ agent }: { agent: Agent }) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
+              // 한글 IME 조합 중 Enter는 무시 — 마지막 글자 잔류/중복 전송 방지 (DashboardAssistant와 동일 가드)
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault()
                 submit()
               }

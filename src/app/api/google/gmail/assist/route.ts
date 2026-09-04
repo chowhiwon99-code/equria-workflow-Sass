@@ -3,6 +3,7 @@ import { anthropic, MODELS } from "@/lib/claude/client"
 import { createClient } from "@/lib/supabase/server"
 import { recordAiUsage } from "@/lib/aiUsage"
 import { getUserWorkspaceId } from "@/lib/workspace"
+import { checkBudget, BUDGET_EXCEEDED_MSG } from "@/lib/budget"
 
 export const maxDuration = 60
 export const runtime = "nodejs"
@@ -70,6 +71,10 @@ export async function POST(req: Request) {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return new Response("Unauthorized", { status: 401 })
+
+  // 예산 게이트 — 다른 AI 라우트와 동일 패턴(세션52 발견: assist 3형제만 누락돼 있었다).
+  const budget = await checkBudget(user.id, "interactive")
+  if (!budget.ok) return new Response(budget.message ?? BUDGET_EXCEEDED_MSG, { status: 429 })
 
   const body = (await req.json().catch(() => null)) as
     | { text?: unknown; action?: unknown; targetLang?: unknown }
