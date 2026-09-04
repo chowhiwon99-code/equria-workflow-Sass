@@ -32,3 +32,32 @@ export function useOnlineUsers(meId: string | null): Set<string> {
 
   return online
 }
+
+/**
+ * 특정 회의록을 지금 보고 있는 다른 사용자 id 집합 — 편집 충돌(라스트라이트윈) 완화용 표시(P0).
+ * 워크스페이스 presence와 같은 원리, 채널만 노트 단위로 좁힘. noteId 없으면(새 노트) 구독 안 함.
+ */
+export function useNoteViewers(noteId: string | null, meId: string | null): Set<string> {
+  const wsId = useCurrentWorkspaceId()
+  const [viewers, setViewers] = useState<Set<string>>(() => new Set())
+
+  useEffect(() => {
+    if (!meId || !wsId || !noteId) return
+    const supabase = createClient()
+    const channel = supabase.channel(`presence-note-${wsId}-${noteId}`, { config: { presence: { key: meId } } })
+    channel
+      .on("presence", { event: "sync" }, () => {
+        const ids = new Set(Object.keys(channel.presenceState()))
+        ids.delete(meId) // 본인 제외 — "다른 사람이 보는 중"만 표시
+        setViewers(ids)
+      })
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") void channel.track({ at: Date.now() })
+      })
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [meId, wsId, noteId])
+
+  return viewers
+}

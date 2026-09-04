@@ -10,8 +10,10 @@ import { cn } from "@/lib/utils"
 import { fieldClass } from "@/components/shared/Modal"
 import type { Tables } from "@/lib/supabase/types"
 import { IMPORTANCE, importanceLabel, importanceColor, CATEGORY_COLORS, tagBg, swatch } from "@/lib/meetingMeta"
+import type { NoteMeta } from "./MeetingsView"
 
-type Note = Tables<"meeting_notes">
+// P0 다이어트: 표는 메타만 다루므로 본문(content)·graph가 없는 NoteMeta를 받는다.
+type Note = NoteMeta
 type Category = Tables<"meeting_categories">
 type MetaPatch = Partial<Pick<Note, "category_id" | "importance" | "meeting_date" | "meeting_time">>
 

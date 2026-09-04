@@ -18,6 +18,25 @@ import { MeetingTable } from "./MeetingTable"
 import type { Tables } from "@/lib/supabase/types"
 
 type Note = Tables<"meeting_notes">
+/** 목록용 메타 — content(본문 HTML)·graph(jsonb)는 목록에서 안 쓰므로 로드하지 않는다(P0 다이어트).
+ *  노트가 쌓여도 목록 페이로드가 본문 크기에 비례해 커지지 않게. 본문은 열 때 lazy fetch. */
+export type NoteMeta = Pick<
+  Note,
+  | "id"
+  | "user_id"
+  | "workspace_id"
+  | "title"
+  | "meeting_date"
+  | "meeting_time"
+  | "attendees"
+  | "folder_id"
+  | "category_id"
+  | "importance"
+  | "created_at"
+  | "updated_at"
+>
+const NOTE_META_COLS =
+  "id, user_id, workspace_id, title, meeting_date, meeting_time, attendees, folder_id, category_id, importance, created_at, updated_at"
 type Category = Tables<"meeting_categories">
 type FolderRow = { id: string; name: string; created_at: string }
 type FolderSort = "name" | "recent" | "old" | "count"
@@ -36,7 +55,7 @@ export function MeetingsView() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [names, setNames] = useState<Record<string, string>>({})
   const [positions, setPositions] = useState<Record<string, string | null>>({})
-  const [notes, setNotes] = useState<Note[]>([])
+  const [notes, setNotes] = useState<NoteMeta[]>([])
   const [folders, setFolders] = useState<FolderRow[]>([])
   const [currentFolder, setCurrentFolder] = useState<string | null>(null) // null = 루트(전체)
   const [folderSort, setFolderSort] = useState<FolderSort>("name")
@@ -45,6 +64,7 @@ export function MeetingsView() {
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState<"list" | "edit">("list")
   const [editing, setEditing] = useState<Note | null>(null)
+  const [editLoading, setEditLoading] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
   const [listMode, setListMode] = useState<"grid" | "table">("grid")
 
@@ -52,13 +72,13 @@ export function MeetingsView() {
     if (!me) return setLoading(false)
     const [{ data: prof }, { data: list }, { data: ppl }, { data: fdrs }, { data: cats }] = await Promise.all([
       supabase.from("profiles").select("role").eq("id", me).single(),
-      supabase.from("meeting_notes").select("*").order("created_at", { ascending: false }),
+      supabase.from("meeting_notes").select(NOTE_META_COLS).order("created_at", { ascending: false }),
       supabase.from("profiles").select("id, name, position"),
       supabase.from("meeting_note_folders").select("id, name, created_at").order("created_at"),
       supabase.from("meeting_categories").select("*").order("sort_order"),
     ])
     setIsAdmin(prof?.role === "admin")
-    setNotes((list as Note[]) ?? [])
+    setNotes((list as NoteMeta[]) ?? [])
     setNames(Object.fromEntries((ppl ?? []).map((p) => [p.id, p.name])))
     setPositions(Object.fromEntries((ppl ?? []).map((p) => [p.id, p.position])))
     setFolders((fdrs as FolderRow[]) ?? [])
@@ -84,9 +104,24 @@ export function MeetingsView() {
     clearSel()
   }
 
-  const openNote = (n: Note | null) => {
-    setEditing(n)
+  // 목록은 메타만 들고 있으므로 열 때 본문(content·graph)을 lazy fetch(P0). 새 노트(null)는 즉시.
+  const openNote = async (n: NoteMeta | null) => {
+    if (!n) {
+      setEditing(null)
+      setView("edit")
+      return
+    }
     setView("edit")
+    setEditLoading(true)
+    setEditing(null)
+    const { data, error } = await supabase.from("meeting_notes").select("*").eq("id", n.id).maybeSingle()
+    if (error || !data) {
+      toast.error("회의록을 불러오지 못했어요.")
+      setView("list")
+    } else {
+      setEditing(data as Note)
+    }
+    setEditLoading(false)
   }
   const backToList = () => setView("list")
   const afterChange = () => {
@@ -143,6 +178,7 @@ export function MeetingsView() {
   if (loading) return <Loading rows={5} />
 
   if (view === "edit" && me) {
+    if (editLoading) return <Loading rows={5} />
     return (
       <MeetingEditor
         note={editing}
@@ -150,6 +186,7 @@ export function MeetingsView() {
         isAdmin={isAdmin}
         authorName={editing ? names[editing.user_id] : undefined}
         authorPosition={editing ? positions[editing.user_id] : undefined}
+        names={names}
         onBack={backToList}
         onSaved={afterChange}
         onDeleted={afterChange}
