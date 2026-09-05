@@ -3,13 +3,11 @@ import {
   convertToModelMessages,
   stepCountIs,
   type UIMessage,
-  type ToolSet,
   type ModelMessage,
 } from "ai"
 import { anthropic } from "@/lib/claude/client"
 import { createClient } from "@/lib/supabase/server"
-import { connectMcp, resolveUserConnectionConfig } from "@/lib/mcp/connect"
-import { MCP_CONNECTORS } from "@/lib/mcp"
+import { startMcpToolLoad, collectMcpTools, connectorUsageNotes } from "@/lib/mcp/loadTools"
 import { buildMemoryBlock, type ExtractTurn } from "@/lib/agentMemory"
 import { OUTPUT_STYLE_RULE } from "@/lib/claude/style"
 import { extractAndStoreMemories } from "@/lib/agentMemoryExtract"
@@ -203,80 +201,22 @@ export async function POST(
     .order("created_at", { ascending: false })
     .limit(30)
 
-  // MCP 서버 + 개인 커넥터의 도구 로드 — 서버·커넥터별로 **병렬** 연결(TTFT의 최대 지분).
-  // ⚠️ 실패는 종전과 같이 개별 무시 — 커넥터 하나의 실패가 채팅 전체를 죽이면 안 된다.
-  //    tools() 실패 시 이미 열린 클라이언트는 즉시 닫는다(누수 방지). 연결 완료 순서가 섞여도
-  //    Promise.all이 쿼리 행 순서를 보존하고, 최종적으로 아래 이름순 정렬이 바이트를 고정한다.
-  type McpLoaded = { client: Awaited<ReturnType<typeof connectMcp>>; tools: ToolSet } | null
-  const connectSafely = async (cfg: Parameters<typeof connectMcp>[0]): Promise<McpLoaded> => {
-    let client: Awaited<ReturnType<typeof connectMcp>> | null = null
-    try {
-      client = await connectMcp(cfg)
-      return { client, tools: await client.tools() }
-    } catch {
-      if (client) void client.close().catch(() => {})
-      return null
-    }
-  }
-
-  const mcpIds = agentVersion.mcp_servers ?? []
-  // ⚠️ order 필수 — 도구 정의는 렌더 순서상 system보다 **앞**이라, 도구 키 순서가 흔들리면
-  //    프롬프트 캐시가 system까지 통째로 무효가 된다(캐시는 prefix 완전 일치).
-  const serverToolsP: PromiseLike<McpLoaded[]> =
-    mcpIds.length === 0
-      ? Promise.resolve([])
-      : supabase
-          .from("mcp_servers")
-          .select("id, name, type, url, auth_type, is_active, encrypted_token")
-          .in("id", mcpIds)
-          .eq("is_active", true)
-          .order("created_at", { ascending: true })
-          .order("id", { ascending: true })
-          .then(({ data }) => Promise.all((data ?? []).map((srv) => connectSafely(srv))))
-
-  // 에이전트에 바인딩된 개인 MCP 커넥터만 — 실행자(요청자) 본인의 연결로 해석(공유 에이전트도 쓰는 사람 계정 기준).
+  // MCP 서버 + 개인 커넥터의 도구 로드 — 병렬 연결(TTFT의 최대 지분). 규약(이름순 정렬·order 필수·
+  // reject 금지·클라이언트 누수 방지)은 전부 lib/mcp/loadTools.ts 헤더에 있다(회의 노트 챗과 공용).
   const boundConnectors = agentVersion.mcp_connectors ?? []
-  const CONN_COLS = "id, connector_id, auth_method, encrypted_token, encrypted_refresh_token"
-  const connectorToolsP: PromiseLike<McpLoaded[]> =
-    boundConnectors.length === 0
-      ? Promise.resolve([])
-      : supabase
-          .from("mcp_user_connections")
-          .select(CONN_COLS)
-          .eq("user_id", user.id)
-          .in("connector_id", boundConnectors)
-          .order("created_at", { ascending: true }) // ⚠️ order 필수 — 위 mcp_servers와 같은 이유
-          .order("id", { ascending: true })
-          .then(({ data }) =>
-            Promise.all(
-              (data ?? []).map(async (row): Promise<McpLoaded> => {
-                const cfg = resolveUserConnectionConfig(row, user.id)
-                if (!cfg) return null
-                const first = await connectSafely(cfg)
-                if (first) return first
-                // access token 만료 시 일부 서버(구글 gmailmcp 등)가 첫 호출에 401을 던지는데,
-                // 그 과정에서 SDK OAuth 프로바이더가 refresh_token으로 갱신해 DB에 저장한다.
-                // → 갱신된 행을 다시 읽어 1회만 재연결(이게 없으면 만료 직후 첫 요청이 항상 실패).
-                try {
-                  const { data: fresh } = await supabase
-                    .from("mcp_user_connections")
-                    .select(CONN_COLS)
-                    .eq("id", row.id)
-                    .maybeSingle()
-                  const retryCfg = fresh ? resolveUserConnectionConfig(fresh, user.id) : null
-                  return retryCfg ? await connectSafely(retryCfg) : null
-                } catch {
-                  return null /* 재시도도 실패하면 이 커넥터 없이 진행 — 채팅 자체는 계속된다 */
-                }
-              }),
-            ),
-          )
+  const mcpToolsP = startMcpToolLoad({
+    supabase,
+    userId: user.id,
+    serverIds: agentVersion.mcp_servers ?? [],
+    // 에이전트에 바인딩된 개인 커넥터만 — 실행자(요청자) 본인의 연결로 해석(공유 에이전트도 쓰는 사람 계정 기준).
+    connectorIds: boundConnectors,
+  })
 
   // ── 병렬 준비 합류점 — 여기까지가 첫 토큰 전 대기의 전부다 ──────────────────────────
-  // ⚠️ 어떤 leg도 reject하지 않아야 한다(빌더는 {error} 반환·MCP는 connectSafely·지식은 내부 catch).
+  // ⚠️ 어떤 leg도 reject하지 않아야 한다(빌더는 {error} 반환·MCP는 loadTools 내부 처리·지식은 내부 catch).
   //    fail-fast가 일어나면 비행 중인 MCP 연결이 누수된다 — 새 leg를 추가할 때 이 규칙을 지킬 것.
-  const [, convRow, knowledge, { data: mems }, serverResults, connectorResults] =
-    await Promise.all([userInsertP, summaryP, knowledgeP, memoriesP, serverToolsP, connectorToolsP])
+  const [, convRow, knowledge, { data: mems }, mcpResults] =
+    await Promise.all([userInsertP, summaryP, knowledgeP, memoriesP, mcpToolsP])
 
   const convSummary: string | null = convRow?.data?.summary ?? null
   const summaryUpto = convRow?.data?.summary_upto ?? 0
@@ -305,36 +245,12 @@ export async function POST(
   volatileSystem += summaryBlock(convSummary)
   // 커넥터 사용 규칙(권한 한계) 자동 주입 — 안 되는 도구를 시도하거나 "재인증하라"고 오안내하지 않게(예: Gmail=작성 전용).
   // 바인딩된 커넥터에서만 나오므로 턴과 무관 → 캐시되는 안정 구간에 둔다.
-  const usageNotes = MCP_CONNECTORS.filter((c) => boundConnectors.includes(c.id) && c.usageNote).map(
-    (c) => `[${c.name} 사용 규칙] ${c.usageNote}`
-  )
+  const usageNotes = connectorUsageNotes(boundConnectors)
   if (usageNotes.length > 0) stableSystem += `\n\n${usageNotes.join("\n")}`
 
-  const mcpClients: Awaited<ReturnType<typeof connectMcp>>[] = []
-  const toolSets: ToolSet[] = []
-  for (const r of [...serverResults, ...connectorResults]) {
-    if (r) {
-      mcpClients.push(r.client)
-      toolSets.push(r.tools)
-    }
-  }
-  // 🔴 **이름순 정렬은 프롬프트 캐시를 살리는 장치다(장식이 아니다).**
-  //    도구 정의는 프롬프트의 **맨 앞(position 0)** 에 렌더된다 — 렌더 순서는 tools → system → messages.
-  //    따라서 도구 배열이 1바이트만 달라져도 tools·system·messages 캐시가 **통째로** 무효가 된다.
-  //    그런데 여기 들어오는 순서는 우리가 정하지 않는다:
-  //      · MCP 서버가 tools()로 돌려주는 순서는 규격상 보장되지 않고,
-  //      · 커넥터 하나가 토큰 만료로 재연결 경로를 타면 그 서버 도구가 뒤늦게 push된다(위 재시도 블록).
-  //    즉 같은 대화 안에서도 호출마다 순서가 바뀔 수 있다. MCP 도구는 여기서 가장 큰 덩어리라
-  //    (실측: Notion clean 입력 91,706토큰) 무효화되면 그 비용을 매번 정가로 낸다.
-  //    Object.keys 순서가 그대로 전송 배열 순서가 되므로, 이름순으로 고정해 바이트를 안정시킨다.
-  const mergedTools: ToolSet = Object.assign({}, ...toolSets)
-  const tools: ToolSet = Object.fromEntries(
-    Object.keys(mergedTools)
-      .sort()
-      .map((name) => [name, mergedTools[name]]),
-  )
+  // 이름순 정렬(프롬프트 캐시 보호)·클라이언트 수집·정리 함수는 loadTools가 담당 — 규약은 그 헤더 참고.
+  const { tools, closeAll: closeMcp } = collectMcpTools(mcpResults)
   const hasTools = Object.keys(tools).length > 0
-  const closeMcp = () => Promise.allSettled(mcpClients.map((c) => c.close()))
 
   // `system` 파라미터로는 캐시 breakpoint를 걸 수 없다(단일 문자열). system 역할 메시지로 쪼개
   // messages 맨 앞에 두고, 안정 구간 끝에만 cacheControl을 건다. 렌더 순서는 tools → system → messages.
