@@ -8,6 +8,7 @@ import {
 import { anthropic } from "@/lib/claude/client"
 import { createClient } from "@/lib/supabase/server"
 import { startMcpToolLoad, collectMcpTools, connectorUsageNotes } from "@/lib/mcp/loadTools"
+import { buildMeetingTools } from "@/lib/agentTools"
 import { buildMemoryBlock, type ExtractTurn } from "@/lib/agentMemory"
 import { OUTPUT_STYLE_RULE } from "@/lib/claude/style"
 import { extractAndStoreMemories } from "@/lib/agentMemoryExtract"
@@ -68,7 +69,7 @@ export async function POST(
     checkBudget(user.id, "interactive"),
     supabase
       .from("agent_versions")
-      .select("system_prompt, model, max_tokens, temperature, mcp_servers, mcp_connectors")
+      .select("system_prompt, model, max_tokens, temperature, mcp_servers, mcp_connectors, native_tools")
       .eq("agent_id", agentId)
       .eq("is_current", true)
       .maybeSingle(),
@@ -249,7 +250,15 @@ export async function POST(
   if (usageNotes.length > 0) stableSystem += `\n\n${usageNotes.join("\n")}`
 
   // 이름순 정렬(프롬프트 캐시 보호)·클라이언트 수집·정리 함수는 loadTools가 담당 — 규약은 그 헤더 참고.
-  const { tools, closeAll: closeMcp } = collectMcpTools(mcpResults)
+  const { tools: mcpTools, closeAll: closeMcp } = collectMcpTools(mcpResults)
+  // 앱 내부 도구 개방(P5) — native_tools에 'meetings'가 있으면 회의록·아이디어 도구를 함께 붙인다.
+  // 병합 후 다시 이름순으로 고정해야 캐시 프리픽스가 안정된다(MCP만 정렬돼 있으면 소용없다).
+  const nativeTools =
+    (agentVersion.native_tools ?? []).includes("meetings") && workspaceId
+      ? buildMeetingTools({ supabase, workspaceId, userId: user.id })
+      : {}
+  const mergedAll = { ...nativeTools, ...mcpTools }
+  const tools = Object.fromEntries(Object.keys(mergedAll).sort().map((k) => [k, mergedAll[k]]))
   const hasTools = Object.keys(tools).length > 0
 
   // `system` 파라미터로는 캐시 breakpoint를 걸 수 없다(단일 문자열). system 역할 메시지로 쪼개

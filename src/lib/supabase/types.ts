@@ -216,6 +216,7 @@ export type Database = {
           mcp_connectors: string[]
           mcp_servers: string[]
           model: string
+          native_tools: string[]
           system_prompt: string
           temperature: number
           tools: Json
@@ -232,6 +233,7 @@ export type Database = {
           mcp_connectors?: string[]
           mcp_servers?: string[]
           model?: string
+          native_tools?: string[]
           system_prompt: string
           temperature?: number
           tools?: Json
@@ -248,6 +250,7 @@ export type Database = {
           mcp_connectors?: string[]
           mcp_servers?: string[]
           model?: string
+          native_tools?: string[]
           system_prompt?: string
           temperature?: number
           tools?: Json

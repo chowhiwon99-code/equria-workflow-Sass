@@ -36,6 +36,8 @@ export type AgentFormInitial = {
   max_tokens: number
   mcp_servers: string[]
   mcp_connectors: string[]
+  /** 앱 내부 도구 개방(P5) — 예: ['meetings']면 회의록·아이디어를 읽는다 */
+  native_tools: string[]
 }
 
 // 생성(create) 모드에서 위저드가 넘겨주는 초기값(부분). id 없음.
@@ -123,6 +125,12 @@ export function AgentBuilderForm({
   const [mcpConnectors, setMcpConnectors] = useState<string[]>(
     initial?.mcp_connectors ?? prefill?.mcp_connectors ?? []
   )
+  // 앱 내부 데이터 접근(P5) — 지금은 회의록·아이디어('meetings') 하나. 켜면 이 에이전트가
+  // 회의록을 검색·열람하고 아이디어 창고를 본다(컴피만 가능하던 것을 에이전트에도 개방).
+  const [useMeetings, setUseMeetings] = useState<boolean>(
+    (initial?.native_tools ?? prefill?.native_tools ?? []).includes("meetings")
+  )
+  const nativeTools = useMeetings ? ["meetings"] : []
   const [availableConnectors, setAvailableConnectors] = useState<{ id: string; name: string }[]>([])
   useEffect(() => {
     fetch("/api/mcp/user-connections")
@@ -234,6 +242,7 @@ export function AgentBuilderForm({
         max_tokens: maxTokens,
         mcp_servers: mcpServers,
         mcp_connectors: mcpConnectors,
+        native_tools: nativeTools,
         version: 1,
         is_current: true,
         created_by: me,
@@ -351,6 +360,7 @@ export function AgentBuilderForm({
           max_tokens: maxTokens,
           mcp_servers: mcpServers,
         mcp_connectors: mcpConnectors,
+        native_tools: nativeTools,
           version,
           is_current: true, // 트리거 handle_new_agent_version 가 이전 버전 is_current=false 처리
           created_by: me,
@@ -742,6 +752,22 @@ export function AgentBuilderForm({
           </div>
         </div>
       )}
+
+      {/* 앱 내부 데이터 접근(P5) — 회의록·아이디어 창고를 이 에이전트가 직접 읽게 할지 */}
+      <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border p-3">
+        <input
+          type="checkbox"
+          checked={useMeetings}
+          onChange={(e) => setUseMeetings(e.target.checked)}
+          className="size-4"
+        />
+        <div className="flex flex-col">
+          <span className="text-sm font-medium">회의록·아이디어 읽기</span>
+          <span className="text-xs text-muted-foreground">
+            켜면 이 에이전트가 우리 회사 회의록을 검색·열람하고 아이디어 창고를 참고해 답해요.
+          </span>
+        </div>
+      </label>
 
       {/* 공유 토글 */}
       <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border p-3">

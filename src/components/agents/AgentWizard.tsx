@@ -13,7 +13,7 @@ import {
   type WizardField,
   type WizardInputs,
 } from "@/lib/agentBuilder"
-import { AGENT_TEMPLATES } from "@/lib/agentTemplates"
+import { AGENT_TEMPLATES, MEETING_TOOL_TEMPLATE_IDS } from "@/lib/agentTemplates"
 import { AgentBuilderForm } from "@/components/agents/AgentBuilderForm"
 import { KnowledgeFilePicker } from "@/components/agents/KnowledgeFilePicker"
 import { McpConnectorPicker } from "@/components/agents/McpConnectorPicker"
@@ -279,6 +279,10 @@ export function AgentWizard({ mcpPrefill, templateId }: { mcpPrefill?: string[];
                 ...(mcpPrefill?.length ? { mcp_servers: mcpPrefill } : {}),
                 ...(((inputs.mcpConnectors as string[]) ?? []).length
                   ? { mcp_connectors: inputs.mcpConnectors as string[] }
+                  : {}),
+                // 회의·아이디어 전문 팩(P5)은 회의록 읽기를 기본 on으로 — 그 도구가 있어야 제 역할을 한다.
+                ...(templateId && MEETING_TOOL_TEMPLATE_IDS.includes(templateId)
+                  ? { native_tools: ["meetings"] }
                   : {}),
                 ...(knowledge.length ? { knowledge } : {}),
               }}

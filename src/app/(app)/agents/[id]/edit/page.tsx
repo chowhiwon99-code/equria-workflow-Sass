@@ -65,6 +65,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
         max_tokens: cur?.max_tokens ?? 4096,
         mcp_servers: cur?.mcp_servers ?? [],
         mcp_connectors: cur?.mcp_connectors ?? [],
+        native_tools: cur?.native_tools ?? [], // P5: 회의록·아이디어 읽기 토글 유지
       })
       setLoading(false)
     })()
