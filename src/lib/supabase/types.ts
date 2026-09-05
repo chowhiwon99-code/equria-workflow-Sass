@@ -2695,6 +2695,94 @@ export type Database = {
           },
         ]
       }
+      meeting_action_items: {
+        Row: {
+          assignee_id: string | null
+          created_at: string
+          created_by: string | null
+          due_date: string | null
+          id: string
+          note_id: string
+          personal_task_id: string | null
+          project_task_id: string | null
+          status: string
+          title: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          assignee_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          due_date?: string | null
+          id?: string
+          note_id: string
+          personal_task_id?: string | null
+          project_task_id?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          assignee_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          due_date?: string | null
+          id?: string
+          note_id?: string
+          personal_task_id?: string | null
+          project_task_id?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_action_items_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_action_items_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_action_items_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "meeting_notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_action_items_personal_task_id_fkey"
+            columns: ["personal_task_id"]
+            isOneToOne: false
+            referencedRelation: "personal_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_action_items_project_task_id_fkey"
+            columns: ["project_task_id"]
+            isOneToOne: false
+            referencedRelation: "project_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_action_items_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meeting_categories: {
         Row: {
           color: string
@@ -2781,6 +2869,7 @@ export type Database = {
           attachment_path: string | null
           attachment_size: number | null
           attendees: string | null
+          calendar_event_id: string | null
           category_id: string | null
           content: string
           created_at: string
@@ -2790,6 +2879,7 @@ export type Database = {
           importance: number
           meeting_date: string | null
           meeting_time: string | null
+          project_id: string | null
           search_text: string | null
           title: string
           transcript: Json | null
@@ -2802,6 +2892,7 @@ export type Database = {
           attachment_path?: string | null
           attachment_size?: number | null
           attendees?: string | null
+          calendar_event_id?: string | null
           category_id?: string | null
           content?: string
           created_at?: string
@@ -2811,6 +2902,7 @@ export type Database = {
           importance?: number
           meeting_date?: string | null
           meeting_time?: string | null
+          project_id?: string | null
           search_text?: string | null
           title?: string
           transcript?: Json | null
@@ -2823,6 +2915,7 @@ export type Database = {
           attachment_path?: string | null
           attachment_size?: number | null
           attendees?: string | null
+          calendar_event_id?: string | null
           category_id?: string | null
           content?: string
           created_at?: string
@@ -2832,6 +2925,7 @@ export type Database = {
           importance?: number
           meeting_date?: string | null
           meeting_time?: string | null
+          project_id?: string | null
           search_text?: string | null
           title?: string
           transcript?: Json | null
@@ -2840,6 +2934,13 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "meeting_notes_calendar_event_id_fkey"
+            columns: ["calendar_event_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "meeting_notes_category_id_fkey"
             columns: ["category_id"]
@@ -2852,6 +2953,13 @@ export type Database = {
             columns: ["folder_id"]
             isOneToOne: false
             referencedRelation: "meeting_note_folders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_notes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
           {
@@ -3874,6 +3982,10 @@ export type Database = {
       }
       set_file_folder: {
         Args: { p_file: string; p_folder: string }
+        Returns: undefined
+      }
+      set_meeting_links: {
+        Args: { p_event: string; p_note: string; p_project: string }
         Returns: undefined
       }
       set_meeting_meta: {

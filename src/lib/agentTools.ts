@@ -22,7 +22,16 @@ const stripHtml = (html: string) => html.replace(/<[^>]*>/g, " ").replace(/\s{2,
  * (검색창·컴피·회의 챗·관련 사이드바가 같은 RPC 소비 — 마이그150 헤더 참고).
  * 인용 규약: 회의록을 근거로 답할 땐 `[제목](/meetings?note=<id>)` 링크로 출처를 남긴다.
  */
-export function buildMeetingTools({ supabase, workspaceId }: { supabase: DB; workspaceId: string }): ToolSet {
+export function buildMeetingTools({
+  supabase,
+  workspaceId,
+  userId,
+}: {
+  supabase: DB
+  workspaceId: string
+  /** 있으면 "내 담당" 필터가 가능해진다(컴피는 항상 전달, 회의 챗은 선택) */
+  userId?: string
+}): ToolSet {
   return {
     search_meeting_notes: tool({
       description:
@@ -79,6 +88,30 @@ export function buildMeetingTools({ supabase, workspaceId }: { supabase: DB; wor
       },
     }),
 
+    list_open_action_items: tool({
+      description:
+        "회의에서 나왔지만 아직 처리되지 않은 할 일(액션아이템)을 조회한다. '지난 회의 할 일 어떻게 됐어', " +
+        "'내가 해야 할 게 뭐 남았지' 같은 질문에 사용. mine=true면 내 담당만.",
+      inputSchema: z.object({ mine: z.boolean().optional().describe("기본 false(전체)") }),
+      execute: async ({ mine }) => {
+        let q = supabase
+          .from("meeting_action_items")
+          .select("title, due_date, status, assignee_id, note_id")
+          .eq("workspace_id", workspaceId)
+          .eq("status", "open")
+        if (mine && userId) q = q.eq("assignee_id", userId)
+        const { data } = await q.order("due_date", { ascending: true, nullsFirst: false }).limit(30)
+        return {
+          items: (data ?? []).map((a) => ({
+            title: a.title,
+            due_date: a.due_date,
+            assignee_id: a.assignee_id,
+            source_note_id: a.note_id,
+          })),
+        }
+      },
+    }),
+
     list_ideas: tool({
       description:
         "아이디어 창고를 조회한다(제목·태그·상태·출처 회의). '아이디어 뭐 쌓였어', '보류했던 아이디어' 같은 질문에 사용. " +
@@ -110,7 +143,7 @@ export function buildMeetingTools({ supabase, workspaceId }: { supabase: DB; wor
 export function buildCompiTools({ supabase, userId, workspaceId }: { supabase: DB; userId: string; workspaceId: string }): ToolSet {
   return {
     // 회의록·아이디어 도구 병합(P2) — 컴피가 드디어 회의록을 읽는다(선언돼 있던 후속의 이행)
-    ...buildMeetingTools({ supabase, workspaceId }),
+    ...buildMeetingTools({ supabase, workspaceId, userId }),
 
     get_attendance_balances: tool({
       description:

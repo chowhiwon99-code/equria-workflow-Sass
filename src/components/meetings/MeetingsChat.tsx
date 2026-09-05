@@ -3,10 +3,11 @@
 // 창고에 질문 — 회의노트 대개편 P2 (Granola "chat with folders" 패턴).
 // 회의록·아이디어 전체를 횡단 질의하는 우측 시트. 답변의 인용 링크([제목](/meetings?note=id))를
 // 클릭하면 페이지 이동 없이 해당 회의록을 그 자리에서 연다(무끊김).
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useChat } from "@ai-sdk/react"
 import { DefaultChatTransport, type UIMessage } from "ai"
 import { ArrowUp, Loader2, MessageCircleQuestion, Square, X } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { Markdown } from "@/components/shared/Markdown"
 
@@ -38,7 +39,20 @@ export function MeetingsChat({
 }) {
   const [input, setInput] = useState("")
   const scrollRef = useRef<HTMLDivElement>(null)
-  const transport = useMemo(() => new DefaultChatTransport({ api: "/api/meeting-notes/chat" }), [])
+  // 내가 연결해둔 개인 커넥터(Pro+에서만 서버가 실제로 붙인다 — 라우트 가드). 회의 전 컨텍스트
+  // 가져오기/회의 후 내보내기를 같은 시트에서 하기 위한 배선.
+  const [connectorIds, setConnectorIds] = useState<string[]>([])
+  useEffect(() => {
+    const supabase = createClient()
+    void supabase
+      .from("mcp_user_connections")
+      .select("connector_id")
+      .then(({ data }) => setConnectorIds((data ?? []).map((r) => r.connector_id).slice(0, 8)))
+  }, [])
+  const transport = useMemo(
+    () => new DefaultChatTransport({ api: "/api/meeting-notes/chat", body: () => ({ connectorIds }) }),
+    [connectorIds],
+  )
   const { messages, sendMessage, status, error, stop, clearError } = useChat({
     transport,
     experimental_throttle: 50, // 스트리밍 렌더 배칭 — 위젯·컴피와 동일(품질 기준)

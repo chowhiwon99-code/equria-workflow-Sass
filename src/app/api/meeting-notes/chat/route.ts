@@ -6,6 +6,8 @@ import { checkBudget, BUDGET_EXCEEDED_MSG } from "@/lib/budget"
 import { getUserWorkspaceId, withWorkspace } from "@/lib/workspace"
 import { OUTPUT_STYLE_RULE } from "@/lib/claude/style"
 import { buildMeetingTools } from "@/lib/agentTools"
+import { startMcpToolLoad, collectMcpTools, connectorUsageNotes } from "@/lib/mcp/loadTools"
+import { meetsMinPlan } from "@/lib/plans"
 
 export const maxDuration = 60
 export const runtime = "nodejs"
@@ -43,19 +45,36 @@ export async function POST(req: Request) {
   const workspaceId = await getUserWorkspaceId(supabase, user.id)
   if (!workspaceId) return new Response("Forbidden", { status: 403 })
 
-  const body = (await req.json().catch(() => ({}))) as { messages?: UIMessage[] }
+  const body = (await req.json().catch(() => ({}))) as { messages?: UIMessage[]; connectorIds?: string[] }
   // ⚠️ 클라이언트발 system 메시지는 프롬프트 주입 — user/assistant만 신뢰(assistant 라우트와 동일).
   const messages = (body.messages ?? []).filter((m) => m.role === "user" || m.role === "assistant")
   if (messages.length === 0) return new Response("Bad Request", { status: 400 })
 
   const startedAt = Date.now()
-  const modelMessages = await convertToModelMessages(messages.slice(-HISTORY_WINDOW))
-  const tools = buildMeetingTools({ supabase, workspaceId })
 
+  // 개인 MCP 커넥터 합류(P3) — **Pro+ 기능**(대표 확정: MCP 연동은 Pro 차별점 유지).
+  // 여기가 유일한 서버 가드다. 커넥터를 못 쓰는 플랜이면 회의록 도구만으로 정상 동작한다(기능 저하 없음).
+  // ⚠️ 요청받은 커넥터 id는 신뢰하지 않는다 — 본인이 실제로 연결한 것만 loadTools가 쿼리로 걸러낸다.
+  const requested = Array.isArray(body.connectorIds) ? body.connectorIds.filter((c) => typeof c === "string").slice(0, 8) : []
+  const { data: ws } = await supabase.from("workspaces").select("plan").eq("id", workspaceId).maybeSingle()
+  const canUseConnectors = meetsMinPlan(ws?.plan, "pro")
+  const connectorIds = canUseConnectors ? requested : []
+
+  const [modelMessages, mcpResults] = await Promise.all([
+    convertToModelMessages(messages.slice(-HISTORY_WINDOW)),
+    startMcpToolLoad({ supabase, userId: user.id, connectorIds }),
+  ])
+  const { tools: mcpTools, closeAll: closeMcp } = collectMcpTools(mcpResults)
+  // 네이티브(회의) 도구 + MCP 도구 — 캐시 프리픽스 안정성을 위해 최종 키를 이름순으로 고정한다.
+  const merged = { ...buildMeetingTools({ supabase, workspaceId, userId: user.id }), ...mcpTools }
+  const tools = Object.fromEntries(Object.keys(merged).sort().map((k) => [k, merged[k]]))
+
+  // 커넥터 사용 규칙(권한 한계)은 턴과 무관 → 캐시되는 안정 구간 끝에.
+  const usageNotes = connectorIds.length > 0 ? connectorUsageNotes(connectorIds) : []
   const systemMessages: ModelMessage[] = [
     {
       role: "system",
-      content: SYSTEM_BASE + OUTPUT_STYLE_RULE,
+      content: SYSTEM_BASE + (usageNotes.length ? `\n\n${usageNotes.join("\n")}` : "") + OUTPUT_STYLE_RULE,
       providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
     },
   ]
@@ -68,6 +87,7 @@ export async function POST(req: Request) {
     stopWhen: stepCountIs(6), // 검색→전문 여러 건 읽기→종합까지 다단계 허용
     maxOutputTokens: 3072,
     async onFinish({ totalUsage }) {
+      await closeMcp() // 연 커넥터는 반드시 닫는다(누수 방지 — loadTools 규약)
       const inT = totalUsage.inputTokens ?? 0
       const outT = totalUsage.outputTokens ?? 0
       const cacheReadTokens = totalUsage.inputTokenDetails?.cacheReadTokens ?? 0
@@ -93,6 +113,7 @@ export async function POST(req: Request) {
       )
     },
     async onError({ error }) {
+      await closeMcp()
       await supabase.from("agent_usage").insert(
         withWorkspace(
           {

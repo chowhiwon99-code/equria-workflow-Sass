@@ -16,6 +16,7 @@ import { AiAssistPanel } from "./AiAssistPanel"
 import { ResearchPanel } from "./ResearchPanel"
 import { TranscriptPanel } from "./TranscriptPanel"
 import { RelatedSidebar } from "./RelatedSidebar"
+import { ActionItemsSection } from "./ActionItemsSection"
 import { IdeaCaptureDialog } from "@/components/ideas/IdeaCaptureDialog"
 import { PRINT_CSS, escapeHtml, type GraphData } from "./meetingContent"
 import type { ParsedTranscript } from "@/lib/transcript"
@@ -72,6 +73,7 @@ export function MeetingEditor({
   const [transcript, setTranscript] = useState<ParsedTranscript | null>(init.transcript) // P1 전사(본문과 분리)
   const [pendingRaw, setPendingRaw] = useState<string | null>(null) // 붙여넣기에서 감지된 전사(선택 대기)
   const [ideaDraft, setIdeaDraft] = useState<string | null>(null) // 아이디어 캡처 다이얼로그(null=닫힘)
+  const [projectId, setProjectId] = useState<string | null>(note?.project_id ?? null) // P3 연결(RPC로 즉시 저장 — dirty 아님)
   const [busy, setBusy] = useState(false)
   const [researchOpen, setResearchOpen] = useState(false)
   const editorRef = useRef<Editor | null>(null)
@@ -191,6 +193,9 @@ export function MeetingEditor({
         onMeetingDateChange={setMeetingDate}
         attendees={canEdit ? attendees : (note?.attendees ?? "")}
         onAttendeesChange={setAttendees}
+        noteId={note?.id ?? null}
+        projectId={projectId}
+        onProjectChange={setProjectId}
         onBack={handleBack}
         onSave={save}
         onRemove={remove}
@@ -235,6 +240,9 @@ export function MeetingEditor({
           onTranscriptDetected={canEdit ? setPendingRaw : undefined}
         />
       </div>
+
+      {/* 회의에서 나온 할 일(P3) — 추출·담당자 확인·내 할 일로 가져오기. 저장된 노트에서만. */}
+      <ActionItemsSection noteId={note?.id ?? null} me={me} canEdit={canEdit} names={names} editorRef={editorRef} />
 
       {/* 관련 회의 사이드카(P2) — 비슷한 얘기를 했던 과거 회의(결과 없으면 미렌더, xl 전용) */}
       {onOpenNote && (

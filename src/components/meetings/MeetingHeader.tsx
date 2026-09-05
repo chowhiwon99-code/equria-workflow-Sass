@@ -2,8 +2,10 @@
 
 // 회의록 상단 — MeetingEditor 분해(P0). 상단 바(뒤로/PDF/삭제/저장) + 제목 + 메타(날짜·참석자) +
 // "보는 중" 표시(편집 충돌 완화). P3에서 프로젝트/일정 연결 셀렉트가 여기에 추가된다.
-import { useEffect, useRef } from "react"
-import { ArrowLeft, Trash2, Loader2, Calendar, Users, Eye, FileDown } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { toast } from "sonner"
+import { ArrowLeft, Trash2, Loader2, Calendar, Users, Eye, FileDown, FolderKanban } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 
 export function MeetingHeader({
@@ -19,6 +21,9 @@ export function MeetingHeader({
   onMeetingDateChange,
   attendees,
   onAttendeesChange,
+  noteId,
+  projectId,
+  onProjectChange,
   onBack,
   onSave,
   onRemove,
@@ -36,12 +41,49 @@ export function MeetingHeader({
   onMeetingDateChange: (v: string) => void
   attendees: string
   onAttendeesChange: (v: string) => void
+  /** 저장된 노트에서만 프로젝트 연결 가능(P3) */
+  noteId: string | null
+  projectId: string | null
+  onProjectChange: (id: string | null) => void
   onBack: () => void
   onSave: () => void
   onRemove: () => void
   onExportPdf: () => void
 }) {
   const titleRef = useRef<HTMLTextAreaElement>(null)
+  const [projects, setProjects] = useState<{ id: string; name: string }[]>([])
+
+  // 프로젝트 연결 후보(P3) — 저장된 노트에서만. 진행/예정만(끝난 프로젝트에 회의를 새로 붙일 일은 드묾).
+  useEffect(() => {
+    if (!noteId || !canEdit) return
+    const supabase = createClient()
+    void supabase
+      .from("projects")
+      .select("id, name")
+      .is("deleted_at", null)
+      .in("status", ["planned", "in_progress", "on_hold"])
+      .order("created_at", { ascending: false })
+      .limit(50)
+      .then(({ data }) => setProjects(data ?? []))
+  }, [noteId, canEdit])
+
+  // 연결은 메타 RPC(멤버 누구나) — 본문 편집권과 분리된 권한 패턴(065·070과 동일).
+  const linkProject = async (value: string) => {
+    if (!noteId) return
+    const next = value || null
+    const supabase = createClient()
+    const { error } = await supabase.rpc("set_meeting_links", {
+      p_note: noteId,
+      p_project: next as string,
+      p_event: null as unknown as string,
+    })
+    if (error) {
+      toast.error("프로젝트를 연결하지 못했어요.")
+      return
+    }
+    onProjectChange(next)
+    toast.success(next ? "프로젝트에 연결했어요." : "프로젝트 연결을 해제했어요.")
+  }
 
   useEffect(() => {
     const t = titleRef.current
@@ -132,6 +174,21 @@ export function MeetingHeader({
                 className="w-full border-0 bg-transparent p-0 text-xs text-foreground outline-none placeholder:text-muted-foreground/60 focus-visible:ring-0"
               />
             </label>
+            {noteId && projects.length > 0 && (
+              <label className="inline-flex items-center gap-1.5" title="이 회의를 프로젝트에 연결하면 컴피·창고 질의가 함께 묶어 답해요">
+                <FolderKanban className="size-3.5 shrink-0" />
+                <select
+                  value={projectId ?? ""}
+                  onChange={(e) => void linkProject(e.target.value)}
+                  className="max-w-[9rem] truncate border-0 bg-transparent p-0 text-xs text-foreground outline-none focus-visible:ring-0"
+                >
+                  <option value="">프로젝트 연결 안 함</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </label>
+            )}
           </>
         ) : (
           <>
