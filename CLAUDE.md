@@ -137,7 +137,7 @@ equria-workspace/
 
 ---
 
-## 6. DB 스키마 요약 (약 59개 테이블 · 마이그 001~147)
+## 6. DB 스키마 요약 (약 62개 테이블 · 마이그 001~155)
 
 | 영역 | 테이블 |
 |------|--------|
@@ -152,7 +152,7 @@ equria-workspace/
 | 프로젝트/개인 | `projects` · `project_members` · `project_tasks`(094) · `personal_tasks`(092) |
 | 테넌시 | `workspaces` · `workspace_members`(회사 격리·마이그030~) |
 | 파일/문서 | `files` · `business_cards` · `tax_invoices` |
-| 회의 | `meeting_notes` · `meeting_note_folders` · `meeting_categories`(분류·중요도, 마이그 070) |
+| 회의·아이디어 | `meeting_notes`(+`transcript` 149·`search_text` 150·`project_id`/`calendar_event_id` 152) · `meeting_note_folders` · `meeting_categories`(070) · `meeting_action_items`(액션아이템·알림 트리거, 153) · `ideas`(아이디어 창고, 148) · `idea_graphs`(아이디어 지도 캐시, 154) — 검색 RPC `search_meeting_notes`(pg_trgm) |
 | 근태/HR | `attendance_records`(사유=status enum: …연차·반차·월차) · `leave_requests` · `expense_reports` · `attendance_viewers`(열람 위임·064) · `hr_settings`(회사별 휴가·근무·휴무일 jsonb·오너 write·마이그128) · `profiles.hire_date`(근속 연차) |
 | 재무 | `finance_entries` · `fx_rates`(환율) |
 | 현금흐름(손익) | `cash_accounts`(슬롯) · `cash_transfers` · `cash_categories`(그룹) · `cashflow_settings` · `cash_calc_types`(회사 계산 유형·AST 수식) (마이그 078~085) |
@@ -161,7 +161,7 @@ equria-workspace/
 | AI 사용량(크레딧) | `workspace_credits` · `credit_ledger` (마이그132~133 — 차감은 **DB 트리거**가 한다) |
 | 결제/구독 | `billing_subscriptions` · `billing_payments` · `billing_keys`(**RLS 정책 0개 = 전면 거부**) · `billing_events`(감사로그) — 마이그139~142. 쓰기는 전부 `security definer` RPC(service_role 전용). 갱신 청구=`lib/billing/renew.ts`, 환불 계산=`lib/billing/refund.ts` |
 
-> 전체 SQL: `supabase/migrations/` (001~147, 135~137은 결번). 원격 적용·drift 없음. **세부 진행상황·최신 변경은 HANDOFF.md가 SSOT.**
+> 전체 SQL: `supabase/migrations/` (001~155, 135~137은 결번). 원격 적용·drift 없음. **세부 진행상황·최신 변경은 HANDOFF.md가 SSOT.**
 > ⚠️ 마이그147이 `workflows`·`workflow_runs`를 DROP했다(2026-09-04, 워크플로우 기능 전면 삭제 — 대표 결정, 에이전트에 집중).
 > 기본 에이전트 8개 시드: `supabase/seed.sql` 참고
 
