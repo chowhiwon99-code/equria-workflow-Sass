@@ -5,12 +5,14 @@
 // P4에서 재부상 카드·뇌구조 그래프(아이디어 지도)가 여기에 얹힌다.
 import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
-import { Lightbulb, Plus, Trash2, FileText } from "lucide-react"
+import { Lightbulb, Plus, Trash2, FileText, Network, Loader2, RefreshCw, Sparkles } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { EmptyState, Loading } from "@/components/shared/States"
+import { ResearchGraph } from "@/components/meetings/ResearchGraph"
 import { IdeaCaptureDialog } from "./IdeaCaptureDialog"
+import type { GraphData } from "@/components/meetings/meetingContent"
 import type { Tables } from "@/lib/supabase/types"
 
 type Idea = Tables<"ideas">
@@ -38,12 +40,64 @@ export function IdeasPanel({
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<IdeaStatus | "all">("all")
   const [capture, setCapture] = useState(false)
+  // 아이디어 지도(뇌구조, P4) — 캐시 조회는 무료, 재생성만 AI 호출(명시적 버튼)
+  const [mapOpen, setMapOpen] = useState(false)
+  const [graph, setGraph] = useState<GraphData | null>(null)
+  const [graphAt, setGraphAt] = useState<string | null>(null)
+  const [graphBusy, setGraphBusy] = useState(false)
+  // 재부상(P4) — 오래 안 본 씨앗·검토 아이디어 3건
+  const [resurfaced, setResurfaced] = useState<Idea[]>([])
 
   const load = useCallback(async () => {
     const { data } = await supabase.from("ideas").select("*").order("created_at", { ascending: false })
-    setIdeas((data as Idea[]) ?? [])
+    const list = (data as Idea[]) ?? []
+    setIdeas(list)
+    // 재부상: 오래 안 본 씨앗·검토 3건(한 번도 안 뜬 것 우선). 표시와 동시에 커서를 갱신해
+    // 다음엔 다른 아이디어가 올라오게 한다 — 크론 없이 화면 로드로만 도는 간격 반복.
+    const candidates = list
+      .filter((i) => i.status === "seed" || i.status === "review")
+      .sort((a, b) => (a.last_surfaced_at ?? "").localeCompare(b.last_surfaced_at ?? ""))
+      .slice(0, 3)
+    setResurfaced(candidates)
+    if (candidates.length > 0) {
+      // ⚠️ Supabase 빌더는 lazy thenable — `void rpc(...)` 단독이면 HTTP 전송 자체가 안 된다
+      //    (safe-changes §5. E2E에서 커서가 안 올라가 발견). .then으로 실제 실행시킨다.
+      void supabase
+        .rpc("touch_ideas_surfaced", { p_ids: candidates.map((c) => c.id) })
+        .then(() => {})
+    }
     setLoading(false)
   }, [supabase])
+
+  // 저장된 지도(캐시) 불러오기 — AI 호출 없음
+  const loadGraph = useCallback(async () => {
+    const res = await fetch("/api/ideas/graph")
+    if (!res.ok) return
+    const j = (await res.json()) as { graph: GraphData | null; updatedAt: string | null }
+    setGraph(j.graph)
+    setGraphAt(j.updatedAt)
+  }, [])
+
+  const rebuildGraph = async () => {
+    if (graphBusy) return
+    setGraphBusy(true)
+    try {
+      const res = await fetch("/api/ideas/graph", { method: "POST" })
+      if (!res.ok) throw new Error(res.status === 429 ? await res.text() : "지도를 만들지 못했어요.")
+      const j = (await res.json()) as { graph: GraphData | null; updatedAt: string | null; reason?: string }
+      if (!j.graph) {
+        toast.error(j.reason ?? "아이디어가 더 쌓이면 지도를 그릴 수 있어요.")
+        return
+      }
+      setGraph(j.graph)
+      setGraphAt(j.updatedAt)
+      toast.success("아이디어 지도를 새로 그렸어요.")
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setGraphBusy(false)
+    }
+  }
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -103,10 +157,74 @@ export function IdeasPanel({
           </button>
         ))}
         <span className="flex-1" />
+        <Button
+          size="sm"
+          variant={mapOpen ? "default" : "outline"}
+          onClick={() => {
+            const next = !mapOpen
+            setMapOpen(next)
+            if (next && !graph) void loadGraph()
+          }}
+          title="아이디어들이 어떻게 이어지는지 한눈에 보기"
+        >
+          <Network className="size-3.5" /> 아이디어 지도
+        </Button>
         <Button size="sm" variant="outline" onClick={() => setCapture(true)}>
           <Plus className="size-3.5" /> 아이디어
         </Button>
       </div>
+
+      {/* 아이디어 지도(뇌구조) — 리서치 그래프 캔버스를 그대로 재사용(d3-force) */}
+      {mapOpen && (
+        <div className="rounded-xl border bg-card p-3">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+              <Network className="size-3.5" /> 아이디어 지도
+              {graphAt && ` · ${new Date(graphAt).toLocaleDateString("ko-KR")} 기준`}
+            </span>
+            <span className="flex-1" />
+            <Button size="sm" variant="outline" onClick={rebuildGraph} disabled={graphBusy}>
+              {graphBusy ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
+              {graph ? "다시 그리기" : "지도 만들기"}
+            </Button>
+          </div>
+          {graph ? (
+            <ResearchGraph
+              nodes={graph.nodes}
+              links={graph.links}
+              topic="우리 팀 아이디어"
+              material=""
+              onInsert={() => {}}
+              onClose={() => setMapOpen(false)}
+            />
+          ) : (
+            <p className="py-6 text-center text-xs text-muted-foreground">
+              {graphBusy ? "아이디어들의 연결을 찾는 중…" : "아직 지도가 없어요. [지도 만들기]를 눌러 아이디어들이 어떻게 이어지는지 보세요."}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* 다시 떠오른 아이디어(재부상) — 창고의 핵심 가치. 오래 안 본 것부터 3건 */}
+      {!mapOpen && resurfaced.length > 0 && filter === "all" && (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
+          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-primary">
+            <Sparkles className="size-3" /> 다시 볼 만한 아이디어
+          </span>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {resurfaced.map((i) => (
+              <button
+                key={i.id}
+                onClick={() => setStatus(i, "review")}
+                title="클릭하면 '검토 중'으로 올려요"
+                className="rounded-full border bg-card px-2.5 py-1 text-xs transition-colors hover:border-primary/40"
+              >
+                {i.title}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {visible.length === 0 ? (
         <EmptyState

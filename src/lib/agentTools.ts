@@ -112,6 +112,28 @@ export function buildMeetingTools({
       },
     }),
 
+    get_resurfaced_ideas: tool({
+      description:
+        "오래 들여다보지 않은 아이디어(씨앗·검토 중)를 다시 꺼내온다. '요즘 볼 만한 아이디어 있어?', " +
+        "'묵혀둔 아이디어 좀 보여줘' 같은 질문이나 주간 회고에 사용.",
+      inputSchema: z.object({ limit: z.number().int().min(1).max(10).optional().describe("기본 3") }),
+      execute: async ({ limit }) => {
+        const { data } = await supabase
+          .from("ideas")
+          .select("id, title, body, tags, status, last_surfaced_at")
+          .eq("workspace_id", workspaceId)
+          .in("status", ["seed", "review"])
+          .order("last_surfaced_at", { ascending: true, nullsFirst: true })
+          .limit(limit ?? 3)
+        const rows = data ?? []
+        // 조회한 것은 재부상 커서를 갱신 — 다음엔 다른 아이디어가 올라온다(화면과 같은 규칙).
+        if (rows.length > 0) await supabase.rpc("touch_ideas_surfaced", { p_ids: rows.map((r) => r.id) })
+        return {
+          ideas: rows.map((i) => ({ title: i.title, summary: (i.body ?? "").slice(0, 200), tags: i.tags, status: i.status })),
+        }
+      },
+    }),
+
     list_ideas: tool({
       description:
         "아이디어 창고를 조회한다(제목·태그·상태·출처 회의). '아이디어 뭐 쌓였어', '보류했던 아이디어' 같은 질문에 사용. " +

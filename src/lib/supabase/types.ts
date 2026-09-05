@@ -2372,6 +2372,45 @@ export type Database = {
           },
         ]
       }
+      idea_graphs: {
+        Row: {
+          graph: Json
+          idea_count: number
+          updated_at: string
+          updated_by: string | null
+          workspace_id: string
+        }
+        Insert: {
+          graph: Json
+          idea_count?: number
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id: string
+        }
+        Update: {
+          graph?: Json
+          idea_count?: number
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "idea_graphs_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "idea_graphs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ideas: {
         Row: {
           body: string
@@ -4023,6 +4062,7 @@ export type Database = {
       show_trgm: { Args: { "": string }; Returns: string[] }
       strip_html: { Args: { t: string }; Returns: string }
       submit_document: { Args: { doc_id: string }; Returns: string }
+      touch_ideas_surfaced: { Args: { p_ids: string[] }; Returns: undefined }
       workspace_seat_limit: {
         Args: { p_workspace_id: string }
         Returns: number
