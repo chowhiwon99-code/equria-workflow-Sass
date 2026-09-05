@@ -15,6 +15,7 @@ import { MeetingHeader } from "./MeetingHeader"
 import { AiAssistPanel } from "./AiAssistPanel"
 import { ResearchPanel } from "./ResearchPanel"
 import { TranscriptPanel } from "./TranscriptPanel"
+import { RelatedSidebar } from "./RelatedSidebar"
 import { IdeaCaptureDialog } from "@/components/ideas/IdeaCaptureDialog"
 import { PRINT_CSS, escapeHtml, type GraphData } from "./meetingContent"
 import type { ParsedTranscript } from "@/lib/transcript"
@@ -32,6 +33,7 @@ export function MeetingEditor({
   onBack,
   onSaved,
   onDeleted,
+  onOpenNote,
 }: {
   note: Note | null
   me: string
@@ -43,6 +45,8 @@ export function MeetingEditor({
   onBack: () => void
   onSaved: () => void
   onDeleted: () => void
+  /** 관련 회의(사이드카)에서 다른 노트 열기 — 미저장 변경이 있으면 확인 후(P2) */
+  onOpenNote?: (noteId: string) => void
 }) {
   const supabase = createClient()
   const wsId = useCurrentWorkspaceId() // B1-b
@@ -231,6 +235,18 @@ export function MeetingEditor({
           onTranscriptDetected={canEdit ? setPendingRaw : undefined}
         />
       </div>
+
+      {/* 관련 회의 사이드카(P2) — 비슷한 얘기를 했던 과거 회의(결과 없으면 미렌더, xl 전용) */}
+      {onOpenNote && (
+        <RelatedSidebar
+          currentNoteId={note?.id ?? null}
+          title={title}
+          onOpenNote={(id) => {
+            if (dirty && !confirm("저장하지 않은 변경이 있어요. 다른 회의록으로 이동할까요?")) return
+            onOpenNote(id)
+          }}
+        />
+      )}
 
       {/* 아이디어 캡처(P1) — 선택 텍스트 또는 빈 손으로 창고에 담기 */}
       {ideaDraft !== null && (

@@ -1,7 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-import { Plus, NotebookPen, ChevronRight } from "lucide-react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { Plus, NotebookPen, ChevronRight, Search, MessageCircleQuestion, X } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
@@ -15,6 +15,7 @@ import { SelectionBar } from "@/components/shared/SelectionBar"
 import { Loading, EmptyState } from "@/components/shared/States"
 import { MeetingEditor } from "./MeetingEditor"
 import { MeetingTable } from "./MeetingTable"
+import { MeetingsChat } from "./MeetingsChat"
 import { IdeasPanel } from "@/components/ideas/IdeasPanel"
 import type { Tables } from "@/lib/supabase/types"
 
@@ -68,6 +69,9 @@ export function MeetingsView() {
   const [editLoading, setEditLoading] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
   const [listMode, setListMode] = useState<"grid" | "table" | "ideas">("grid")
+  const [chatOpen, setChatOpen] = useState(false) // 창고에 질문(P2)
+  const [searchQ, setSearchQ] = useState("")
+  const [searchResults, setSearchResults] = useState<{ id: string; title: string; meeting_date: string | null; snippet: string }[] | null>(null)
 
   const load = useCallback(async () => {
     if (!me) return setLoading(false)
@@ -91,6 +95,26 @@ export function MeetingsView() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load()
   }, [load])
+
+  // 검색(P2) — 300ms 디바운스 → search_meeting_notes RPC(pg_trgm). 목록은 메타만 들고 있어 로컬 필터 불가.
+  // 짧은 질의(<2자)의 결과 클리어도 타임아웃(0ms) 안에서 — effect 동기 setState 금지 규칙 준수.
+  useEffect(() => {
+    const q = searchQ.trim()
+    const short = !wsId || q.length < 2
+    const t = setTimeout(
+      async () => {
+        if (short) {
+          setSearchResults(null)
+          return
+        }
+        const { data } = await supabase.rpc("search_meeting_notes", { p_workspace: wsId as string, p_q: q, p_limit: 12 })
+        setSearchResults((data ?? []) as NonNullable<typeof searchResults>)
+      },
+      short ? 0 : 300
+    )
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQ, wsId])
 
   const clearSel = () => setSel(new Set())
   const toggleSel = (id: string) =>
@@ -130,6 +154,19 @@ export function MeetingsView() {
     setView("list")
     load()
   }
+
+  // ?note=<id> 딥링크(P2) — 컴피·창고 질의의 인용 링크에서 진입. 로드 완료 후 최초 1회만.
+  // setTimeout(0) = openNote의 동기 setState를 effect 본문 밖으로(동기 setState 금지 규칙).
+  const deepLinked = useRef(false)
+  useEffect(() => {
+    if (deepLinked.current || loading) return
+    deepLinked.current = true
+    const id = new URLSearchParams(window.location.search).get("note")
+    if (!id) return
+    const t = setTimeout(() => void openNote({ id }), 0)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading])
 
   const createFolder = async (name: string) => {
     if (!me) return
@@ -192,6 +229,7 @@ export function MeetingsView() {
         onBack={backToList}
         onSaved={afterChange}
         onDeleted={afterChange}
+        onOpenNote={(id) => void openNote({ id })}
       />
     )
   }
@@ -219,11 +257,55 @@ export function MeetingsView() {
             <span className="hidden sm:inline">폴더를 더블클릭해 열고, 회의록을 끌어다 정리하세요.</span>
           </p>
         </div>
-        <Button size="sm" onClick={() => openNote(null)}>
-          <Plus className="size-3.5" /> 새 회의록
-        </Button>
+        <div className="flex items-center gap-1.5">
+          <label className="relative hidden items-center sm:flex">
+            <Search className="pointer-events-none absolute left-2.5 size-3.5 text-muted-foreground" />
+            <input
+              value={searchQ}
+              onChange={(e) => setSearchQ(e.target.value)}
+              placeholder="회의록 검색"
+              className="h-8 w-44 rounded-lg border border-border bg-card pl-8 pr-7 text-sm outline-none transition-[width] focus-visible:w-56 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            />
+            {searchQ && (
+              <button onClick={() => setSearchQ("")} className="absolute right-2 text-muted-foreground hover:text-foreground" aria-label="검색 지우기">
+                <X className="size-3.5" />
+              </button>
+            )}
+          </label>
+          <Button size="sm" variant="outline" onClick={() => setChatOpen(true)}>
+            <MessageCircleQuestion className="size-3.5" /> 창고에 질문
+          </Button>
+          <Button size="sm" onClick={() => openNote(null)}>
+            <Plus className="size-3.5" /> 새 회의록
+          </Button>
+        </div>
       </div>
 
+      {/* 검색 결과(P2) — 검색 중엔 목록 대신 결과만(스니펫과 함께). 지우면 원래 화면 복귀. */}
+      {searchResults !== null && (
+        <div className="flex flex-col gap-1.5">
+          {searchResults.length === 0 ? (
+            <p className="px-1 py-6 text-center text-sm text-muted-foreground">&lsquo;{searchQ.trim()}&rsquo; 검색 결과가 없어요.</p>
+          ) : (
+            searchResults.map((r) => (
+              <button
+                key={r.id}
+                onClick={() => void openNote({ id: r.id })}
+                className="rounded-xl border bg-card p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
+              >
+                <div className="flex items-baseline gap-2">
+                  <span className="text-sm font-medium">{r.title}</span>
+                  {r.meeting_date && <span className="text-[11px] text-muted-foreground">{r.meeting_date}</span>}
+                </div>
+                <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{r.snippet}</p>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+
+      {searchResults === null && (
+      <>
       {/* 경로(breadcrumb) + 폴더 정렬 */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-1 text-sm">
@@ -360,6 +442,11 @@ export function MeetingsView() {
       )}
         </>
       )}
+      </>
+      )}
+
+      {/* 창고에 질문(P2) — 회의록·아이디어 횡단 질의, 인용 클릭 시 제자리에서 열기 */}
+      <MeetingsChat open={chatOpen} onClose={() => setChatOpen(false)} onOpenNote={(id) => void openNote({ id })} />
     </div>
   )
 }

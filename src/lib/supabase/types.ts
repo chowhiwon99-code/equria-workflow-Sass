@@ -2790,6 +2790,7 @@ export type Database = {
           importance: number
           meeting_date: string | null
           meeting_time: string | null
+          search_text: string | null
           title: string
           transcript: Json | null
           updated_at: string
@@ -2810,6 +2811,7 @@ export type Database = {
           importance?: number
           meeting_date?: string | null
           meeting_time?: string | null
+          search_text?: string | null
           title?: string
           transcript?: Json | null
           updated_at?: string
@@ -2830,6 +2832,7 @@ export type Database = {
           importance?: number
           meeting_date?: string | null
           meeting_time?: string | null
+          search_text?: string | null
           title?: string
           transcript?: Json | null
           updated_at?: string
@@ -3859,6 +3862,16 @@ export type Database = {
         Args: { p_invite: string }
         Returns: undefined
       }
+      search_meeting_notes: {
+        Args: { p_limit?: number; p_q: string; p_workspace: string }
+        Returns: {
+          id: string
+          meeting_date: string
+          rank: number
+          snippet: string
+          title: string
+        }[]
+      }
       set_file_folder: {
         Args: { p_file: string; p_folder: string }
         Returns: undefined
@@ -3896,6 +3909,7 @@ export type Database = {
       shares_workspace_with: { Args: { other_user: string }; Returns: boolean }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      strip_html: { Args: { t: string }; Returns: string }
       submit_document: { Args: { doc_id: string }; Returns: string }
       workspace_seat_limit: {
         Args: { p_workspace_id: string }
