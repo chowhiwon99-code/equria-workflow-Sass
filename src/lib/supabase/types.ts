@@ -2863,6 +2863,185 @@ export type Database = {
           },
         ]
       }
+      meeting_decision_scans: {
+        Row: {
+          dismissed: boolean
+          found_count: number
+          note_id: string
+          scanned_at: string
+          scanned_by: string | null
+          scanned_len: number
+          workspace_id: string
+        }
+        Insert: {
+          dismissed?: boolean
+          found_count?: number
+          note_id: string
+          scanned_at?: string
+          scanned_by?: string | null
+          scanned_len?: number
+          workspace_id: string
+        }
+        Update: {
+          dismissed?: boolean
+          found_count?: number
+          note_id?: string
+          scanned_at?: string
+          scanned_by?: string | null
+          scanned_len?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_decision_scans_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: true
+            referencedRelation: "meeting_notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_decision_scans_scanned_by_fkey"
+            columns: ["scanned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_decision_scans_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meeting_decisions: {
+        Row: {
+          approved_by: string | null
+          confidence: number | null
+          created_at: string
+          decided_at: string
+          detail: string | null
+          dismissed_candidates: string[]
+          id: string
+          kind: string
+          last_surfaced_at: string | null
+          note_id: string | null
+          owner_id: string | null
+          relation: string | null
+          resolves_id: string | null
+          source: string
+          source_app: string | null
+          source_date: string | null
+          source_excerpt: string | null
+          source_title: string | null
+          statement: string
+          status: string
+          supersedes_id: string | null
+          surface_count: number
+          topic: string[]
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          approved_by?: string | null
+          confidence?: number | null
+          created_at?: string
+          decided_at: string
+          detail?: string | null
+          dismissed_candidates?: string[]
+          id?: string
+          kind?: string
+          last_surfaced_at?: string | null
+          note_id?: string | null
+          owner_id?: string | null
+          relation?: string | null
+          resolves_id?: string | null
+          source?: string
+          source_app?: string | null
+          source_date?: string | null
+          source_excerpt?: string | null
+          source_title?: string | null
+          statement: string
+          status?: string
+          supersedes_id?: string | null
+          surface_count?: number
+          topic?: string[]
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          approved_by?: string | null
+          confidence?: number | null
+          created_at?: string
+          decided_at?: string
+          detail?: string | null
+          dismissed_candidates?: string[]
+          id?: string
+          kind?: string
+          last_surfaced_at?: string | null
+          note_id?: string | null
+          owner_id?: string | null
+          relation?: string | null
+          resolves_id?: string | null
+          source?: string
+          source_app?: string | null
+          source_date?: string | null
+          source_excerpt?: string | null
+          source_title?: string | null
+          statement?: string
+          status?: string
+          supersedes_id?: string | null
+          surface_count?: number
+          topic?: string[]
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_decisions_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_decisions_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "meeting_notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_decisions_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_decisions_resolves_id_fkey"
+            columns: ["resolves_id"]
+            isOneToOne: false
+            referencedRelation: "meeting_decisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_decisions_supersedes_id_fkey"
+            columns: ["supersedes_id"]
+            isOneToOne: false
+            referencedRelation: "meeting_decisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_decisions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meeting_note_folders: {
         Row: {
           created_at: string
@@ -3998,6 +4177,10 @@ export type Database = {
       is_workspace_admin: { Args: { ws_id: string }; Returns: boolean }
       is_workspace_member: { Args: { ws_id: string }; Returns: boolean }
       leave_group_room: { Args: { p_room: string }; Returns: undefined }
+      link_decision_supersede: {
+        Args: { p_new: string; p_old: string; p_relation: string }
+        Returns: undefined
+      }
       mark_dm_read: { Args: { conv_id: string }; Returns: number }
       mark_room_read: { Args: { p_room: string }; Returns: undefined }
       owner_can_set_role: { Args: { target: string }; Returns: boolean }
@@ -4011,6 +4194,30 @@ export type Database = {
       revoke_workspace_invite: {
         Args: { p_invite: string }
         Returns: undefined
+      }
+      search_decisions: {
+        Args: {
+          p_before?: string
+          p_exclude_note?: string
+          p_kind?: string
+          p_limit?: number
+          p_q?: string
+          p_status?: string
+          p_topics?: string[]
+          p_workspace: string
+        }
+        Returns: {
+          decided_at: string
+          id: string
+          note_id: string
+          owner_id: string
+          sim: number
+          source_title: string
+          statement: string
+          status: string
+          supersedes_id: string
+          topic: string[]
+        }[]
       }
       search_meeting_notes: {
         Args: { p_limit?: number; p_q: string; p_workspace: string }

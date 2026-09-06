@@ -17,6 +17,8 @@ import { ResearchPanel } from "./ResearchPanel"
 import { TranscriptPanel } from "./TranscriptPanel"
 import { RelatedSidebar } from "./RelatedSidebar"
 import { ActionItemsSection } from "./ActionItemsSection"
+import { DecisionsSection } from "./DecisionsSection"
+import type { DecisionDraft } from "./DecisionApprovalBanner"
 import { IdeaCaptureDialog } from "@/components/ideas/IdeaCaptureDialog"
 import { PRINT_CSS, escapeHtml, type GraphData } from "./meetingContent"
 import type { ParsedTranscript } from "@/lib/transcript"
@@ -74,6 +76,9 @@ export function MeetingEditor({
   const [pendingRaw, setPendingRaw] = useState<string | null>(null) // 붙여넣기에서 감지된 전사(선택 대기)
   const [ideaDraft, setIdeaDraft] = useState<string | null>(null) // 아이디어 캡처 다이얼로그(null=닫힘)
   const [projectId, setProjectId] = useState<string | null>(note?.project_id ?? null) // P3 연결(RPC로 즉시 저장 — dirty 아님)
+  // 결정 승인 대기(Unit A) — 저장 직후 결정이 발견됐을 때만 채워진다. 없으면 화면에 아무 일도 안 일어난다.
+  const [pendingDrafts, setPendingDrafts] = useState<DecisionDraft[] | null>(null)
+  const [savedNoteId, setSavedNoteId] = useState<string | null>(note?.id ?? null)
   const [busy, setBusy] = useState(false)
   const [researchOpen, setResearchOpen] = useState(false)
   const editorRef = useRef<Editor | null>(null)
@@ -118,6 +123,7 @@ export function MeetingEditor({
         graph: graphData,
         transcript: transcript as unknown as Json,
       }
+      let savedId = note?.id ?? null
       if (note?.id) {
         // 편집 충돌 완화(P0) — 라스트라이트윈이라, 내가 여는 사이 다른 사람이 저장했으면 덮어쓰기 전에 확인.
         const { data: cur } = await supabase.from("meeting_notes").select("updated_at").eq("id", note.id).maybeSingle()
@@ -135,15 +141,86 @@ export function MeetingEditor({
         )
         toast.success("회의록을 저장했어요.")
       } else {
-        await mustOk(supabase.from("meeting_notes").insert({ ...payload, user_id: me, workspace_id: wsId as string }))
+        const created = await mustOk(
+          supabase
+            .from("meeting_notes")
+            .insert({ ...payload, user_id: me, workspace_id: wsId as string })
+            .select("id")
+            .single()
+        )
+        savedId = created.data?.id ?? null
         toast.success("회의록을 만들었어요.")
       }
+      setBusy(false)
+
+      // 결정 추출(Unit A) — 저장이 끝난 **뒤** 별도로 돈다. 실패·예산초과가 저장을 막지 않는다.
+      // 결정이 없으면 아무 일도 일어나지 않고 평소처럼 목록으로 나간다(화면이 조용해야 한다).
+      const found = savedId ? await scanForDecisions(savedId) : null
+      if (found && found.length > 0) {
+        setPendingDrafts(found)
+        setSavedNoteId(savedId)
+        return // 승인 카드를 보여주기 위해 편집기에 머문다
+      }
       onSaved()
+      return
     } catch {
       toast.error("저장에 실패했어요.")
     } finally {
       setBusy(false)
     }
+  }
+
+  /**
+   * 저장 직후 결정 스캔 — 커서(meeting_decision_scans)가 재실행을 막는다.
+   * 조건: 본문 200자 이상 · 지난 스캔보다 300자 이상 늘었을 때 · 닫지 않았을 때.
+   * 이건 "자동 재생성"이 아니라 **내용이 유의미하게 늘었을 때 1회 실행**이다.
+   */
+  const scanForDecisions = async (noteId: string): Promise<DecisionDraft[] | null> => {
+    try {
+      const text = editorRef.current?.getText().trim() ?? ""
+      if (text.length < 200) return null
+      const { data: scan } = await supabase
+        .from("meeting_decision_scans")
+        .select("scanned_len, dismissed")
+        .eq("note_id", noteId)
+        .maybeSingle()
+      if (scan?.dismissed) return null
+      if (scan && text.length - scan.scanned_len < 300) return null
+
+      const res = await fetch("/api/meeting-notes/extract-decisions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: text.slice(0, 24000), today: new Date().toLocaleDateString("en-CA") }),
+      })
+      if (!res.ok) return null
+      const { decisions } = (await res.json()) as { decisions: DecisionDraft[] }
+      await supabase.from("meeting_decision_scans").upsert(
+        {
+          note_id: noteId,
+          workspace_id: wsId as string,
+          scanned_len: text.length,
+          found_count: decisions.length,
+          scanned_at: new Date().toISOString(),
+          scanned_by: me,
+        },
+        { onConflict: "note_id" },
+      )
+      return decisions.length > 0 ? decisions : null
+    } catch {
+      return null // 추출 실패는 조용히 — 저장은 이미 끝났다
+    }
+  }
+
+  /** 승인 카드를 닫거나 승인이 끝나면 원래 흐름(목록 복귀)으로 돌아간다. */
+  const finishDecisionFlow = async () => {
+    if (savedNoteId) {
+      await supabase
+        .from("meeting_decision_scans")
+        .update({ dismissed: true })
+        .eq("note_id", savedNoteId)
+    }
+    setPendingDrafts(null)
+    onSaved()
   }
 
   const remove = async () => {
@@ -241,8 +318,22 @@ export function MeetingEditor({
         />
       </div>
 
+      {/* 이 회의의 결정(Unit A) — 원장에 남는 것. 할 일보다 상위 개념이라 위에 둔다. */}
+      <DecisionsSection
+        noteId={savedNoteId}
+        me={me}
+        canEdit={canEdit}
+        names={names}
+        meetingDate={meetingDate}
+        noteTitle={title}
+        editorRef={editorRef}
+        onOpenNote={onOpenNote}
+        pendingDrafts={pendingDrafts}
+        onPendingDone={finishDecisionFlow}
+      />
+
       {/* 회의에서 나온 할 일(P3) — 추출·담당자 확인·내 할 일로 가져오기. 저장된 노트에서만. */}
-      <ActionItemsSection noteId={note?.id ?? null} me={me} canEdit={canEdit} names={names} editorRef={editorRef} />
+      <ActionItemsSection noteId={savedNoteId} me={me} canEdit={canEdit} names={names} editorRef={editorRef} />
 
       {/* 관련 회의 사이드카(P2) — 비슷한 얘기를 했던 과거 회의(결과 없으면 미렌더, xl 전용) */}
       {onOpenNote && (

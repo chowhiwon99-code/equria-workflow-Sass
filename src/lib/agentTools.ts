@@ -88,10 +88,130 @@ export function buildMeetingTools({
       },
     }),
 
+    search_decisions: tool({
+      description:
+        "회사가 **내린 결정**을 조회한다(결정 원장). '우리 가격 어떻게 정했지', '그거 결정된 거야?', " +
+        "'아직 안 정해진 게 뭐야' 같은 질문에 사용. status: active(유효)·superseded(대체됨)·dropped(철회). " +
+        "kind: decision(결정)·open_question(미결 쟁점). " +
+        "⚠️ 결정은 '무엇이 유효한 방침인가'이고, 할 일(list_open_action_items)은 '누가 언제까지 무엇을 한다'이다 — 섞지 말 것.",
+      inputSchema: z.object({
+        query: z.string().max(100).optional().describe("검색어(주제·키워드). 없으면 최신순 목록"),
+        kind: z.enum(["decision", "open_question"]).optional().describe("기본 decision"),
+        status: z.enum(["active", "superseded", "dropped", "all"]).optional().describe("기본 active(지금 유효한 것만)"),
+      }),
+      execute: async ({ query, kind, status }) => {
+        const st = status === "all" ? null : (status ?? "active")
+        // 검색 + 상태 지정이면 RPC(trgm+topic 2채널). status='all'은 RPC가 표현 못 하므로
+        // 아래 테이블 쿼리로 흘려보낸다(ilike 필터 포함).
+        if (query && query.trim().length >= 2 && st) {
+          const { data } = await supabase.rpc("search_decisions", {
+            p_workspace: workspaceId,
+            p_q: query.trim(),
+            p_topics: [],
+            p_kind: kind ?? "decision",
+            p_status: st,
+            p_limit: 8,
+          })
+          return {
+            decisions: (data ?? []).map((d) => ({
+              decision_id: d.id,
+              statement: d.statement,
+              decided_at: d.decided_at,
+              status: d.status,
+              source_note_id: d.note_id,
+              source_title: d.source_title,
+            })),
+          }
+        }
+        let q = supabase
+          .from("meeting_decisions")
+          .select("id, statement, decided_at, status, note_id, source_title, kind")
+          .eq("workspace_id", workspaceId)
+          .eq("kind", kind ?? "decision")
+        if (st) q = q.eq("status", st)
+        if (query && query.trim().length >= 2) q = q.ilike("statement", `%${query.trim()}%`)
+        const { data } = await q.order("decided_at", { ascending: false }).limit(15)
+        return {
+          decisions: (data ?? []).map((d) => ({
+            decision_id: d.id,
+            statement: d.statement,
+            decided_at: d.decided_at,
+            status: d.status,
+            source_note_id: d.note_id,
+            source_title: d.source_title,
+          })),
+        }
+      },
+    }),
+
+    get_decision_history: tool({
+      description:
+        "한 결정이 어떻게 바뀌어 왔는지 **번복 이력 전체**를 본다. '이 결정 언제 바뀐 거야', " +
+        "'예전엔 어떻게 했었지' 같은 질문에 사용. search_decisions로 찾은 decision_id를 넣는다.",
+      inputSchema: z.object({ decision_id: z.string().uuid() }),
+      execute: async ({ decision_id }) => {
+        // 체인을 과거 방향으로 따라간다(최대 10단계 — 사이클·폭주 방어)
+        const chain: { statement: string; decided_at: string; status: string; relation: string | null }[] = []
+        let cursor: string | null = decision_id
+        for (let i = 0; i < 10 && cursor; i++) {
+          const { data }: { data: { statement: string; decided_at: string; status: string; relation: string | null; supersedes_id: string | null } | null } =
+            await supabase
+              .from("meeting_decisions")
+              .select("statement, decided_at, status, relation, supersedes_id")
+              .eq("id", cursor)
+              .eq("workspace_id", workspaceId)
+              .maybeSingle()
+          if (!data) break
+          chain.push({ statement: data.statement, decided_at: data.decided_at, status: data.status, relation: data.relation })
+          cursor = data.supersedes_id
+        }
+        return { history: chain, note: chain.length <= 1 ? "이 결정은 이전 결정을 대체한 적이 없어요." : undefined }
+      },
+    }),
+
+    get_decision_stats: tool({
+      description:
+        "결정 현황 요약 — 이번 달 결정 수·뒤집힌 수·미결 수. '이번 달 뭐 정했어', '결정 잘 되고 있나' 같은 질문에 사용.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        const first = new Date()
+        first.setDate(1)
+        const monthStart = first.toLocaleDateString("en-CA")
+        const [{ data: decided }, { data: reversed }, { data: open }] = await Promise.all([
+          supabase
+            .from("meeting_decisions")
+            .select("id")
+            .eq("workspace_id", workspaceId)
+            .eq("kind", "decision")
+            .neq("status", "dropped")
+            .gte("decided_at", monthStart),
+          supabase
+            .from("meeting_decisions")
+            .select("id")
+            .eq("workspace_id", workspaceId)
+            .in("relation", ["replaces", "contradicts"])
+            .gte("decided_at", monthStart),
+          supabase
+            .from("meeting_decisions")
+            .select("id")
+            .eq("workspace_id", workspaceId)
+            .eq("kind", "open_question")
+            .eq("status", "active"),
+        ])
+        return {
+          month_start: monthStart,
+          decisions_this_month: (decided ?? []).length,
+          reversed_this_month: (reversed ?? []).length,
+          open_questions_total: (open ?? []).length,
+        }
+      },
+    }),
+
     list_open_action_items: tool({
       description:
-        "회의에서 나왔지만 아직 처리되지 않은 할 일(액션아이템)을 조회한다. '지난 회의 할 일 어떻게 됐어', " +
-        "'내가 해야 할 게 뭐 남았지' 같은 질문에 사용. mine=true면 내 담당만.",
+        "회의에서 나왔지만 아직 처리되지 않은 **할 일**(실행 단위 — 누가 언제까지 무엇을 한다)을 조회한다. " +
+        "'지난 회의 할 일 어떻게 됐어', '내가 해야 할 게 뭐 남았지' 같은 질문에 사용. mine=true면 내 담당만. " +
+        "⚠️ '무엇으로 정했는가'(방침)는 할 일이 아니라 결정이다 — search_decisions를 쓸 것.",
       inputSchema: z.object({ mine: z.boolean().optional().describe("기본 false(전체)") }),
       execute: async ({ mine }) => {
         let q = supabase
