@@ -59,6 +59,25 @@ description: EQURIA Workspace의 알려진 이슈·기술부채 백로그. 다�
 - **I25. 계산 슬롯 값→0 시 이번 달 장부 기록 soft-delete(Undo 없음)**: "계산값=결과값" 모델상 계산값 0=이번 달 금액 0이라 자동 휴지통 처리(recordEntry와 달리 undo push 없음). 수동 tax/memo 기록이 있으면 손실 — 휴지통에서만 복구. 모델 근본이라 by-design 수용(LOW·엣지).
 - **I26. 날짜 헬퍼 중복(cleanup)**: ProjectTimeline/TaskTimeline/WorkOverview/AttendanceAdmin이 d0/fmt/shiftDate/addDays/todayStr를 각자 재구현 — `@/lib/calendar`(toDateInputValue·isSameDay 등)로 통합 후보. 동작 정상, 유지보수 부채(LOW).
 
+## 🆕 세션56 회의노트·결정 인프라 보류분 (2026-09-05~09, 비차단)
+
+- **I41. 결정 추출은 본문 200자 이상일 때만 돈다(by design)**: 짧은 회의록(메모 몇 줄)에서는 승인 카드가
+  아예 안 뜬다. 잡담에 AI를 태우지 않으려는 임계값인데, 실사용에서 "짧은데 결정은 있는" 회의가 잦으면
+  150자로 낮추는 걸 검토. 커서는 `meeting_decision_scans`(+300자 증가 시 재실행). LOW.
+- **I42. 결정 승인 카드는 "저장 직후"에만 뜬다**: 이미 저장된 노트를 열어봐도 자동으로 뜨지 않는다
+  (읽으러 온 사람에게 승인을 강요하지 않으려는 설계). 수동으로는 결정 섹션의 [결정 뽑기] 버튼.
+  대신 저장 시 결정이 발견되면 **목록으로 안 나가고 편집기에 머문다** — 기존 "저장=목록 복귀" 흐름의
+  유일한 예외이니 UI를 만질 때 주의. LOW(의도된 동작).
+- **I43. 번복 판정은 승인된 결정 최대 2건만 검사**: 한 회의에서 5건을 승인하면 앞의 2건만 과거 결정과
+  대조한다(질문 피로 방지). 놓친 번복은 다음에 같은 주제가 나올 때 잡힌다. LOW.
+- **I44. `search_decisions` RPC의 `status='all'`은 RPC로 표현 불가**: `p_status` 기본값이 'active'인데
+  생성된 타입이 optional string이라 null을 명시로 못 넘긴다 → `agentTools`의 `search_decisions` 도구는
+  all일 때 테이블 직접 쿼리(ilike)로 우회한다. 검색 품질이 RPC보다 낮으니(trgm·topic 채널 없음)
+  중요해지면 RPC 시그니처에 `p_any_status boolean` 추가를 검토. LOW.
+- **I45. 회의노트 검색·결정 검색은 순차 스캔**: `search_meeting_notes`(151)는 OR 조건, `search_decisions`(156)는
+  UNION이라 둘 다 GIN 인덱스를 안 탄다. 워크스페이스당 수백 건 전제의 선택이며, 노트/결정이 수천 건대로
+  늘면 `%` 연산자(set_limit) 경로로 전환 필요. 인덱스는 이미 만들어 뒀다. LOW(현 규모 무관).
+
 ## 🆕 세션56 채팅 경험 개선 보류분 (2026-09-04, 적대리뷰 발견 · 비차단)
 
 - **I38. 위젯 "응답 중단" 버튼이 서버 생성을 멈추지 않음(의미 불일치·MED)**: 중단을 눌러도 서버는
