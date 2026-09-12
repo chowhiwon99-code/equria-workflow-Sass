@@ -33,6 +33,8 @@ export function DecisionsSection({
   editorRef,
   onOpenNote,
   pendingDrafts = null,
+  pendingSource = "meeting",
+  pendingSourceApp = null,
   onPendingDone,
 }: {
   noteId: string | null
@@ -45,6 +47,9 @@ export function DecisionsSection({
   onOpenNote?: (noteId: string) => void
   /** 저장 직후 자동 추출된 초안(부모 소유) — 있으면 승인 카드가 뜬다 */
   pendingDrafts?: DecisionDraft[] | null
+  /** 초안 출처 — 카톡(Unit C)에서 왔으면 'chat'/'kakao'로 기록돼 사후 일괄 삭제가 가능하다 */
+  pendingSource?: "meeting" | "chat"
+  pendingSourceApp?: string | null
   /** 승인·닫기 완료 → 부모가 원래 흐름(목록 복귀)을 이어간다 */
   onPendingDone?: () => void
 }) {
@@ -142,6 +147,8 @@ export function DecisionsSection({
           meetingDate={meetingDate}
           noteTitle={noteTitle}
           members={members}
+          source={pendingDrafts ? pendingSource : "meeting"}
+          sourceApp={pendingDrafts ? pendingSourceApp ?? undefined : undefined}
           onDone={load}
           onDismiss={() => {
             if (pendingDrafts) onPendingDone?.()

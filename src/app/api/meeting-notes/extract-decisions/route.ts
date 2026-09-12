@@ -36,6 +36,15 @@ const schema = z.object({
       }),
     )
     .max(10),
+  // Unit C — 카톡은 **원문을 저장하지 않는다**. 이 요약이 본문에 남는 유일한 기록이라
+  // 딥링크·인용·검색이 여기에 걸린다. 회의록 모드에선 본문이 이미 있으므로 null.
+  // ⚠️ nullish(= optional + nullable)인 이유: 필수 키로 두면 모델이 회의록 모드에서 이걸 빠뜨렸을 때
+  // 스키마 검증이 터져 **Unit A의 결정 추출까지 500**이 된다. 새 필드로 기존 경로를 깨지 않는다.
+  summary: z
+    .string()
+    .max(400)
+    .nullish()
+    .describe("메신저 대화일 때만: 대화 전체를 3줄 이내로 요약. 회의록 모드면 생략"),
 })
 
 const SYSTEM_MEETING =
@@ -52,7 +61,9 @@ const SYSTEM_CHAT =
   SYSTEM_MEETING +
   "\n\n이 입력은 메신저 대화 로그입니다. 잡담·인사·이모티콘 반응이 많으니 기준을 더 높이세요.\n" +
   "'ㅇㅋ', '넵'처럼 무엇에 동의했는지 대화에서 특정할 수 없으면 뽑지 마세요.\n" +
-  "🔴 개인 신상·건강·금전 거래·인사 평가·급여에 관한 내용은 어떤 형태로도 추출하지 마세요."
+  "🔴 개인 신상·건강·금전 거래·인사 평가·급여에 관한 내용은 어떤 형태로도 추출하지 마세요.\n" +
+  "summary에 대화 전체를 **3줄 이내**로 요약하세요. 원문은 저장되지 않으므로 이 요약이 유일하게 남는 기록입니다.\n" +
+  "요약에도 개인 신상·연락처는 넣지 마세요. 업무 맥락만 남기세요."
 
 export async function POST(req: Request) {
   const supabase = await createClient()
@@ -94,7 +105,7 @@ export async function POST(req: Request) {
     })
     // 근거 발췌가 없는 항목은 서버에서 버린다 — 원장 오염 방지의 1차 방어선
     const decisions = object.decisions.filter((d) => d.statement.trim() && d.excerpt.trim())
-    return Response.json({ decisions })
+    return Response.json({ decisions, summary: mode === "chat" ? (object.summary?.trim() || null) : null })
   } catch {
     return new Response("결정을 뽑지 못했어요.", { status: 500 })
   }

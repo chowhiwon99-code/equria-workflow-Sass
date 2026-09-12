@@ -79,6 +79,9 @@ export function MeetingEditor({
   const [projectId, setProjectId] = useState<string | null>(note?.project_id ?? null) // P3 연결(RPC로 즉시 저장 — dirty 아님)
   // 결정 승인 대기(Unit A) — 저장 직후 결정이 발견됐을 때만 채워진다. 없으면 화면에 아무 일도 안 일어난다.
   const [pendingDrafts, setPendingDrafts] = useState<DecisionDraft[] | null>(null)
+  // Unit C — 카톡에서 뽑아둔 결정. 노트가 저장돼야 원장에 넣을 수 있어(note_id FK) 저장 완료까지 들고 있는다.
+  const [chatDrafts, setChatDrafts] = useState<DecisionDraft[] | null>(null)
+  const [pendingIsChat, setPendingIsChat] = useState(false)
   const [savedNoteId, setSavedNoteId] = useState<string | null>(note?.id ?? null)
   const [busy, setBusy] = useState(false)
   const [researchOpen, setResearchOpen] = useState(false)
@@ -154,6 +157,15 @@ export function MeetingEditor({
       }
       setBusy(false)
 
+      // 카톡에서 이미 뽑아둔 결정이 있으면 그걸 먼저 승인받는다(Unit C) — AI를 다시 부르지 않는다.
+      if (savedId && chatDrafts && chatDrafts.length > 0) {
+        setPendingDrafts(chatDrafts)
+        setPendingIsChat(true)
+        setSavedNoteId(savedId)
+        setChatDrafts(null)
+        return
+      }
+
       // 결정 추출(Unit A) — 저장이 끝난 **뒤** 별도로 돈다. 실패·예산초과가 저장을 막지 않는다.
       // 결정이 없으면 아무 일도 일어나지 않고 평소처럼 목록으로 나간다(화면이 조용해야 한다).
       const found = savedId ? await scanForDecisions(savedId) : null
@@ -221,6 +233,7 @@ export function MeetingEditor({
         .eq("note_id", savedNoteId)
     }
     setPendingDrafts(null)
+    setPendingIsChat(false)
     onSaved()
   }
 
@@ -294,6 +307,7 @@ export function MeetingEditor({
         setPendingRaw={setPendingRaw}
         editorRef={editorRef}
         meta={[title, meetingDate, attendees].filter(Boolean).join(" · ")}
+        onChatDecisions={setChatDrafts}
       />
 
       {/* 리서치 워크벤치 + 저장된 꼬리물기 그래프 복원 */}
@@ -343,6 +357,8 @@ export function MeetingEditor({
         editorRef={editorRef}
         onOpenNote={onOpenNote}
         pendingDrafts={pendingDrafts}
+        pendingSource={pendingIsChat ? "chat" : "meeting"}
+        pendingSourceApp={pendingIsChat ? "kakao" : null}
         onPendingDone={finishDecisionFlow}
       />
 
