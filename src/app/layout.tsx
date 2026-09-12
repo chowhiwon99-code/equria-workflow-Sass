@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
+import { VercelAnalytics } from "@/components/analytics/VercelAnalytics";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -60,6 +61,8 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <ThemeProvider>{children}</ThemeProvider>
         <ServiceWorkerRegister />
+        {/* 유입 측정(랜딩→가입→결제 퍼널만). 내부 화면 제외 규칙은 컴포넌트 주석 참고 */}
+        <VercelAnalytics />
       </body>
     </html>
   );
