@@ -16,6 +16,7 @@ import { AiAssistPanel } from "./AiAssistPanel"
 import { ResearchPanel } from "./ResearchPanel"
 import { TranscriptPanel } from "./TranscriptPanel"
 import { RelatedSidebar } from "./RelatedSidebar"
+import { DecisionBriefBanner } from "./DecisionBriefBanner"
 import { ActionItemsSection } from "./ActionItemsSection"
 import { DecisionsSection } from "./DecisionsSection"
 import type { DecisionDraft } from "./DecisionApprovalBanner"
@@ -305,6 +306,19 @@ export function MeetingEditor({
         setGraphData={setGraphData}
         title={title}
       />
+
+      {/* 브리핑(Unit B) — 새 회의록을 쓰기 시작할 때만. 이미 저장된 노트는 DecisionsSection이
+          이 회의의 결정을 보여주므로 여기서 또 들이밀면 소음이다. 결과 0이면 미렌더. */}
+      {!note?.id && !savedNoteId && onOpenNote && (
+        <DecisionBriefBanner
+          currentNoteId={null}
+          title={title}
+          onOpenNote={(id) => {
+            if (dirty && !confirm("저장하지 않은 변경이 있어요. 다른 회의록으로 이동할까요?")) return
+            onOpenNote(id)
+          }}
+        />
+      )}
 
       {/* 본문 — Tiptap 블록 에디터 */}
       <div className="mt-5 min-h-[45vh]">
