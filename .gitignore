@@ -21,6 +21,8 @@ next-env.d.ts
 
 # claude code (개인 권한 설정만 제외, .claude/skills 는 공유)
 /.claude/settings.local.json
+# 중첩 git 워크트리(1GB+) — 체크아웃 안에 살아서 `git add .` 한 번이면 통째로 스테이징된다.
+/.claude/worktrees/
 
 # misc
 .DS_Store
