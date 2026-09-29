@@ -6,7 +6,7 @@ import { Plus, FolderKanban, Check, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { Select } from "@/components/shared/Select"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
-import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
+import { useCurrentWorkspaceId, useWorkspace } from "@/components/workspace/WorkspaceProvider"
 import { createClient } from "@/lib/supabase/client"
 import { mustOk } from "@/lib/supabase/mustOk"
 import { cn } from "@/lib/utils"
@@ -66,8 +66,10 @@ export function ProjectsView() {
   const supabase = createClient()
   const me = useCurrentUserId()
   const { push } = useUndo()
+  // 워크스페이스 오너는 남이 만든 프로젝트도 삭제 가능(마이그158 — 제외된 멤버의 프로젝트가 못 지워지는 문제).
+  const isWsOwner = useWorkspace().currentWorkspace?.role === "owner"
 
-  // 프로젝트 삭제 = 하드삭제(기존 DELETE RLS=created_by, 마이그 불필요·즉시 동작).
+  // 프로젝트 삭제 = 하드삭제(DELETE RLS = 생성자 또는 워크스페이스 오너, 마이그158).
   // FK: members/tasks=CASCADE(정상), finance/files/calendar=SET NULL(데이터 보존). 생성자 카드에만 노출 + Undo(행 재삽입).
   const deleteProject = async (p: ProjectRow) => {
     await mustOk(supabase.from("projects").delete().eq("id", p.id))
@@ -268,7 +270,7 @@ export function ProjectsView() {
             const members = Array.from(new Set(ids))
               .map((uid) => profileById.get(uid))
               .filter((m): m is MemberLite => !!m)
-            return <ProjectCard key={p.id} project={p} members={members} me={me} onDelete={deleteProject} />
+            return <ProjectCard key={p.id} project={p} members={members} me={me} isWsOwner={isWsOwner} onDelete={deleteProject} />
           })}
         </div>
       )}
@@ -299,17 +301,19 @@ function ProjectCard({
   project: p,
   members,
   me,
+  isWsOwner,
   onDelete,
 }: {
   project: ProjectRow
   members: MemberLite[]
   me: string | null
+  isWsOwner: boolean
   onDelete: (p: ProjectRow) => void
 }) {
   const st = PROJECT_STATUS[p.status as ProjectStatus]
   const pct = projectProgress(p)
   const canceled = p.status === "canceled"
-  const canDelete = !!me && p.created_by === me
+  const canDelete = !!me && (p.created_by === me || isWsOwner)
   return (
     <Link
       href={`/projects/${p.id}`}

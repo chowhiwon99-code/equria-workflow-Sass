@@ -21,7 +21,7 @@ import { PROJECT_STATUS, PROJECT_STATUS_ORDER } from "@/lib/projects"
 import { IMPORTANCE, importanceLabel, importanceColor, tagBg } from "@/lib/meetingMeta"
 import { isFigmaUrl, toFigmaDesktopUrl } from "@/lib/figma"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
-import { useCurrentWorkspaceId } from "@/components/workspace/WorkspaceProvider"
+import { useCurrentWorkspaceId, useWorkspace } from "@/components/workspace/WorkspaceProvider"
 import { combineDateTimeToIso, toDateInputValue } from "@/lib/calendar"
 import { TaskTimeline, type TaskPatch } from "./TaskTimeline"
 import type { Tables, Json } from "@/lib/supabase/types"
@@ -36,6 +36,8 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
   const wsId = useCurrentWorkspaceId() // B1-b: 쓰기에 워크스페이스 명시
   const { push } = useUndo()
   const me = useCurrentUserId()
+  // 워크스페이스 오너는 남이 만든 프로젝트도 삭제 가능(마이그158).
+  const isWsOwner = useWorkspace().currentWorkspace?.role === "owner"
   const router = useRouter()
   const [project, setProject] = useState<(Project & { owner: { name: string; position: string | null } | null }) | null>(null)
   const [members, setMembers] = useState<MemberRow[]>([])
@@ -138,8 +140,8 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
     load()
   }
 
-  // 프로젝트 삭제 = 하드삭제(기존 DELETE RLS=created_by, 마이그 불필요·즉시 동작).
-  // FK: members/tasks=CASCADE, finance/files/calendar=SET NULL(보존). 생성자만 버튼 노출 → 목록 이동 + Undo(행 재삽입).
+  // 프로젝트 삭제 = 하드삭제(DELETE RLS = 생성자 또는 워크스페이스 오너, 마이그158).
+  // FK: members/tasks=CASCADE, finance/files/calendar=SET NULL(보존). 생성자·오너만 버튼 노출 → 목록 이동 + Undo(행 재삽입).
   const deleteProject = async () => {
     if (!project) return
     // eslint-disable-next-line @typescript-eslint/no-unused-vars -- owner(조인)만 떼고 나머지 컬럼을 재삽입용으로 보관
@@ -230,7 +232,7 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
         </div>
         {project.description && <p className="mt-1.5 text-sm text-muted-foreground">{project.description}</p>}
         </div>
-        {me && project.created_by && me === project.created_by && (
+        {me && ((project.created_by && me === project.created_by) || isWsOwner) && (
           <button
             onClick={deleteProject}
             className="mt-1 inline-flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
