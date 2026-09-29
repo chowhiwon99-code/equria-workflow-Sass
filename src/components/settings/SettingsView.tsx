@@ -18,6 +18,7 @@ import { McpCredentialsCard } from "./McpCredentialsCard"
 import { InviteLinksCard } from "./InviteLinksCard"
 import { HrSettingsCard } from "./HrSettingsCard"
 import { BillingCard } from "./BillingCard"
+import { DeleteWorkspaceCard } from "./DeleteWorkspaceCard"
 
 const THEMES = [
   { value: "light", label: "라이트" },
@@ -318,7 +319,7 @@ export function SettingsView() {
     }
   }
 
-  // 오너 전용 — 구성원 계정 완전 삭제(개인 데이터 연쇄 삭제, 공유 자원은 보존).
+  // 오너 전용 — 구성원을 이 워크스페이스에서 제외(멤버십만 해제, 계정은 보존 — api/members/[id]).
   const deleteMember = async (id: string) => {
     setBusyId(id)
     try {
@@ -326,7 +327,7 @@ export function SettingsView() {
       if (res.ok) {
         setMemberList((prev) => prev.filter((m) => m.id !== id))
         setUsage((prev) => (prev ? prev.filter((u) => u.user_id !== id) : prev))
-        toast.success("구성원을 삭제했어요.")
+        toast.success("워크스페이스에서 제외했어요.")
       } else {
         toast.error((await res.text().catch(() => "")) || "삭제에 실패했어요.")
       }
@@ -630,6 +631,14 @@ export function SettingsView() {
           "얼마 쓰는지 → 어떤 요금제인지"로 읽히게 한다. 해지는 오너만. */}
       {isOwner && <BillingCard />}
 
+      {/* 대표: 워크스페이스 영구 삭제(이름 입력 확인) */}
+      {isOwner && (
+        <Card>
+          <SectionTitle title="워크스페이스 삭제" />
+          <DeleteWorkspaceCard />
+        </Card>
+      )}
+
       {/* 계정 */}
       <Card>
         <div className="flex items-center justify-between">
@@ -704,9 +713,9 @@ function MemberInfoRow({
       {!isMe &&
         (confirming ? (
           <span className="flex items-center gap-1.5 text-xs">
-            <span className="text-muted-foreground">계정·개인데이터 삭제?</span>
+            <span className="text-muted-foreground">워크스페이스에서 제외?</span>
             <Button size="sm" variant="destructive" className="h-8" onClick={onDelete} disabled={busy}>
-              삭제
+              제외
             </Button>
             <button type="button" onClick={() => setConfirming(false)} className="text-muted-foreground hover:text-foreground">
               취소
@@ -717,8 +726,8 @@ function MemberInfoRow({
             type="button"
             onClick={() => setConfirming(true)}
             className="rounded p-1 text-muted-foreground transition-colors hover:text-destructive"
-            title={`${member.name} 구성원 삭제`}
-            aria-label={`${member.name} 삭제`}
+            title={`${member.name} 구성원 제외`}
+            aria-label={`${member.name} 제외`}
           >
             <Trash2 className="size-4" />
           </button>

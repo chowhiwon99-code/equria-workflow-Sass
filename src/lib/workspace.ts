@@ -6,8 +6,10 @@ import { ACTIVE_WS_COOKIE } from "@/lib/workspace-cookie"
 // 클라이언트 컴포넌트의 useCurrentWorkspaceId()에 대응하는 서버측 소스.
 // 단일 테넌트(equria)에선 멤버십이 1개 → 반환값이 기존 sentinel DEFAULT와 동일 → 동작 변화 0.
 
-/** 플랫폼 운영자(우리) 워크스페이스 = equria sentinel. MCP 앱 크리덴셜 등 전역 공유 자원의 관리 게이트 기준. */
-export const OPERATOR_WORKSPACE_ID = "00000000-0000-0000-0000-0000000000e1"
+/** 플랫폼 운영자(우리) 워크스페이스. MCP 앱 크리덴셜 등 전역 공유 자원의 관리 게이트 기준.
+ *  2026-09-29 equria sentinel(…e1) → Lazy로 이전(대표 결정: 사내 운영을 Lazy로 옮기고 EQURIA는 삭제).
+ *  워크스페이스 삭제 API가 이 id는 삭제를 거부한다. */
+export const OPERATOR_WORKSPACE_ID = "7bd3ac7a-affc-4d0d-88da-cd5476f450ee"
 
 /** 현재 사용자의 쓰기 대상 워크스페이스 id. 활성 워크스페이스 쿠키(전환한 회사)를 우선하되
  *  "내 비게스트 멤버십"일 때만(스푸핑 방지) — 없으면 첫 비게스트 멤버십으로 폴백. 둘 다 없으면 null.
