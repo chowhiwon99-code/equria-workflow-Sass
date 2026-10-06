@@ -1910,6 +1910,7 @@ export type Database = {
           entry_date: string
           fee_amount: number
           id: string
+          import_fp: string | null
           kind: string
           metadata: Json
           project_id: string | null
@@ -1936,6 +1937,7 @@ export type Database = {
           entry_date: string
           fee_amount?: number
           id?: string
+          import_fp?: string | null
           kind: string
           metadata?: Json
           project_id?: string | null
@@ -1962,6 +1964,7 @@ export type Database = {
           entry_date?: string
           fee_amount?: number
           id?: string
+          import_fp?: string | null
           kind?: string
           metadata?: Json
           project_id?: string | null

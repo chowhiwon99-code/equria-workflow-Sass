@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
-import { Upload, FileText, Loader2, Plus, Pencil, Download, Trash2, Receipt } from "lucide-react"
+import { Upload, FileText, Loader2, Plus, Pencil, Download, Trash2, Receipt, Landmark } from "lucide-react"
 import { Select } from "@/components/shared/Select"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrentUserId } from "@/components/auth/CurrentUserProvider"
@@ -26,6 +26,7 @@ import { aggregateByCurrency, aggregateByCategory, toBreakdown, buildMonthlyTren
 import { TrendBars, BreakdownBars } from "./financeCharts"
 import { FinanceEntryModal } from "./FinanceEntryModal"
 import { TaxInvoiceModal } from "./TaxInvoiceModal"
+import { BankImportDialog } from "./BankImportDialog"
 
 type Kind = "expense" | "revenue"
 type KindFilter = "all" | Kind
@@ -45,6 +46,7 @@ export function FinanceView() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [editing, setEditing] = useState<FinanceEntry | null>(null)
   const [editingTax, setEditingTax] = useState<TaxInvoice | null>(null)
+  const [importingBank, setImportingBank] = useState(false)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [receiptPreview, setReceiptPreview] = useState<{ url: string; name: string; mime: string | null } | null>(null)
@@ -424,6 +426,9 @@ export function FinanceView() {
           <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={uploading}>
             {uploading ? <Loader2 className="animate-spin" /> : <Upload />}
             {uploading ? "분석 중…" : "영수증·세금계산서 (이미지/PDF)"}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setImportingBank(true)}>
+            <Landmark /> 통장 내역
           </Button>
           <Button size="sm" onClick={() => setCreating(true)}>
             <Plus /> 직접 입력
@@ -852,6 +857,17 @@ export function FinanceView() {
           onClose={() => setEditingTax(null)}
           onSaved={() => {
             setEditingTax(null)
+            load()
+          }}
+        />
+      )}
+
+      {importingBank && (
+        <BankImportDialog
+          onClose={() => setImportingBank(false)}
+          onImported={() => {
+            setImportingBank(false)
+            setTab("ledger")
             load()
           }}
         />
